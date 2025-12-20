@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 244 245 249; /* #F4F5F9 - matching your existing dashboard */
+    --foreground: 0 0 0;
+    --card: 0 0 100%; /* white cards */
+    --card-foreground: 0 0 0;
+    --popover: 0 0 100%;
+    --popover-foreground: 0 0 0;
+    --primary: 221 76 100; /* #4880FF */
+    --primary-foreground: 0 0 100%;
+    --secondary: 210 40 96.1%;
+    --secondary-foreground: 222.2 47.4 11.2%;
+    --muted: 210 40 96.1%;
+    --muted-foreground: 215.4 16.3 46.9%;
+    --accent: 210 40 96.1%;
+    --accent-foreground: 222.2 47.4 11.2%;
+    --destructive: 0 84.2 60.2%;
+    --destructive-foreground: 210 40 98%;
+    --border: 214.3 31.8 91.4%;
+    --input: 214.3 31.8 91.4%;
+    --ring: 221 76 100;
+    --radius: 1rem; /* 16px - matching rounded-2xl from existing dashboard */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Nunito Sans', Arial, sans-serif;
+  }
+}
+
+@layer utilities {
+  /* Custom shadow matching your existing dashboard */
+  .card-shadow {
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  }
+
+  .card-shadow-hover {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+
+  /* Smooth transitions for interactive elements */
+  .transition-card {
+    @apply transition-all duration-200 ease-in-out;
+  }
+}
