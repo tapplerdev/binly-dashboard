@@ -29,10 +29,10 @@
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background)); color: hsl(var(--foreground));
     font-family: 'Nunito Sans', Arial, sans-serif;
   }
 
@@ -58,27 +58,27 @@
 
   /* Fast transitions - UI feedback (buttons, toggles, hovers) */
   .transition-fast {
-    @apply transition-all duration-150 ease-in-out;
+    transition: all 150ms ease-in-out;
   }
 
   /* Standard transitions - Cards, panels, interactive elements */
   .transition-card {
-    @apply transition-all duration-200 ease-in-out;
+    transition: all 200ms ease-in-out;
   }
 
   /* Medium transitions - Modals, drawers, overlays */
   .transition-modal {
-    @apply transition-all duration-300 ease-in-out;
+    transition: all 300ms ease-in-out;
   }
 
   /* Slow transitions - Map elements, data visualization */
   .transition-map {
-    @apply transition-all duration-500 ease-in-out;
+    transition: all 500ms ease-in-out;
   }
 
   /* Fade transitions - Opacity changes only */
   .transition-fade {
-    @apply transition-opacity duration-300 ease-in-out;
+    transition: opacity 300ms ease-in-out;
   }
 
   /* Scale transitions - For markers appearing/disappearing */
