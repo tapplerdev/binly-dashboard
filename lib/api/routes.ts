@@ -80,27 +80,35 @@ export async function getRoutes(): Promise<Route[]> {
             const details = await detailsResponse.json();
             // Extract bin IDs from bins array
             // Backend returns: { bins: [{ id: string, bin_number: int, sequence_order: int, ... }] }
-            const binIds = details.bins?.map((bin: any) => {
+            const binIds = details.bins?.map((bin: unknown) => {
               if (!bin) return null;
-
-              // Direct id field (BinResponse embedded in BinInRoute)
-              if (bin.id) {
-                return bin.id;
-              }
-
-              // Nested bin object (in case of join query)
-              if (bin.bin?.id) {
-                return bin.bin.id;
-              }
-
-              // bin_id field
-              if (bin.bin_id) {
-                return bin.bin_id;
-              }
 
               // If bin is just a string ID
               if (typeof bin === 'string') {
                 return bin;
+              }
+
+              // Handle object bin structures
+              if (typeof bin === 'object') {
+                const binObj = bin as Record<string, unknown>;
+
+                // Direct id field (BinResponse embedded in BinInRoute)
+                if (binObj.id && typeof binObj.id === 'string') {
+                  return binObj.id;
+                }
+
+                // Nested bin object (in case of join query)
+                if (binObj.bin && typeof binObj.bin === 'object') {
+                  const nestedBin = binObj.bin as Record<string, unknown>;
+                  if (nestedBin.id && typeof nestedBin.id === 'string') {
+                    return nestedBin.id;
+                  }
+                }
+
+                // bin_id field
+                if (binObj.bin_id && typeof binObj.bin_id === 'string') {
+                  return binObj.bin_id;
+                }
               }
 
               console.warn('Unexpected bin structure:', bin);

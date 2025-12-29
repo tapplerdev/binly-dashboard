@@ -211,9 +211,15 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
           animate();
 
           // Fit bounds
-          const bounds = new google.maps.LatLngBounds();
-          bins.forEach(bin => bounds.extend({ lat: bin.latitude, lng: bin.longitude }));
-          map.fitBounds(bounds, { padding: 80 });
+          if (map) {
+            const bounds = new google.maps.LatLngBounds();
+            bins.forEach(bin => {
+              if (bin.latitude != null && bin.longitude != null) {
+                bounds.extend({ lat: bin.latitude, lng: bin.longitude });
+              }
+            });
+            map.fitBounds(bounds);
+          }
         }
       } catch (error) {
         console.error('Error fetching route:', error);
@@ -261,6 +267,8 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
       {bins.map((bin, index) => {
         const isFirst = index === 0;
         const isLast = index === bins.length - 1;
+
+        if (bin.latitude == null || bin.longitude == null) return null;
 
         return (
           <AdvancedMarker

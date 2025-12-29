@@ -44,8 +44,8 @@ export function useCreateRoute() {
           bin_ids: newRoute.bin_ids,
           bin_count: newRoute.bin_ids.length,
           estimated_duration_hours: newRoute.estimated_duration_hours || 6,
-          created_at: Date.now(),
-          updated_at: Date.now(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         };
 
         queryClient.setQueryData<Route[]>(

@@ -292,9 +292,9 @@ function FilterBar({
   availableRoutes: string[];
   activeFilterCount: number;
   onClearAll: () => void;
-  lastWeekRef: React.RefObject<HTMLButtonElement>;
-  thisWeekRef: React.RefObject<HTMLButtonElement>;
-  nextWeekRef: React.RefObject<HTMLButtonElement>;
+  lastWeekRef: React.RefObject<HTMLButtonElement | null>;
+  thisWeekRef: React.RefObject<HTMLButtonElement | null>;
+  nextWeekRef: React.RefObject<HTMLButtonElement | null>;
   dateSliderStyle: { left: number; width: number };
 }) {
   const [isDriverDropdownOpen, setIsDriverDropdownOpen] = useState(false);
@@ -653,7 +653,7 @@ function FilterBar({
           ))}
           {filters.searchQuery && (
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
-              <span>Search: "{filters.searchQuery}"</span>
+              <span>Search: &ldquo;{filters.searchQuery}&rdquo;</span>
               <button
                 onClick={() => {
                   setFilters(prev => ({
@@ -1001,9 +1001,9 @@ function CreateShiftDrawer({
 
       // Success! Close drawer
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       console.error('Failed to create shift:', err);
-      setError(err.message || 'Failed to create shift. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to create shift. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

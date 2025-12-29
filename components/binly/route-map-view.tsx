@@ -57,11 +57,15 @@ function RoutePolyline({ bins }: RoutePolylineProps) {
           setPolyline(line);
 
           // Fit map bounds to show all bins with more padding to zoom out
-          const bounds = new google.maps.LatLngBounds();
-          bins.forEach(bin => {
-            bounds.extend({ lat: bin.latitude, lng: bin.longitude });
-          });
-          map.fitBounds(bounds, { padding: 150 });
+          if (map) {
+            const bounds = new google.maps.LatLngBounds();
+            bins.forEach(bin => {
+              if (bin.latitude != null && bin.longitude != null) {
+                bounds.extend({ lat: bin.latitude, lng: bin.longitude });
+              }
+            });
+            map.fitBounds(bounds);
+          }
 
           // Animate the polyline (pulsing opacity and thickness)
           let opacity = 1;
@@ -190,6 +194,8 @@ export function RouteMapView({ route }: RouteMapViewProps) {
         {bins.map((bin, index) => {
           const isFirst = index === 0;
           const isLast = index === bins.length - 1;
+
+          if (bin.latitude == null || bin.longitude == null) return null;
 
           return (
             <AdvancedMarker
