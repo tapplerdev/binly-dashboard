@@ -3,11 +3,11 @@
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Map as MapIcon, Loader2 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Map, AdvancedMarker } from '@vis.gl/react-google-maps';
-import { getBins } from '@/lib/api/bins';
-import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
+import { useBins } from '@/lib/hooks/use-bins';
+import { isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 
 // Default map center (San Jose, CA area)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -20,25 +20,12 @@ interface TacticalMapProps {
 export function TacticalMap({ className }: TacticalMapProps) {
   const [fillLevelsEnabled, setFillLevelsEnabled] = useState(true);
   const [noGoZonesEnabled, setNoGoZonesEnabled] = useState(false);
-  const [bins, setBins] = useState<Bin[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchBins() {
-      try {
-        const data = await getBins();
-        setBins(data);
-      } catch (error) {
-        console.error('Failed to fetch bins:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
+  // Use React Query for data fetching and caching
+  const { data: bins = [], isLoading: loading } = useBins();
 
-    fetchBins();
-  }, []);
-
-  const mappableBins = bins.filter(isMappableBin);
+  // Memoize filtered bins to prevent unnecessary recalculations
+  const mappableBins = useMemo(() => bins.filter(isMappableBin), [bins]);
 
   return (
     <Card className={cn('overflow-hidden', className)}>
