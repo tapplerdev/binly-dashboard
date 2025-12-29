@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Nunito_Sans } from 'next/font/google';
 import './globals.css';
+import { QueryProvider } from '@/lib/providers/query-provider';
 
 const nunitoSans = Nunito_Sans({
   subsets: ['latin'],
@@ -9,7 +10,7 @@ const nunitoSans = Nunito_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'Binly Dashboard - The Pulse',
+  title: 'Binly Dashboard',
   description: 'High-end command center for waste management operations',
 };
 
@@ -20,7 +21,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={nunitoSans.variable}>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <QueryProvider>{children}</QueryProvider>
+      </body>
     </html>
   );
 }

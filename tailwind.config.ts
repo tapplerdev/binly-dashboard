@@ -22,6 +22,11 @@ const config: Config = {
           DEFAULT: '#4880FF',
           foreground: '#ffffff',
         },
+        binly: {
+          green: '#5E9646',
+          blue: '#4AA0B5',
+          yellow: '#F2C94C',
+        },
         secondary: {
           DEFAULT: 'hsl(var(--secondary))',
           foreground: 'hsl(var(--secondary-foreground))',
