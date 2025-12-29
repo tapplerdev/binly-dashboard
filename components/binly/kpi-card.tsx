@@ -11,6 +11,9 @@ interface KpiCardProps {
   icon?: ReactNode;
   iconBgColor?: string;
   trend?: 'up' | 'down';
+  trendValue?: string;
+  subtitle?: string;
+  chart?: ReactNode;
   onClick?: () => void;
   className?: string;
 }
@@ -21,6 +24,9 @@ export function KpiCard({
   icon,
   iconBgColor = 'bg-gray-100',
   trend,
+  trendValue,
+  subtitle,
+  chart,
   onClick,
   className,
 }: KpiCardProps) {
@@ -32,10 +38,10 @@ export function KpiCard({
       )}
       onClick={onClick}
     >
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <p className="text-sm text-gray-600 font-medium mb-2">{title}</p>
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-baseline gap-2 mb-1">
             <h2 className="text-3xl font-bold text-gray-900">{value}</h2>
             {trend && (
               <span
@@ -44,10 +50,13 @@ export function KpiCard({
                   trend === 'up' ? 'text-green-600' : 'text-red-600'
                 )}
               >
-                {trend === 'up' ? '↑' : '↓'}
+                {trend === 'up' ? '↑' : '↓'} {trendValue}
               </span>
             )}
           </div>
+          {subtitle && (
+            <p className="text-xs text-gray-500">{subtitle}</p>
+          )}
         </div>
         {icon && (
           <div
@@ -60,6 +69,11 @@ export function KpiCard({
           </div>
         )}
       </div>
+      {chart && (
+        <div className="mt-2">
+          {chart}
+        </div>
+      )}
     </Card>
   );
 }

@@ -5,6 +5,9 @@ import { IntelligenceCard } from '@/components/binly/intelligence-card';
 import { TacticalMap } from '@/components/binly/tactical-map';
 import { FieldFeedItem } from '@/components/binly/field-feed-item';
 import { SearchBar } from '@/components/binly/search-bar';
+import { AIAssistantPanel } from '@/components/binly/ai-assistant-panel';
+import { MiniTrendChart } from '@/components/binly/mini-trend-chart';
+import { MiniBarChart, SegmentedBarChart } from '@/components/binly/mini-bar-chart';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -20,6 +23,9 @@ import {
 } from 'lucide-react';
 
 export default function PulsePage() {
+  // Sample data for charts (in production, this would come from API)
+  const harvestTrend = [850, 920, 1050, 980, 1100, 1150, 1240];
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-[1600px] mx-auto space-y-6">
@@ -36,27 +42,45 @@ export default function PulsePage() {
             icon={<TrendingUp className="w-6 h-6 text-green-600" />}
             iconBgColor="bg-green-50"
             trend="up"
+            trendValue="14%"
+            subtitle="Target: 1,500 KG (83%)"
+            chart={<MiniTrendChart data={harvestTrend} color="#16a34a" />}
             onClick={() => console.log('Navigate to Analytics')}
           />
           <KpiCard
             title="Active Drivers"
-            value="8/10 Active"
+            value="8/10"
             icon={<Truck className="w-6 h-6 text-blue-600" />}
             iconBgColor="bg-blue-50"
+            subtitle="2 drivers on break"
+            chart={<MiniBarChart filled={8} total={10} color="#2563eb" />}
             onClick={() => console.log('Navigate to Live Map')}
           />
           <KpiCard
-            title="Full Bins"
+            title="Critical Bins"
             value="12 Bins"
             icon={<Trash2 className="w-6 h-6 text-red-600" />}
             iconBgColor="bg-red-50"
+            trend="down"
+            trendValue="3"
+            subtitle=">80% capacity"
+            chart={
+              <SegmentedBarChart
+                segments={[
+                  { value: 12, color: '#dc2626', label: 'Critical (>80%)' },
+                  { value: 25, color: '#f59e0b', label: 'Warning (60-80%)' },
+                  { value: 63, color: '#22c55e', label: 'OK (<60%)' },
+                ]}
+              />
+            }
             onClick={() => console.log('Navigate to Inventory filtered')}
           />
           <KpiCard
-            title="Issues"
+            title="Urgent Issues"
             value="3 Alerts"
             icon={<AlertTriangle className="w-6 h-6 text-orange-600" />}
             iconBgColor="bg-orange-50"
+            subtitle="2 require immediate action"
             onClick={() => console.log('Navigate to Field Reports')}
           />
         </div>
@@ -97,42 +121,9 @@ export default function PulsePage() {
             </div>
           </div>
 
-          {/* Intelligence Highlights - Right Column */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Intelligence Highlights
-              </h2>
-              <Badge variant="default" className="gap-1">
-                <Sparkles className="w-3 h-3" />
-                AI
-              </Badge>
-            </div>
-
-            <div className="space-y-3">
-              <IntelligenceCard
-                title="AI predicts 5 bins in the North Sector will hit 100% within 4 hours"
-                description="Predicted fill level based on historical patterns"
-                timestamp="4 hours ago"
-                icon={<Sparkles className="w-5 h-5 text-purple-500" />}
-                onClick={() => console.log('Open predictive insights')}
-              />
-
-              <IntelligenceCard
-                title="Rerouting Driver Ariel could save 12 miles to replacing your bins browniea..."
-                description="Smart-Path optimization available"
-                timestamp="2 hours ago"
-                icon={<Route className="w-5 h-5 text-blue-500" />}
-                onClick={() => console.log('Open route optimization')}
-              />
-
-              <IntelligenceCard
-                title="Top Performer"
-                description="Driver • days ago"
-                icon={<Award className="w-5 h-5 text-yellow-500" />}
-                onClick={() => console.log('View leaders panel')}
-              />
-            </div>
+          {/* AI Assistant - Right Column */}
+          <div>
+            <AIAssistantPanel />
           </div>
         </div>
       </div>
