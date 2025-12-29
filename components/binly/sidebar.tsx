@@ -11,10 +11,13 @@ import { useAuthStore } from '@/lib/auth/store';
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { clearAuth } = useAuthStore();
+  const { user, clearAuth } = useAuthStore();
   const [collapsed, setCollapsed] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  // Get user initial for avatar
+  const userInitial = user?.name?.charAt(0).toUpperCase() || 'U';
 
   // Find which section contains the current path on initial mount only
   const defaultOpenSection = sidebarNavItems.find((section) =>
@@ -208,14 +211,18 @@ export function Sidebar() {
         >
           {/* Avatar */}
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#5E9646] to-[#4AA0B5] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-            O
+            {userInitial}
           </div>
 
           {/* User Info - Hidden when collapsed */}
           {!collapsed && (
             <div className="flex-1 text-left overflow-hidden">
-              <p className="text-sm font-semibold text-gray-900 truncate">Omar Gabr</p>
-              <p className="text-xs text-gray-500 truncate">admin@binly.com</p>
+              {user?.name && (
+                <p className="text-sm font-semibold text-gray-900 truncate">{user.name}</p>
+              )}
+              {user?.email && (
+                <p className="text-xs text-gray-500 truncate">{user.email}</p>
+              )}
             </div>
           )}
 

@@ -8,7 +8,7 @@ import { useAuthStore } from '@/lib/auth/store';
 
 export function ProfilePill() {
   const router = useRouter();
-  const { clearAuth } = useAuthStore();
+  const { user, clearAuth } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -16,6 +16,10 @@ export function ProfilePill() {
     clearAuth();
     router.push('/login');
   };
+
+  // Get user initials for avatar
+  const userInitial = user?.name?.charAt(0).toUpperCase() || 'U';
+  const firstName = user?.name?.split(' ')[0] || 'User';
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -45,7 +49,7 @@ export function ProfilePill() {
         <User className="w-5 h-5" />
 
         {/* Show first name */}
-        <span className="font-semibold text-sm">Omar</span>
+        <span className="font-semibold text-sm">{firstName}</span>
 
         {/* Chevron */}
         <ChevronDown
@@ -63,15 +67,19 @@ export function ProfilePill() {
           <div className="px-6 py-4 bg-[#5E9646]">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg">
-                O
+                {userInitial}
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-white text-base">Omar Gabr</p>
-                <p className="text-xs text-white/80 mt-0.5">admin@binly.com</p>
+                {user?.name && (
+                  <p className="font-semibold text-white text-base">{user.name}</p>
+                )}
+                {user?.email && (
+                  <p className="text-xs text-white/80 mt-0.5">{user.email}</p>
+                )}
               </div>
             </div>
             <span className="inline-block px-2.5 py-1 bg-white/20 text-white text-xs font-bold rounded uppercase">
-              Owner
+              {user?.role === 'admin' ? 'Admin' : 'User'}
             </span>
           </div>
 

@@ -65,22 +65,27 @@ export function TacticalMap({ className }: TacticalMapProps) {
                 <AdvancedMarker
                   key={bin.id}
                   position={{ lat: bin.latitude, lng: bin.longitude }}
+                  zIndex={10}
                 >
                   <div
-                    className="w-6 h-6 rounded-full border-2 border-white shadow-md"
+                    className="w-8 h-8 rounded-full border-2 border-white shadow-lg cursor-pointer transition-all duration-300 animate-scale-in"
                     style={{
                       backgroundColor: getBinMarkerColor(bin.fill_percentage),
                     }}
                     title={`Bin #${bin.bin_number} - ${bin.fill_percentage ?? 0}%`}
-                  />
+                  >
+                    <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
+                      {bin.bin_number}
+                    </div>
+                  </div>
                 </AdvancedMarker>
               ))}
           </Map>
         )}
 
         {/* Map Controls - Top Right */}
-        <div className="absolute top-4 right-4 bg-white rounded-lg p-3 shadow-lg space-y-2 z-10">
-          <div className="flex items-center gap-2">
+        <div className="absolute top-4 right-4 bg-white rounded-2xl p-4 shadow-lg space-y-3 z-10">
+          <div className="flex items-center gap-3">
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
@@ -88,12 +93,12 @@ export function TacticalMap({ className }: TacticalMapProps) {
                 onChange={(e) => setFillLevelsEnabled(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+              <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
             </label>
             <span className="text-sm font-medium text-gray-700">Fill Levels</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
@@ -101,7 +106,7 @@ export function TacticalMap({ className }: TacticalMapProps) {
                 onChange={(e) => setNoGoZonesEnabled(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-600"></div>
+              <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
             </label>
             <span className="text-sm font-medium text-gray-700">No-Go Zones</span>
           </div>
@@ -111,7 +116,7 @@ export function TacticalMap({ className }: TacticalMapProps) {
         <div className="absolute bottom-4 right-4 z-10">
           <Link
             href="/operations/live-map"
-            className="bg-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+            className="bg-white px-4 py-2 rounded-2xl shadow-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-card flex items-center gap-2"
           >
             <MapIcon className="w-4 h-4" />
             Go to Live Map

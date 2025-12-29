@@ -19,6 +19,8 @@ export interface Bin {
   move_requested: boolean;
   latitude?: number | null;
   longitude?: number | null;
+  location_name?: string | null; // Optional formatted location name
+  photo_url?: string | null; // Latest check photo URL
 }
 
 /**

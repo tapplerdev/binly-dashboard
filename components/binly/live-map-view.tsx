@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
-import { getBins } from '@/lib/api/bins';
-import { getNoGoZones } from '@/lib/api/zones';
+import { useBins } from '@/lib/hooks/use-bins';
+import { useNoGoZones } from '@/lib/hooks/use-zones';
 import {
   Bin,
   isMappableBin,
@@ -15,10 +15,40 @@ import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { ZoneDetailsDrawer } from './zone-details-drawer';
 import { BinDetailsDrawer } from './bin-details-drawer';
+import { MapSearchBar } from './map-search-bar';
 
 // Default map center (San Jose, CA area - center of bin operations)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 11;
+
+// Map controller for programmatic zoom/pan (must be child of Map to use useMap hook)
+function MapController({
+  targetLocation,
+  onComplete,
+}: {
+  targetLocation: { lat: number; lng: number; zoom?: number } | null;
+  onComplete: () => void;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || !targetLocation) return;
+
+    map.panTo({ lat: targetLocation.lat, lng: targetLocation.lng });
+    if (targetLocation.zoom) {
+      map.setZoom(targetLocation.zoom);
+    }
+
+    // Call onComplete after animation
+    const timeout = setTimeout(() => {
+      onComplete();
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [map, targetLocation, onComplete]);
+
+  return null;
+}
 
 // Zone rendering component (must be child of Map to use useMap hook)
 function ZoneCircles({
@@ -130,41 +160,41 @@ function ZoneCircles({
 }
 
 export function LiveMapView() {
-  const [bins, setBins] = useState<Bin[]>([]);
-  const [zones, setZones] = useState<NoGoZone[]>([]);
+  // React Query hooks for data fetching
+  const { data: bins = [], isLoading: loadingBins, error: binsError } = useBins();
+  const { data: zones = [], isLoading: loadingZones, error: zonesError } = useNoGoZones('active');
+
   const [selectedBin, setSelectedBin] = useState<Bin | null>(null);
   const [selectedZone, setSelectedZone] = useState<NoGoZone | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showFillLevels, setShowFillLevels] = useState(true);
   const [showNoGoZones, setShowNoGoZones] = useState(true);
   const [currentZoom, setCurrentZoom] = useState(DEFAULT_ZOOM);
+  const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
+  const [showLegend, setShowLegend] = useState(false);
 
-  // Fetch bins and zones on mount
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true);
-        const [binsData, zonesData] = await Promise.all([
-          getBins(),
-          getNoGoZones('active'),
-        ]);
-        setBins(binsData);
-        setZones(zonesData);
-        setError(null);
-      } catch (err) {
-        console.error('Failed to fetch data:', err);
-        setError('Failed to load data. Please try again.');
-      } finally {
-        setLoading(false);
+  // Combined loading and error states
+  const loading = loadingBins || loadingZones;
+  const error = binsError?.message || zonesError?.message || null;
+
+  // Memoize filtered bins to prevent recalculation on every render
+  const mappableBins = useMemo(() => bins.filter(isMappableBin), [bins]);
+
+  // Handle search result selection
+  const handleSearchResult = (result: { type: 'bin' | 'zone'; data: Bin | NoGoZone }) => {
+    if (result.type === 'bin') {
+      const bin = result.data as Bin;
+      if (isMappableBin(bin)) {
+        setTargetLocation({ lat: bin.latitude, lng: bin.longitude, zoom: 16 });
+        setSelectedBin(bin);
+        setSelectedZone(null);
       }
+    } else {
+      const zone = result.data as NoGoZone;
+      setTargetLocation({ lat: zone.center_latitude, lng: zone.center_longitude, zoom: 14 });
+      setSelectedZone(zone);
+      setSelectedBin(null);
     }
-
-    fetchData();
-  }, []);
-
-  // Filter bins with valid coordinates
-  const mappableBins = bins.filter(isMappableBin);
+  };
 
   return (
     <div className="relative h-screen w-full">
@@ -187,103 +217,132 @@ export function LiveMapView() {
         </div>
       )}
 
-      {/* Map Controls - Top Right */}
-      <div className="absolute top-4 right-4 z-10 bg-white rounded-2xl p-4 shadow-lg space-y-3">
-        <div className="flex items-center gap-3">
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showFillLevels}
-              onChange={(e) => setShowFillLevels(e.target.checked)}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-          </label>
-          <span className="text-sm font-medium text-gray-700">
-            Fill Levels
-          </span>
+      {/* Search Bar - Top Center */}
+      {!loading && (
+        <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10 w-full max-w-md px-4">
+          <MapSearchBar
+            bins={bins}
+            zones={zones}
+            onSelectResult={handleSearchResult}
+          />
         </div>
+      )}
 
-        <div className="flex items-center gap-3">
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showNoGoZones}
-              onChange={(e) => setShowNoGoZones(e.target.checked)}
-              className="sr-only peer"
+      {/* Legend Button - Top Right */}
+      {!loading && (
+        <button
+          onClick={() => setShowLegend(!showLegend)}
+          className="absolute top-4 right-4 z-10 w-10 h-10 bg-white/90 backdrop-blur-md rounded-full shadow-lg flex items-center justify-center hover:bg-white transition-all duration-200 group"
+          title="Show Legend"
+        >
+          <svg
+            className="w-5 h-5 text-gray-700 group-hover:text-primary transition-colors"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
             />
-            <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
-          </label>
-          <span className="text-sm font-medium text-gray-700">
-            No-Go Zones
-          </span>
+          </svg>
+          {bins.filter((b) => (b.fill_percentage ?? 0) >= 80).length > 0 && (
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+          )}
+        </button>
+      )}
+
+      {/* Collapsible Legend Panel - Top Right */}
+      {showLegend && (
+        <div className="absolute top-16 right-4 z-10 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-4 w-64 animate-scale-in">
+          {/* Fill Levels Legend */}
+          {showFillLevels && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-gray-700 mb-2">
+                Fill Level Legend
+              </p>
+              <div className="space-y-1.5">
+                <LegendItem color="#10B981" label="Low (0-25%)" />
+                <LegendItem color="#F59E0B" label="Medium (25-50%)" />
+                <LegendItem color="#F97316" label="High (50-80%)" />
+                <LegendItem color="#EF4444" label="Critical (80%+)" />
+                <LegendItem color="#9CA3AF" label="Unknown" />
+              </div>
+            </div>
+          )}
+
+          {/* No-Go Zones Legend */}
+          {showNoGoZones && (
+            <div className="pt-3 border-t border-gray-200">
+              <p className="text-xs font-semibold text-gray-700 mb-2">
+                Zone Severity Legend
+              </p>
+              <div className="space-y-1.5">
+                <LegendItem color="#F59E0B" label="Low (0-15)" />
+                <LegendItem color="#F97316" label="Medium (16-30)" />
+                <LegendItem color="#EF4444" label="High (31-50)" />
+                <LegendItem color="#DC2626" label="Critical (51+)" />
+              </div>
+            </div>
+          )}
         </div>
+      )}
 
-        {/* Fill Levels Legend */}
-        {showFillLevels && (
-          <div className="pt-3 border-t border-gray-200">
-            <p className="text-xs font-semibold text-gray-700 mb-2">
-              Fill Level Legend
-            </p>
-            <div className="space-y-1.5">
-              <LegendItem color="#10B981" label="Low (0-25%)" />
-              <LegendItem color="#F59E0B" label="Medium (25-50%)" />
-              <LegendItem color="#F97316" label="High (50-80%)" />
-              <LegendItem color="#EF4444" label="Critical (80%+)" />
-              <LegendItem color="#9CA3AF" label="Unknown" />
-            </div>
-          </div>
-        )}
+      {/* Bottom Stats Bar - Glassmorphism */}
+      {!loading && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 bg-white/90 backdrop-blur-md rounded-full shadow-xl border border-gray-100 px-6 py-3 flex items-center gap-6">
+          {/* Toggle: Fill Levels */}
+          <button
+            onClick={() => setShowFillLevels(!showFillLevels)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200 ${
+              showFillLevels
+                ? 'bg-primary text-white shadow-md'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <div className="w-2 h-2 rounded-full bg-current" />
+            <span className="text-sm font-medium">Fill Levels</span>
+          </button>
 
-        {/* No-Go Zones Legend */}
-        {showNoGoZones && (
-          <div className="pt-3 border-t border-gray-200">
-            <p className="text-xs font-semibold text-gray-700 mb-2">
-              Zone Severity Legend
-            </p>
-            <div className="space-y-1.5">
-              <LegendItem color="#F59E0B" label="Low (0-15)" />
-              <LegendItem color="#F97316" label="Medium (16-30)" />
-              <LegendItem color="#EF4444" label="High (31-50)" />
-              <LegendItem color="#DC2626" label="Critical (51+)" />
-            </div>
-          </div>
-        )}
+          {/* Toggle: No-Go Zones */}
+          <button
+            onClick={() => setShowNoGoZones(!showNoGoZones)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200 ${
+              showNoGoZones
+                ? 'bg-red-600 text-white shadow-md'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <div className="w-2 h-2 rounded-full bg-current" />
+            <span className="text-sm font-medium">No-Go Zones</span>
+          </button>
 
-        {/* Stats */}
-        <div className="pt-3 border-t border-gray-200">
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-600">Total Bins:</span>
-              <span className="font-semibold text-gray-900">{bins.length}</span>
+          {/* Divider */}
+          <div className="w-px h-6 bg-gray-300" />
+
+          {/* Stats */}
+          <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-1.5">
+              <span className="text-gray-600">Total:</span>
+              <span className="font-bold text-gray-900">{bins.length}</span>
             </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-600">On Map:</span>
-              <span className="font-semibold text-gray-900">
-                {mappableBins.length}
-              </span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-600">Active:</span>
-              <span className="font-semibold text-gray-900">
-                {bins.filter((b) => b.status === 'active').length}
-              </span>
-            </div>
-            <div className="flex justify-between text-xs">
+            <div className="flex items-center gap-1.5">
               <span className="text-gray-600">Critical:</span>
-              <span className="font-semibold text-red-600">
+              <span className="font-bold text-red-600">
                 {bins.filter((b) => (b.fill_percentage ?? 0) >= 80).length}
               </span>
             </div>
-            {showNoGoZones && (
-              <div className="flex justify-between text-xs border-t border-gray-200 pt-1 mt-1">
-                <span className="text-gray-600">No-Go Zones:</span>
-                <span className="font-semibold text-red-600">{zones.length}</span>
+            {showNoGoZones && zones.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-gray-600">No-Go:</span>
+                <span className="font-bold text-red-600">{zones.length}</span>
               </div>
             )}
           </div>
         </div>
-      </div>
+      )}
 
       {/* Bin Details Drawer - Right Side */}
       {selectedBin && (
@@ -310,7 +369,7 @@ export function LiveMapView() {
           minZoom={3}
           maxZoom={20}
           gestureHandling="greedy"
-          disableDefaultUI={false}
+          disableDefaultUI={true}
           restriction={{
             latLngBounds: {
               north: 85,
@@ -322,6 +381,12 @@ export function LiveMapView() {
           }}
           style={{ width: '100%', height: '100%' }}
         >
+        {/* Map controller for search navigation */}
+        <MapController
+          targetLocation={targetLocation}
+          onComplete={() => setTargetLocation(null)}
+        />
+
         {/* Render zone circles (geographic at zoom >= 8) */}
         <ZoneCircles
           zones={zones}

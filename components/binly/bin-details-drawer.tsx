@@ -1,35 +1,50 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Bin, getFillLevelCategory } from '@/lib/types/bin';
-import { X, MapPin, Calendar, ChevronDown, User, Truck, Clock, Camera } from 'lucide-react';
+import { getBinChecks, BinCheck } from '@/lib/api/bins';
+import { X, MapPin, Calendar, ChevronDown, User, Clock, Camera, Loader2 } from 'lucide-react';
 
 interface BinDetailsDrawerProps {
   bin: Bin;
   onClose: () => void;
 }
 
-interface CollectionRecord {
-  id: string;
-  date: string;
-  weight: number;
-  driverName: string;
-  driverPhoto?: string;
-  routeNumber: string;
-  truckId: string;
-  timestamp: string;
-  beforePhoto?: string;
-  afterPhoto?: string;
-  notes?: string;
-}
-
 export function BinDetailsDrawer({ bin, onClose }: BinDetailsDrawerProps) {
-  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [showAllHistory, setShowAllHistory] = useState(false);
+  const [checks, setChecks] = useState<BinCheck[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isClosing, setIsClosing] = useState(false);
   const fillPercentage = bin.fill_percentage ?? 0;
   const fillCategory = getFillLevelCategory(fillPercentage);
   const isHighPriority = fillPercentage >= 80;
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+    }, 300); // Match animation duration
+  };
+
+  // Fetch check history when drawer opens
+  useEffect(() => {
+    async function fetchCheckHistory() {
+      try {
+        setLoading(true);
+        const checkData = await getBinChecks(bin.id);
+        setChecks(checkData);
+      } catch (error) {
+        console.error('Failed to fetch check history:', error);
+        setChecks([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchCheckHistory();
+  }, [bin.id]);
 
   // Format collection history dates
   const formatDate = (isoDate: string) => {
@@ -56,62 +71,39 @@ export function BinDetailsDrawer({ bin, onClose }: BinDetailsDrawerProps) {
     return 'bg-green-600';
   };
 
-  // Mock collection history with full details (replace with real data from API later)
-  const collectionHistory: CollectionRecord[] = [
-    {
-      id: '1',
-      date: '2024-10-26T14:30:00Z',
-      weight: 140,
-      driverName: 'Omar Gabr',
-      routeNumber: 'Route 4',
-      truckId: 'TRK-042',
-      timestamp: '2024-10-26T14:30:00Z',
-      beforePhoto: '/placeholder-bin-before.jpg',
-      afterPhoto: '/placeholder-bin-after.jpg',
-      notes: 'Regular collection, no issues',
-    },
-    {
-      id: '2',
-      date: '2024-10-19T09:15:00Z',
-      weight: 135,
-      driverName: 'Ariel Santos',
-      routeNumber: 'Route 2',
-      truckId: 'TRK-023',
-      timestamp: '2024-10-19T09:15:00Z',
-      notes: 'Bin was slightly overfilled',
-    },
-    {
-      id: '3',
-      date: '2024-10-12T16:45:00Z',
-      weight: 130,
-      driverName: 'Maria Lopez',
-      routeNumber: 'Route 4',
-      truckId: 'TRK-042',
-      timestamp: '2024-10-12T16:45:00Z',
-    },
-  ];
-
-  const toggleRow = (id: string) => {
+  const toggleRow = (id: number) => {
     setExpandedRow(expandedRow === id ? null : id);
   };
 
   // Determine which records to show
-  const visibleHistory = showAllHistory ? collectionHistory : collectionHistory.slice(0, 3);
-  const hasMoreHistory = collectionHistory.length > 3;
+  const visibleHistory = showAllHistory ? checks : checks.slice(0, 3);
+  const hasMoreHistory = checks.length > 3;
+
+  // Format full address from bin data
+  const getFullAddress = () => {
+    if (bin.location_name) {
+      return bin.location_name;
+    }
+    // Construct from parts if available
+    const parts = [bin.current_street, bin.city, bin.zip].filter(Boolean);
+    if (parts.length > 0) {
+      return parts.join(', ');
+    }
+    // Fallback to coordinates
+    return `${bin.latitude}, ${bin.longitude}`;
+  };
 
   return (
-    <div className="absolute top-0 right-0 h-full w-96 bg-white shadow-2xl z-20 overflow-hidden flex flex-col animate-slide-in-right">
+    <div className={`absolute top-0 right-0 h-full w-96 bg-white shadow-2xl z-20 overflow-hidden flex flex-col ${isClosing ? 'animate-slide-out-right' : 'animate-slide-in-right'}`}>
       {/* Header */}
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex-1">
-            <h2 className="text-xl font-semibold text-gray-900 mb-1">
-              Bin Details: #{bin.bin_number}
-            </h2>
-          </div>
+      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Bin #{bin.bin_number}
+          </h2>
           <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+            onClick={handleClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors p-1 -mr-1"
           >
             <X className="w-5 h-5" />
           </button>
@@ -120,41 +112,44 @@ export function BinDetailsDrawer({ bin, onClose }: BinDetailsDrawerProps) {
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
-        {/* Location */}
-        <div className="p-6 border-b border-gray-200">
+        {/* Location - Compact */}
+        <div className="px-4 py-3 border-b border-gray-100">
           <div className="flex items-start gap-2">
-            <MapPin className="w-4 h-4 text-gray-600 mt-0.5" />
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">
-                Location:
-              </h3>
-              <p className="text-sm text-gray-700">
-                {bin.location_name || `${bin.latitude}, ${bin.longitude}`}
+            <MapPin className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-0.5">
+                Location
+              </p>
+              <p className="text-sm text-gray-900 leading-snug">
+                {getFullAddress()}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Current Fill Level */}
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">
-            Current Fill:{' '}
+        {/* Current Fill Level - Compact */}
+        <div className="px-4 py-3 border-b border-gray-200">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Current Fill
+            </h3>
             <span
-              className={`${
+              className={`text-lg font-bold ${
                 fillPercentage >= 80
                   ? 'text-red-600'
                   : fillPercentage >= 50
                   ? 'text-orange-600'
-                  : 'text-gray-900'
+                  : fillPercentage >= 25
+                  ? 'text-yellow-600'
+                  : 'text-green-600'
               }`}
             >
-              {fillPercentage}%{' '}
-              {fillPercentage >= 80 && '(Critical)'}
+              {fillPercentage}%
             </span>
-          </h3>
+          </div>
 
           {/* Progress Bar */}
-          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+          <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
             <div
               className={`h-full ${getFillColor()} transition-all duration-300`}
               style={{ width: `${fillPercentage}%` }}
@@ -163,53 +158,68 @@ export function BinDetailsDrawer({ bin, onClose }: BinDetailsDrawerProps) {
         </div>
 
         {/* Collection History */}
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center gap-2 mb-4">
-            <Calendar className="w-4 h-4 text-gray-600" />
-            <h3 className="text-sm font-semibold text-gray-900">
+        <div className="px-4 py-3 border-b border-gray-200">
+          <div className="flex items-center gap-2 mb-3">
+            <Calendar className="w-4 h-4 text-gray-500" />
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
               Collection History
             </h3>
           </div>
 
-          <div className="space-y-2">
-            {visibleHistory.map((entry) => (
-              <CollectionHistoryRow
-                key={entry.id}
-                entry={entry}
-                isExpanded={expandedRow === entry.id}
-                onToggle={() => toggleRow(entry.id)}
-                formatDate={formatDate}
-                formatTimestamp={formatTimestamp}
-              />
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+            </div>
+          ) : checks.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-4">
+              No collection history available
+            </p>
+          ) : (
+            <>
+              <div className="space-y-2">
+                {visibleHistory.map((check) => (
+                  <CollectionHistoryRow
+                    key={check.id}
+                    check={check}
+                    isExpanded={expandedRow === check.id}
+                    onToggle={() => toggleRow(check.id)}
+                    formatDate={formatDate}
+                    formatTimestamp={formatTimestamp}
+                  />
+                ))}
+              </div>
 
-          {/* View Full History Link */}
-          {hasMoreHistory && !showAllHistory && (
-            <button
-              onClick={() => setShowAllHistory(true)}
-              className="w-full mt-3 text-sm text-primary hover:text-primary/80 font-medium transition-colors"
-            >
-              View Full History ({collectionHistory.length} total)
-            </button>
-          )}
-          {showAllHistory && (
-            <button
-              onClick={() => setShowAllHistory(false)}
-              className="w-full mt-3 text-sm text-gray-500 hover:text-gray-700 font-medium transition-colors"
-            >
-              Show Less
-            </button>
+              {/* View Full History Link */}
+              {hasMoreHistory && !showAllHistory && (
+                <button
+                  onClick={() => setShowAllHistory(true)}
+                  className="w-full mt-2 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+                >
+                  View Full History ({checks.length} total)
+                </button>
+              )}
+              {showAllHistory && (
+                <button
+                  onClick={() => setShowAllHistory(false)}
+                  className="w-full mt-2 text-xs text-gray-500 hover:text-gray-700 font-medium transition-colors"
+                >
+                  Show Less
+                </button>
+              )}
+            </>
           )}
         </div>
 
-        {/* Proof of Work Photos */}
+        {/* Latest Photo Preview */}
         {bin.photo_url && (
-          <div className="p-6">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">
-              Proof of Work Photos
-            </h3>
-            <div className="rounded-lg overflow-hidden bg-gray-100">
+          <div className="px-4 py-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Camera className="w-4 h-4 text-gray-500" />
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Latest Photo
+              </h3>
+            </div>
+            <div className="rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
               <img
                 src={bin.photo_url}
                 alt={`Bin #${bin.bin_number}`}
@@ -221,15 +231,15 @@ export function BinDetailsDrawer({ bin, onClose }: BinDetailsDrawerProps) {
       </div>
 
       {/* Footer Actions */}
-      <div className="p-6 border-t border-gray-200 bg-gray-50">
+      <div className="p-4 border-t border-gray-200 bg-gray-50">
         <button
-          className={`w-full px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 uppercase tracking-wide ${
+          className={`w-full px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
             isHighPriority
               ? 'bg-green-600 text-white shadow-sm hover:shadow-md hover:bg-green-700'
               : 'bg-white border-2 border-green-600 text-green-600 hover:bg-green-50'
           }`}
         >
-          Move Request
+          Request Move
         </button>
       </div>
     </div>
@@ -238,13 +248,13 @@ export function BinDetailsDrawer({ bin, onClose }: BinDetailsDrawerProps) {
 
 // Collection History Row Component with Expand/Collapse
 function CollectionHistoryRow({
-  entry,
+  check,
   isExpanded,
   onToggle,
   formatDate,
   formatTimestamp,
 }: {
-  entry: CollectionRecord;
+  check: BinCheck;
   isExpanded: boolean;
   onToggle: () => void;
   formatDate: (date: string) => string;
@@ -255,100 +265,70 @@ function CollectionHistoryRow({
       {/* Clickable Row Header */}
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between py-3 px-4 hover:bg-gray-50 transition-colors cursor-pointer"
+        className="w-full flex items-center justify-between py-2 px-3 hover:bg-gray-50 transition-colors cursor-pointer"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <ChevronDown
             className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${
               isExpanded ? 'rotate-180' : ''
             }`}
           />
-          <span className="text-sm text-gray-700">{formatDate(entry.date)}</span>
+          <span className="text-sm text-gray-700">{formatDate(check.checkedOnIso)}</span>
         </div>
-        <span className="text-sm font-semibold text-gray-900">{entry.weight}kg</span>
+        <span className="text-sm font-semibold text-gray-900">
+          {check.fillPercentage !== null ? `${check.fillPercentage}%` : 'N/A'}
+        </span>
       </button>
 
       {/* Expanded Details */}
       {isExpanded && (
-        <div className="px-4 pb-4 pt-2 bg-gray-100 border-t border-gray-200 space-y-3 animate-fade-in">
-          {/* Driver Info */}
-          <div className="flex items-center gap-2">
-            <User className="w-4 h-4 text-gray-500" />
-            <div>
-              <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">Driver</p>
-              <p className="text-sm font-medium text-gray-900">{entry.driverName}</p>
-            </div>
-          </div>
-
-          {/* Route & Truck */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex items-center gap-2">
-              <Truck className="w-4 h-4 text-gray-500" />
-              <div>
-                <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">Route</p>
-                <p className="text-sm font-medium text-gray-900">{entry.routeNumber}</p>
+        <div className="px-3 pb-3 pt-2 bg-gray-50 border-t border-gray-200 space-y-2 animate-fade-in">
+          {/* Driver/Checker Info */}
+          {check.checkedByName && (
+            <div className="flex items-start gap-2">
+              <User className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">Checked By</p>
+                <p className="text-sm font-medium text-gray-900">{check.checkedByName}</p>
               </div>
             </div>
-            <div>
-              <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">Truck ID</p>
-              <p className="text-sm font-medium text-gray-900">{entry.truckId}</p>
+          )}
+
+          {/* Location at time of check */}
+          <div className="flex items-start gap-2">
+            <MapPin className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">Location</p>
+              <p className="text-sm font-medium text-gray-900 leading-snug">{check.checkedFrom}</p>
             </div>
           </div>
 
           {/* Exact Timestamp */}
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-gray-500" />
-            <div>
-              <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">Collected At</p>
+          <div className="flex items-start gap-2">
+            <Clock className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">Timestamp</p>
               <p className="text-sm font-medium text-gray-900">
-                {formatTimestamp(entry.timestamp)}
+                {formatTimestamp(check.checkedOnIso)}
               </p>
             </div>
           </div>
 
-          {/* Photos */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Camera className="w-4 h-4 text-gray-500" />
-              <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">Proof of Work</p>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {entry.beforePhoto ? (
-                <div className="relative">
-                  <div className="aspect-square rounded-lg overflow-hidden bg-gray-200 cursor-pointer hover:opacity-90 transition-opacity">
-                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                      Before
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="aspect-square rounded-lg overflow-hidden bg-gray-50 border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1">
-                  <Camera className="w-5 h-5 text-gray-400" />
-                  <span className="text-[10px] text-gray-400">No Photo</span>
-                </div>
-              )}
-              {entry.afterPhoto ? (
-                <div className="relative">
-                  <div className="aspect-square rounded-lg overflow-hidden bg-gray-200 cursor-pointer hover:opacity-90 transition-opacity">
-                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                      After
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="aspect-square rounded-lg overflow-hidden bg-gray-50 border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1">
-                  <Camera className="w-5 h-5 text-gray-400" />
-                  <span className="text-[10px] text-gray-400">No Photo</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Notes */}
-          {entry.notes && (
-            <div className="pt-2 border-t border-gray-200">
-              <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold mb-1">Notes</p>
-              <p className="text-sm text-gray-700 italic">{entry.notes}</p>
+          {/* Photo */}
+          {check.photoUrl && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Camera className="w-4 h-4 text-gray-500" />
+                <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">Photo</p>
+              </div>
+              <div className="rounded-lg overflow-hidden bg-gray-200 border border-gray-300">
+                <img
+                  src={check.photoUrl}
+                  alt="Check photo"
+                  className="w-full h-auto object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => window.open(check.photoUrl!, '_blank')}
+                />
+              </div>
             </div>
           )}
         </div>

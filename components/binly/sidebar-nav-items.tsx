@@ -50,7 +50,7 @@ export const sidebarNavItems: NavItem[] = [
       {
         path: '/operations/routes',
         key: 'routes',
-        title: 'Active Routes',
+        title: 'Routes',
         icon: <Route className="w-5 h-5" />,
         children: [],
       },

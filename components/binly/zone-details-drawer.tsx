@@ -20,6 +20,14 @@ interface ZoneDetailsDrawerProps {
 export function ZoneDetailsDrawer({ zone, onClose }: ZoneDetailsDrawerProps) {
   const [incidents, setIncidents] = useState<ZoneIncident[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isClosing, setIsClosing] = useState(false);
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+    }, 300); // Match animation duration
+  };
 
   useEffect(() => {
     async function fetchIncidents() {
@@ -45,7 +53,7 @@ export function ZoneDetailsDrawer({ zone, onClose }: ZoneDetailsDrawerProps) {
   const incidentsWithPhotos = incidents.filter((i) => i.photo_url);
 
   return (
-    <div className="absolute top-0 right-0 h-full w-96 bg-white shadow-2xl z-20 overflow-hidden flex flex-col">
+    <div className={`absolute top-0 right-0 h-full w-96 bg-white shadow-2xl z-20 overflow-hidden flex flex-col ${isClosing ? 'animate-slide-out-right' : 'animate-slide-in-right'}`}>
       {/* Header */}
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-start justify-between mb-4">
@@ -59,7 +67,7 @@ export function ZoneDetailsDrawer({ zone, onClose }: ZoneDetailsDrawerProps) {
             <p className="text-sm text-gray-600">{zone.name}</p>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-400 hover:text-gray-600 transition-colors p-1"
           >
             <X className="w-5 h-5" />
