@@ -4,11 +4,12 @@ import { KpiCard } from '@/components/binly/kpi-card';
 import { IntelligenceCard } from '@/components/binly/intelligence-card';
 import { TacticalMap } from '@/components/binly/tactical-map';
 import { FieldFeedItem } from '@/components/binly/field-feed-item';
-import { FieldFeedChecklist } from '@/components/binly/field-feed-checklist';
+import { SearchBar } from '@/components/binly/search-bar';
+import { AIAssistantPanel } from '@/components/binly/ai-assistant-panel';
+import { FloatingFieldFeed } from '@/components/binly/floating-field-feed';
 import { MiniTrendChart } from '@/components/binly/mini-trend-chart';
 import { MiniBarChart, SegmentedBarChart } from '@/components/binly/mini-bar-chart';
 import { ActiveRoutesTable } from '@/components/binly/active-routes-table';
-import { TopDriversCard } from '@/components/binly/top-drivers-card';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -87,84 +88,81 @@ export default function PulsePage() {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-[1600px] mx-auto space-y-6">
+        {/* Header with Search */}
+        <div className="flex justify-center">
+          <SearchBar className="w-full max-w-2xl" />
+        </div>
+
         {/* KPI Cards Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2.5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard
-            title="Total customers"
-            value="567,899"
-            icon={<TrendingUp className="w-4 h-4 text-green-600" />}
+            title="Total Weight"
+            value="1,240 KG"
+            icon={<TrendingUp className="w-6 h-6 text-green-600" />}
             iconBgColor="bg-green-50"
             trend="up"
-            trendValue="2.6%"
+            trendValue="14%"
+            subtitle="Target: 1,500 KG (83%)"
+            chart={<MiniTrendChart data={harvestTrend} color="#16a34a" />}
             onClick={() => console.log('Navigate to Analytics')}
           />
           <KpiCard
-            title="Total revenue"
-            value="$3,465 M"
-            icon={<TrendingUp className="w-4 h-4 text-green-600" />}
-            iconBgColor="bg-green-50"
-            trend="up"
-            trendValue="0.5%"
-            onClick={() => console.log('Navigate to Revenue')}
+            title="Active Drivers"
+            value="8/10"
+            icon={<Truck className="w-6 h-6 text-blue-600" />}
+            iconBgColor="bg-blue-50"
+            subtitle="2 drivers on break"
+            chart={<MiniBarChart filled={8} total={10} color="#2563eb" />}
+            onClick={() => console.log('Navigate to Live Map')}
           />
           <KpiCard
-            title="Total orders"
-            value="1,136 M"
-            icon={<Truck className="w-4 h-4 text-red-600" />}
+            title="Critical Bins"
+            value="12 Bins"
+            icon={<Trash2 className="w-6 h-6 text-red-600" />}
             iconBgColor="bg-red-50"
             trend="down"
-            trendValue="0.2%"
-            onClick={() => console.log('Navigate to Orders')}
+            trendValue="3"
+            subtitle=">80% capacity"
+            chart={
+              <SegmentedBarChart
+                segments={[
+                  { value: 12, color: '#dc2626', label: 'Critical (>80%)' },
+                  { value: 25, color: '#f59e0b', label: 'Warning (60-80%)' },
+                  { value: 63, color: '#22c55e', label: 'OK (<60%)' },
+                ]}
+              />
+            }
+            onClick={() => console.log('Navigate to Inventory filtered')}
           />
           <KpiCard
-            title="Total returns"
-            value="1,789"
-            icon={<Trash2 className="w-4 h-4 text-green-600" />}
-            iconBgColor="bg-green-50"
-            trend="up"
-            trendValue="0.12%"
-            onClick={() => console.log('Navigate to Returns')}
+            title="Urgent Issues"
+            value="3 Alerts"
+            icon={<AlertTriangle className="w-6 h-6 text-orange-600" />}
+            iconBgColor="bg-orange-50"
+            subtitle="2 require immediate action"
+            onClick={() => console.log('Navigate to Field Reports')}
           />
-
-          {/* Add Data Card */}
-          <Card className="p-3 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all duration-200 bg-white border-2 border-dashed border-gray-300 hover:border-primary">
-            <div className="flex flex-col items-center justify-center text-center h-full space-y-1.5">
-              <div className="p-1.5 rounded-md bg-gray-100 text-gray-400">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </div>
-              <p className="text-[11px] text-gray-600 font-medium">Add data</p>
-            </div>
-          </Card>
         </div>
 
-        {/* Main Content - Map + Right Sidebar */}
-        <div className="flex gap-4 items-stretch min-h-[600px]">
-          {/* Map Section - Flexible Width */}
+        {/* Main Content - Flexible Layout with Fixed Sidebar */}
+        <div className="flex gap-6 items-start">
+          {/* Map Section - Takes Up Remaining Space */}
           <div className="flex-1 min-w-0">
-            <TacticalMap />
-          </div>
-
-          {/* Right Sidebar - Fixed 320px */}
-          <div className="w-[320px] shrink-0 space-y-4 flex flex-col">
-            {/* Field Feed */}
-            <div className="bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden">
-              <div className="px-3 py-2.5 bg-gray-50 border-b border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900">Field Feed</h3>
-              </div>
-              <div className="p-3">
-                <FieldFeedChecklist />
-              </div>
-              <div className="px-3 py-2 bg-gray-50 border-t border-gray-200">
-                <button className="text-xs text-primary hover:text-primary/80 font-medium transition-colors">
-                  View all activity →
-                </button>
+            <div className="relative">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                Live Snapshot
+              </h2>
+              <div className="relative">
+                <TacticalMap />
+                {/* Floating Field Feed overlays the map */}
+                <FloatingFieldFeed />
               </div>
             </div>
+          </div>
 
-            {/* Top Drivers */}
-            <TopDriversCard />
+          {/* AI Assistant - Fixed Sidebar */}
+          <div className="w-[380px] shrink-0">
+            <AIAssistantPanel />
           </div>
         </div>
 

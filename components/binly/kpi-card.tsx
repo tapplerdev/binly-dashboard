@@ -33,47 +33,46 @@ export function KpiCard({
   return (
     <Card
       className={cn(
-        'p-4 cursor-pointer hover:card-shadow-hover hover:-translate-y-0.5',
+        'p-4 cursor-pointer shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 bg-white border-gray-200 rounded-lg',
         className
       )}
       onClick={onClick}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1">
-          <p className="text-sm text-gray-600 font-medium mb-2">{title}</p>
-          <div className="flex items-baseline gap-2 mb-1">
-            <h2 className="text-3xl font-bold text-gray-900">{value}</h2>
-            {trend && (
-              <span
-                className={cn(
-                  'text-sm font-semibold',
-                  trend === 'up' ? 'text-green-600' : 'text-red-600'
-                )}
-              >
-                {trend === 'up' ? '↑' : '↓'} {trendValue}
-              </span>
-            )}
-          </div>
-          {subtitle && (
-            <p className="text-xs text-gray-500">{subtitle}</p>
+      {/* Horizontal Layout */}
+      <div className="flex items-start justify-between gap-3">
+        {/* Left Side - Icon + Title + Value */}
+        <div className="flex items-start gap-3 flex-1">
+          {/* Icon */}
+          {icon && (
+            <div
+              className={cn(
+                'p-2 rounded-lg flex items-center justify-center shrink-0',
+                iconBgColor
+              )}
+            >
+              {icon}
+            </div>
           )}
+
+          {/* Title + Value stacked */}
+          <div className="flex flex-col gap-1">
+            <p className="text-xs text-gray-500 font-normal">{title}</p>
+            <h2 className="text-2xl font-bold text-gray-900 leading-none">{value}</h2>
+          </div>
         </div>
-        {icon && (
-          <div
+
+        {/* Right Side - Trend */}
+        {trend && trendValue && (
+          <span
             className={cn(
-              'p-3 rounded-xl flex items-center justify-center',
-              iconBgColor
+              'text-sm font-semibold inline-flex items-center gap-1',
+              trend === 'up' ? 'text-green-600' : 'text-red-600'
             )}
           >
-            {icon}
-          </div>
+            {trend === 'up' ? '↑' : '↓'} {trendValue}
+          </span>
         )}
       </div>
-      {chart && (
-        <div className="mt-2">
-          {chart}
-        </div>
-      )}
     </Card>
   );
 }

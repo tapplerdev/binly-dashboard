@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Route, getRouteLabel, getRouteSchedule } from '@/lib/types/route';
-import { MapPin, Clock, Package, Search, Plus, Filter, ChevronDown } from 'lucide-react';
-import { BinSelectionMap } from './bin-selection-map';
+import { Route } from '@/lib/types/route';
+import { Plus, Filter, ChevronDown, Package, MapPin, Clock, Route as RouteIcon } from 'lucide-react';
 import { RouteDetailsDrawer } from './route-details-drawer';
 import { CreateRouteModal } from './create-route-modal';
+import { RoutesMapView } from './routes-map-view';
+import { RoutesSidebar } from './routes-sidebar';
 import { useRoutes, useCreateRoute, useDeleteRoute, useDuplicateRoute } from '@/lib/hooks/use-routes';
+import { FilterDrawer, type RouteFilters } from './filter-drawer';
 
 export function RoutesView() {
   // React Query hooks
@@ -16,273 +18,309 @@ export function RoutesView() {
   const duplicateRouteMutation = useDuplicateRoute();
 
   // Local state
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
+  const [detailsRoute, setDetailsRoute] = useState<Route | null>(null);
+  const [hoveredRouteId, setHoveredRouteId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [showBinSelection, setShowBinSelection] = useState(false);
   const [duplicateSource, setDuplicateSource] = useState<Route | null>(null);
+  const [visibleRouteIds, setVisibleRouteIds] = useState<Set<string>>(new Set());
 
-  // Filter states
-  const [areaFilter, setAreaFilter] = useState('all');
-  const [scheduleFilter, setScheduleFilter] = useState('all');
+  // Filter drawer state
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [isFilterDrawerClosing, setIsFilterDrawerClosing] = useState(false);
+  // Current filter state (updates in real-time as user adjusts filters)
+  const [filters, setFilters] = useState<RouteFilters>({
+    schedules: [],
+    binCountMin: null,
+    binCountMax: null,
+    durationMin: null,
+    durationMax: null,
+    containsBinNumber: '',
+    geographicAreas: [],
+  });
+  // Confirmed filters (only updates when user clicks "Show Routes")
+  const [confirmedFilters, setConfirmedFilters] = useState<RouteFilters>(filters);
 
-  // Dropdown states
-  const [isAreaDropdownOpen, setIsAreaDropdownOpen] = useState(false);
-  const [isScheduleDropdownOpen, setIsScheduleDropdownOpen] = useState(false);
-  const [isAreaClosing, setIsAreaClosing] = useState(false);
-  const [isScheduleClosing, setIsScheduleClosing] = useState(false);
-  const areaDropdownRef = useRef<HTMLDivElement>(null);
-  const scheduleDropdownRef = useRef<HTMLDivElement>(null);
+  // Get unique schedules and areas for filter drawer
+  const uniqueSchedules = Array.from(new Set(routes.map(r => r.schedule_pattern).filter(Boolean))) as string[];
+  const uniqueAreas = Array.from(new Set(routes.map(r => r.geographic_area).filter(Boolean))) as string[];
 
-  // Close dropdown with animation
-  const closeAreaDropdown = () => {
-    setIsAreaClosing(true);
-    setTimeout(() => {
-      setIsAreaDropdownOpen(false);
-      setIsAreaClosing(false);
-    }, 150);
-  };
+  // Filter routes for display in sidebar (uses confirmedFilters)
+  const displayedRoutes = routes.filter(route => {
+    // Schedule filter
+    if (confirmedFilters.schedules.length > 0 && route.schedule_pattern) {
+      if (!confirmedFilters.schedules.includes(route.schedule_pattern)) return false;
+    }
 
-  const closeScheduleDropdown = () => {
-    setIsScheduleClosing(true);
-    setTimeout(() => {
-      setIsScheduleDropdownOpen(false);
-      setIsScheduleClosing(false);
-    }, 150);
-  };
+    // Geographic area filter
+    if (confirmedFilters.geographicAreas.length > 0 && route.geographic_area) {
+      if (!confirmedFilters.geographicAreas.includes(route.geographic_area)) return false;
+    }
 
-  // Close other dropdowns when opening one
-  const openAreaDropdown = () => {
-    if (isScheduleDropdownOpen) closeScheduleDropdown();
-    setIsAreaDropdownOpen(true);
-  };
+    // Bin count filter
+    if (confirmedFilters.binCountMin !== null && route.bin_count < confirmedFilters.binCountMin) return false;
+    if (confirmedFilters.binCountMax !== null && route.bin_count > confirmedFilters.binCountMax) return false;
 
-  const openScheduleDropdown = () => {
-    if (isAreaDropdownOpen) closeAreaDropdown();
-    setIsScheduleDropdownOpen(true);
-  };
+    // Duration filter
+    if (confirmedFilters.durationMin !== null && route.estimated_duration_hours < confirmedFilters.durationMin) return false;
+    if (confirmedFilters.durationMax !== null && route.estimated_duration_hours > confirmedFilters.durationMax) return false;
 
-  // Click outside to close dropdowns
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        isAreaDropdownOpen &&
-        areaDropdownRef.current &&
-        !areaDropdownRef.current.contains(event.target as Node)
-      ) {
-        closeAreaDropdown();
-      }
-      if (
-        isScheduleDropdownOpen &&
-        scheduleDropdownRef.current &&
-        !scheduleDropdownRef.current.contains(event.target as Node)
-      ) {
-        closeScheduleDropdown();
-      }
-    };
+    // Contains bin filter (would need bin data to implement properly)
+    if (confirmedFilters.containsBinNumber) {
+      // This would need to check if the route contains a bin with this number
+      // Placeholder: always pass for now
+    }
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isAreaDropdownOpen, isScheduleDropdownOpen]);
-
-  // Filter routes
-  const filteredRoutes = routes.filter(route => {
-    const matchesSearch = searchQuery === '' ||
-      route.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      route.geographic_area.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      route.description?.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesArea = areaFilter === 'all' || route.geographic_area === areaFilter;
-    const matchesSchedule = scheduleFilter === 'all' || route.schedule_pattern === scheduleFilter;
-
-    return matchesSearch && matchesArea && matchesSchedule;
+    return true;
   });
 
-  // Get unique areas and schedules for filters
-  const uniqueAreas = Array.from(new Set(routes.map(r => r.geographic_area)));
-  const uniqueSchedules = Array.from(new Set(routes.map(r => r.schedule_pattern).filter(Boolean))) as string[];
+  // Filter routes for count calculation (uses current filters for real-time feedback)
+  const filteredRoutes = routes.filter(route => {
+    // Schedule filter
+    if (filters.schedules.length > 0 && route.schedule_pattern) {
+      if (!filters.schedules.includes(route.schedule_pattern)) return false;
+    }
+
+    // Geographic area filter
+    if (filters.geographicAreas.length > 0 && route.geographic_area) {
+      if (!filters.geographicAreas.includes(route.geographic_area)) return false;
+    }
+
+    // Bin count filter
+    if (filters.binCountMin !== null && route.bin_count < filters.binCountMin) return false;
+    if (filters.binCountMax !== null && route.bin_count > filters.binCountMax) return false;
+
+    // Duration filter
+    if (filters.durationMin !== null && route.estimated_duration_hours < filters.durationMin) return false;
+    if (filters.durationMax !== null && route.estimated_duration_hours > filters.durationMax) return false;
+
+    // Contains bin filter (would need bin data to implement properly)
+    // For now, we'll skip this as it requires bin numbers array in route
+    if (filters.containsBinNumber) {
+      // This would need to check if the route contains a bin with this number
+      // Placeholder: always pass for now
+    }
+
+    return true;
+  });
+
+  // Count active filters
+  const activeFilterCount =
+    filters.schedules.length +
+    filters.geographicAreas.length +
+    (filters.binCountMin !== null ? 1 : 0) +
+    (filters.binCountMax !== null ? 1 : 0) +
+    (filters.durationMin !== null ? 1 : 0) +
+    (filters.durationMax !== null ? 1 : 0) +
+    (filters.containsBinNumber ? 1 : 0);
+
+  // Clear all filters
+  const handleClearFilters = () => {
+    setFilters({
+      schedules: [],
+      binCountMin: null,
+      binCountMax: null,
+      durationMin: null,
+      durationMax: null,
+      containsBinNumber: '',
+      geographicAreas: [],
+    });
+  };
 
   // Handle Create Route button click
   const handleCreateRoute = () => {
     setIsCreating(true);
   };
 
+  // Handle route selection - toggle visibility
+  const handleRouteSelect = (route: Route) => {
+    setVisibleRouteIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(route.id)) {
+        // Route already visible - remove it (toggle off)
+        newSet.delete(route.id);
+        // If we're removing the selected route, deselect it
+        if (selectedRoute?.id === route.id) {
+          setSelectedRoute(null);
+        }
+      } else {
+        // Route not visible - add it (toggle on)
+        newSet.add(route.id);
+        setSelectedRoute(route);
+      }
+      return newSet;
+    });
+  };
+
+  // Show all routes at once
+  const handleShowAllRoutes = () => {
+    const allRouteIds = new Set(displayedRoutes.map(r => r.id));
+    setVisibleRouteIds(allRouteIds);
+  };
+
+  // Clear all visible routes
+  const handleClearAllRoutes = () => {
+    setVisibleRouteIds(new Set());
+    setSelectedRoute(null);
+  };
+
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
+    <div className="flex flex-col h-screen">
+      {/* Top Header Bar */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4 shrink-0">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Route Blueprints</h1>
-            <p className="text-gray-600 mt-1">
-              Create and manage reusable route templates for efficient shift planning
-            </p>
+            <h1 className="text-2xl font-bold text-gray-900">Routes</h1>
           </div>
-          <button
-            onClick={handleCreateRoute}
-            className="px-4 py-2.5 bg-primary hover:bg-primary/90 text-white rounded-lg font-medium flex items-center gap-2 transition-all"
-          >
-            <Plus className="w-5 h-5" />
-            Create Route
-          </button>
-        </div>
-
-        {/* Stats Summary */}
-        <div className="grid grid-cols-4 gap-4 mt-6">
-          {loading ? (
-            // Skeleton loaders for initial page load
-            <>
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="bg-white rounded-2xl p-4 card-shadow animate-pulse">
-                  <div className="h-4 w-32 bg-gray-200 rounded mb-2" />
-                  <div className="h-8 w-16 bg-gray-200 rounded" />
+          <div className="flex items-center gap-3">
+            {/* KPI Stats - Cards with Icons */}
+            {!loading && (
+              <div className="flex items-center gap-3 mr-6">
+                {/* Total Routes */}
+                <div className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm hover:shadow-md transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-50 rounded-lg">
+                      <RouteIcon className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 font-medium">Total Routes</p>
+                      <p className="text-lg font-bold text-gray-900">{routes.length}</p>
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </>
-          ) : (
-            <>
-              <div className="bg-white rounded-2xl p-4 card-shadow">
-                <p className="text-sm text-gray-600 mb-1">Total Routes</p>
-                <p className="text-2xl font-bold text-gray-900">{routes.length}</p>
-              </div>
-              <div className="bg-white rounded-2xl p-4 card-shadow">
-                <p className="text-sm text-gray-600 mb-1">Total Bins Covered</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {routes.reduce((sum, r) => sum + r.bin_count, 0)}
-                </p>
-              </div>
-              <div className="bg-white rounded-2xl p-4 card-shadow">
-                <p className="text-sm text-gray-600 mb-1">Geographic Areas</p>
-                <p className="text-2xl font-bold text-gray-900">{uniqueAreas.length}</p>
-              </div>
-              <div className="bg-white rounded-2xl p-4 card-shadow">
-                <p className="text-sm text-gray-600 mb-1">Avg. Route Duration</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {routes.length > 0
-                    ? (routes.reduce((sum, r) => sum + r.estimated_duration_hours, 0) / routes.length).toFixed(1)
-                    : '0.0'}h
-                </p>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
 
-      {/* Search and Filters */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-6">
-        <div className="flex items-center gap-3">
-          {/* Search */}
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search routes by name, area, or description..."
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all"
-            />
-          </div>
+                {/* Total Bins Covered */}
+                <div className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm hover:shadow-md transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-50 rounded-lg">
+                      <Package className="w-4 h-4 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 font-medium">Bins Covered</p>
+                      <p className="text-lg font-bold text-gray-900">
+                        {routes.reduce((sum, r) => sum + r.bin_count, 0)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-          {/* Area Filter - Custom Dropdown */}
-          <div className="relative" ref={areaDropdownRef}>
+                {/* Avg. Route Duration */}
+                <div className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm hover:shadow-md transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-orange-50 rounded-lg">
+                      <Clock className="w-4 h-4 text-orange-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 font-medium">Avg. Duration</p>
+                      <p className="text-lg font-bold text-gray-900">
+                        {routes.length > 0
+                          ? (routes.reduce((sum, r) => sum + r.estimated_duration_hours, 0) / routes.length).toFixed(1)
+                          : '0.0'}h
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Filter Button */}
             <button
-              onClick={() => isAreaDropdownOpen ? closeAreaDropdown() : openAreaDropdown()}
-              className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-all"
+              onClick={() => {
+                if (isFilterDrawerOpen) {
+                  // Trigger closing animation
+                  setIsFilterDrawerClosing(true);
+                  setTimeout(() => {
+                    setConfirmedFilters(filters);
+                    setIsFilterDrawerOpen(false);
+                    setIsFilterDrawerClosing(false);
+                  }, 300);
+                } else {
+                  setIsFilterDrawerOpen(true);
+                }
+              }}
+              className="relative px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-all flex items-center gap-2"
             >
               <Filter className="w-4 h-4 text-gray-600" />
-              <span className="text-gray-700">{areaFilter === 'all' ? 'All Areas' : areaFilter}</span>
-              <ChevronDown className="w-4 h-4 text-gray-400" />
+              <span className="text-gray-700">Filter</span>
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-white text-xs font-bold rounded-full flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
             </button>
-            {isAreaDropdownOpen && (
-              <div className={`absolute top-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-2 min-w-[180px] z-50 ${isAreaClosing ? 'animate-slide-out-up' : 'animate-slide-in-down'}`}>
-                <button
-                  onClick={() => { setAreaFilter('all'); closeAreaDropdown(); }}
-                  className={`w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm transition-colors ${areaFilter === 'all' ? 'bg-blue-50 text-primary font-medium' : 'text-gray-700'}`}
-                >
-                  All Areas
-                </button>
-                {uniqueAreas.map(area => (
-                  <button
-                    key={area}
-                    onClick={() => { setAreaFilter(area); closeAreaDropdown(); }}
-                    className={`w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm transition-colors ${areaFilter === area ? 'bg-blue-50 text-primary font-medium' : 'text-gray-700'}`}
-                  >
-                    {area}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
 
-          {/* Schedule Filter - Custom Dropdown */}
-          <div className="relative" ref={scheduleDropdownRef}>
+            {/* Create Button */}
             <button
-              onClick={() => isScheduleDropdownOpen ? closeScheduleDropdown() : openScheduleDropdown()}
-              className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-all"
+              onClick={handleCreateRoute}
+              className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-sm"
             >
-              <span className="text-gray-700">{scheduleFilter === 'all' ? 'All Schedules' : scheduleFilter}</span>
-              <ChevronDown className="w-4 h-4 text-gray-400" />
+              <Plus className="w-4 h-4" />
+              Create Route
             </button>
-            {isScheduleDropdownOpen && (
-              <div className={`absolute top-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-2 min-w-[200px] z-50 ${isScheduleClosing ? 'animate-slide-out-up' : 'animate-slide-in-down'}`}>
-                <button
-                  onClick={() => { setScheduleFilter('all'); closeScheduleDropdown(); }}
-                  className={`w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm transition-colors ${scheduleFilter === 'all' ? 'bg-blue-50 text-primary font-medium' : 'text-gray-700'}`}
-                >
-                  All Schedules
-                </button>
-                {uniqueSchedules.map(schedule => (
-                  <button
-                    key={schedule}
-                    onClick={() => { setScheduleFilter(schedule); closeScheduleDropdown(); }}
-                    className={`w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm transition-colors ${scheduleFilter === schedule ? 'bg-blue-50 text-primary font-medium' : 'text-gray-700'}`}
-                  >
-                    {schedule}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>
 
-      {/* Routes Grid */}
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-gray-600">Loading routes...</p>
+      {/* Main Content - Sidebar + Map */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Sidebar - Routes List */}
+        {loading ? (
+          <div className="w-80 bg-white border-r border-gray-200 flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-sm text-gray-600">Loading routes...</p>
+            </div>
           </div>
-        </div>
-      ) : filteredRoutes.length === 0 ? (
-        <div className="bg-white rounded-2xl p-12 card-shadow text-center">
-          <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No routes found</h3>
-          <p className="text-gray-600 mb-6">
-            {searchQuery || areaFilter !== 'all' || scheduleFilter !== 'all'
-              ? 'Try adjusting your filters'
-              : 'Create your first route blueprint to get started'}
-          </p>
-          {!(searchQuery || areaFilter !== 'all' || scheduleFilter !== 'all') && (
-            <button
-              onClick={() => setIsCreating(true)}
-              className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg font-medium transition-fast"
-            >
-              Create Route
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredRoutes.map((route) => (
-            <RouteCard
-              key={route.id}
-              route={route}
-              onClick={() => setSelectedRoute(route)}
+        ) : (
+          <RoutesSidebar
+            routes={displayedRoutes}
+            selectedRouteId={selectedRoute?.id}
+            visibleRouteIds={visibleRouteIds}
+            onRouteSelect={handleRouteSelect}
+            onViewDetails={setDetailsRoute}
+            onRouteHover={setHoveredRouteId}
+            onShowAll={handleShowAllRoutes}
+            onClearAll={handleClearAllRoutes}
+          />
+        )}
+
+        {/* Map View - Full Height */}
+        <div className="flex-1 relative">
+          {loading ? (
+            <div className="w-full h-full flex items-center justify-center bg-gray-100">
+              <div className="text-center">
+                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-gray-600">Loading routes map...</p>
+              </div>
+            </div>
+          ) : (
+            <RoutesMapView
+              routes={displayedRoutes}
+              visibleRouteIds={visibleRouteIds}
+              onRouteSelect={handleRouteSelect}
+              onViewDetails={setDetailsRoute}
+              selectedRouteId={selectedRoute?.id}
             />
-          ))}
+          )}
+
+          {/* Filter Drawer - Rendered inside map container */}
+          <FilterDrawer
+            isOpen={isFilterDrawerOpen}
+            onClose={() => {
+              // Confirm filters when closing (clicking "Show Routes" button)
+              setConfirmedFilters(filters);
+              setIsFilterDrawerOpen(false);
+            }}
+            filters={filters}
+            onFiltersChange={setFilters}
+            onClearAll={handleClearFilters}
+            matchingRoutesCount={filteredRoutes.length}
+            availableSchedules={uniqueSchedules}
+            availableAreas={uniqueAreas}
+            isExternalClosing={isFilterDrawerClosing}
+          />
         </div>
-      )}
+      </div>
 
       {/* Create/Edit Route Modal */}
       {isCreating && (
@@ -315,36 +353,36 @@ export function RoutesView() {
       )}
 
       {/* Route Details Drawer */}
-      {selectedRoute && (
+      {detailsRoute && (
         <RouteDetailsDrawer
-          route={selectedRoute}
-          onClose={() => setSelectedRoute(null)}
+          route={detailsRoute}
+          onClose={() => setDetailsRoute(null)}
           onEdit={() => {
             setIsCreating(true);
-            setSelectedRoute(null);
+            setDetailsRoute(null);
           }}
           onDuplicate={async () => {
             try {
-              const copiedName = `${selectedRoute.name} (Copy)`;
+              const copiedName = `${detailsRoute.name} (Copy)`;
               await duplicateRouteMutation.mutateAsync({
-                routeId: selectedRoute.id,
+                routeId: detailsRoute.id,
                 name: copiedName,
               });
 
-              setSelectedRoute(null);
+              setDetailsRoute(null);
             } catch (error) {
               console.error('Failed to duplicate route:', error);
               alert('Failed to duplicate route. Please try again.');
             }
           }}
           onDelete={async () => {
-            if (!confirm(`Are you sure you want to delete "${selectedRoute.name}"?`)) {
+            if (!confirm(`Are you sure you want to delete "${detailsRoute.name}"?`)) {
               return;
             }
 
             try {
-              await deleteRouteMutation.mutateAsync(selectedRoute.id);
-              setSelectedRoute(null);
+              await deleteRouteMutation.mutateAsync(detailsRoute.id);
+              setDetailsRoute(null);
             } catch (error) {
               console.error('Failed to delete route:', error);
               alert('Failed to delete route. Please try again.');
@@ -353,76 +391,6 @@ export function RoutesView() {
         />
       )}
 
-      {/* Bin Selection Modal */}
-      {showBinSelection && (
-        <BinSelectionMap
-          onClose={() => setShowBinSelection(false)}
-          onConfirm={(binIds) => {
-            console.log('Selected bins:', binIds);
-            setShowBinSelection(false);
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-interface RouteCardProps {
-  route: Route;
-  onClick: () => void;
-}
-
-function RouteCard({ route, onClick }: RouteCardProps) {
-  return (
-    <div
-      onClick={onClick}
-      className="bg-white rounded-2xl p-5 card-shadow hover:card-shadow-hover transition-card cursor-pointer group"
-    >
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary transition-fast">
-            {route.name}
-          </h3>
-          {route.description && (
-            <p className="text-sm text-gray-500 mt-1 line-clamp-2">{route.description}</p>
-          )}
-        </div>
-      </div>
-
-      {/* Metrics */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="bg-gray-50 rounded-lg p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <Package className="w-4 h-4 text-gray-400" />
-            <span className="text-xs text-gray-500">Bins</span>
-          </div>
-          <p className="text-lg font-semibold text-gray-900">{route.bin_count}</p>
-        </div>
-
-        <div className="bg-gray-50 rounded-lg p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <Clock className="w-4 h-4 text-gray-400" />
-            <span className="text-xs text-gray-500">Duration</span>
-          </div>
-          <p className="text-lg font-semibold text-gray-900">{route.estimated_duration_hours}h</p>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="pt-3 border-t border-gray-100">
-        <div className="flex items-center justify-between text-sm">
-          <div className="flex items-center gap-1.5 text-gray-600">
-            <MapPin className="w-4 h-4" />
-            <span className="font-medium">{route.geographic_area}</span>
-          </div>
-          {route.schedule_pattern && (
-            <span className="px-2.5 py-1 bg-blue-50 text-primary text-xs font-medium rounded-full">
-              {route.schedule_pattern}
-            </span>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

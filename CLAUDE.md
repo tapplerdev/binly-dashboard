@@ -9,6 +9,16 @@ You are an expert full-stack developer proficient in TypeScript, React, Next.js,
 ### Objective
 Create Next.js solutions that are functional and adhere to best practices in performance, security, and maintainability.
 
+## Server Management Rules
+
+**CRITICAL - READ CAREFULLY:**
+- **NEVER start the dev server (`npm run dev`) automatically** - The user will run it themselves
+- **NEVER run background processes** without explicit user permission
+- **DO NOT use `run_in_background: true`** for dev servers, builds, or any long-running commands
+- If you need to check compilation errors, ASK the user to run the dev server first
+- Only run quick commands like `git`, `npm install`, or single file operations
+- The user manages all server processes - you only write code
+
 ## Code Style and Structure
 
 - Write concise, technical TypeScript code with accurate examples

@@ -7,7 +7,9 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { useBins } from '@/lib/hooks/use-bins';
+import { useNoGoZones } from '@/lib/hooks/use-zones';
 import { isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
+import { getZoneColorRgba } from '@/lib/types/zone';
 
 // Default map center (San Jose, CA area)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -22,15 +24,18 @@ export function TacticalMap({ className }: TacticalMapProps) {
   const [noGoZonesEnabled, setNoGoZonesEnabled] = useState(false);
 
   // Use React Query for data fetching and caching
-  const { data: bins = [], isLoading: loading } = useBins();
+  const { data: bins = [], isLoading: loadingBins } = useBins();
+  const { data: zones = [], isLoading: loadingZones } = useNoGoZones('active');
+
+  const loading = loadingBins || loadingZones;
 
   // Memoize filtered bins to prevent unnecessary recalculations
   const mappableBins = useMemo(() => bins.filter(isMappableBin), [bins]);
 
   return (
-    <Card className={cn('overflow-hidden', className)}>
+    <Card className={cn('overflow-hidden h-full', className)}>
       {/* Map Container */}
-      <div className="relative h-[400px] bg-gray-100">
+      <div className="relative h-full bg-gray-100">
         {loading ? (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
             <div className="text-center">
@@ -43,10 +48,45 @@ export function TacticalMap({ className }: TacticalMapProps) {
             mapId="binly-tactical-map"
             defaultCenter={DEFAULT_CENTER}
             defaultZoom={DEFAULT_ZOOM}
+            minZoom={3}
+            maxZoom={20}
             gestureHandling="greedy"
             disableDefaultUI={true}
+            restriction={{
+              latLngBounds: {
+                north: 85,
+                south: -85,
+                west: -180,
+                east: 180,
+              },
+              strictBounds: false,
+            }}
             style={{ width: '100%', height: '100%' }}
           >
+            {/* Render no-go zone markers */}
+            {noGoZonesEnabled &&
+              zones.map((zone) => (
+                <AdvancedMarker
+                  key={zone.id}
+                  position={{
+                    lat: zone.center_latitude,
+                    lng: zone.center_longitude,
+                  }}
+                  zIndex={1}
+                >
+                  <div
+                    className="rounded-full shadow-lg cursor-pointer transition-all duration-300 hover:scale-110 animate-scale-in"
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      backgroundColor: getZoneColorRgba(zone.conflict_score, 0.4),
+                    }}
+                    title={`${zone.name} - Score: ${zone.conflict_score}`}
+                  />
+                </AdvancedMarker>
+              ))}
+
+            {/* Render bin markers */}
             {fillLevelsEnabled &&
               mappableBins.map((bin) => (
                 <AdvancedMarker

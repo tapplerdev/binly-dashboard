@@ -20,8 +20,8 @@ export function MiniTrendChart({ data, color = '#4880FF', className = '' }: Mini
   }));
 
   return (
-    <div className={`w-full h-12 ${className}`}>
-      <ResponsiveContainer width="100%" height="100%">
+    <div className={`w-full h-12 min-h-[48px] ${className}`}>
+      <ResponsiveContainer width="100%" height={48}>
         <AreaChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id={`gradient-${color}`} x1="0" y1="0" x2="0" y2="1">
