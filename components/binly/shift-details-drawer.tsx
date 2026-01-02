@@ -1,8 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shift';
+import { getShiftDetails } from '@/lib/api/shifts';
+
+interface ShiftBin {
+  id: number;
+  bin_id: string;
+  bin_number: string;
+  current_street: string;
+  city: string;
+  zip: string;
+  sequence_order: number;
+  is_completed: number;
+  completed_at: number | null;
+  updated_fill_percentage: number | null;
+  fill_percentage: number;
+  latitude: number | null;
+  longitude: number | null;
+}
 
 interface ShiftDetailsDrawerProps {
   shift: Shift;
@@ -11,6 +28,24 @@ interface ShiftDetailsDrawerProps {
 
 export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) {
   const [isClosing, setIsClosing] = useState(false);
+  const [bins, setBins] = useState<ShiftBin[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch shift details on mount
+  useEffect(() => {
+    async function loadShiftDetails() {
+      try {
+        setLoading(true);
+        const details = await getShiftDetails(shift.driverId); // Use driverId, not shift ID
+        setBins(details.bins || []);
+      } catch (error) {
+        console.error('Failed to load shift details:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadShiftDetails();
+  }, [shift.driverId]);
 
   const handleClose = () => {
     setIsClosing(true);
@@ -18,23 +53,15 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
       onClose();
     }, 300); // Match animation duration
   };
+
   const statusColor = getShiftStatusColor(shift.status);
   const statusLabel = getShiftStatusLabel(shift.status);
   const isActive = shift.status === 'active';
   const isCompleted = shift.status === 'completed';
 
-  // Mock bin data for this shift
-  const mockBins = [
-    { id: '1', number: 1045, address: '123 Main St', collected: true, collectedAt: '08:15 AM', weight: 45 },
-    { id: '2', number: 1046, address: '456 Oak Ave', collected: true, collectedAt: '08:32 AM', weight: 52 },
-    { id: '3', number: 1047, address: '789 Pine Rd', collected: isActive, collectedAt: isActive ? '09:05 AM' : undefined, weight: isActive ? 48 : undefined },
-    { id: '4', number: 1048, address: '321 Elm Dr', collected: false },
-    { id: '5', number: 1049, address: '654 Maple Ln', collected: false },
-  ];
-
-  const collectedCount = mockBins.filter(b => b.collected).length;
-  const progressPercentage = Math.round((collectedCount / mockBins.length) * 100);
-  const totalWeight = mockBins.reduce((sum, b) => sum + (b.weight || 0), 0);
+  const collectedCount = bins.filter(b => b.is_completed === 1).length;
+  const progressPercentage = bins.length > 0 ? Math.round((collectedCount / bins.length) * 100) : 0;
+  const totalWeight = 145; // Mock for now - backend doesn't track weight yet
 
   return (
     <>
@@ -118,7 +145,7 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                     <span className="text-xs text-gray-500">Collected</span>
                   </div>
                   <p className="text-lg font-semibold text-gray-900">
-                    {collectedCount}/{mockBins.length}
+                    {shift.binsCollected || collectedCount}/{shift.binCount}
                   </p>
                 </div>
 
@@ -171,50 +198,74 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
 
           {/* Bin List */}
           <div className="p-6">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">Bins ({mockBins.length})</h3>
-            <div className="space-y-2">
-              {mockBins.map((bin, index) => (
-                <div
-                  key={bin.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg border transition-fast ${
-                    bin.collected
-                      ? 'bg-green-50 border-green-200'
-                      : 'bg-white border-gray-200 hover:bg-gray-50'
-                  }`}
-                >
-                  {/* Status Icon */}
-                  <div className="flex-shrink-0">
-                    {bin.collected ? (
-                      <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
-                        <Check className="w-4 h-4 text-white" />
-                      </div>
-                    ) : (
-                      <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
-                        <Circle className="w-3 h-3 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Bins ({shift.binCount})</h3>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : bins.length === 0 ? (
+              <div className="bg-gray-50 rounded-lg p-6 text-center border border-gray-200">
+                <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-sm text-gray-600">No bins assigned to this shift</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {bins.map((bin) => {
+                  const isCompleted = bin.is_completed === 1;
+                  const collectedTime = bin.completed_at
+                    ? new Date(bin.completed_at * 1000).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                      })
+                    : null;
 
-                  {/* Bin Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <p className="font-medium text-gray-900">Bin #{bin.number}</p>
-                      {bin.collected && bin.collectedAt && (
-                        <span className="text-xs text-green-600">@ {bin.collectedAt}</span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-500 truncate">{bin.address}</p>
-                  </div>
+                  return (
+                    <div
+                      key={bin.id}
+                      className={`flex items-center gap-3 p-3 rounded-lg border transition-fast ${
+                        isCompleted
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-white border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      {/* Status Icon */}
+                      <div className="flex-shrink-0">
+                        {isCompleted ? (
+                          <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
+                            <Check className="w-4 h-4 text-white" />
+                          </div>
+                        ) : (
+                          <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
+                            <Circle className="w-3 h-3 text-gray-400" />
+                          </div>
+                        )}
+                      </div>
 
-                  {/* Weight */}
-                  {bin.weight && (
-                    <div className="flex-shrink-0 text-right">
-                      <p className="text-sm font-semibold text-gray-900">{bin.weight} kg</p>
+                      {/* Bin Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <p className="font-medium text-gray-900">Bin #{bin.bin_number}</p>
+                          {isCompleted && collectedTime && (
+                            <span className="text-xs text-green-600">@ {collectedTime}</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-500 truncate">
+                          {bin.current_street}, {bin.city} {bin.zip}
+                        </p>
+                      </div>
+
+                      {/* Fill Percentage */}
+                      <div className="flex-shrink-0 text-right">
+                        <p className="text-sm font-semibold text-gray-900">
+                          {bin.updated_fill_percentage ?? bin.fill_percentage}% Fill
+                        </p>
+                      </div>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 

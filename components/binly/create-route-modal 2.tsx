@@ -37,14 +37,6 @@ const WAREHOUSE_LOCATION = {
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 11;
 
-// Format duration: show minutes if < 1 hour, otherwise show hours
-const formatDuration = (hours: number): string => {
-  if (hours < 1) {
-    return `${Math.round(hours * 60)} min`;
-  }
-  return `${hours.toFixed(1)}h`;
-};
-
 
 // Lasso Selection Component using Google Maps DrawingManager
 interface LassoSelectionProps {
@@ -136,16 +128,6 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
   const polylineRef = useRef<google.maps.Polyline | null>(null);
   const glowPolylineRef = useRef<google.maps.Polyline | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-
-  // Animation state (persist across renders for smooth continuous animation)
-  const animationStateRef = useRef({
-    opacity: 1,
-    opacityDirection: -0.003,  // Slower pulsing (was -0.008)
-    strokeWeight: 6,
-    weightDirection: -0.02,    // Slower pulsing (was -0.05)
-    glowOpacity: 0.3,
-    glowOpacityDirection: -0.002,  // Slower pulsing (was -0.006)
-  });
   const [hoveredBin, setHoveredBin] = useState<{ bin: Bin; index: number } | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -171,14 +153,7 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
             distance: route.distance / 1609.34, // meters to miles
             duration: route.duration / 3600, // seconds to hours
           };
-          console.log('📍 RoutePreview: Mapbox route calculated:', {
-            distance: newStats.distance.toFixed(2) + ' mi',
-            duration: newStats.duration.toFixed(2) + ' h',
-            onStatsChange: typeof onStatsChange
-          });
-          if (onStatsChange) {
-            onStatsChange(newStats);
-          }
+          onStatsChange(newStats);
 
           // Draw polyline
           const path = route.geometry.coordinates.map((coord: number[]) => ({
@@ -186,85 +161,82 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
             lng: coord[0],
           }));
 
-          // Cancel any existing animation before updating
-          if (animationFrameRef.current) {
-            cancelAnimationFrame(animationFrameRef.current);
+          // Clear old polylines if they exist
+          if (polylineRef.current) {
+            polylineRef.current.setMap(null);
+          }
+          if (glowPolylineRef.current) {
+            glowPolylineRef.current.setMap(null);
           }
 
-          // Check if this is the first time creating polylines
-          const isFirstRender = !polylineRef.current;
+          // Create glow polyline (thicker, semi-transparent layer underneath)
+          const glowLine = new google.maps.Polyline({
+            path: path,
+            geodesic: false,
+            strokeColor: '#4880FF',
+            strokeOpacity: 0.3,
+            strokeWeight: 12,
+            map: map,
+            clickable: false,
+            zIndex: 999,
+          });
 
-          // Update existing polylines or create new ones (no flicker)
-          if (polylineRef.current && glowPolylineRef.current) {
-            // Just update the path - smooth, no flicker!
-            polylineRef.current.setPath(path);
-            glowPolylineRef.current.setPath(path);
-          } else {
-            // Create polylines for the first time
-            const glowLine = new google.maps.Polyline({
-              path: path,
-              geodesic: false,
-              strokeColor: '#4880FF',
-              strokeOpacity: 0.3,
-              strokeWeight: 12,
-              map: map,
-              clickable: false,
-              zIndex: 999,
-            });
+          // Create main polyline
+          const polyline = new google.maps.Polyline({
+            path: path,
+            geodesic: false,
+            strokeColor: '#4880FF',
+            strokeOpacity: 1,
+            strokeWeight: 6,
+            map: map,
+            zIndex: 1000,
+          });
 
-            const polyline = new google.maps.Polyline({
-              path: path,
-              geodesic: false,
-              strokeColor: '#4880FF',
-              strokeOpacity: 1,
-              strokeWeight: 6,
-              map: map,
-              zIndex: 1000,
-            });
-
-            polylineRef.current = polyline;
-            glowPolylineRef.current = glowLine;
-          }
+          polylineRef.current = polyline;
+          glowPolylineRef.current = glowLine;
 
           // Animate polylines (pulsing effect matching routes map view)
+          let opacity = 1;
+          let opacityDirection = -0.008;
+          let strokeWeight = 6;
+          let weightDirection = -0.05;
+          let glowOpacity = 0.3;
+          let glowOpacityDirection = -0.006;
+
           const animate = () => {
-            const state = animationStateRef.current;
-
             // Pulsing values
-            state.opacity += state.opacityDirection;
-            if (state.opacity <= 0.85 || state.opacity >= 1) state.opacityDirection *= -1;
+            opacity += opacityDirection;
+            if (opacity <= 0.85 || opacity >= 1) opacityDirection *= -1;
 
-            state.strokeWeight += state.weightDirection;
-            if (state.strokeWeight <= 5 || state.strokeWeight >= 7) state.weightDirection *= -1;
+            strokeWeight += weightDirection;
+            if (strokeWeight <= 5 || strokeWeight >= 7) weightDirection *= -1;
 
-            state.glowOpacity += state.glowOpacityDirection;
-            if (state.glowOpacity <= 0.15 || state.glowOpacity >= 0.4) state.glowOpacityDirection *= -1;
+            glowOpacity += glowOpacityDirection;
+            if (glowOpacity <= 0.15 || glowOpacity >= 0.4) glowOpacityDirection *= -1;
 
             // Update main polyline
             if (polylineRef.current) {
               polylineRef.current.setOptions({
-                strokeOpacity: state.opacity,
-                strokeWeight: state.strokeWeight,
+                strokeOpacity: opacity,
+                strokeWeight: strokeWeight,
               });
             }
 
             // Update glow polyline
             if (glowPolylineRef.current) {
               glowPolylineRef.current.setOptions({
-                strokeOpacity: state.glowOpacity,
-                strokeWeight: 14 + (state.strokeWeight - 5) * 2,
+                strokeOpacity: glowOpacity,
+                strokeWeight: 14 + (strokeWeight - 5) * 2,
               });
             }
 
             animationFrameRef.current = requestAnimationFrame(animate);
           };
 
-          // Start animation (will continue smoothly even when route updates)
           animate();
 
-          // Fit bounds ONLY on first render (not when route updates during optimization)
-          // This prevents choppy zooming when bins are reordered
-          if (map && isFirstRender) {
+          // Fit bounds (include all bins + warehouse)
+          if (map) {
             const bounds = new google.maps.LatLngBounds();
             bins.forEach(bin => {
               if (bin.latitude != null && bin.longitude != null) {
@@ -282,10 +254,8 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
     }
 
     fetchRoute();
-  }, [map, bins]);
 
-  // Cleanup only on component unmount (not on every bins change)
-  useEffect(() => {
+    // Cleanup function
     return () => {
       if (polylineRef.current) {
         polylineRef.current.setMap(null);
@@ -297,7 +267,7 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, []); // Empty deps = only runs on mount/unmount
+  }, [map, bins]);
 
   // Expose stats to parent via callback
   useEffect(() => {
@@ -305,6 +275,13 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
       onMapReady();
     }
   }, [routeStats, onMapReady]);
+
+  // Update parent with current route stats
+  useEffect(() => {
+    if (onStatsUpdate && routeStats.distance > 0) {
+      onStatsUpdate(routeStats);
+    }
+  }, [routeStats, onStatsUpdate]);
 
   // Handle lasso selection
   const handleLassoSelection = (selectedBins: Bin[]) => {
@@ -442,7 +419,7 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
       })}
 
       {/* Stats Overlay */}
-      {bins.length >= 2 && routeStats?.distance > 0 && (
+      {bins.length >= 2 && routeStats.distance > 0 && (
         <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg px-4 py-3 border border-gray-200">
           <div className="flex items-center gap-4 text-sm">
             <div>
@@ -457,7 +434,7 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
             <div className="w-px h-8 bg-gray-200" />
             <div>
               <p className="text-xs text-gray-500">Est. Time</p>
-              <p className="font-semibold text-gray-900">{formatDuration(routeStats.duration)}</p>
+              <p className="font-semibold text-gray-900">{routeStats.duration.toFixed(1)}h</p>
             </div>
           </div>
         </div>
@@ -487,7 +464,6 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
   const [lassoMode, setLassoMode] = useState(false);
   const [optimizeMode, setOptimizeMode] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
-  const [currentRouteStats, setCurrentRouteStats] = useState<{ distance: number; duration: number }>({ distance: 0, duration: 0 });
   const [beforeStats, setBeforeStats] = useState<{ distance: number; duration: number } | null>(null);
   const [afterStats, setAfterStats] = useState<{ distance: number; duration: number } | null>(null);
   const [manualBinOrder, setManualBinOrder] = useState<string[]>([]);
@@ -495,6 +471,8 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
   const [isCopyDropdownOpen, setIsCopyDropdownOpen] = useState(false);
   const [isCopyClosing, setIsCopyClosing] = useState(false);
   const copyDropdownRef = useRef<HTMLDivElement>(null);
+  const currentStatsRef = useRef<{ distance: number; duration: number }>({ distance: 0, duration: 0 });
+  const waitingForAfterStats = useRef(false);
   const [isClosing, setIsClosing] = useState(false);
   const [isOpening, setIsOpening] = useState(true);
 
@@ -514,30 +492,6 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
       setSelectedBins(selected);
     }
   }, [editRoute, allBins]);
-
-  // Log when currentRouteStats changes
-  useEffect(() => {
-    console.log('📊 Parent: currentRouteStats updated:', {
-      distance: currentRouteStats.distance.toFixed(2) + ' mi',
-      duration: currentRouteStats.duration.toFixed(2) + ' h'
-    });
-  }, [currentRouteStats]);
-
-  // Capture AFTER stats when route recalculates after optimization
-  useEffect(() => {
-    // Only capture if we're in optimize mode, have BEFORE stats, don't have AFTER yet, and stats are different
-    if (optimizeMode && beforeStats && !afterStats && currentRouteStats.distance > 0) {
-      // Check if the distance changed (meaning route was recalculated)
-      if (Math.abs(currentRouteStats.distance - beforeStats.distance) > 0.01) {
-        console.log('📊 AFTER stats captured:', {
-          distance: currentRouteStats.distance.toFixed(2) + ' mi',
-          duration: currentRouteStats.duration.toFixed(2) + ' h',
-          savings: (beforeStats.distance - currentRouteStats.distance).toFixed(2) + ' mi'
-        });
-        setAfterStats({ ...currentRouteStats });
-      }
-    }
-  }, [optimizeMode, beforeStats, afterStats, currentRouteStats]);
 
   // Close dropdown with animation
   const closeCopyDropdown = () => {
@@ -672,21 +626,22 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
           const optimizedBinIds = data.optimized_bin_ids;
           console.log('🔄 Optimized bin IDs (NEW order):', optimizedBinIds);
 
-          // STEP 1: Capture BEFORE stats from current route
-          setBeforeStats({ ...currentRouteStats });
+          // STEP 1: Capture BEFORE stats from the bottom overlay (current route via Mapbox)
+          setBeforeStats({ ...currentStatsRef.current });
           setManualBinOrder([...formData.bin_ids]);
 
           console.log('📊 BEFORE stats captured:', {
-            distance: currentRouteStats.distance.toFixed(2) + ' mi',
-            duration: currentRouteStats.duration.toFixed(2) + ' h'
+            distance: currentStatsRef.current.distance.toFixed(2) + ' mi',
+            duration: currentStatsRef.current.duration.toFixed(2) + ' h'
           });
 
-          // STEP 2: Reorder bins - this will trigger RoutePreview to recalculate with new stats
+          // STEP 2: Reorder bins - this will trigger RoutePreview to recalculate
           const reorderedBins = optimizedBinIds
             .map((id: string) => selectedBins.find(b => b.id === id))
             .filter((b: Bin | undefined): b is Bin => b !== undefined);
 
           console.log('🔄 Reordered bins (AFTER optimization):', reorderedBins.map((b, i) => `${i+1}. Bin #${b.bin_number}`));
+          console.log('❓ Order changed?', JSON.stringify(selectedBins.map(b => b.id)) !== JSON.stringify(optimizedBinIds));
 
           setSelectedBins(reorderedBins);
           setFormData({
@@ -694,10 +649,10 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
             bin_ids: optimizedBinIds,
           });
 
-          // Enable optimize mode
+          // Enable optimize mode (will show BEFORE/AFTER once afterStats is set)
           setOptimizeMode(true);
 
-          console.log('✅ OPTIMIZE ROUTE - Bins reordered, waiting for Mapbox recalculation...');
+          console.log('✅ OPTIMIZE ROUTE - COMPLETE (waiting for AFTER stats from RoutePreview)');
         } else {
           console.error('❌ API returned unexpected data structure:', data);
         }
@@ -749,27 +704,12 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
       schedule_pattern,
       bin_ids: formData.bin_ids,
       bin_count: formData.bin_ids.length,
-      estimated_duration_hours: afterStats?.duration || beforeStats?.duration || currentRouteStats?.duration || 6,
+      estimated_duration_hours: afterStats?.duration || currentRouteStats.duration || 6,
     });
     handleClose();
   };
 
   const mappableBins = selectedBins.filter(isMappableBin);
-
-  // Simple stats update - update current stats state and optionally set AFTER stats
-  const handleStatsUpdate = useCallback((stats: { distance: number; duration: number }) => {
-    // Always update the current stats state (for bottom overlay display)
-    setCurrentRouteStats(stats);
-
-    // If we're in optimize mode and waiting for AFTER stats, capture them once
-    if (optimizeMode && beforeStats && !afterStats) {
-      console.log('📊 AFTER stats captured:', {
-        distance: stats.distance.toFixed(2) + ' mi',
-        duration: stats.duration.toFixed(2) + ' h'
-      });
-      setAfterStats({ ...stats });
-    }
-  }, [optimizeMode, beforeStats, afterStats]);
 
   return (
     <div className={`fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 transition-opacity duration-200 ${isClosing ? 'opacity-0' : isOpening ? 'opacity-0' : 'opacity-100'}`}>
@@ -931,7 +871,7 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
                         'Optimizing...'
                       ) : optimizeMode ? (
                         <>
-                          <span className="group-hover:hidden">Optimized</span>
+                          <span className="group-hover:hidden">Optimized ✓</span>
                           <span className="hidden group-hover:inline">Revert to Original</span>
                         </>
                       ) : (
@@ -954,7 +894,7 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
                 )}
 
                 {optimizeMode && beforeStats && afterStats && (
-                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-300 rounded-lg p-3 mb-3 shadow-sm animate-in slide-in-from-top-2 fade-in duration-300">
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-300 rounded-lg p-3 mb-3 shadow-sm">
                     <div className="flex items-start gap-2">
                       <Sparkles className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
                       <div className="flex-1">
@@ -968,7 +908,7 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
                               {beforeStats.distance.toFixed(1)} mi
                             </p>
                             <p className="text-xs text-gray-700">
-                              {formatDuration(beforeStats.duration)}
+                              {beforeStats.duration.toFixed(1)}h
                             </p>
                           </div>
                           <div className="bg-white/80 rounded-md p-2 ring-2 ring-green-400">
@@ -977,7 +917,7 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
                               {afterStats.distance.toFixed(1)} mi
                             </p>
                             <p className="text-xs text-green-700 font-semibold">
-                              {formatDuration(afterStats.duration)}
+                              {afterStats.duration.toFixed(1)}h
                             </p>
                           </div>
                         </div>

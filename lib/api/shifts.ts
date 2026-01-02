@@ -103,43 +103,59 @@ interface BackendDriver {
  */
 export async function getShifts(): Promise<Shift[]> {
   try {
+    console.log('🔍 Fetching shifts from backend...');
+
     // Get all drivers with shift info
     const driversResponse = await fetch(`${API_BASE_URL}/api/manager/drivers`, {
       headers: getAuthHeaders(),
     });
 
+    console.log(`📡 Response status: ${driversResponse.status}`);
+
     // Handle authentication errors gracefully
     if (driversResponse.status === 401) {
-      console.warn('⚠️  Backend requires authentication. Shifts will not load until auth is implemented.');
+      console.warn('⚠️  Backend requires authentication. No shifts will load.');
       return [];
     }
 
     if (!driversResponse.ok) {
-      throw new Error(`Failed to fetch drivers: ${driversResponse.statusText}`);
+      console.warn('⚠️  Backend unavailable:', driversResponse.statusText);
+      return [];
     }
 
     const driversData = await driversResponse.json();
+    console.log('📦 Drivers data received:', driversData);
+
     const drivers: BackendDriver[] = driversData.data || [];
+    console.log(`👥 Found ${drivers.length} drivers total`);
 
     // Filter drivers with shifts and convert to frontend Shift format
-    const shifts: Shift[] = drivers
-      .filter(driver => driver.shift_id) // Only drivers with active shifts
-      .map(driver => convertBackendShiftToFrontend(driver));
+    const driversWithShifts = drivers.filter(driver => driver.shift_id);
+    console.log(`✅ ${driversWithShifts.length} drivers have active shifts`);
 
+    const shifts: Shift[] = driversWithShifts.map(driver => {
+      const shift = convertBackendShiftToFrontend(driver);
+      console.log(`   - ${driver.driver_name}: ${driver.status} (${driver.total_bins} bins)`);
+      return shift;
+    });
+
+    console.log(`📊 Returning ${shifts.length} shifts`);
     return shifts;
   } catch (error) {
-    console.error('Error fetching shifts:', error);
-    // Return empty array instead of throwing to prevent UI crash
+    console.error('❌ Error fetching shifts:', error);
     return [];
   }
 }
 
 /**
  * Fetches detailed shift information including bin list
+ * @param driverId - The driver ID to fetch shift details for
  */
-export async function getShiftDetails(shiftId: string): Promise<BackendShiftDetails> {
+export async function getShiftDetailsByDriverId(driverId: string): Promise<BackendShiftDetails> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/manager/driver-shift-details?shift_id=${shiftId}`);
+    const response = await fetch(`${API_BASE_URL}/api/manager/driver-shift-details?driver_id=${driverId}`, {
+      headers: getAuthHeaders(),
+    });
 
     if (!response.ok) {
       throw new Error(`Failed to fetch shift details: ${response.statusText}`);
@@ -151,6 +167,11 @@ export async function getShiftDetails(shiftId: string): Promise<BackendShiftDeta
     console.error('Error fetching shift details:', error);
     throw error;
   }
+}
+
+// Alias for backwards compatibility - now expects driver ID
+export async function getShiftDetails(driverId: string): Promise<BackendShiftDetails> {
+  return getShiftDetailsByDriverId(driverId);
 }
 
 /**
@@ -221,29 +242,57 @@ function convertBackendShiftToFrontend(driver: BackendDriver): Shift {
 
   const status = statusMap[driver.status] || 'scheduled';
 
-  // Convert Unix timestamp to ISO date string (YYYY-MM-DD)
+  // Convert Unix timestamp to local date string (YYYY-MM-DD)
+  // Use local timezone instead of UTC to avoid date shifts
+  const getLocalDateString = (timestamp: number): string => {
+    const d = new Date(timestamp * 1000);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
   const date = driver.start_time
-    ? new Date(driver.start_time * 1000).toISOString().split('T')[0]
-    : new Date(driver.updated_at! * 1000).toISOString().split('T')[0];
+    ? getLocalDateString(driver.start_time)
+    : getLocalDateString(driver.updated_at!);
 
-  // Extract time from timestamp
+  console.log(`   📅 Shift date for ${driver.driver_name}: ${date} (from timestamp: ${driver.start_time})`);
+
+  // Helper: Convert timestamp to 12-hour AM/PM format
+  const formatTime12Hour = (timestamp: number): string => {
+    const d = new Date(timestamp * 1000);
+    let hours = d.getHours();
+    const minutes = d.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12; // 0 should be 12
+    const minutesStr = minutes < 10 ? '0' + minutes : minutes;
+    return `${hours}:${minutesStr} ${ampm}`;
+  };
+
+  // Extract time from timestamp in 12-hour format
   const startTime = driver.start_time
-    ? new Date(driver.start_time * 1000).toTimeString().slice(0, 5)
-    : '08:00';
+    ? formatTime12Hour(driver.start_time)
+    : '8:00 AM';
 
-  // Calculate estimated completion time if active
+  // Calculate end time (8-hour shift) and estimated completion
+  let endTime: string;
   let estimatedCompletion: string | undefined;
-  if (driver.status === 'active' && driver.start_time) {
-    // Assume 8-hour shift
-    const estimatedEnd = new Date((driver.start_time + 8 * 3600) * 1000);
-    estimatedCompletion = estimatedEnd.toISOString();
+
+  if (driver.start_time) {
+    const endTimestamp = driver.start_time + 8 * 3600; // 8 hours later
+    endTime = formatTime12Hour(endTimestamp);
+
+    if (driver.status === 'active') {
+      const estimatedEnd = new Date(endTimestamp * 1000);
+      estimatedCompletion = estimatedEnd.toISOString();
+    }
+  } else {
+    endTime = '4:00 PM'; // Default end time
   }
 
   return {
     id: driver.shift_id!,
     date,
     startTime,
-    endTime: '16:00', // Default 8-hour shift
+    endTime,
     driverId: driver.driver_id,
     driverName: driver.driver_name,
     driverPhoto: undefined,

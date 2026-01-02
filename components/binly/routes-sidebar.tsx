@@ -4,6 +4,14 @@ import { useState, useEffect, useRef } from 'react';
 import { Route } from '@/lib/types/route';
 import { Package, Clock, MapPin, Calendar, Search, X, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 
+// Format duration: show minutes if < 1 hour, otherwise show hours
+const formatDuration = (hours: number): string => {
+  if (hours < 1) {
+    return `${Math.round(hours * 60)} min`;
+  }
+  return `${hours.toFixed(1)}h`;
+};
+
 type SortOption =
   | 'name-asc'
   | 'name-desc'
@@ -281,7 +289,7 @@ export function RoutesSidebar({ routes, selectedRouteId, visibleRouteIds, onRout
                 <div className="flex items-center gap-1.5 bg-white/50 rounded-md px-2 py-1">
                   <Clock className="w-3.5 h-3.5 text-gray-500" />
                   <div>
-                    <span className="text-sm font-semibold text-gray-900">{route.estimated_duration_hours}h</span>
+                    <span className="text-sm font-semibold text-gray-900">{formatDuration(route.estimated_duration_hours)}</span>
                   </div>
                 </div>
               </div>

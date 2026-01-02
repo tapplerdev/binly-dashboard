@@ -11,6 +11,14 @@ import { Loader2 } from 'lucide-react';
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 11;
 
+// Format duration: show minutes if < 1 hour, otherwise show hours
+const formatDuration = (hours: number): string => {
+  if (hours < 1) {
+    return `${Math.round(hours * 60)} min`;
+  }
+  return `${hours.toFixed(1)}h`;
+};
+
 // Route colors based on status/type
 const ROUTE_COLORS = [
   '#4880FF', // Primary blue
@@ -302,7 +310,7 @@ function AllRoutesPolylines({ routes, visibleRouteIds, allBins, onRouteSelect, o
               </div>
               <div className="text-sm">
                 <span className="text-gray-500">Duration:</span>
-                <span className="font-semibold text-gray-900 ml-1">{hoveredRoute.route.estimated_duration_hours}h</span>
+                <span className="font-semibold text-gray-900 ml-1">{formatDuration(hoveredRoute.route.estimated_duration_hours)}</span>
               </div>
             </div>
 

@@ -7,6 +7,14 @@ import { RouteMapView } from './route-map-view';
 import { getBins } from '@/lib/api/bins';
 import { Bin } from '@/lib/types/bin';
 
+// Format duration: show minutes if < 1 hour, otherwise show hours
+const formatDuration = (hours: number): string => {
+  if (hours < 1) {
+    return `${Math.round(hours * 60)} min`;
+  }
+  return `${hours.toFixed(1)}h`;
+};
+
 interface RouteDetailsDrawerProps {
   route: Route;
   onClose: () => void;
@@ -86,7 +94,7 @@ export function RouteDetailsDrawer({ route, onClose, onEdit, onDelete, onDuplica
                   <Clock className="w-5 h-5 text-gray-400" />
                   <span className="text-sm text-gray-600">Est. Duration</span>
                 </div>
-                <p className="text-2xl font-bold text-gray-900">{route.estimated_duration_hours}h</p>
+                <p className="text-2xl font-bold text-gray-900">{formatDuration(route.estimated_duration_hours)}</p>
               </div>
 
               <div className="bg-white rounded-lg p-4 border border-gray-200">

@@ -1,15 +1,20 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Calendar, List, User, X, Search, ChevronDown, Filter } from 'lucide-react';
+import { Calendar, List, User, X, Search, ChevronDown, Filter, MapPin, Loader2 } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel, ShiftStatus } from '@/lib/types/shift';
 import { ShiftDetailsDrawer } from './shift-details-drawer';
 import { BinSelectionMap } from './bin-selection-map';
 import { Route, getRouteLabel } from '@/lib/types/route';
 import { useShifts, useAssignRoute } from '@/lib/hooks/use-shifts';
 import { useRoutes } from '@/lib/hooks/use-routes';
+import { useActiveDrivers } from '@/lib/hooks/use-active-drivers';
+import { useDrivers } from '@/lib/hooks/use-drivers';
+import { ActiveDriver } from '@/lib/types/active-driver';
+import { LiveOpsMap } from './live-ops-map';
+import { useAuthStore } from '@/lib/auth/store';
 
-type ViewMode = 'list' | 'timeline';
+type ViewMode = 'list' | 'timeline' | 'live';
 
 interface ShiftFilters {
   searchQuery: string;
@@ -25,7 +30,7 @@ export function ShiftsView() {
   const assignRouteMutation = useAssignRoute();
 
   // Local state
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [viewMode, setViewMode] = useState<ViewMode>('live');
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [filters, setFilters] = useState<ShiftFilters>({
@@ -38,6 +43,7 @@ export function ShiftsView() {
 
   const listButtonRef = useRef<HTMLButtonElement>(null);
   const timelineButtonRef = useRef<HTMLButtonElement>(null);
+  const liveButtonRef = useRef<HTMLButtonElement>(null);
   const [sliderStyle, setSliderStyle] = useState({ left: 0, width: 0 });
 
   const lastWeekRef = useRef<HTMLButtonElement>(null);
@@ -48,7 +54,10 @@ export function ShiftsView() {
   // Update slider position when view mode changes
   useEffect(() => {
     const updateSlider = () => {
-      const button = viewMode === 'list' ? listButtonRef.current : timelineButtonRef.current;
+      const button =
+        viewMode === 'list' ? listButtonRef.current :
+        viewMode === 'timeline' ? timelineButtonRef.current :
+        liveButtonRef.current;
       if (button) {
         setSliderStyle({
           left: button.offsetLeft,
@@ -83,7 +92,7 @@ export function ShiftsView() {
 
   // Helper function to get week range for date filtering
   const getWeekRange = (dateRange: 'this-week' | 'next-week' | 'last-week' | 'all') => {
-    const today = new Date('2025-12-27'); // Mock current date
+    const today = new Date(); // Current date
     const currentDay = today.getDay();
     const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
 
@@ -181,27 +190,31 @@ export function ShiftsView() {
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
               <h1 className="text-2xl font-semibold text-gray-900">Shifts</h1>
-              <button
-                onClick={() => setIsCreateDrawerOpen(true)}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-fast shadow-sm"
-              >
-                Create Shift
-              </button>
+              {viewMode !== 'live' && (
+                <button
+                  onClick={() => setIsCreateDrawerOpen(true)}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-fast shadow-sm"
+                >
+                  Create Shift
+                </button>
+              )}
             </div>
 
-            {/* Filter Bar */}
-            <FilterBar
-              filters={filters}
-              setFilters={setFilters}
-              availableDrivers={availableDrivers}
-              availableRoutes={availableRoutes}
-              activeFilterCount={activeFilterCount}
-              onClearAll={clearAllFilters}
-              lastWeekRef={lastWeekRef}
-              thisWeekRef={thisWeekRef}
-              nextWeekRef={nextWeekRef}
-              dateSliderStyle={dateSliderStyle}
-            />
+            {/* Filter Bar - Hidden in Live Ops mode */}
+            {viewMode !== 'live' && (
+              <FilterBar
+                filters={filters}
+                setFilters={setFilters}
+                availableDrivers={availableDrivers}
+                availableRoutes={availableRoutes}
+                activeFilterCount={activeFilterCount}
+                onClearAll={clearAllFilters}
+                lastWeekRef={lastWeekRef}
+                thisWeekRef={thisWeekRef}
+                nextWeekRef={nextWeekRef}
+                dateSliderStyle={dateSliderStyle}
+              />
+            )}
 
             {/* View Toggle */}
             <div className="flex items-center justify-center gap-2 bg-gray-100 rounded-lg p-1 w-fit mx-auto relative">
@@ -239,6 +252,18 @@ export function ShiftsView() {
                 <Calendar className="w-4 h-4" />
                 Timeline
               </button>
+              <button
+                ref={liveButtonRef}
+                onClick={() => setViewMode('live')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-fast relative z-10 ${
+                  viewMode === 'live'
+                    ? 'text-gray-900'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <MapPin className="w-4 h-4" />
+                Live Ops
+              </button>
             </div>
           </div>
 
@@ -251,8 +276,10 @@ export function ShiftsView() {
             <div className="max-w-4xl mx-auto">
               <ShiftsListView shifts={filteredShifts} onShiftClick={setSelectedShift} />
             </div>
-          ) : (
+          ) : viewMode === 'timeline' ? (
             <ShiftsTimelineView shifts={filteredShifts} onShiftClick={setSelectedShift} />
+          ) : (
+            <LiveOpsView shifts={shifts} />
           )}
         </div>
       </div>
@@ -685,7 +712,38 @@ function ShiftsListView({ shifts, onShiftClick }: { shifts: Shift[]; onShiftClic
   }, {} as Record<string, Shift[]>);
 
   const sortedDates = Object.keys(groupedShifts).sort();
-  const today = '2025-12-27'; // Mock today's date
+
+  // Get today's date in YYYY-MM-DD format (local timezone)
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  // Helper to format date label
+  const getDateLabel = (dateStr: string) => {
+    // Direct string comparison for today
+    if (dateStr === todayStr) {
+      return 'Today';
+    }
+
+    // Calculate tomorrow and yesterday
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
+    if (dateStr === tomorrowStr) {
+      return 'Tomorrow';
+    }
+    if (dateStr === yesterdayStr) {
+      return 'Yesterday';
+    }
+
+    // Format as "Mon, Jan 1"
+    const shiftDate = new Date(dateStr + 'T00:00:00'); // Add time to avoid timezone issues
+    return shiftDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
 
   return (
     <div className="space-y-8">
@@ -693,14 +751,13 @@ function ShiftsListView({ shifts, onShiftClick }: { shifts: Shift[]; onShiftClic
         const shifts = groupedShifts[date];
         const activeShifts = shifts.filter((s) => s.status === 'active').length;
         const totalBins = shifts.reduce((sum, s) => sum + s.binCount, 0);
-        const isToday = date === today;
 
         return (
           <div key={date}>
             {/* Date Header */}
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-gray-900">
-                {isToday ? 'Today' : 'Tomorrow'} · {activeShifts} Active Shift
+                {getDateLabel(date)} · {activeShifts} Active Shift
                 {activeShifts !== 1 ? 's' : ''} · {totalBins} Bins Total
               </h2>
             </div>
@@ -744,7 +801,7 @@ function ShiftCard({ shift, onClick }: { shift: Shift; onClick: () => void }) {
       <div className="flex items-center gap-4">
         {/* Time */}
         <div className={`flex-shrink-0 text-sm font-medium ${isActive ? 'text-white' : 'text-gray-900'}`}>
-          {shift.startTime} AM - {shift.endTime.replace(':', ':')} PM
+          {shift.startTime} - {shift.endTime}
         </div>
 
         {/* Route */}
@@ -784,15 +841,18 @@ function ShiftCard({ shift, onClick }: { shift: Shift; onClick: () => void }) {
 
 // Timeline View Component
 function ShiftsTimelineView({ shifts, onShiftClick }: { shifts: Shift[]; onShiftClick: (shift: Shift) => void }) {
-  // Generate week dates (Mon 25 - Sun 31)
+  const [timeScale, setTimeScale] = useState<'week' | 'today'>('week');
+
+  // Generate week dates for this week (Dec 29 2025 - Jan 4 2026)
+  // Jan 1, 2026 is a Thursday, so the week is Mon Dec 29 - Sun Jan 4
   const weekDates = [
-    { day: 'Mon', date: 25 },
-    { day: 'Tue', date: 26 },
-    { day: 'Wed', date: 27 },
-    { day: 'Thu', date: 28 },
-    { day: 'Fri', date: 29 },
-    { day: 'Sat', date: 30 },
-    { day: 'Sun', date: 31 },
+    { day: 'Mon', date: 29, fullDate: '2025-12-29' },
+    { day: 'Tue', date: 30, fullDate: '2025-12-30' },
+    { day: 'Wed', date: 31, fullDate: '2025-12-31' },
+    { day: 'Thu', date: 1, fullDate: '2026-01-01' },  // Today
+    { day: 'Fri', date: 2, fullDate: '2026-01-02' },
+    { day: 'Sat', date: 3, fullDate: '2026-01-03' },
+    { day: 'Sun', date: 4, fullDate: '2026-01-04' },
   ];
 
   // Get unique drivers from filtered shifts
@@ -807,6 +867,66 @@ function ShiftsTimelineView({ shifts, onShiftClick }: { shifts: Shift[]; onShift
   const shiftsByDriverAndDate = shifts.reduce((acc, shift) => {
     const dateNum = parseInt(shift.date.split('-')[2]);
     const key = `${shift.driverId}-${dateNum}`;
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(shift);
+    return acc;
+  }, {} as Record<string, Shift[]>);
+
+  return (
+    <div className="space-y-6">
+      {/* Week/Today Toggle */}
+      <div className="flex items-center justify-center">
+        <div className="inline-flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => setTimeScale('week')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-fast ${
+              timeScale === 'week'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Week View
+          </button>
+          <button
+            onClick={() => setTimeScale('today')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-fast ${
+              timeScale === 'today'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Today View
+          </button>
+        </div>
+      </div>
+
+      {/* Render appropriate view */}
+      {timeScale === 'week' ? (
+        <WeeklyTimeline shifts={shifts} weekDates={weekDates} drivers={drivers} onShiftClick={onShiftClick} />
+      ) : (
+        <DailyGantt shifts={shifts} drivers={drivers} onShiftClick={onShiftClick} />
+      )}
+    </div>
+  );
+}
+
+// Weekly Timeline Component (existing weekly view)
+function WeeklyTimeline({
+  shifts,
+  weekDates,
+  drivers,
+  onShiftClick
+}: {
+  shifts: Shift[];
+  weekDates: { day: string; date: number; fullDate: string }[];
+  drivers: { name: string; id: string }[];
+  onShiftClick: (shift: Shift) => void;
+}) {
+  // Group shifts by driver and full date
+  const shiftsByDriverAndDate = shifts.reduce((acc, shift) => {
+    const key = `${shift.driverId}-${shift.date}`;
     if (!acc[key]) {
       acc[key] = [];
     }
@@ -853,10 +973,10 @@ function ShiftsTimelineView({ shifts, onShiftClick }: { shifts: Shift[]; onShift
 
                 {/* Day Cells */}
                 {weekDates.map((d) => {
-                  const shifts = shiftsByDriverAndDate[`${driver.id}-${d.date}`] || [];
+                  const shifts = shiftsByDriverAndDate[`${driver.id}-${d.fullDate}`] || [];
                   return (
                     <td
-                      key={d.date}
+                      key={d.fullDate}
                       style={{
                         padding: '12px',
                         verticalAlign: 'top',
@@ -938,6 +1058,194 @@ function TimelineShiftBlock({ shift, onClick }: { shift: Shift; onClick: () => v
   );
 }
 
+// Daily Gantt Component - Hourly view for today's operations
+function DailyGantt({
+  shifts,
+  drivers,
+  onShiftClick
+}: {
+  shifts: Shift[];
+  drivers: { name: string; id: string }[];
+  onShiftClick: (shift: Shift) => void;
+}) {
+  // Filter only today's shifts - get actual current date
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const todayShifts = shifts.filter(shift => shift.date === today);
+
+  // Hour columns: 6 AM to 6 PM (12 hours)
+  const hours = Array.from({ length: 13 }, (_, i) => i + 6); // 6, 7, 8, ..., 18
+
+  // Helper: Convert time string "8:36 PM" or "08:00" to hour number (with decimals for minutes)
+  const timeToHour = (timeStr: string): number => {
+    // Handle 12-hour format (e.g., "8:36 PM")
+    if (timeStr.includes('AM') || timeStr.includes('PM')) {
+      const isPM = timeStr.includes('PM');
+      const [time] = timeStr.split(' ');
+      const [hourStr, minStr] = time.split(':');
+      let hour = parseInt(hourStr);
+      const minutes = parseInt(minStr) || 0;
+
+      // Convert to 24-hour format
+      if (isPM && hour !== 12) {
+        hour += 12;
+      } else if (!isPM && hour === 12) {
+        hour = 0;
+      }
+
+      // Return hour with decimal for minutes (e.g., 8:30 = 8.5)
+      return hour + minutes / 60;
+    }
+
+    // Handle 24-hour format (e.g., "08:00")
+    const [hourStr, minStr] = timeStr.split(':');
+    const hour = parseInt(hourStr);
+    const minutes = parseInt(minStr) || 0;
+    return hour + minutes / 60;
+  };
+
+  // Helper: Calculate shift position and width
+  const getShiftStyle = (shift: Shift) => {
+    const startHour = timeToHour(shift.startTime);
+    const endHour = timeToHour(shift.endTime);
+
+    // Position from left (relative to 6 AM)
+    const left = ((startHour - 6) / 12) * 100;
+
+    // Width based on duration
+    const width = ((endHour - startHour) / 12) * 100;
+
+    return { left: `${left}%`, width: `${width}%` };
+  };
+
+  return (
+    <div className="overflow-x-auto pb-6">
+      <table className="w-full" style={{ minWidth: '1400px', borderCollapse: 'collapse' }}>
+        {/* Table Header - Hourly Time Axis */}
+        <thead>
+          <tr>
+            <th style={{ width: '160px', padding: '16px 20px', textAlign: 'left', fontWeight: 600, fontSize: '13px', color: '#6b7280', backgroundColor: '#f9fafb', border: '1px solid #e5e7eb' }}>
+              Driver
+            </th>
+            {hours.map((hour) => (
+              <th
+                key={hour}
+                style={{ width: '100px', padding: '12px 8px', textAlign: 'center', fontWeight: 600, fontSize: '12px', color: '#111827', backgroundColor: '#f9fafb', border: '1px solid #e5e7eb' }}
+              >
+                {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
+              </th>
+            ))}
+          </tr>
+        </thead>
+
+        {/* Table Body */}
+        <tbody>
+          {drivers.map((driver) => {
+            // Find shifts for this driver today
+            const driverShifts = todayShifts.filter(s => s.driverId === driver.id);
+
+            return (
+              <tr key={driver.id}>
+                {/* Driver Name Cell */}
+                <td style={{ padding: '20px', verticalAlign: 'middle', backgroundColor: '#f9fafb', border: '1px solid #e5e7eb' }}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0 text-white font-semibold text-sm">
+                      {driver.name.split(' ').map(n => n[0]).join('')}
+                    </div>
+                    <span style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                      {driver.name}
+                    </span>
+                  </div>
+                </td>
+
+                {/* Timeline Cell - Spans all hour columns */}
+                <td
+                  colSpan={hours.length}
+                  style={{
+                    padding: '12px',
+                    verticalAlign: 'middle',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e5e7eb',
+                    position: 'relative',
+                    height: '80px'
+                  }}
+                >
+                  {/* Render shift blocks positioned by time */}
+                  {driverShifts.length > 0 ? (
+                    driverShifts.map((shift) => {
+                      const style = getShiftStyle(shift);
+                      const isActive = shift.status === 'active';
+                      const progressPercentage = isActive && shift.binsCollected
+                        ? Math.round((shift.binsCollected / shift.binCount) * 100)
+                        : 0;
+
+                      return (
+                        <div
+                          key={shift.id}
+                          onClick={() => onShiftClick(shift)}
+                          style={{
+                            position: 'absolute',
+                            left: style.left,
+                            width: style.width,
+                            top: '12px',
+                            bottom: '12px',
+                            background: isActive
+                              ? 'linear-gradient(90deg, rgba(22, 163, 74, 0.95) 0%, rgba(34, 197, 94, 0.85) 50%, rgba(202, 138, 4, 0.75) 100%)'
+                              : '#3b82f6',
+                            borderRadius: '8px',
+                            padding: '8px 12px',
+                            color: '#ffffff',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            boxShadow: isActive
+                              ? '0 0 25px rgba(22, 163, 74, 0.5), 0 4px 6px -1px rgb(0 0 0 / 0.2)'
+                              : '0 2px 4px rgba(0,0,0,0.1)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center',
+                            overflow: 'hidden'
+                          }}
+                          className="hover:shadow-lg hover:scale-[1.02] transition-all"
+                          title={`${shift.route} - ${shift.binCount} bins`}
+                        >
+                          <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '2px' }}>
+                            {shift.route.split(' - ')[0]}
+                          </div>
+                          <div style={{ fontSize: '11px', opacity: 0.9 }}>
+                            {shift.startTime} - {shift.endTime}
+                          </div>
+                          {isActive && (
+                            <div style={{ fontSize: '10px', opacity: 0.9, marginTop: '2px' }}>
+                              {shift.binsCollected}/{shift.binCount} ({progressPercentage}%)
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', transform: 'translateY(-50%)', textAlign: 'center', color: '#9ca3af', fontSize: '12px' }}>
+                      No shifts today
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+
+          {/* Empty state if no drivers */}
+          {drivers.length === 0 && (
+            <tr>
+              <td colSpan={hours.length + 1} style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>
+                No drivers found
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // Create Shift Drawer Component
 function CreateShiftDrawer({
   onClose,
@@ -947,6 +1255,7 @@ function CreateShiftDrawer({
   assignRouteMutation: ReturnType<typeof useAssignRoute>;
 }) {
   const { data: routes = [], isLoading: loadingRoutes } = useRoutes();
+  const { data: drivers = [], isLoading: loadingDrivers } = useDrivers();
   const [formData, setFormData] = useState({
     date: '2025-12-28',
     startTime: '08:00',
@@ -959,13 +1268,37 @@ function CreateShiftDrawer({
   const [showBinSelection, setShowBinSelection] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDriverDropdownOpen, setIsDriverDropdownOpen] = useState(false);
+  const [isDriverClosing, setIsDriverClosing] = useState(false);
+  const driverDropdownRef = useRef<HTMLDivElement>(null);
 
-  // TODO: Replace with real driver list from backend
-  const availableDrivers = [
-    { id: '1', name: 'Omar Gabr', status: 'Available' },
-    { id: '2', name: 'Maria Lopez', status: 'Available' },
-    { id: '3', name: 'Ariel Santos', status: 'Available' },
-  ];
+  // Close dropdown with animation
+  const closeDriverDropdown = () => {
+    setIsDriverClosing(true);
+    setTimeout(() => {
+      setIsDriverDropdownOpen(false);
+      setIsDriverClosing(false);
+    }, 150);
+  };
+
+  // Click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        isDriverDropdownOpen &&
+        driverDropdownRef.current &&
+        !driverDropdownRef.current.contains(event.target as Node)
+      ) {
+        closeDriverDropdown();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isDriverDropdownOpen]);
+
+  // Get selected driver info
+  const selectedDriver = drivers.find(d => d.id === formData.driverId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1093,19 +1426,88 @@ function CreateShiftDrawer({
                 </div>
                 <label className="text-sm font-semibold text-gray-900">Driver</label>
               </div>
-              <select
-                value={formData.driverId}
-                onChange={(e) => setFormData({ ...formData, driverId: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                required
-              >
-                <option value="">Select driver...</option>
-                {availableDrivers.map((driver) => (
-                  <option key={driver.id} value={driver.id}>
-                    {driver.name} · {driver.status}
-                  </option>
-                ))}
-              </select>
+
+              <div className="relative" ref={driverDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => isDriverDropdownOpen ? closeDriverDropdown() : setIsDriverDropdownOpen(true)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-left flex items-center justify-between hover:bg-gray-50 transition-fast"
+                >
+                  <span className={selectedDriver ? 'text-gray-900' : 'text-gray-500'}>
+                    {selectedDriver ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xs font-semibold">
+                          {selectedDriver.name.split(' ').map(n => n[0]).join('')}
+                        </div>
+                        <span className="font-medium">{selectedDriver.name}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          selectedDriver.status === 'available'
+                            ? 'bg-green-100 text-green-700'
+                            : selectedDriver.status === 'on-shift'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {selectedDriver.status === 'available' ? 'Available' :
+                           selectedDriver.status === 'on-shift' ? 'On Shift' : 'Unavailable'}
+                        </span>
+                      </div>
+                    ) : (
+                      'Select driver...'
+                    )}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                </button>
+
+                {isDriverDropdownOpen && (
+                  <div className={`absolute top-full mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto z-50 ${isDriverClosing ? 'animate-slide-out-up' : 'animate-slide-in-down'}`}>
+                    {loadingDrivers ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+                      </div>
+                    ) : drivers.length === 0 ? (
+                      <div className="text-center py-8 px-4">
+                        <User className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500">No drivers available</p>
+                        <p className="text-xs text-gray-400 mt-1">Please add drivers to continue</p>
+                      </div>
+                    ) : (
+                      <div className="p-2">
+                        {drivers.map((driver) => (
+                          <button
+                            key={driver.id}
+                            type="button"
+                            onClick={() => {
+                              setFormData({ ...formData, driverId: driver.id });
+                              closeDriverDropdown();
+                            }}
+                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-fast ${
+                              formData.driverId === driver.id ? 'bg-primary/5 border border-primary/20' : ''
+                            }`}
+                          >
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
+                              {driver.name.split(' ').map(n => n[0]).join('')}
+                            </div>
+                            <div className="flex-1 text-left min-w-0">
+                              <p className="font-medium text-gray-900 text-sm">{driver.name}</p>
+                              <p className="text-xs text-gray-500 truncate">{driver.email}</p>
+                            </div>
+                            <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ${
+                              driver.status === 'available'
+                                ? 'bg-green-100 text-green-700'
+                                : driver.status === 'on-shift'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-gray-100 text-gray-700'
+                            }`}>
+                              {driver.status === 'available' ? 'Available' :
+                               driver.status === 'on-shift' ? 'On Shift' : 'Unavailable'}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Step 4: Bin Assignment */}
@@ -1293,6 +1695,236 @@ function CreateShiftDrawer({
           initialSelectedBins={formData.selectedBins}
         />
       )}
+    </div>
+  );
+}
+
+// Live Ops View Component - Command Center
+function LiveOpsView({ shifts }: { shifts: Shift[] }) {
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+
+  // Get auth token from Zustand store
+  const { token } = useAuthStore();
+
+  // Use active drivers hook for real-time data
+  const { drivers: driversData, isLoading, error, wsStatus } = useActiveDrivers({
+    token: token || undefined,
+    enabled: true,
+  });
+
+  // ALWAYS ensure drivers is an array
+  const drivers = Array.isArray(driversData) ? driversData : [];
+
+  return (
+    <div className="flex gap-6" style={{ height: 'calc(100vh - 280px)' }}>
+      {/* Left Panel - Driver Fleet */}
+      <div className="w-80 bg-white border border-gray-200 rounded-xl flex flex-col shadow-sm">
+        {/* Panel Header */}
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Active Drivers</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                {drivers.length} driver{drivers.length !== 1 ? 's' : ''} on duty
+              </p>
+            </div>
+            {/* WebSocket status indicator */}
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  wsStatus === 'connected'
+                    ? 'bg-green-500 animate-pulse'
+                    : wsStatus === 'connecting'
+                    ? 'bg-yellow-500 animate-pulse'
+                    : 'bg-gray-400'
+                }`}
+                title={`WebSocket: ${wsStatus}`}
+              />
+              <span className="text-xs text-gray-500">
+                {wsStatus === 'connected' ? 'Live' : wsStatus === 'connecting' ? 'Connecting...' : 'Offline'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Driver List */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {error ? (
+            <div className="text-center py-12 px-4">
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+                <p className="text-sm text-red-600 font-medium">Failed to load drivers</p>
+                <p className="text-xs text-red-500 mt-1">{error.message}</p>
+              </div>
+              {!token && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                  <p className="text-sm text-yellow-700 font-medium">Authentication Required</p>
+                  <p className="text-xs text-yellow-600 mt-1">Please log in to view live driver tracking</p>
+                </div>
+              )}
+            </div>
+          ) : isLoading ? (
+            <div className="text-center py-12">
+              <Loader2 className="w-12 h-12 text-gray-300 mx-auto mb-3 animate-spin" />
+              <p className="text-sm text-gray-500">Loading drivers...</p>
+            </div>
+          ) : drivers.length === 0 ? (
+            <div className="text-center py-12">
+              <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm text-gray-500">No active shifts</p>
+              <p className="text-xs text-gray-400 mt-1">Drivers will appear here when they start their shifts</p>
+            </div>
+          ) : (
+            drivers.map((driver, index) => {
+              // Handle different field names from API
+              const driverId = driver.driverId || driver.driver_id || driver.id || `driver-${index}`;
+              return (
+                <DriverCard
+                  key={driverId}
+                  driver={driver}
+                  isSelected={driverId === selectedDriverId}
+                  onClick={() => setSelectedDriverId(driverId)}
+                />
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Right Panel - Live Map */}
+      <div className="flex-1 bg-white border border-gray-200 rounded-xl relative shadow-sm overflow-hidden">
+        <LiveOpsMap
+          drivers={drivers}
+          isLoading={isLoading}
+          selectedDriverId={selectedDriverId}
+          onDriverClick={setSelectedDriverId}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Driver Card Component for Live Ops
+function DriverCard({
+  driver,
+  isSelected,
+  onClick,
+}: {
+  driver: ActiveDriver;
+  isSelected: boolean;
+  onClick: () => void;
+}) {
+  // Log the driver data to see what we're getting
+  console.log('🚗 Driver Card Data:', driver);
+
+  const progressPercentage =
+    driver.completedBins && driver.totalBins
+      ? Math.round((driver.completedBins / driver.totalBins) * 100)
+      : 0;
+
+  // Get status color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active':
+        return { bg: 'bg-green-100', text: 'text-green-700', dot: 'bg-green-600' };
+      case 'paused':
+        return { bg: 'bg-yellow-100', text: 'text-yellow-700', dot: 'bg-yellow-600' };
+      case 'inactive':
+      case 'ended':
+        return { bg: 'bg-gray-100', text: 'text-gray-700', dot: 'bg-gray-600' };
+      default:
+        return { bg: 'bg-gray-100', text: 'text-gray-700', dot: 'bg-gray-600' };
+    }
+  };
+
+  const statusColor = getStatusColor(driver.status || 'inactive');
+
+  // Format last update time
+  const getLastUpdateTime = () => {
+    if (!driver.lastLocationUpdate) return 'No location data';
+
+    try {
+      const updateTime = new Date(driver.lastLocationUpdate);
+
+      // Check if valid date
+      if (isNaN(updateTime.getTime())) {
+        return 'Just now';
+      }
+
+      const now = new Date();
+      const diffMs = now.getTime() - updateTime.getTime();
+      const diffSecs = Math.floor(diffMs / 1000);
+
+      if (diffSecs < 0) return 'Just now';
+      if (diffSecs < 60) return `${diffSecs}s ago`;
+      if (diffSecs < 3600) return `${Math.floor(diffSecs / 60)}m ago`;
+      return `${Math.floor(diffSecs / 3600)}h ago`;
+    } catch (error) {
+      console.error('Error parsing timestamp:', error, driver.lastLocationUpdate);
+      return 'Just now';
+    }
+  };
+
+  // Get initials safely
+  const getInitials = (name: string | undefined) => {
+    if (!name) return '?';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const driverName = driver.driverName || 'Unknown Driver';
+  const routeName = driver.routeName || 'No route assigned';
+
+  return (
+    <div
+      className={`bg-white border-2 rounded-xl p-4 hover:shadow-md transition-all cursor-pointer ${
+        isSelected ? 'border-primary shadow-md' : 'border-gray-200'
+      }`}
+      onClick={onClick}
+    >
+      {/* Driver Info */}
+      <div className="flex items-start gap-3 mb-3">
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0 text-white font-semibold text-sm">
+          {getInitials(driverName)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-gray-900 truncate">{driverName}</h3>
+          <p className="text-xs text-gray-600">{routeName}</p>
+        </div>
+        <div className="flex-shrink-0">
+          <span className={`inline-flex items-center gap-1 px-2 py-1 ${statusColor.bg} ${statusColor.text} rounded-full text-xs font-medium`}>
+            <span className={`w-2 h-2 ${statusColor.dot} rounded-full ${driver.status === 'active' ? 'animate-pulse' : ''}`} />
+            {driver.status ? driver.status.charAt(0).toUpperCase() + driver.status.slice(1) : 'Unknown'}
+          </span>
+        </div>
+      </div>
+
+      {/* Progress */}
+      {driver.totalBins && driver.totalBins > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-600">Progress</span>
+            <span className="font-medium text-gray-900">
+              {driver.completedBins || 0}/{driver.totalBins} bins ({progressPercentage}%)
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div
+              className="bg-green-600 h-2 rounded-full transition-all"
+              style={{ width: `${progressPercentage}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Location Info */}
+      <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
+        <div className="flex items-center gap-1 text-gray-600">
+          <MapPin className="w-3 h-3" />
+          <span>{getLastUpdateTime()}</span>
+        </div>
+        {driver.currentLocation?.speed !== undefined && (
+          <span className="text-gray-600">{Math.round(driver.currentLocation.speed)} km/h</span>
+        )}
+      </div>
     </div>
   );
 }
