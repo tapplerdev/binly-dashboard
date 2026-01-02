@@ -197,7 +197,7 @@ export function LiveMapView() {
   };
 
   return (
-    <div className="relative h-screen w-full">
+    <div className="relative h-[calc(100vh-80px)] w-full">
       {/* Loading State */}
       {loading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-gray-100">
