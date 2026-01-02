@@ -51,7 +51,7 @@ export function useActiveDrivers({ token, enabled = true }: UseActiveDriversOpti
       const rawData = Array.isArray(responseData) ? responseData : responseData.data || [];
 
       // Transform snake_case to camelCase
-      const data: ActiveDriver[] = rawData.map((driver: any) => ({
+      const data: ActiveDriver[] = rawData.map((driver: Record<string, unknown>) => ({
         driverId: driver.driver_id || driver.driverId,
         driverName: driver.driver_name || driver.driverName || 'Unknown Driver',
         status: driver.status || 'inactive',
@@ -142,7 +142,7 @@ export function useActiveDrivers({ token, enabled = true }: UseActiveDriversOpti
     }
   };
 
-  const handleDriverLocationUpdate = (locationData: any) => {
+  const handleDriverLocationUpdate = (locationData: Record<string, unknown>) => {
     // Handle both snake_case (from backend) and camelCase
     const driverId = locationData.driver_id || locationData.driverId;
     const latitude = locationData.latitude;
@@ -192,7 +192,7 @@ export function useActiveDrivers({ token, enabled = true }: UseActiveDriversOpti
     });
   };
 
-  const handleShiftUpdate = (shiftData: any) => {
+  const handleShiftUpdate = (shiftData: Record<string, unknown>) => {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('📋 Updating Shift Data');
     console.log('   Shift ID:', shiftData.shiftId);

@@ -1,6 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getBins, getBinById, getBinChecks, getBinMoves, type BinCheck, type BinMove } from '@/lib/api/bins';
-import { Bin } from '@/lib/types/bin';
+import { useQuery } from '@tanstack/react-query';
+import { getBins, getBinById, getBinChecks, getBinMoves } from '@/lib/api/bins';
 
 // Query keys
 export const binKeys = {

@@ -7,7 +7,6 @@ import {
   verifyFieldObservation,
   getShiftIncidents,
 } from '@/lib/api/zones';
-import { NoGoZone, ZoneIncident } from '@/lib/types/zone';
 
 // Query keys
 export const zoneKeys = {

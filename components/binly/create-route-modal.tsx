@@ -984,7 +984,7 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
 
                         {/* Savings */}
                         <div className="bg-green-100 rounded-md p-2 border border-green-300">
-                          <p className="text-xs text-green-900 font-semibold mb-0.5">You'll save:</p>
+                          <p className="text-xs text-green-900 font-semibold mb-0.5">You&apos;ll save:</p>
                           <p className="text-xs text-green-700">
                             <strong>{(beforeStats.distance - afterStats.distance).toFixed(1)} mi</strong> •
                             <strong> {((beforeStats.duration - afterStats.duration) * 60).toFixed(0)} min</strong>

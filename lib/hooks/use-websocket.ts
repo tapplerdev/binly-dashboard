@@ -4,7 +4,7 @@ export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'err
 
 export interface WebSocketMessage {
   type: string;
-  data: any;
+  data: unknown;
 }
 
 interface UseWebSocketOptions {
@@ -103,8 +103,8 @@ export function useWebSocket({
         console.error('   URL:', url);
         console.error('   Error Object:', error);
         console.error('   ReadyState:', ws.readyState);
-        console.error('   Type:', (error as any).type);
-        console.error('   Target:', (error as any).target);
+        console.error('   Type:', (error as Event).type);
+        console.error('   Target:', (error as Event).target);
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         setStatus('error');
         onErrorRef.current?.(error);
@@ -148,7 +148,7 @@ export function useWebSocket({
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       setStatus('error');
     }
-  }, [url, autoReconnect, reconnectInterval, reconnectAttempts]);
+  }, [url, autoReconnect, reconnectInterval, reconnectAttempts, status]);
 
   const disconnect = useCallback(() => {
     console.log('Disconnecting WebSocket...');
