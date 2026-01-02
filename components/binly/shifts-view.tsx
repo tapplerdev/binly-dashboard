@@ -55,9 +55,9 @@ export function ShiftsView() {
   useEffect(() => {
     const updateSlider = () => {
       const button =
+        viewMode === 'live' ? liveButtonRef.current :
         viewMode === 'list' ? listButtonRef.current :
-        viewMode === 'timeline' ? timelineButtonRef.current :
-        liveButtonRef.current;
+        timelineButtonRef.current;
       if (button) {
         setSliderStyle({
           left: button.offsetLeft,
@@ -229,6 +229,18 @@ export function ShiftsView() {
                 }}
               />
               <button
+                ref={liveButtonRef}
+                onClick={() => setViewMode('live')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-fast relative z-10 ${
+                  viewMode === 'live'
+                    ? 'text-gray-900'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <MapPin className="w-4 h-4" />
+                Live
+              </button>
+              <button
                 ref={listButtonRef}
                 onClick={() => setViewMode('list')}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-fast relative z-10 ${
@@ -251,18 +263,6 @@ export function ShiftsView() {
               >
                 <Calendar className="w-4 h-4" />
                 Timeline
-              </button>
-              <button
-                ref={liveButtonRef}
-                onClick={() => setViewMode('live')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-fast relative z-10 ${
-                  viewMode === 'live'
-                    ? 'text-gray-900'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <MapPin className="w-4 h-4" />
-                Live Ops
               </button>
             </div>
           </div>
