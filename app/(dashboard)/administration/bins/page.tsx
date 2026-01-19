@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   getBinsWithPriority,
@@ -15,49 +15,183 @@ import { Button } from '@/components/ui/button';
 import { KpiCard } from '@/components/binly/kpi-card';
 import { BulkCreateBinModal } from '@/components/binly/bulk-create-bin-modal';
 import { BinDetailDrawer } from '@/components/binly/bin-detail-drawer';
+import { Dropdown, MultiSelectDropdown } from '@/components/ui/dropdown';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import {
   PackageSearch,
   AlertTriangle,
-  Archive,
   TrendingUp,
   Plus,
-  Filter,
-  ArrowUpDown,
   Calendar,
   Trash2,
   MapPin,
   Clock,
-  CheckCircle2,
-  XCircle,
+  ChevronUp,
+  ChevronDown,
+  Search,
+  Eye,
+  MoreVertical,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function BinsPage() {
   // State for filters and sorting
-  const [sortBy, setSortBy] = useState<BinSortOption>('priority');
-  const [filter, setFilter] = useState<BinFilterOption>('all');
-  const [statusFilter, setStatusFilter] = useState<BinStatusFilter>('active');
+  const [sortBy, setSortBy] = useState<BinSortOption>('bin_number');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [filters, setFilters] = useState<BinFilterOption[]>([]);
+  const [statusFilter, setStatusFilter] = useState<BinStatusFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedBin, setSelectedBin] = useState<BinWithPriority | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [selectedBins, setSelectedBins] = useState<Set<string>>(new Set());
 
-  // Fetch bins with priority
-  const { data: bins, isLoading, error, refetch } = useQuery({
-    queryKey: ['bins', 'priority', sortBy, filter, statusFilter],
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (openMenuId) {
+        setOpenMenuId(null);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [openMenuId]);
+
+  // Handle column header click for sorting
+  const handleSort = (column: BinSortOption) => {
+    if (sortBy === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortDirection('desc');
+    }
+  };
+
+  // Multi-select handlers
+  const handleSelectBin = (binId: string) => {
+    const newSelected = new Set(selectedBins);
+    if (newSelected.has(binId)) {
+      newSelected.delete(binId);
+    } else {
+      newSelected.add(binId);
+    }
+    setSelectedBins(newSelected);
+  };
+
+  const handleSelectAll = (binsToSelect: BinWithPriority[]) => {
+    if (selectedBins.size === binsToSelect.length) {
+      setSelectedBins(new Set());
+    } else {
+      setSelectedBins(new Set(binsToSelect.map((b) => b.id)));
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedBins(new Set());
+  };
+
+  // Fetch ALL bins for KPI metrics (always fetch all, regardless of status filter)
+  const { data: allBinsForKpis } = useQuery({
+    queryKey: ['bins', 'priority', 'all-for-kpis'],
     queryFn: () =>
       getBinsWithPriority({
-        sort: sortBy,
-        filter,
-        status: statusFilter,
-        limit: 100,
+        sort: 'priority',
+        filter: 'all',
+        status: 'all',
+        limit: 1000,
       }),
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 30000,
+    staleTime: 10000,
   });
 
-  // Calculate KPI metrics
-  const totalBins = bins?.length || 0;
-  const criticalBins = bins?.filter((b) => (b.fill_percentage || 0) >= 80).length || 0;
-  const pendingMoves = bins?.filter((b) => b.has_pending_move).length || 0;
-  const needsCheck = bins?.filter((b) => b.has_check_recommendation).length || 0;
+  // Fetch ALL bins for table view (always fetch all statuses, filter on frontend)
+  const { data: allBins, isLoading, error, refetch } = useQuery({
+    queryKey: ['bins', 'priority', 'all-bins'],
+    queryFn: () =>
+      getBinsWithPriority({
+        sort: 'priority',
+        filter: 'all',
+        status: 'all',
+        limit: 1000,
+      }),
+    refetchInterval: 30000,
+    staleTime: 10000,
+  });
+
+  // Apply client-side filtering for status, filters, search, and sorting
+  const bins = allBins
+    ?.filter((bin) => {
+      // Status filter
+      if (statusFilter !== 'all' && bin.status !== statusFilter) {
+        return false;
+      }
+
+      // Multi-select filters
+      if (filters.length > 0) {
+        const passesFilters = filters.every((filter) => {
+          switch (filter) {
+            case 'next_move_request':
+              return bin.has_pending_move;
+            case 'longest_unchecked':
+            case 'has_check_recommendation':
+              return bin.has_check_recommendation;
+            case 'high_fill':
+              return (bin.fill_percentage || 0) >= 60;
+            default:
+              return true;
+          }
+        });
+        if (!passesFilters) return false;
+      }
+
+      // Search filter (respects above filters)
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesSearch =
+          bin.bin_number.toString().includes(query) ||
+          bin.current_street.toLowerCase().includes(query) ||
+          bin.city.toLowerCase().includes(query) ||
+          bin.zip.toLowerCase().includes(query);
+        if (!matchesSearch) return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      // Client-side sorting with direction
+      let comparison = 0;
+      switch (sortBy) {
+        case 'priority':
+          comparison = b.priority_score - a.priority_score;
+          break;
+        case 'bin_number':
+          comparison = a.bin_number - b.bin_number;
+          break;
+        case 'fill_percentage':
+          comparison = (b.fill_percentage || 0) - (a.fill_percentage || 0);
+          break;
+        case 'days_since_check':
+          comparison = (b.days_since_check || 0) - (a.days_since_check || 0);
+          break;
+        case 'status':
+          comparison = a.status.localeCompare(b.status);
+          break;
+        default:
+          return 0;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+  // Show full-screen loader only on initial load (no data yet)
+  const isInitialLoading = isLoading && !allBins;
+
+  // Calculate KPI metrics from ALL bins (system-wide, never changes with filters)
+  const totalBins = allBinsForKpis?.length || 0;
+  const criticalBins = allBinsForKpis?.filter((b) => (b.fill_percentage || 0) >= 80).length || 0;
+  const pendingMoves = allBinsForKpis?.filter((b) => b.has_pending_move).length || 0;
+  const needsCheck = allBinsForKpis?.filter((b) => b.has_check_recommendation).length || 0;
 
   // Get priority badge color and label
   const getPriorityBadge = (score: number) => {
@@ -80,19 +214,19 @@ export default function BinsPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return { label: 'Active', color: 'bg-green-100 text-green-700', icon: CheckCircle2 };
+        return { label: 'Active', color: 'bg-green-100 text-green-700' };
       case 'retired':
-        return { label: 'Retired', color: 'bg-gray-100 text-gray-600', icon: Archive };
+        return { label: 'Retired', color: 'bg-gray-100 text-gray-600' };
       case 'pending_move':
-        return { label: 'Pending Move', color: 'bg-blue-100 text-blue-700', icon: Calendar };
+        return { label: 'Pending Move', color: 'bg-blue-100 text-blue-700' };
       case 'in_storage':
-        return { label: 'In Storage', color: 'bg-purple-100 text-purple-700', icon: Archive };
+        return { label: 'In Storage', color: 'bg-purple-100 text-purple-700' };
       default:
-        return { label: status, color: 'bg-gray-100 text-gray-600', icon: XCircle };
+        return { label: status, color: 'bg-gray-100 text-gray-600' };
     }
   };
 
-  if (isLoading) {
+  if (isInitialLoading) {
     return (
       <div className="min-h-screen bg-background p-6 flex items-center justify-center">
         <div className="text-center">
@@ -167,92 +301,45 @@ export default function BinsPage() {
           />
         </div>
 
-        {/* Filters and Sorting */}
+        {/* Filters and Search */}
         <Card className="p-4">
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Sort By */}
-            <div className="flex items-center gap-2">
-              <ArrowUpDown className="w-4 h-4 text-gray-500" />
-              <span className="text-sm font-medium text-gray-700">Sort:</span>
-              <div className="flex gap-2">
-                {[
-                  { value: 'priority', label: 'Priority' },
-                  { value: 'bin_number', label: 'Bin #' },
-                  { value: 'fill_percentage', label: 'Fill %' },
-                  { value: 'days_since_check', label: 'Last Check' },
-                ].map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => setSortBy(option.value as BinSortOption)}
-                    className={cn(
-                      'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                      sortBy === option.value
-                        ? 'bg-primary text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+          <div className="flex items-center gap-4">
+            {/* Filter By Dropdown (Multi-select) */}
+            <MultiSelectDropdown
+              label="Filter By"
+              selectedValues={filters}
+              options={[
+                { value: 'next_move_request', label: 'Move Requests' },
+                { value: 'longest_unchecked', label: 'Needs Check' },
+                { value: 'high_fill', label: 'High Fill' },
+              ]}
+              onChange={(values) => setFilters(values as BinFilterOption[])}
+            />
+
+            {/* Search Bar */}
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search bins..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              />
             </div>
 
-            {/* Divider */}
-            <div className="h-8 w-px bg-gray-300" />
-
-            {/* Filter By */}
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-gray-500" />
-              <span className="text-sm font-medium text-gray-700">Filter:</span>
-              <div className="flex gap-2 flex-wrap">
-                {[
-                  { value: 'all', label: 'All Bins' },
-                  { value: 'next_move_request', label: 'Move Requests' },
-                  { value: 'longest_unchecked', label: 'Needs Check' },
-                  { value: 'high_fill', label: 'High Fill' },
-                ].map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => setFilter(option.value as BinFilterOption)}
-                    className={cn(
-                      'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                      filter === option.value
-                        ? 'bg-primary text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="h-8 w-px bg-gray-300" />
-
-            {/* Status Filter */}
-            <div className="flex items-center gap-2">
+            {/* Status Segmented Control */}
+            <div className="flex items-center gap-3 ml-auto">
               <span className="text-sm font-medium text-gray-700">Status:</span>
-              <div className="flex gap-2">
-                {[
-                  { value: 'active', label: 'Active' },
+              <SegmentedControl
+                value={statusFilter}
+                options={[
                   { value: 'all', label: 'All' },
+                  { value: 'active', label: 'Active' },
                   { value: 'retired', label: 'Retired' },
-                ].map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => setStatusFilter(option.value as BinStatusFilter)}
-                    className={cn(
-                      'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                      statusFilter === option.value
-                        ? 'bg-primary text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+                ]}
+                onChange={(value) => setStatusFilter(value as BinStatusFilter)}
+              />
             </div>
           </div>
         </Card>
@@ -274,7 +361,7 @@ export default function BinsPage() {
                 <thead className="border-b border-gray-200">
                   <tr>
                     <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
-                      Bin #
+                      Bin
                     </th>
                     <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
                       Location
@@ -288,13 +375,10 @@ export default function BinsPage() {
                     <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
                       Status
                     </th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
                       Last Checked
                     </th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
-                      Flags
-                    </th>
-                    <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">
+                    <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700">
                       Actions
                     </th>
                   </tr>
@@ -304,7 +388,6 @@ export default function BinsPage() {
                     const priority = getPriorityBadge(bin.priority_score);
                     const fill = getFillBadge(bin.fill_percentage);
                     const status = getStatusBadge(bin.status);
-                    const StatusIcon = status.icon;
 
                     return (
                       <tr
@@ -312,83 +395,103 @@ export default function BinsPage() {
                         className="hover:bg-gray-50 transition-colors cursor-pointer"
                         onClick={() => setSelectedBin(bin)}
                       >
-                        <td className="py-3 px-4">
-                          <span className="font-semibold text-gray-900">#{bin.bin_number}</span>
+                        <td className="py-4 px-4">
+                          <span className="font-semibold text-gray-900">{bin.bin_number}</span>
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-start gap-2">
-                            <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
                             <div className="text-sm">
-                              <div className="text-gray-900">{bin.current_street}</div>
-                              <div className="text-gray-500">
+                              <div className="text-gray-900 font-medium">{bin.current_street}</div>
+                              <div className="text-gray-500 text-xs">
                                 {bin.city}, {bin.zip}
                               </div>
                             </div>
                           </div>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-4 px-4">
                           <Badge className={cn('border', priority.color)}>
                             {priority.label}
                           </Badge>
-                          <div className="text-xs text-gray-500 mt-1">
-                            Score: {Math.round(bin.priority_score)}
-                          </div>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-4 px-4">
                           <Badge className={fill.color}>{fill.label}</Badge>
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <StatusIcon className="w-4 h-4" />
-                            <Badge className={status.color}>{status.label}</Badge>
-                          </div>
+                        <td className="py-4 px-4">
+                          <Badge className={status.color}>{status.label}</Badge>
                         </td>
-                        <td className="py-3 px-4">
-                          {bin.days_since_check !== undefined && bin.days_since_check !== null ? (
-                            <div className="text-sm">
-                              <span
-                                className={cn(
-                                  'font-medium',
-                                  bin.days_since_check >= 7 ? 'text-red-600' : 'text-gray-700'
-                                )}
-                              >
-                                {bin.days_since_check} days ago
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-sm text-gray-500">Never</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex gap-1">
-                            {bin.has_pending_move && (
-                              <Badge className="bg-blue-100 text-blue-700 text-xs">
-                                Move
-                              </Badge>
+                        <td className="py-4 px-4">
+                          <span
+                            className={cn(
+                              'text-sm font-medium',
+                              bin.days_since_check !== undefined && bin.days_since_check !== null
+                                ? bin.days_since_check >= 7
+                                  ? 'text-red-600'
+                                  : 'text-gray-700'
+                                : 'text-gray-500'
                             )}
-                            {bin.has_check_recommendation && (
-                              <Badge className="bg-yellow-100 text-yellow-700 text-xs">
-                                Check
-                              </Badge>
-                            )}
-                            {bin.move_request_urgency === 'urgent' && (
-                              <Badge className="bg-red-100 text-red-700 text-xs">
-                                Urgent
-                              </Badge>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedBin(bin);
-                            }}
                           >
-                            View Details
-                          </Button>
+                            {bin.days_since_check !== undefined && bin.days_since_check !== null
+                              ? `${bin.days_since_check} days ago`
+                              : 'Never'}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center justify-center gap-2">
+                            {/* View Details Icon */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedBin(bin);
+                              }}
+                              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="View Details"
+                            >
+                              <Eye className="w-4 h-4 text-gray-600" />
+                            </button>
+
+                            {/* More Actions Menu */}
+                            <div className="relative">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenMenuId(openMenuId === bin.id ? null : bin.id);
+                                }}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                title="More Actions"
+                              >
+                                <MoreVertical className="w-4 h-4 text-gray-600" />
+                              </button>
+
+                              {/* Dropdown Menu */}
+                              {openMenuId === bin.id && (
+                                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[160px] animate-slide-in-down">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      // TODO: Implement schedule move
+                                      setOpenMenuId(null);
+                                    }}
+                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-t-lg"
+                                  >
+                                    <Calendar className="w-4 h-4" />
+                                    Schedule Move
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      // TODO: Implement retire bin
+                                      setOpenMenuId(null);
+                                    }}
+                                    className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 rounded-b-lg"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                    Retire Bin
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </td>
                       </tr>
                     );
