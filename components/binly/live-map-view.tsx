@@ -172,6 +172,25 @@ export function LiveMapView() {
   const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
   const [showLegend, setShowLegend] = useState(false);
 
+  // Check URL params for bin ID and zoom to it
+  useEffect(() => {
+    if (!bins.length) return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const binId = urlParams.get('bin');
+
+    if (binId) {
+      const bin = bins.find((b) => b.id === binId);
+      if (bin && isMappableBin(bin)) {
+        // Zoom to the bin
+        setTargetLocation({ lat: bin.latitude, lng: bin.longitude, zoom: 16 });
+        setSelectedBin(bin);
+        // Clean up URL
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
+  }, [bins]);
+
   // Combined loading and error states
   const loading = loadingBins || loadingZones;
   const error = binsError?.message || zonesError?.message || null;
@@ -292,31 +311,31 @@ export function LiveMapView() {
 
       {/* Bottom Stats Bar - Glassmorphism */}
       {!loading && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 bg-white/90 backdrop-blur-md rounded-full shadow-xl border border-gray-100 px-6 py-3 flex items-center gap-6">
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 bg-white/90 backdrop-blur-md rounded-full shadow-xl border border-gray-100 px-6 py-3 flex items-center gap-4">
           {/* Toggle: Fill Levels */}
           <button
             onClick={() => setShowFillLevels(!showFillLevels)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200 ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors ${
               showFillLevels
-                ? 'bg-primary text-white shadow-md'
+                ? 'bg-primary text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            <div className="w-2 h-2 rounded-full bg-current" />
-            <span className="text-sm font-medium">Fill Levels</span>
+            <div className="w-2 h-2 rounded-full bg-current shrink-0" />
+            <span className="text-sm font-medium whitespace-nowrap">Fill Levels</span>
           </button>
 
           {/* Toggle: No-Go Zones */}
           <button
             onClick={() => setShowNoGoZones(!showNoGoZones)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200 ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors ${
               showNoGoZones
-                ? 'bg-red-600 text-white shadow-md'
+                ? 'bg-red-600 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            <div className="w-2 h-2 rounded-full bg-current" />
-            <span className="text-sm font-medium">No-Go Zones</span>
+            <div className="w-2 h-2 rounded-full bg-current shrink-0" />
+            <span className="text-sm font-medium whitespace-nowrap">No-Go Zones</span>
           </button>
 
           {/* Divider */}

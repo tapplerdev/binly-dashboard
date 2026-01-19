@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { KpiCard } from '@/components/binly/kpi-card';
 import { BulkCreateBinModal } from '@/components/binly/bulk-create-bin-modal';
 import { BinDetailDrawer } from '@/components/binly/bin-detail-drawer';
+import { ScheduleMoveModal, RetireBinModal } from '@/components/binly/bin-modals';
 import { Dropdown, MultiSelectDropdown } from '@/components/ui/dropdown';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import {
@@ -46,6 +47,10 @@ export default function BinsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [selectedBins, setSelectedBins] = useState<Set<string>>(new Set());
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showRetireModal, setShowRetireModal] = useState(false);
+  const [modalTargetBin, setModalTargetBin] = useState<BinWithPriority | null>(null);
+  const [modalTargetBins, setModalTargetBins] = useState<BinWithPriority[]>([]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -360,7 +365,16 @@ export default function BinsPage() {
               <table className="w-full">
                 <thead className="border-b border-gray-200">
                   <tr>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
+                    <th className="py-3 px-4 w-[5%]">
+                      <input
+                        type="checkbox"
+                        checked={bins && bins.length > 0 && selectedBins.size === bins.length}
+                        onChange={() => handleSelectAll(bins || [])}
+                        className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+                        title="Select all"
+                      />
+                    </th>
+                    <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700 w-[8%]">
                       Bin
                     </th>
                     <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
@@ -395,17 +409,22 @@ export default function BinsPage() {
                         className="hover:bg-gray-50 transition-colors cursor-pointer"
                         onClick={() => setSelectedBin(bin)}
                       >
-                        <td className="py-4 px-4">
+                        <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedBins.has(bin.id)}
+                            onChange={() => handleSelectBin(bin.id)}
+                            className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+                          />
+                        </td>
+                        <td className="py-4 px-4 text-center">
                           <span className="font-semibold text-gray-900">{bin.bin_number}</span>
                         </td>
                         <td className="py-4 px-4">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                            <div className="text-sm">
-                              <div className="text-gray-900 font-medium">{bin.current_street}</div>
-                              <div className="text-gray-500 text-xs">
-                                {bin.city}, {bin.zip}
-                              </div>
+                          <div className="text-sm">
+                            <div className="text-gray-900 font-medium">{bin.current_street}</div>
+                            <div className="text-gray-500 text-xs">
+                              {bin.city}, {bin.zip}
                             </div>
                           </div>
                         </td>
@@ -469,7 +488,8 @@ export default function BinsPage() {
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      // TODO: Implement schedule move
+                                      setModalTargetBin(bin);
+                                      setShowScheduleModal(true);
                                       setOpenMenuId(null);
                                     }}
                                     className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-t-lg"
@@ -480,7 +500,8 @@ export default function BinsPage() {
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      // TODO: Implement retire bin
+                                      setModalTargetBin(bin);
+                                      setShowRetireModal(true);
                                       setOpenMenuId(null);
                                     }}
                                     className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 rounded-b-lg"
@@ -503,6 +524,71 @@ export default function BinsPage() {
         </Card>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedBins.size > 0 && (
+        <div className="fixed bottom-6 left-0 right-0 z-40 flex justify-center animate-slide-in-up">
+          <Card className="px-6 py-4 shadow-2xl border-2 border-primary/20">
+            <div className="flex items-center gap-6">
+              {/* Selection Count */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                  <span className="text-sm font-bold text-primary">{selectedBins.size}</span>
+                </div>
+                <span className="text-sm font-semibold text-gray-900">
+                  {selectedBins.size} bin{selectedBins.size !== 1 ? 's' : ''} selected
+                </span>
+              </div>
+
+              {/* Divider */}
+              <div className="w-px h-8 bg-gray-200" />
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={() => {
+                    const selectedBinsData = bins?.filter((b) => selectedBins.has(b.id)) || [];
+                    setModalTargetBin(null);
+                    setModalTargetBins(selectedBinsData);
+                    setShowScheduleModal(true);
+                  }}
+                  className="bg-primary hover:bg-primary/90"
+                  size="sm"
+                >
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Schedule Moves
+                </Button>
+                <Button
+                  onClick={() => {
+                    const selectedBinsData = bins?.filter((b) => selectedBins.has(b.id)) || [];
+                    setModalTargetBin(null);
+                    setModalTargetBins(selectedBinsData);
+                    setShowRetireModal(true);
+                  }}
+                  variant="outline"
+                  className="border-red-200 text-red-600 hover:bg-red-50"
+                  size="sm"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Retire
+                </Button>
+              </div>
+
+              {/* Divider */}
+              <div className="w-px h-8 bg-gray-200" />
+
+              {/* Cancel Button */}
+              <button
+                onClick={clearSelection}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Clear selection"
+              >
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+          </Card>
+        </div>
+      )}
+
       {/* Modals and Drawers */}
       {showCreateModal && (
         <BulkCreateBinModal
@@ -519,6 +605,44 @@ export default function BinsPage() {
           bin={selectedBin}
           onClose={() => setSelectedBin(null)}
           onUpdate={() => refetch()}
+        />
+      )}
+
+      {showScheduleModal && (modalTargetBin || modalTargetBins.length > 0) && (
+        <ScheduleMoveModal
+          bin={modalTargetBin || undefined}
+          bins={modalTargetBins.length > 0 ? modalTargetBins : undefined}
+          onClose={() => {
+            setShowScheduleModal(false);
+            setModalTargetBin(null);
+            setModalTargetBins([]);
+          }}
+          onSuccess={() => {
+            setShowScheduleModal(false);
+            setModalTargetBin(null);
+            setModalTargetBins([]);
+            clearSelection();
+            refetch();
+          }}
+        />
+      )}
+
+      {showRetireModal && (modalTargetBin || modalTargetBins.length > 0) && (
+        <RetireBinModal
+          bin={modalTargetBin || undefined}
+          bins={modalTargetBins.length > 0 ? modalTargetBins : undefined}
+          onClose={() => {
+            setShowRetireModal(false);
+            setModalTargetBin(null);
+            setModalTargetBins([]);
+          }}
+          onSuccess={() => {
+            setShowRetireModal(false);
+            setModalTargetBin(null);
+            setModalTargetBins([]);
+            clearSelection();
+            refetch();
+          }}
         />
       )}
     </div>

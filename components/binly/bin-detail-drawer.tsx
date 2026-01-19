@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { getBinChecks, getBinMoves, type BinCheck, type BinMove } from '@/lib/api/bins';
 import { BinWithPriority } from '@/lib/types/bin';
@@ -18,6 +19,10 @@ import {
   AlertTriangle,
   Trash2,
   Image as ImageIcon,
+  Truck,
+  User,
+  Navigation,
+  ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -30,6 +35,7 @@ interface BinDetailDrawerProps {
 }
 
 export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinDetailDrawerProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'overview' | 'checks' | 'moves'>('overview');
   const [isClosing, setIsClosing] = useState(false);
 
@@ -221,39 +227,141 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
                 </Card>
               </div>
 
-              {/* Priority Breakdown */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Priority Breakdown</h3>
-                <Card className="p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Base Score:</span>
-                    <span className="font-bold text-gray-900">
-                      {Math.round(bin.priority_score)}
-                    </span>
+              {/* Two Column Layout: Map + Routes */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Column: Map View */}
+                <div className="space-y-4">
+                  {/* Static Map */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Map View</h3>
+                    <Card className="p-0 overflow-hidden relative">
+                      {bin.latitude && bin.longitude ? (
+                        <>
+                          {/* Static Google Maps Image */}
+                          <div className="relative aspect-square w-full">
+                            <img
+                              src={`https://maps.googleapis.com/maps/api/staticmap?center=${bin.latitude},${bin.longitude}&zoom=15&size=600x600&markers=color:red%7C${bin.latitude},${bin.longitude}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
+                              alt="Bin location"
+                              className="w-full h-full object-cover"
+                            />
+                            {/* View on Live Map Button */}
+                            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+                              <Button
+                                onClick={() => {
+                                  router.push(`/operations/live-map?bin=${bin.id}`);
+                                }}
+                                className="bg-white hover:bg-gray-50 text-gray-900 shadow-lg border border-gray-200"
+                                size="sm"
+                              >
+                                <Navigation className="w-4 h-4 mr-2" />
+                                View on Live Map
+                                <ExternalLink className="w-3 h-3 ml-2" />
+                              </Button>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="aspect-square w-full bg-gray-100 flex items-center justify-center">
+                          <div className="text-center">
+                            <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                            <p className="text-sm text-gray-500">No location data</p>
+                          </div>
+                        </div>
+                      )}
+                    </Card>
                   </div>
-                  {bin.fill_percentage && bin.fill_percentage >= 60 && (
-                    <div className="flex items-center justify-between text-orange-600">
-                      <span>High Fill Level:</span>
-                      <span className="font-semibold">+{bin.fill_percentage >= 80 ? 300 : 150}</span>
-                    </div>
-                  )}
-                  {bin.days_since_check && bin.days_since_check >= 7 && (
-                    <div className="flex items-center justify-between text-red-600">
-                      <span>Overdue Check:</span>
-                      <span className="font-semibold">
-                        +{bin.days_since_check >= 30 ? 800 : bin.days_since_check >= 14 ? 400 : 200}
-                      </span>
-                    </div>
-                  )}
-                  {bin.has_pending_move && (
-                    <div className="flex items-center justify-between text-blue-600">
-                      <span>Pending Move:</span>
-                      <span className="font-semibold">
-                        +{bin.move_request_urgency === 'urgent' ? 1000 : 400}
-                      </span>
-                    </div>
-                  )}
-                </Card>
+                </div>
+
+                {/* Right Column: Scheduled Routes */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Scheduled Routes</h3>
+                  <Card className="p-4 space-y-4">
+                    {/* TODO: Replace with real data from backend */}
+                    {/* Mock data for now */}
+                    {false ? (
+                      <>
+                        {/* Upcoming Routes */}
+                        <div className="space-y-3">
+                          <h4 className="text-sm font-semibold text-gray-700">Upcoming:</h4>
+                          <div className="space-y-2">
+                            <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                              <div className="flex items-start gap-3">
+                                <div className="p-2 bg-blue-100 rounded-lg">
+                                  <Truck className="w-4 h-4 text-blue-600" />
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="font-semibold text-gray-900">Route #5</span>
+                                    <Badge className="bg-blue-100 text-blue-700 text-xs">
+                                      Stop 3 of 12
+                                    </Badge>
+                                  </div>
+                                  <div className="text-sm text-gray-600 space-y-1">
+                                    <div className="flex items-center gap-2">
+                                      <Calendar className="w-3 h-3" />
+                                      <span>Tomorrow, 2:00 PM</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <User className="w-3 h-3" />
+                                      <span>Driver: John Smith</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="border-t border-gray-200" />
+
+                        {/* Last Collection */}
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-semibold text-gray-700">Last Collection:</h4>
+                          <div className="p-3 bg-gray-50 rounded-lg">
+                            <div className="text-sm space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Calendar className="w-3 h-3 text-gray-400" />
+                                <span className="text-gray-900">Dec 15, 2024 - Route #5</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <User className="w-3 h-3 text-gray-400" />
+                                <span className="text-gray-600">Driver: John Smith</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-green-600">
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Collected, filled to 65%</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      /* Empty State */
+                      <div className="text-center py-8">
+                        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <Truck className="w-6 h-6 text-gray-400" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-gray-900 mb-1">
+                          Not Currently Scheduled
+                        </h4>
+                        <p className="text-sm text-gray-500 mb-4">
+                          This bin is not on any upcoming routes. Consider adding it to a route if it needs service.
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            router.push('/operations/routes');
+                          }}
+                        >
+                          <Calendar className="w-4 h-4 mr-2" />
+                          Add to Route
+                        </Button>
+                      </div>
+                    )}
+                  </Card>
+                </div>
               </div>
             </div>
           )}
