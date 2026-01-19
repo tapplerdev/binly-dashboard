@@ -3,7 +3,7 @@
  * Based on backend BinResponse struct from /api/bins
  */
 
-export type BinStatus = 'active' | 'missing';
+export type BinStatus = 'active' | 'missing' | 'retired' | 'in_storage' | 'pending_move' | 'needs_check';
 
 export interface Bin {
   id: string;
@@ -13,6 +13,7 @@ export interface Bin {
   zip: string;
   lastMovedIso?: string | null;
   lastCheckedIso?: string | null;
+  lastCheckedAtIso?: string | null;
   status: BinStatus;
   fill_percentage?: number | null;
   checked: boolean;
@@ -21,6 +22,21 @@ export interface Bin {
   longitude?: number | null;
   location_name?: string | null; // Optional formatted location name
   photo_url?: string | null; // Latest check photo URL
+  created_by_user_id?: string | null;
+  retiredAtIso?: string | null;
+  retired_by_user_id?: string | null;
+}
+
+/**
+ * Bin with priority data from /api/bins/priority endpoint
+ */
+export interface BinWithPriority extends Bin {
+  priority_score: number;
+  days_since_check?: number | null;
+  next_move_request_date?: number | null;
+  move_request_urgency?: 'urgent' | 'scheduled' | null;
+  has_pending_move: boolean;
+  has_check_recommendation: boolean;
 }
 
 /**
@@ -75,4 +91,21 @@ export function getBinMarkerColor(
     case 'critical':
       return '#EF4444'; // red-500
   }
+}
+
+/**
+ * Potential Location - A driver-requested location for a future bin
+ */
+export interface PotentialLocation {
+  id: string;
+  address: string;
+  street: string;
+  city: string;
+  zip: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  requested_by_user_id: string;
+  requested_by_name: string;
+  created_at_iso: string;
+  notes?: string | null;
 }

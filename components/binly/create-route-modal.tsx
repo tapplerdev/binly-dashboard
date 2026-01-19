@@ -846,7 +846,7 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       placeholder="e.g., Route 5 - Downtown Commercial"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary transition-all"
                       required
                     />
                   </div>
@@ -860,7 +860,7 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       placeholder="Brief description of this route..."
                       rows={2}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none transition-all"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary resize-none transition-all"
                     />
                   </div>
                 </div>
@@ -1003,7 +1003,7 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search bins by number or address..."
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary transition-all"
                   />
                 </div>
 
