@@ -27,8 +27,7 @@ import {
   Trash2,
   MapPin,
   Clock,
-  ChevronUp,
-  ChevronDown,
+  ChevronsUpDown,
   Search,
   Eye,
   MoreVertical,
@@ -70,7 +69,7 @@ export default function BinsPage() {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortBy(column);
-      setSortDirection('desc');
+      setSortDirection('asc');
     }
   };
 
@@ -231,6 +230,25 @@ export default function BinsPage() {
     }
   };
 
+  // Get move request urgency badge based on scheduled date
+  const getMoveRequestBadge = (moveRequestDate?: number | null) => {
+    if (!moveRequestDate) return null;
+
+    const now = Date.now() / 1000; // Convert to Unix timestamp
+    const daysUntil = (moveRequestDate - now) / 86400;
+
+    if (moveRequestDate < now) {
+      return { label: '⚠️ Overdue', color: 'bg-red-500 text-white border-red-600' };
+    }
+    if (daysUntil < 1) {
+      return { label: '🔴 Urgent Move', color: 'bg-red-500 text-white border-red-600' };
+    }
+    if (daysUntil < 3) {
+      return { label: 'Move Soon', color: 'bg-orange-500 text-white border-orange-600' };
+    }
+    return { label: 'Scheduled Move', color: 'bg-blue-500 text-white border-blue-600' };
+  };
+
   if (isInitialLoading) {
     return (
       <div className="min-h-screen bg-background p-6 flex items-center justify-center">
@@ -363,9 +381,9 @@ export default function BinsPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="border-b border-gray-200">
+                <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="py-3 px-4 w-[5%]">
+                    <th className="py-5 px-4 w-[5%] align-middle">
                       <input
                         type="checkbox"
                         checked={bins && bins.length > 0 && selectedBins.size === bins.length}
@@ -374,25 +392,55 @@ export default function BinsPage() {
                         title="Select all"
                       />
                     </th>
-                    <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700 w-[8%]">
-                      Bin
+                    <th
+                      className="text-center py-5 px-4 text-sm font-semibold text-gray-700 w-[8%] cursor-pointer align-middle"
+                      onClick={() => handleSort('bin_number')}
+                    >
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span>Bin</span>
+                        <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                      </div>
                     </th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
+                    <th className="text-left py-5 px-4 text-sm font-semibold text-gray-700 align-middle">
                       Location
                     </th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
-                      Priority
+                    <th
+                      className="text-left py-5 px-4 text-sm font-semibold text-gray-700 cursor-pointer align-middle"
+                      onClick={() => handleSort('priority')}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Priority</span>
+                        <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                      </div>
                     </th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
-                      Fill Level
+                    <th
+                      className="text-left py-5 px-4 text-sm font-semibold text-gray-700 cursor-pointer whitespace-nowrap align-middle"
+                      onClick={() => handleSort('fill_percentage')}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Fill Level</span>
+                        <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                      </div>
                     </th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
-                      Status
+                    <th
+                      className="text-left py-5 px-4 text-sm font-semibold text-gray-700 cursor-pointer align-middle"
+                      onClick={() => handleSort('status')}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Status</span>
+                        <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                      </div>
                     </th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
-                      Last Checked
+                    <th
+                      className="text-left py-5 px-4 text-sm font-semibold text-gray-700 whitespace-nowrap cursor-pointer align-middle"
+                      onClick={() => handleSort('days_since_check')}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Last Checked</span>
+                        <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                      </div>
                     </th>
-                    <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700">
+                    <th className="text-center py-5 px-4 text-sm font-semibold text-gray-700 align-middle">
                       Actions
                     </th>
                   </tr>

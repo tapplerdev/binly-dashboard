@@ -14,7 +14,7 @@ import { NoGoZone, getZoneColor, getZoneColorRgba, getZoneOpacity } from '@/lib/
 import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { ZoneDetailsDrawer } from './zone-details-drawer';
-import { BinDetailsDrawer } from './bin-details-drawer';
+import { BinDetailDrawer } from './bin-detail-drawer';
 import { MapSearchBar } from './map-search-bar';
 
 // Default map center (San Jose, CA area - center of bin operations)
@@ -365,8 +365,8 @@ export function LiveMapView() {
 
       {/* Bin Details Drawer - Right Side */}
       {selectedBin && (
-        <BinDetailsDrawer
-          bin={selectedBin}
+        <BinDetailDrawer
+          bin={selectedBin as any}
           onClose={() => setSelectedBin(null)}
         />
       )}

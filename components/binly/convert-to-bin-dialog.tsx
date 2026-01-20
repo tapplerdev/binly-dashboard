@@ -84,12 +84,14 @@ export function ConvertToBinDialog({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 z-50 animate-fade-in"
+        className="fixed inset-0 bg-black/30 z-[60] animate-fade-in flex items-center justify-center p-4"
         onClick={() => onOpenChange(false)}
-      />
-
-      {/* Dialog */}
-      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl shadow-2xl z-50 animate-scale-in">
+      >
+        {/* Dialog */}
+        <div
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md z-[70] animate-scale-in"
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Header */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
@@ -201,6 +203,7 @@ export function ConvertToBinDialog({
             </Button>
           </div>
         </form>
+        </div>
       </div>
     </>
   );

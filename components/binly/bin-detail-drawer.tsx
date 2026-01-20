@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getBinChecks, getBinMoves, type BinCheck, type BinMove } from '@/lib/api/bins';
-import { BinWithPriority } from '@/lib/types/bin';
+import { getMoveRequest, cancelMoveRequest } from '@/lib/api/move-requests';
+import { BinWithPriority, getMoveRequestUrgency, getMoveRequestBadgeColor } from '@/lib/types/bin';
+import { AssignMovesModal } from '@/components/binly/assign-moves-modal';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +25,8 @@ import {
   User,
   Navigation,
   ExternalLink,
+  ArrowRight,
+  PackageX,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -36,8 +40,10 @@ interface BinDetailDrawerProps {
 
 export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinDetailDrawerProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'overview' | 'checks' | 'moves'>('overview');
   const [isClosing, setIsClosing] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
 
   const handleClose = () => {
     setIsClosing(true);
@@ -58,6 +64,27 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
     queryKey: ['bin-moves', bin.id],
     queryFn: () => getBinMoves(bin.id),
     enabled: activeTab === 'moves',
+  });
+
+  // Fetch active move request
+  const { data: activeMoveRequest, isLoading: moveRequestLoading } = useQuery({
+    queryKey: ['move-request', bin.next_move_request_id],
+    queryFn: () => getMoveRequest(bin.next_move_request_id!),
+    enabled: !!bin.has_pending_move && !!bin.next_move_request_id && activeTab === 'overview',
+  });
+
+  // Cancel move request mutation
+  const cancelMoveMutation = useMutation({
+    mutationFn: (moveRequestId: string) => cancelMoveRequest(moveRequestId, 'Cancelled by manager'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['move-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['bins'] });
+      alert('Move request cancelled successfully');
+    },
+    onError: (error) => {
+      console.error('Failed to cancel move request:', error);
+      alert('Failed to cancel move request. Please try again.');
+    },
   });
 
   const getPriorityColor = (score: number) => {
@@ -199,6 +226,139 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
                   </div>
                 </Card>
               </div>
+
+              {/* Active Move Request */}
+              {bin.has_pending_move && activeMoveRequest && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Pending Move Request</h3>
+                  <Card className="p-4 border-l-4 border-l-primary">
+                    <div className="space-y-4">
+                      {/* Move Type and Status */}
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          {activeMoveRequest.move_type === 'pickup_only' ? (
+                            <PackageX className="w-5 h-5 text-blue-600" />
+                          ) : (
+                            <ArrowRight className="w-5 h-5 text-blue-600" />
+                          )}
+                          <span className="font-semibold text-gray-900">
+                            {activeMoveRequest.move_type === 'pickup_only' ? 'Pickup Only' : 'Relocation'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            className={getMoveRequestBadgeColor(activeMoveRequest.scheduled_date)}
+                          >
+                            {getMoveRequestUrgency(activeMoveRequest.scheduled_date).toUpperCase()}
+                          </Badge>
+                          <Badge className="bg-gray-100 text-gray-700">
+                            {activeMoveRequest.status.replace('_', ' ').toUpperCase()}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {/* Scheduled Date */}
+                      <div className="flex items-center gap-2 text-sm">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-600">Scheduled for:</span>
+                        <span className="font-medium text-gray-900">
+                          {format(new Date(activeMoveRequest.scheduled_date * 1000), 'PPp')}
+                        </span>
+                      </div>
+
+                      {/* Assigned Driver */}
+                      {activeMoveRequest.assigned_shift_id ? (
+                        <div className="flex items-center gap-2 text-sm">
+                          <User className="w-4 h-4 text-gray-400" />
+                          <span className="text-gray-600">Assigned to:</span>
+                          <span className="font-medium text-gray-900">
+                            {activeMoveRequest.assigned_driver_name || 'Driver (Shift assigned)'}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-sm">
+                          <AlertTriangle className="w-4 h-4 text-orange-500" />
+                          <span className="text-orange-600 font-medium">Unassigned</span>
+                        </div>
+                      )}
+
+                      {/* Disposal Action (for pickup only) */}
+                      {activeMoveRequest.move_type === 'pickup_only' && activeMoveRequest.disposal_action && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Trash2 className="w-4 h-4 text-gray-400" />
+                          <span className="text-gray-600">Action:</span>
+                          <span className="font-medium text-gray-900 capitalize">
+                            {activeMoveRequest.disposal_action}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* New Location (for relocation) */}
+                      {activeMoveRequest.move_type === 'relocation' && activeMoveRequest.new_street && (
+                        <div className="text-sm">
+                          <div className="flex items-center gap-2 mb-1">
+                            <MapPin className="w-4 h-4 text-gray-400" />
+                            <span className="text-gray-600">New Location:</span>
+                          </div>
+                          <div className="ml-6 text-gray-900">
+                            {activeMoveRequest.new_street}
+                            {activeMoveRequest.new_city && `, ${activeMoveRequest.new_city}`}
+                            {activeMoveRequest.new_zip && ` ${activeMoveRequest.new_zip}`}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Reason/Notes */}
+                      {(activeMoveRequest.reason || activeMoveRequest.notes) && (
+                        <div className="text-sm">
+                          <span className="text-gray-600">
+                            {activeMoveRequest.reason ? 'Reason: ' : 'Notes: '}
+                          </span>
+                          <span className="text-gray-900">
+                            {activeMoveRequest.reason || activeMoveRequest.notes}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-2 pt-2 border-t border-gray-200">
+                        {activeMoveRequest.status === 'pending' && !activeMoveRequest.assigned_shift_id && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowAssignModal(true)}
+                          >
+                            <Truck className="w-4 h-4 mr-2" />
+                            Assign to Shift
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onScheduleMove?.(bin)}
+                        >
+                          <Calendar className="w-4 h-4 mr-2" />
+                          Edit Move
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (confirm('Are you sure you want to cancel this move request?')) {
+                              cancelMoveMutation.mutate(activeMoveRequest.id);
+                            }
+                          }}
+                          disabled={cancelMoveMutation.isPending}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          {cancelMoveMutation.isPending ? 'Cancelling...' : 'Cancel Move'}
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              )}
 
               {/* Location Details */}
               <div>
@@ -473,6 +633,18 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
           )}
         </div>
       </div>
+
+      {/* Assignment Modal */}
+      {showAssignModal && activeMoveRequest && (
+        <AssignMovesModal
+          moveRequests={[activeMoveRequest]}
+          onClose={() => setShowAssignModal(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['move-requests'] });
+            queryClient.invalidateQueries({ queryKey: ['bins'] });
+          }}
+        />
+      )}
     </>
   );
 }

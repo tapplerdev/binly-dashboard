@@ -3,39 +3,59 @@
 import { useState } from 'react';
 import { PotentialLocationsList } from '@/components/binly/potential-locations-list';
 import { CreatePotentialLocationDialog } from '@/components/binly/create-potential-location-dialog';
+import { MoveRequestsList } from '@/components/binly/move-requests-list';
 
 // Import the full bins page component
 import BinsPage from '../bins/page';
 
 export default function InventoryPage() {
-  const [activeTab, setActiveTab] = useState<'bins' | 'potential'>('bins');
+  const [activeTab, setActiveTab] = useState<'bins' | 'potential' | 'moves'>('bins');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
       {/* Tab Navigation - Fixed at top */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-[1600px] mx-auto px-6 py-4">
-          <div className="flex gap-3">
+        <div className="max-w-[1600px] mx-auto px-6">
+          <div className="flex gap-8">
             <button
               onClick={() => setActiveTab('bins')}
-              className={`px-8 py-3 rounded-xl font-semibold transition-all ${
+              className={`py-3 text-sm font-medium transition-all duration-200 relative ${
                 activeTab === 'bins'
-                  ? 'bg-primary text-white shadow-md'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'text-gray-900'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               Active Bins
+              <div className={`absolute -bottom-[1px] left-0 right-0 h-[2px] bg-primary transition-all duration-200 ${
+                activeTab === 'bins' ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-0'
+              }`} />
             </button>
             <button
               onClick={() => setActiveTab('potential')}
-              className={`px-8 py-3 rounded-xl font-semibold transition-all ${
+              className={`py-3 text-sm font-medium transition-all duration-200 relative ${
                 activeTab === 'potential'
-                  ? 'bg-primary text-white shadow-md'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'text-gray-900'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               Potential Locations
+              <div className={`absolute -bottom-[1px] left-0 right-0 h-[2px] bg-primary transition-all duration-200 ${
+                activeTab === 'potential' ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-0'
+              }`} />
+            </button>
+            <button
+              onClick={() => setActiveTab('moves')}
+              className={`py-3 text-sm font-medium transition-all duration-200 relative ${
+                activeTab === 'moves'
+                  ? 'text-gray-900'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Move Requests
+              <div className={`absolute -bottom-[1px] left-0 right-0 h-[2px] bg-primary transition-all duration-200 ${
+                activeTab === 'moves' ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-0'
+              }`} />
             </button>
           </div>
         </div>
@@ -48,6 +68,14 @@ export default function InventoryPage() {
         <div className="p-6">
           <div className="max-w-[1600px] mx-auto">
             <PotentialLocationsList onCreateNew={() => setShowCreateDialog(true)} />
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'moves' && (
+        <div className="p-6">
+          <div className="max-w-[1600px] mx-auto">
+            <MoveRequestsList />
           </div>
         </div>
       )}

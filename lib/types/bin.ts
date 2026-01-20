@@ -109,3 +109,72 @@ export interface PotentialLocation {
   created_at_iso: string;
   notes?: string | null;
 }
+
+/**
+ * Move Request - A request to move a bin to a new location or pick it up
+ */
+export type MoveRequestStatus = 'pending' | 'assigned' | 'in_progress' | 'completed' | 'cancelled' | 'overdue';
+export type MoveRequestType = 'pickup_only' | 'relocation';
+export type DisposalAction = 'retire' | 'store';
+
+export interface MoveRequest {
+  id: string;
+  bin_id: string;
+  bin_number: number;
+  current_street: string;
+  city: string;
+  zip: string;
+  urgency: 'urgent' | 'scheduled';
+  move_type: MoveRequestType;
+  scheduled_date: number; // Unix timestamp
+  scheduled_date_iso: string; // ISO string for display
+  disposal_action?: DisposalAction | null;
+  new_street?: string | null;
+  new_city?: string | null;
+  new_zip?: string | null;
+  new_latitude?: number | null;
+  new_longitude?: number | null;
+  reason?: string | null;
+  notes?: string | null;
+  status: MoveRequestStatus;
+  assigned_shift_id?: string | null;
+  assigned_driver_name?: string | null;
+  completed_at?: number | null;
+  completed_at_iso?: string | null;
+  created_by_user_id: string;
+  created_by_name?: string | null;
+  created_at: number;
+  created_at_iso: string;
+  updated_at: number;
+  updated_at_iso: string;
+}
+
+/**
+ * Calculate urgency status based on scheduled date
+ */
+export function getMoveRequestUrgency(scheduledDate: number): 'urgent' | 'soon' | 'scheduled' | 'overdue' {
+  const now = Date.now() / 1000; // Convert to Unix timestamp
+  const daysUntil = (scheduledDate - now) / 86400;
+
+  if (scheduledDate < now) return 'overdue';
+  if (daysUntil < 1) return 'urgent';
+  if (daysUntil < 3) return 'soon';
+  return 'scheduled';
+}
+
+/**
+ * Get color for move request badge based on urgency
+ */
+export function getMoveRequestBadgeColor(scheduledDate: number): string {
+  const urgency = getMoveRequestUrgency(scheduledDate);
+  switch (urgency) {
+    case 'overdue':
+      return 'bg-red-500 text-white';
+    case 'urgent':
+      return 'bg-red-500 text-white';
+    case 'soon':
+      return 'bg-orange-500 text-white';
+    case 'scheduled':
+      return 'bg-blue-500 text-white';
+  }
+}
