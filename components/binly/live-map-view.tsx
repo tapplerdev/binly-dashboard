@@ -22,6 +22,7 @@ import { BinDetailDrawer } from './bin-detail-drawer';
 import { PotentialLocationDetailsDrawer } from './potential-location-details-drawer';
 import { MapSearchBar } from './map-search-bar';
 import { PotentialLocationPin } from '@/components/ui/potential-location-pin';
+import { OperationsNavTabs } from './operations-nav-tabs';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 const WS_URL = API_URL.replace(/^https/, 'wss').replace(/^http/, 'ws');
@@ -326,26 +327,29 @@ export function LiveMapView() {
         </div>
       )}
 
-      {/* Search Bar - Top Center */}
+      {/* Search Bar and Navigation - Top Center */}
       {!loading && (
-        <div className="absolute top-4 lg:top-8 left-1/2 -translate-x-1/2 z-10 w-full max-w-md px-3 lg:px-4 pointer-events-auto">
-          <MapSearchBar
-            bins={bins}
-            zones={zones}
-            onSelectResult={handleSearchResult}
-          />
+        <div className="absolute top-4 lg:top-8 left-1/2 -translate-x-1/2 z-10 w-full max-w-2xl px-3 lg:px-4 pointer-events-auto">
+          <div className="flex flex-col gap-3">
+            <MapSearchBar
+              bins={bins}
+              zones={zones}
+              onSelectResult={handleSearchResult}
+            />
+            <OperationsNavTabs />
+          </div>
         </div>
       )}
 
-      {/* Legend Button - Top Right */}
+      {/* Legend/Info Button - Bottom Right (Floating) */}
       {!loading && (
         <button
           onClick={() => setShowLegend(!showLegend)}
-          className="absolute top-4 right-4 z-10 w-10 h-10 bg-white/90 backdrop-blur-md rounded-full shadow-lg flex items-center justify-center hover:bg-white transition-all duration-200 group"
-          title="Show Legend"
+          className="fixed bottom-28 lg:bottom-20 right-4 z-20 w-12 h-12 bg-primary text-white rounded-full shadow-xl flex items-center justify-center hover:bg-primary/90 transition-all duration-200 group"
+          title="Map Legend & Help"
         >
           <svg
-            className="w-5 h-5 text-gray-700 group-hover:text-primary transition-colors"
+            className="w-6 h-6 text-white transition-transform group-hover:scale-110"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -363,9 +367,9 @@ export function LiveMapView() {
         </button>
       )}
 
-      {/* Collapsible Legend Panel - Top Right */}
+      {/* Collapsible Legend Panel - Bottom Right (Above button) */}
       {showLegend && (
-        <div className="absolute top-16 right-3 lg:right-4 z-10 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-3 lg:p-4 w-56 lg:w-64 animate-scale-in">
+        <div className="fixed bottom-44 lg:bottom-36 right-3 lg:right-4 z-20 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-3 lg:p-4 w-72 max-h-[60vh] overflow-y-auto animate-scale-in">
           {/* Fill Levels Legend */}
           {showFillLevels && (
             <div className="mb-4">
