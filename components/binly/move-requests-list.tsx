@@ -71,6 +71,10 @@ export function MoveRequestsList() {
   const [moveToCancel, setMoveToCancel] = useState<MoveRequest | null>(null); // For canceling individual move
   const [selectedMoveForDetail, setSelectedMoveForDetail] = useState<MoveRequest | null>(null); // For detail drawer
 
+  // Animation states for cancel modals
+  const [isBulkCancelClosing, setIsBulkCancelClosing] = useState(false);
+  const [isSingleCancelClosing, setIsSingleCancelClosing] = useState(false);
+
   // Fetch all move requests
   const { data: allMoves, isLoading, error, refetch } = useQuery({
     queryKey: ['move-requests', 'all'],
@@ -424,6 +428,24 @@ export function MoveRequestsList() {
 
   const handleBulkCancelConfirm = () => {
     bulkCancelMutation.mutate();
+  };
+
+  // Modal close handlers with animation
+  const handleCloseBulkCancelModal = () => {
+    setIsBulkCancelClosing(true);
+    setTimeout(() => {
+      setShowBulkCancelModal(false);
+      setIsBulkCancelClosing(false);
+    }, 300);
+  };
+
+  const handleCloseSingleCancelModal = () => {
+    setIsSingleCancelClosing(true);
+    setTimeout(() => {
+      setShowSingleCancelModal(false);
+      setMoveToCancel(null);
+      setIsSingleCancelClosing(false);
+    }, 300);
   };
 
   // Get urgency badge
@@ -939,11 +961,15 @@ export function MoveRequestsList() {
       {showBulkCancelModal && (
         <>
           <div
-            className="fixed inset-0 bg-black/30 z-40 flex items-center justify-center p-4"
-            onClick={() => setShowBulkCancelModal(false)}
+            className={`fixed inset-0 bg-black/30 z-40 flex items-center justify-center p-4 ${
+              isBulkCancelClosing ? 'animate-fade-out' : 'animate-fade-in'
+            }`}
+            onClick={handleCloseBulkCancelModal}
           >
             <div
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+              className={`bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 ${
+                isBulkCancelClosing ? 'animate-scale-out' : 'animate-scale-in'
+              }`}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-start justify-between mb-4">
@@ -954,7 +980,7 @@ export function MoveRequestsList() {
                   </p>
                 </div>
                 <button
-                  onClick={() => setShowBulkCancelModal(false)}
+                  onClick={handleCloseBulkCancelModal}
                   className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   <XIcon className="w-5 h-5 text-gray-500" />
@@ -973,7 +999,7 @@ export function MoveRequestsList() {
               <div className="flex gap-3 justify-end">
                 <Button
                   variant="outline"
-                  onClick={() => setShowBulkCancelModal(false)}
+                  onClick={handleCloseBulkCancelModal}
                 >
                   Keep Requests
                 </Button>
@@ -1011,11 +1037,15 @@ export function MoveRequestsList() {
       {showSingleCancelModal && moveToCancel && (
         <>
           <div
-            className="fixed inset-0 bg-black/30 z-40 flex items-center justify-center p-4"
-            onClick={() => setShowSingleCancelModal(false)}
+            className={`fixed inset-0 bg-black/30 z-40 flex items-center justify-center p-4 ${
+              isSingleCancelClosing ? 'animate-fade-out' : 'animate-fade-in'
+            }`}
+            onClick={handleCloseSingleCancelModal}
           >
             <div
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+              className={`bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 ${
+                isSingleCancelClosing ? 'animate-scale-out' : 'animate-scale-in'
+              }`}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-start justify-between mb-4">
@@ -1026,7 +1056,7 @@ export function MoveRequestsList() {
                   </p>
                 </div>
                 <button
-                  onClick={() => setShowSingleCancelModal(false)}
+                  onClick={handleCloseSingleCancelModal}
                   className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   <XIcon className="w-5 h-5 text-gray-500" />
@@ -1062,7 +1092,7 @@ export function MoveRequestsList() {
               <div className="flex gap-3 justify-end">
                 <Button
                   variant="outline"
-                  onClick={() => setShowSingleCancelModal(false)}
+                  onClick={handleCloseSingleCancelModal}
                 >
                   Keep Request
                 </Button>
