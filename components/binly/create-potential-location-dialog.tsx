@@ -451,6 +451,12 @@ export function CreatePotentialLocationDialog({
       longitude: '',
       notes: '',
     });
+    setAutoFilled({
+      street: false,
+      city: false,
+      zip: false,
+      coordinates: false,
+    });
     setMarkerPosition(null); // Clear orange marker - user must click map again
     setError('');
 
