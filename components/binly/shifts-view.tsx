@@ -184,18 +184,19 @@ export function ShiftsView() {
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Content Area */}
       <div className="flex-1 overflow-auto">
-        <div className="p-6">
+        <div className="p-3 md:p-6">
           {/* Header & Filters - Always centered with max-width */}
-          <div className="max-w-6xl mx-auto mb-6">
+          <div className="max-w-6xl mx-auto mb-4 md:mb-6">
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-              <h1 className="text-2xl font-semibold text-gray-900">Shifts</h1>
+            <div className="flex items-center justify-between mb-3 md:mb-4">
+              <h1 className="text-xl md:text-2xl font-semibold text-gray-900">Shifts</h1>
               {viewMode !== 'live' && (
                 <button
                   onClick={() => setIsCreateDrawerOpen(true)}
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-fast shadow-sm"
+                  className="bg-green-600 hover:bg-green-700 text-white px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-fast shadow-sm"
                 >
-                  Create Shift
+                  <span className="hidden sm:inline">Create Shift</span>
+                  <span className="sm:hidden">Create</span>
                 </button>
               )}
             </div>
@@ -440,10 +441,10 @@ function FilterBar({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-6">
-      <div className="flex flex-wrap items-center gap-3 mb-3">
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 md:p-4 mb-4 md:mb-6">
+      <div className="flex flex-col md:flex-row md:flex-wrap items-stretch md:items-center gap-2 md:gap-3 mb-3">
         {/* Search Input */}
-        <div className="relative" style={{ width: '320px' }}>
+        <div className="relative w-full md:w-auto md:flex-1 md:max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
@@ -459,74 +460,76 @@ function FilterBar({
           />
         </div>
 
-        {/* Date Range Toggle */}
-        <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1 border border-gray-200 relative">
-          {/* Sliding background */}
-          <div
-            className="absolute bg-white rounded-md shadow-sm transition-all duration-200 ease-in-out"
-            style={{
-              left: `${dateSliderStyle.left}px`,
-              width: `${dateSliderStyle.width}px`,
-              top: '4px',
-              bottom: '4px',
-            }}
-          />
-          <button
-            ref={lastWeekRef}
-            onClick={() => {
-              setFilters(prev => ({ ...prev, dateRange: 'last-week' }));
-              if (isDriverDropdownOpen) closeDriverDropdown();
-              if (isStatusDropdownOpen) closeStatusDropdown();
-              if (isRouteDropdownOpen) closeRouteDropdown();
-            }}
-            className={`px-3 py-1.5 rounded text-xs font-medium transition-fast relative z-10 ${
-              filters.dateRange === 'last-week'
-                ? 'text-gray-900'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Last Week
-          </button>
-          <button
-            ref={thisWeekRef}
-            onClick={() => {
-              setFilters(prev => ({ ...prev, dateRange: 'this-week' }));
-              if (isDriverDropdownOpen) closeDriverDropdown();
-              if (isStatusDropdownOpen) closeStatusDropdown();
-              if (isRouteDropdownOpen) closeRouteDropdown();
-            }}
-            className={`px-3 py-1.5 rounded text-xs font-medium transition-fast relative z-10 ${
-              filters.dateRange === 'this-week'
-                ? 'text-gray-900'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            This Week
-          </button>
-          <button
-            ref={nextWeekRef}
-            onClick={() => {
-              setFilters(prev => ({ ...prev, dateRange: 'next-week' }));
-              if (isDriverDropdownOpen) closeDriverDropdown();
-              if (isStatusDropdownOpen) closeStatusDropdown();
-              if (isRouteDropdownOpen) closeRouteDropdown();
-            }}
-            className={`px-3 py-1.5 rounded text-xs font-medium transition-fast relative z-10 ${
-              filters.dateRange === 'next-week'
-                ? 'text-gray-900'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Next Week
-          </button>
-        </div>
+        {/* Filters Row - Horizontal scroll on mobile */}
+        <div className="w-full md:w-auto flex items-center gap-2 md:gap-3 overflow-x-auto scrollbar-hide">
+          {/* Date Range Toggle */}
+          <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1 border border-gray-200 relative shrink-0">
+            {/* Sliding background */}
+            <div
+              className="absolute bg-white rounded-md shadow-sm transition-all duration-200 ease-in-out"
+              style={{
+                left: `${dateSliderStyle.left}px`,
+                width: `${dateSliderStyle.width}px`,
+                top: '4px',
+                bottom: '4px',
+              }}
+            />
+            <button
+              ref={lastWeekRef}
+              onClick={() => {
+                setFilters(prev => ({ ...prev, dateRange: 'last-week' }));
+                if (isDriverDropdownOpen) closeDriverDropdown();
+                if (isStatusDropdownOpen) closeStatusDropdown();
+                if (isRouteDropdownOpen) closeRouteDropdown();
+              }}
+              className={`px-2 md:px-3 py-1.5 rounded text-[11px] md:text-xs font-medium transition-fast relative z-10 whitespace-nowrap ${
+                filters.dateRange === 'last-week'
+                  ? 'text-gray-900'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Last Week
+            </button>
+            <button
+              ref={thisWeekRef}
+              onClick={() => {
+                setFilters(prev => ({ ...prev, dateRange: 'this-week' }));
+                if (isDriverDropdownOpen) closeDriverDropdown();
+                if (isStatusDropdownOpen) closeStatusDropdown();
+                if (isRouteDropdownOpen) closeRouteDropdown();
+              }}
+              className={`px-2 md:px-3 py-1.5 rounded text-[11px] md:text-xs font-medium transition-fast relative z-10 whitespace-nowrap ${
+                filters.dateRange === 'this-week'
+                  ? 'text-gray-900'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              This Week
+            </button>
+            <button
+              ref={nextWeekRef}
+              onClick={() => {
+                setFilters(prev => ({ ...prev, dateRange: 'next-week' }));
+                if (isDriverDropdownOpen) closeDriverDropdown();
+                if (isStatusDropdownOpen) closeStatusDropdown();
+                if (isRouteDropdownOpen) closeRouteDropdown();
+              }}
+              className={`px-2 md:px-3 py-1.5 rounded text-[11px] md:text-xs font-medium transition-fast relative z-10 whitespace-nowrap ${
+                filters.dateRange === 'next-week'
+                  ? 'text-gray-900'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Next Week
+            </button>
+          </div>
 
-        {/* Driver Filter */}
-        <div className="relative" ref={driverRef}>
-          <button
-            onClick={() => isDriverDropdownOpen ? closeDriverDropdown() : openDriverDropdown()}
-            className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-fast"
-          >
+          {/* Driver Filter */}
+          <div className="relative shrink-0" ref={driverRef}>
+            <button
+              onClick={() => isDriverDropdownOpen ? closeDriverDropdown() : openDriverDropdown()}
+              className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2.5 border border-gray-200 rounded-lg text-xs md:text-sm font-medium hover:bg-gray-50 transition-fast whitespace-nowrap"
+            >
             <User className="w-4 h-4 text-gray-600" />
             <span className="text-gray-700">Driver</span>
             {filters.drivers.length > 0 && (
@@ -551,14 +554,14 @@ function FilterBar({
               ))}
             </div>
           )}
-        </div>
+          </div>
 
-        {/* Status Filter */}
-        <div className="relative" ref={statusRef}>
-          <button
-            onClick={() => isStatusDropdownOpen ? closeStatusDropdown() : openStatusDropdown()}
-            className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-fast"
-          >
+          {/* Status Filter */}
+          <div className="relative shrink-0" ref={statusRef}>
+            <button
+              onClick={() => isStatusDropdownOpen ? closeStatusDropdown() : openStatusDropdown()}
+              className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2.5 border border-gray-200 rounded-lg text-xs md:text-sm font-medium hover:bg-gray-50 transition-fast whitespace-nowrap"
+            >
             <Filter className="w-4 h-4 text-gray-600" />
             <span className="text-gray-700">Status</span>
             {filters.statuses.length > 0 && (
@@ -583,14 +586,14 @@ function FilterBar({
               ))}
             </div>
           )}
-        </div>
+          </div>
 
-        {/* Route Filter */}
-        <div className="relative" ref={routeRef}>
-          <button
-            onClick={() => isRouteDropdownOpen ? closeRouteDropdown() : openRouteDropdown()}
-            className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-fast"
-          >
+          {/* Route Filter */}
+          <div className="relative shrink-0" ref={routeRef}>
+            <button
+              onClick={() => isRouteDropdownOpen ? closeRouteDropdown() : openRouteDropdown()}
+              className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2.5 border border-gray-200 rounded-lg text-xs md:text-sm font-medium hover:bg-gray-50 transition-fast whitespace-nowrap"
+            >
             <span className="text-gray-700">Route</span>
             {filters.routes.length > 0 && (
               <span className="bg-primary text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-semibold">
@@ -614,17 +617,18 @@ function FilterBar({
               ))}
             </div>
           )}
-        </div>
+          </div>
 
-        {/* Clear All */}
-        {activeFilterCount > 0 && (
-          <button
-            onClick={onClearAll}
-            className="text-sm text-gray-500 hover:text-gray-700 font-medium ml-auto transition-fast"
-          >
-            Clear all
-          </button>
-        )}
+          {/* Clear All - Inside scroll container on mobile */}
+          {activeFilterCount > 0 && (
+            <button
+              onClick={onClearAll}
+              className="text-xs md:text-sm text-gray-500 hover:text-gray-700 font-medium shrink-0 md:ml-auto transition-fast"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Active Filter Chips */}

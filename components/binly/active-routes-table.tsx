@@ -98,27 +98,27 @@ export function ActiveRoutesTable({
     <Card className="overflow-hidden">
       {/* Header */}
       <div
-        className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors border-b"
+        className="flex items-center justify-between p-3 md:p-4 cursor-pointer hover:bg-gray-50 transition-colors border-b"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-gray-900">Active Routes</h2>
-          <Badge variant="default" className="bg-green-600">
+        <div className="flex items-center gap-2 md:gap-3">
+          <h2 className="text-base md:text-lg font-semibold text-gray-900">Active Routes</h2>
+          <Badge variant="default" className="bg-green-600 text-xs md:text-sm">
             {activeShifts.length} active
           </Badge>
         </div>
         <button className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
           {isExpanded ? (
-            <ChevronUp className="w-5 h-5 text-gray-600" />
+            <ChevronUp className="w-4 md:w-5 h-4 md:h-5 text-gray-600" />
           ) : (
-            <ChevronDown className="w-5 h-5 text-gray-600" />
+            <ChevronDown className="w-4 md:w-5 h-4 md:h-5 text-gray-600" />
           )}
         </button>
       </div>
 
-      {/* Table */}
+      {/* Desktop Table */}
       {isExpanded && (
-        <div className="overflow-x-auto">
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
@@ -263,6 +263,122 @@ export function ActiveRoutesTable({
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Mobile Card View */}
+      {isExpanded && (
+        <div className="lg:hidden p-3 space-y-3">
+          {activeShifts.map((shift) => {
+            const status = getRouteStatus(shift);
+            const eta = getETAStatus(shift);
+            const progress = shift.binsCollected && shift.binCount
+              ? (shift.binsCollected / shift.binCount) * 100
+              : 0;
+
+            return (
+              <Card
+                key={shift.id}
+                className="p-4 hover:shadow-lg transition-all active:scale-[0.98]"
+              >
+                {/* Header - Driver and Status */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    {shift.driverPhoto ? (
+                      <img
+                        src={shift.driverPhoto}
+                        alt={shift.driverName}
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center text-sm font-semibold">
+                        {shift.driverName.charAt(0)}
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-base font-semibold text-gray-900">
+                        {shift.driverName}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <div className={`w-2 h-2 rounded-full ${status.color}`} />
+                        <span className="text-xs font-medium text-gray-600">
+                          {status.label}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ETA Badge */}
+                  {eta && (
+                    <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded-lg">
+                      <Clock className="w-3.5 h-3.5 text-gray-400" />
+                      <span className={`text-sm font-semibold ${eta.color}`}>
+                        {eta.text}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Route */}
+                <div className="flex items-center gap-2 mb-3">
+                  <Navigation className="w-4 h-4 text-gray-400 shrink-0" />
+                  <span className="text-sm text-gray-700">{shift.route}</span>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs text-gray-500">Progress</span>
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-gray-400" />
+                      <span className="text-sm font-semibold text-gray-900">
+                        {shift.binsCollected || 0}/{shift.binCount}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        ({Math.round(progress)}%)
+                      </span>
+                    </div>
+                  </div>
+                  <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${status.color} transition-all duration-500`}
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 h-9"
+                    onClick={() => onTrackRoute?.(shift.id)}
+                  >
+                    <MapPin className="w-4 h-4 mr-1.5" />
+                    Track
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 h-9"
+                    onClick={() => onCallDriver?.(shift.id)}
+                  >
+                    <Phone className="w-4 h-4 mr-1.5" />
+                    Call
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-9 px-3"
+                    onClick={() => onRerouteDriver?.(shift.id)}
+                  >
+                    <Navigation className="w-4 h-4" />
+                  </Button>
+                </div>
+              </Card>
+            );
+          })}
         </div>
       )}
     </Card>

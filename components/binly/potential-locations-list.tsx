@@ -146,81 +146,84 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
     <>
       <div className="bg-white rounded-2xl card-shadow">
         {/* Header */}
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
+        <div className="p-3 md:p-6 border-b border-gray-200">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-0">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-lg md:text-xl font-semibold text-gray-900">
                 Potential Locations
               </h2>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-xs md:text-sm text-gray-600 mt-1">
                 {filter === 'active' ? 'Active location requests' : 'Converted to bins'}
               </p>
             </div>
 
             {/* Filter Toggle and Create Button */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3">
+              {/* Filter Toggle */}
+              <div className="flex gap-1.5 md:gap-2">
+                <button
+                  onClick={() => setFilter('active')}
+                  className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-all ${
+                    filter === 'active'
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  Active
+                </button>
+                <button
+                  onClick={() => setFilter('converted')}
+                  className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-all ${
+                    filter === 'converted'
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  Converted
+                </button>
+              </div>
+
               {/* Create Button */}
               <Button
                 onClick={onCreateNew}
-                className="bg-primary hover:bg-primary/90 gap-2"
+                className="bg-primary hover:bg-primary/90 gap-1.5 md:gap-2 text-xs md:text-sm px-3 md:px-4 py-1.5 md:py-2 h-auto"
               >
-                <MapPin className="w-4 h-4" />
-                Add Location
+                <MapPin className="w-3.5 md:w-4 h-3.5 md:h-4" />
+                <span className="hidden sm:inline">Add Location</span>
+                <span className="sm:hidden">Add</span>
               </Button>
-
-              {/* Filter Toggle */}
-              <div className="flex gap-2">
-              <button
-                onClick={() => setFilter('active')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  filter === 'active'
-                    ? 'bg-primary text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                Active
-              </button>
-              <button
-                onClick={() => setFilter('converted')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  filter === 'converted'
-                    ? 'bg-primary text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                Converted
-              </button>
-              </div>
             </div>
           </div>
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 text-primary animate-spin" />
-            </div>
-          ) : locations.length === 0 ? (
-            <div className="text-center py-12">
-              <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                No potential locations found
-              </h3>
-              <p className="text-gray-600 mb-4">
-                {filter === 'active'
-                  ? 'Create a new potential location to get started'
-                  : 'No locations have been converted yet'}
-              </p>
-              {filter === 'active' && (
-                <Button onClick={onCreateNew} className="gap-2">
-                  <MapPin className="w-4 h-4" />
-                  Add Location
-                </Button>
-              )}
-            </div>
-          ) : (
-            <table className="w-full">
+        {/* Loading & Empty States */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+          </div>
+        ) : locations.length === 0 ? (
+          <div className="text-center py-12">
+            <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              No potential locations found
+            </h3>
+            <p className="text-gray-600 mb-4">
+              {filter === 'active'
+                ? 'Create a new potential location to get started'
+                : 'No locations have been converted yet'}
+            </p>
+            {filter === 'active' && (
+              <Button onClick={onCreateNew} className="gap-2">
+                <MapPin className="w-4 h-4" />
+                Add Location
+              </Button>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th
@@ -347,9 +350,100 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                   </tr>
                 ))}
               </tbody>
-            </table>
-          )}
-        </div>
+              </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="lg:hidden p-3 space-y-3">
+              {sortedLocations.map((location) => (
+                <div
+                  key={location.id}
+                  onClick={() => setSelectedLocation(location)}
+                  className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer"
+                >
+                  {/* Header - Address */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <div className="text-base font-semibold text-gray-900 mb-1">
+                        {location.street}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {location.city}, {location.zip}
+                      </div>
+                    </div>
+                    {filter === 'converted' && (
+                      <Badge variant="default" className="gap-1 shrink-0 ml-2">
+                        <Check className="w-3 h-3" />
+                        Bin #{location.bin_number}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Requested By */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <User className="w-4 h-4 text-gray-400 shrink-0" />
+                    <div className="text-sm">
+                      <span className="text-gray-500">Requested by:</span>{' '}
+                      <span className="text-gray-900 font-medium">
+                        {location.requested_by_name}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Date Created */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+                    <div className="text-sm">
+                      <span className="text-gray-500">Created:</span>{' '}
+                      <span className="text-gray-900">{formatDate(location.created_at_iso)}</span>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons - Only for active locations */}
+                  {filter === 'active' && (
+                    <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedLocation(location);
+                        }}
+                      >
+                        <Eye className="w-4 h-4 mr-1.5" />
+                        View
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleConvert(location);
+                        }}
+                      >
+                        <Check className="w-4 h-4 mr-1.5" />
+                        Convert
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-9 px-3 border-red-200 text-red-600 hover:bg-red-50"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(location);
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Details Drawer */}
