@@ -2,12 +2,21 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
-import { MapPin, X, Loader2, Search } from 'lucide-react';
+import { MapPin, X, Loader2, Search, Plus, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
 import { inputStyles } from '@/lib/utils';
 import { useBins } from '@/lib/hooks/use-bins';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
+
+interface QueuedLocation {
+  street: string;
+  city: string;
+  zip: string;
+  latitude: number;
+  longitude: number;
+  notes?: string;
+}
 
 interface CreatePotentialLocationDialogProps {
   open: boolean;
@@ -82,6 +91,7 @@ export function CreatePotentialLocationDialog({
   const [searchQuery, setSearchQuery] = useState('');
   const [markerPosition, setMarkerPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationQueue, setLocationQueue] = useState<QueuedLocation[]>([]);
   const [formData, setFormData] = useState({
     street: '',
     city: '',
@@ -105,6 +115,7 @@ export function CreatePotentialLocationDialog({
       setMarkerPosition(null);
       setSearchQuery('');
       setError('');
+      setLocationQueue([]);
     }
   }, [open]);
 
@@ -163,7 +174,7 @@ export function CreatePotentialLocationDialog({
     [reverseGeocode]
   );
 
-  // Handle place selection from autocomplete
+  // Handle place selection from autocomplete - only pan/zoom, no marker
   const handlePlaceSelect = useCallback(
     (place: google.maps.places.PlaceResult) => {
       if (!place.geometry?.location) return;
@@ -171,39 +182,91 @@ export function CreatePotentialLocationDialog({
       const lat = place.geometry.location.lat();
       const lng = place.geometry.location.lng();
 
-      setMarkerPosition({ lat, lng });
+      // Only pan the map, don't create marker or fill form
       setMapCenter({ lat, lng });
-
-      let street = '';
-      let city = '';
-      let zip = '';
-
-      place.address_components?.forEach((component) => {
-        if (component.types.includes('street_number')) {
-          street = component.long_name + ' ';
-        }
-        if (component.types.includes('route')) {
-          street += component.long_name;
-        }
-        if (component.types.includes('locality')) {
-          city = component.long_name;
-        }
-        if (component.types.includes('postal_code')) {
-          zip = component.long_name;
-        }
-      });
-
-      setFormData({
-        street: street.trim() || place.formatted_address || '',
-        city: city,
-        zip: zip,
-        latitude: lat.toString(),
-        longitude: lng.toString(),
-        notes: '',
-      });
+      setSearchQuery('');
     },
     []
   );
+
+  // Forward geocode address from form fields
+  const forwardGeocodeAddress = useCallback(async () => {
+    if (!formData.street || !formData.city || !formData.zip) return;
+
+    try {
+      const geocoder = new google.maps.Geocoder();
+      const address = `${formData.street}, ${formData.city}, ${formData.zip}`;
+
+      const result = await geocoder.geocode({ address });
+
+      if (result.results && result.results[0]?.geometry?.location) {
+        const location = result.results[0].geometry.location;
+        const lat = location.lat();
+        const lng = location.lng();
+
+        setMarkerPosition({ lat, lng });
+        setMapCenter({ lat, lng });
+        setFormData((prev) => ({
+          ...prev,
+          latitude: lat.toString(),
+          longitude: lng.toString(),
+        }));
+      }
+    } catch (error) {
+      console.error('Forward geocoding error:', error);
+      // Silently fail - user can still click on map
+    }
+  }, [formData.street, formData.city, formData.zip]);
+
+  // Debounced forward geocoding when address fields change
+  useEffect(() => {
+    if (!formData.street || !formData.city || !formData.zip) return;
+
+    const timeoutId = setTimeout(() => {
+      forwardGeocodeAddress();
+    }, 1000); // Debounce 1 second
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.street, formData.city, formData.zip, forwardGeocodeAddress]);
+
+  // Add current location to queue
+  const handleAddToQueue = useCallback(() => {
+    // Validate required fields
+    if (!formData.street || !formData.city || !formData.zip) {
+      setError('Please fill in street, city, and zip code');
+      return;
+    }
+
+    if (!formData.latitude || !formData.longitude) {
+      setError('Please select a location on the map');
+      return;
+    }
+
+    const newLocation: QueuedLocation = {
+      street: formData.street,
+      city: formData.city,
+      zip: formData.zip,
+      latitude: parseFloat(formData.latitude),
+      longitude: parseFloat(formData.longitude),
+      notes: formData.notes,
+    };
+
+    setLocationQueue((prev) => [...prev, newLocation]);
+
+    // Clear form for next location
+    setFormData({
+      street: '',
+      city: '',
+      zip: '',
+      latitude: '',
+      longitude: '',
+      notes: '',
+    });
+    setMarkerPosition(null);
+    setError('');
+
+    console.log('✅ Added location to queue:', newLocation);
+  }, [formData]);
 
   // Get auth token from Zustand persist storage
   const getAuthToken = (): string | null => {
@@ -235,7 +298,7 @@ export function CreatePotentialLocationDialog({
       }
 
       // Debug logging
-      console.log('🔍 Creating potential location...');
+      console.log('🔍 Creating potential location(s)...');
       console.log('   Token preview:', token.substring(0, 20) + '...');
       console.log('   Token length:', token.length);
 
@@ -266,22 +329,44 @@ export function CreatePotentialLocationDialog({
         }
       }
 
-      const payload: any = {
-        street: formData.street,
-        city: formData.city,
-        zip: formData.zip,
-      };
+      // Build locations array for batch submission
+      const locationsToCreate: any[] = [];
 
-      if (formData.latitude) {
-        payload.latitude = parseFloat(formData.latitude);
-      }
-      if (formData.longitude) {
-        payload.longitude = parseFloat(formData.longitude);
-      }
-      if (formData.notes) {
-        payload.notes = formData.notes;
+      // Add queued locations
+      locationQueue.forEach(loc => {
+        locationsToCreate.push({
+          street: loc.street,
+          city: loc.city,
+          zip: loc.zip,
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          ...(loc.notes && { notes: loc.notes }),
+        });
+      });
+
+      // Add current form data if it has valid data
+      if (formData.street && formData.city && formData.zip && formData.latitude && formData.longitude) {
+        locationsToCreate.push({
+          street: formData.street,
+          city: formData.city,
+          zip: formData.zip,
+          latitude: parseFloat(formData.latitude),
+          longitude: parseFloat(formData.longitude),
+          ...(formData.notes && { notes: formData.notes }),
+        });
       }
 
+      // Validate we have at least one location
+      if (locationsToCreate.length === 0) {
+        setError('Please add at least one location');
+        setLoading(false);
+        return;
+      }
+
+      // Send as array if multiple, or single object if just one
+      const payload = locationsToCreate.length === 1 ? locationsToCreate[0] : locationsToCreate;
+
+      console.log('   Creating', locationsToCreate.length, 'location(s)');
       console.log('   Payload:', JSON.stringify(payload, null, 2));
 
       // Use environment variable or default to production
@@ -479,29 +564,77 @@ export function CreatePotentialLocationDialog({
                 />
               </div>
 
+              {/* Queue Counter Badge */}
+              {locationQueue.length > 0 && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-green-600" />
+                    <p className="text-sm font-semibold text-green-900">
+                      {locationQueue.length} location{locationQueue.length > 1 ? 's' : ''} queued
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLocationQueue([])}
+                    className="text-xs text-green-700 hover:text-green-900 font-medium"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              )}
+
               {/* Actions */}
-              <div className="flex gap-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                  className="flex-1"
-                  disabled={loading}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" className="flex-1 gap-2" disabled={loading || !markerPosition}>
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <MapPin className="w-4 h-4" />
-                      Create Location
-                    </>
-                  )}
+              <div className="space-y-3 pt-4">
+                {/* Add to Queue Button - only show if form has data */}
+                {formData.street && formData.city && formData.zip && markerPosition && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleAddToQueue}
+                    className="w-full gap-2"
+                    disabled={loading}
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add to Queue
+                  </Button>
+                )}
+
+                {/* Cancel and Submit Row */}
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => onOpenChange(false)}
+                    className="flex-1"
+                    disabled={loading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 gap-2"
+                    disabled={loading || (locationQueue.length === 0 && !markerPosition)}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        {locationQueue.length > 0 ? (
+                          <>
+                            <Layers className="w-4 h-4" />
+                            Create All ({locationQueue.length + (formData.street && formData.city && formData.zip && markerPosition ? 1 : 0)})
+                          </>
+                        ) : (
+                          <>
+                            <MapPin className="w-4 h-4" />
+                            Create Location
+                          </>
+                        )}
+                      </>
+                    )}
                 </Button>
               </div>
             </form>
