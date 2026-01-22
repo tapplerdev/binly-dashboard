@@ -167,37 +167,37 @@ export function RoutesView() {
   return (
     <div className="flex flex-col h-screen">
       {/* Top Header Bar */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 shrink-0">
-        <div className="flex items-center justify-between">
+      <div className="bg-white border-b border-gray-200 px-3 lg:px-6 py-3 lg:py-4 shrink-0">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 lg:gap-0">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Routes</h1>
+            <h1 className="text-xl lg:text-2xl font-bold text-gray-900">Routes</h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2 lg:gap-3 w-full lg:w-auto">
             {/* KPI Stats - Cards with Icons */}
             {!loading && (
-              <div className="flex items-center gap-3 mr-6">
+              <div className="grid grid-cols-3 lg:flex lg:items-center gap-2 lg:gap-3 lg:mr-6">
                 {/* Total Routes */}
-                <div className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm hover:shadow-md transition-all">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-50 rounded-lg">
-                      <RouteIcon className="w-4 h-4 text-primary" />
+                <div className="bg-white border border-gray-200 rounded-lg lg:rounded-xl px-2 lg:px-4 py-2 lg:py-2.5 shadow-sm hover:shadow-md transition-all">
+                  <div className="flex flex-col lg:flex-row items-center lg:items-center gap-1 lg:gap-3">
+                    <div className="p-1.5 lg:p-2 bg-blue-50 rounded-lg">
+                      <RouteIcon className="w-3 lg:w-4 h-3 lg:h-4 text-primary" />
                     </div>
-                    <div>
-                      <p className="text-xs text-gray-500 font-medium">Total Routes</p>
-                      <p className="text-lg font-bold text-gray-900">{routes.length}</p>
+                    <div className="text-center lg:text-left">
+                      <p className="text-[10px] lg:text-xs text-gray-500 font-medium">Total Routes</p>
+                      <p className="text-sm lg:text-lg font-bold text-gray-900">{routes.length}</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Total Bins Covered */}
-                <div className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm hover:shadow-md transition-all">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-50 rounded-lg">
-                      <Package className="w-4 h-4 text-green-600" />
+                <div className="bg-white border border-gray-200 rounded-lg lg:rounded-xl px-2 lg:px-4 py-2 lg:py-2.5 shadow-sm hover:shadow-md transition-all">
+                  <div className="flex flex-col lg:flex-row items-center lg:items-center gap-1 lg:gap-3">
+                    <div className="p-1.5 lg:p-2 bg-green-50 rounded-lg">
+                      <Package className="w-3 lg:w-4 h-3 lg:h-4 text-green-600" />
                     </div>
-                    <div>
-                      <p className="text-xs text-gray-500 font-medium">Bins Covered</p>
-                      <p className="text-lg font-bold text-gray-900">
+                    <div className="text-center lg:text-left">
+                      <p className="text-[10px] lg:text-xs text-gray-500 font-medium">Bins Covered</p>
+                      <p className="text-sm lg:text-lg font-bold text-gray-900">
                         {routes.reduce((sum, r) => sum + r.bin_count, 0)}
                       </p>
                     </div>
@@ -205,14 +205,14 @@ export function RoutesView() {
                 </div>
 
                 {/* Avg. Route Duration */}
-                <div className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm hover:shadow-md transition-all">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-orange-50 rounded-lg">
-                      <Clock className="w-4 h-4 text-orange-600" />
+                <div className="bg-white border border-gray-200 rounded-lg lg:rounded-xl px-2 lg:px-4 py-2 lg:py-2.5 shadow-sm hover:shadow-md transition-all">
+                  <div className="flex flex-col lg:flex-row items-center lg:items-center gap-1 lg:gap-3">
+                    <div className="p-1.5 lg:p-2 bg-orange-50 rounded-lg">
+                      <Clock className="w-3 lg:w-4 h-3 lg:h-4 text-orange-600" />
                     </div>
-                    <div>
-                      <p className="text-xs text-gray-500 font-medium">Avg. Duration</p>
-                      <p className="text-lg font-bold text-gray-900">
+                    <div className="text-center lg:text-left">
+                      <p className="text-[10px] lg:text-xs text-gray-500 font-medium">Avg. Duration</p>
+                      <p className="text-sm lg:text-lg font-bold text-gray-900">
                         {routes.length > 0
                           ? (routes.reduce((sum, r) => sum + r.estimated_duration_hours, 0) / routes.length).toFixed(1)
                           : '0.0'}h
@@ -223,65 +223,70 @@ export function RoutesView() {
               </div>
             )}
 
-            {/* Filter Button */}
-            <button
-              onClick={() => {
-                if (isFilterDrawerOpen) {
-                  // Trigger closing animation
-                  setIsFilterDrawerClosing(true);
-                  setTimeout(() => {
-                    setConfirmedFilters(filters);
-                    setIsFilterDrawerOpen(false);
-                    setIsFilterDrawerClosing(false);
-                  }, 300);
-                } else {
-                  setIsFilterDrawerOpen(true);
-                }
-              }}
-              className="relative px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-all flex items-center gap-2"
-            >
-              <Filter className="w-4 h-4 text-gray-600" />
-              <span className="text-gray-700">Filter</span>
-              {activeFilterCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-white text-xs font-bold rounded-full flex items-center justify-center">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
+            {/* Filter and Create Buttons */}
+            <div className="flex items-center gap-2 lg:gap-3">
+              {/* Filter Button */}
+              <button
+                onClick={() => {
+                  if (isFilterDrawerOpen) {
+                    // Trigger closing animation
+                    setIsFilterDrawerClosing(true);
+                    setTimeout(() => {
+                      setConfirmedFilters(filters);
+                      setIsFilterDrawerOpen(false);
+                      setIsFilterDrawerClosing(false);
+                    }, 300);
+                  } else {
+                    setIsFilterDrawerOpen(true);
+                  }
+                }}
+                className="relative px-3 lg:px-4 py-2 border border-gray-200 rounded-lg text-xs lg:text-sm font-medium hover:bg-gray-50 transition-all flex items-center gap-1.5 lg:gap-2 flex-1 lg:flex-none justify-center"
+              >
+                <Filter className="w-3.5 lg:w-4 h-3.5 lg:h-4 text-gray-600" />
+                <span className="text-gray-700">Filter</span>
+                {activeFilterCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 lg:w-5 h-4 lg:h-5 bg-primary text-white text-[10px] lg:text-xs font-bold rounded-full flex items-center justify-center">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
 
-            {/* Create Button */}
-            <button
-              onClick={handleCreateRoute}
-              className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              Create Route
-            </button>
+              {/* Create Button */}
+              <button
+                onClick={handleCreateRoute}
+                className="px-3 lg:px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs lg:text-sm font-medium flex items-center gap-1.5 lg:gap-2 transition-all shadow-sm flex-1 lg:flex-none justify-center"
+              >
+                <Plus className="w-3.5 lg:w-4 h-3.5 lg:h-4" />
+                Create Route
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Main Content - Sidebar + Map */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar - Routes List */}
+        {/* Left Sidebar - Routes List (Desktop Only) */}
         {loading ? (
-          <div className="w-80 bg-white border-r border-gray-200 flex items-center justify-center">
+          <div className="hidden lg:flex w-80 bg-white border-r border-gray-200 items-center justify-center">
             <div className="text-center">
               <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
               <p className="text-sm text-gray-600">Loading routes...</p>
             </div>
           </div>
         ) : (
-          <RoutesSidebar
-            routes={displayedRoutes}
-            selectedRouteId={selectedRoute?.id}
-            visibleRouteIds={visibleRouteIds}
-            onRouteSelect={handleRouteSelect}
-            onViewDetails={setDetailsRoute}
-            onRouteHover={setHoveredRouteId}
-            onShowAll={handleShowAllRoutes}
-            onClearAll={handleClearAllRoutes}
-          />
+          <div className="hidden lg:block">
+            <RoutesSidebar
+              routes={displayedRoutes}
+              selectedRouteId={selectedRoute?.id}
+              visibleRouteIds={visibleRouteIds}
+              onRouteSelect={handleRouteSelect}
+              onViewDetails={setDetailsRoute}
+              onRouteHover={setHoveredRouteId}
+              onShowAll={handleShowAllRoutes}
+              onClearAll={handleClearAllRoutes}
+            />
+          </div>
         )}
 
         {/* Map View - Full Height */}

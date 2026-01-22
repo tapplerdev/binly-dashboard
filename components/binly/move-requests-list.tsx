@@ -519,9 +519,9 @@ export function MoveRequestsList() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
         <KpiCard
           title="Urgent"
           value={urgentCount.toString()}
@@ -565,8 +565,8 @@ export function MoveRequestsList() {
       </div>
 
       {/* Filters and Actions */}
-      <Card className="p-4">
-        <div className="flex items-center gap-4">
+      <Card className="p-3 md:p-4">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 lg:gap-4">
           {/* Multi-select Filter Dropdown */}
           <MultiSelectDropdown
             label="Filter By"
@@ -585,7 +585,7 @@ export function MoveRequestsList() {
           />
 
           {/* Search Bar */}
-          <div className="relative flex-1 max-w-md">
+          <div className="relative flex-1 lg:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
@@ -597,7 +597,7 @@ export function MoveRequestsList() {
           </div>
 
           {/* Assignment Segmented Control */}
-          <div className="flex items-center ml-auto">
+          <div className="flex items-center lg:ml-auto">
             <SegmentedControl
               value={assignedFilter}
               options={[
@@ -611,7 +611,7 @@ export function MoveRequestsList() {
 
           {/* Create Button */}
           <Button
-            className="whitespace-nowrap"
+            className="whitespace-nowrap w-full lg:w-auto"
             onClick={() => setShowScheduleMoveModal(true)}
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -622,48 +622,59 @@ export function MoveRequestsList() {
 
       {/* Bulk Action Bar */}
       {selectedMoves.size > 0 && (
-        <div className="fixed bottom-6 left-0 right-0 z-40 flex justify-center animate-slide-in-up">
-          <Card className="px-6 py-4 shadow-2xl border-2 border-primary/20">
-            <div className="flex items-center gap-6">
+        <div className="fixed bottom-20 lg:bottom-6 left-0 right-0 z-40 flex justify-center px-3 lg:px-0 animate-slide-in-up">
+          <Card className="px-4 lg:px-6 py-3 lg:py-4 shadow-2xl border-2 border-primary/20 w-full lg:w-auto max-w-full lg:max-w-none">
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 lg:gap-6">
               {/* Count Badge */}
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
+                <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm shrink-0">
                   {selectedMoves.size}
                 </div>
-                <span className="font-semibold text-gray-700">
+                <span className="font-semibold text-gray-700 text-sm lg:text-base">
                   {selectedMoves.size} move{selectedMoves.size !== 1 ? 's' : ''} selected
                 </span>
+
+                {/* Clear Button - Mobile only, inline with count */}
+                <button
+                  onClick={clearSelection}
+                  className="lg:hidden ml-auto h-8 w-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+                  aria-label="Clear selection"
+                >
+                  <XIcon className="h-4 w-4 text-gray-500" />
+                </button>
               </div>
 
               {/* Actions */}
-              {hasMixedSelection ? (
-                <div className="flex items-center gap-2 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                  <span className="text-sm text-yellow-800 font-medium">
-                    Mixed selection - Cannot bulk assign
-                  </span>
-                </div>
-              ) : (
-                <Button variant="default" size="sm" onClick={handleBulkAssign}>
-                  <Truck className="h-4 w-4 mr-2" />
-                  {hasAssignedMoves ? 'Re-assign to Shift' : 'Assign to Shift'}
+              <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2 lg:gap-4">
+                {hasMixedSelection ? (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <AlertTriangle className="h-4 w-4 text-yellow-600 shrink-0" />
+                    <span className="text-sm text-yellow-800 font-medium">
+                      Mixed selection - Cannot bulk assign
+                    </span>
+                  </div>
+                ) : (
+                  <Button variant="default" size="sm" onClick={handleBulkAssign} className="w-full lg:w-auto">
+                    <Truck className="h-4 w-4 mr-2" />
+                    {hasAssignedMoves ? 'Re-assign to Shift' : 'Assign to Shift'}
+                  </Button>
+                )}
+
+                <Button variant="outline" size="sm" onClick={handleBulkEditDate} className="w-full lg:w-auto">
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Date
                 </Button>
-              )}
 
-              <Button variant="outline" size="sm" onClick={handleBulkEditDate}>
-                <Edit className="h-4 w-4 mr-2" />
-                Edit Date
-              </Button>
+                <Button variant="destructive" size="sm" onClick={handleBulkCancel} className="w-full lg:w-auto">
+                  <XIcon className="h-4 w-4 mr-2" />
+                  Cancel Moves
+                </Button>
+              </div>
 
-              <Button variant="destructive" size="sm" onClick={handleBulkCancel}>
-                <XIcon className="h-4 w-4 mr-2" />
-                Cancel Moves
-              </Button>
-
-              {/* Clear Button */}
+              {/* Clear Button - Desktop only */}
               <button
                 onClick={clearSelection}
-                className="h-8 w-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+                className="hidden lg:flex h-8 w-8 rounded-full hover:bg-gray-100 items-center justify-center transition-colors"
                 aria-label="Clear selection"
               >
                 <XIcon className="h-4 w-4 text-gray-500" />
@@ -673,8 +684,8 @@ export function MoveRequestsList() {
         </div>
       )}
 
-      {/* Table */}
-      <Card>
+      {/* Desktop Table */}
+      <Card className="hidden lg:block">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -869,6 +880,128 @@ export function MoveRequestsList() {
           )}
         </div>
       </Card>
+
+      {/* Mobile Card View */}
+      {filteredMoves && filteredMoves.length === 0 ? (
+        <Card className="lg:hidden">
+          <div className="text-center py-12">
+            <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-500 font-semibold mb-2">No move requests found</p>
+            <p className="text-gray-400 text-sm">
+              {searchQuery || filters.length > 0 || assignedFilter !== 'all'
+                ? 'Try adjusting your filters'
+                : 'Create a move request to get started'}
+            </p>
+          </div>
+        </Card>
+      ) : (
+        <div className="lg:hidden space-y-3">
+          {filteredMoves?.map((move) => (
+            <Card
+              key={move.id}
+              className="p-4 hover:shadow-lg transition-all cursor-pointer active:scale-[0.98]"
+              onClick={() => handleRowClick(move)}
+            >
+              {/* Header Row: Checkbox, Bin Number, Actions */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedMoves.has(move.id)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handleSelectMove(move.id);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+                  />
+                  <span className="text-lg font-bold text-gray-900">Bin #{move.bin_number}</span>
+                </div>
+
+                {/* Actions Menu */}
+                <button
+                  ref={(el) => {
+                    if (el) menuButtonRefs.current.set(move.id, el);
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const button = e.currentTarget as HTMLButtonElement;
+                    handleMenuOpen(move.id, button);
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  aria-label="More actions"
+                >
+                  <MoreVertical className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+
+              {/* Location */}
+              <div className="flex items-start gap-2 mb-3">
+                <MapPin className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <div className="text-gray-900 font-medium">{move.current_street}</div>
+                  <div className="text-gray-500">
+                    {move.city}, {move.zip}
+                  </div>
+                </div>
+              </div>
+
+              {/* Date & Time */}
+              <div className="flex items-center gap-2 mb-3 text-sm">
+                <Calendar className="w-4 h-4 text-gray-400" />
+                <div>
+                  <span className="text-gray-900 font-medium">
+                    {format(new Date(move.scheduled_date * 1000), 'MMM dd, yyyy')}
+                  </span>
+                  <span className="text-gray-500 ml-2">
+                    {format(new Date(move.scheduled_date * 1000), 'h:mm a')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Badges Row */}
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                {getUrgencyBadge(move)}
+                {getStatusBadge(move.status)}
+              </div>
+
+              {/* Assigned Driver */}
+              {move.driver_name ? (
+                <div className="flex items-center gap-2 text-sm mb-2">
+                  <User className="w-4 h-4 text-gray-400" />
+                  <span className="text-gray-500">Assigned to:</span>
+                  <span className="text-gray-900 font-medium">{move.driver_name}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-sm mb-2">
+                  <User className="w-4 h-4 text-gray-400" />
+                  <span className="text-gray-500 font-medium">Unassigned</span>
+                </div>
+              )}
+
+              {/* Move Type */}
+              <div className="flex items-center gap-2 text-sm">
+                {move.move_type === 'relocation' ? (
+                  <>
+                    <MapPin className="h-4 w-4 text-gray-400" />
+                    <span className="text-gray-900 font-medium">Relocation</span>
+                  </>
+                ) : move.move_type === 'store' ? (
+                  <>
+                    <Package className="h-4 w-4 text-gray-400" />
+                    <span className="text-gray-900 font-medium">Store</span>
+                  </>
+                ) : (
+                  <>
+                    <Package className="h-4 w-4 text-gray-400" />
+                    <span className="text-gray-900 font-medium">Pickup</span>
+                  </>
+                )}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Assignment Modal (for shift assignment) */}
       {showAssignModal && (

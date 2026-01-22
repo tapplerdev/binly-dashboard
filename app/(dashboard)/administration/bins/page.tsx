@@ -278,17 +278,17 @@ export default function BinsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-[1600px] mx-auto space-y-6">
+    <div className="min-h-screen bg-background p-3 md:p-6">
+      <div className="max-w-[1600px] mx-auto space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 lg:gap-0">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Bins Management</h1>
-            <p className="text-gray-600 mt-1">Monitor, manage, and optimize your bin inventory</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Bins Management</h1>
+            <p className="text-sm md:text-base text-gray-600 mt-1">Monitor, manage, and optimize your bin inventory</p>
           </div>
           <Button
             onClick={() => setShowCreateModal(true)}
-            className="bg-primary hover:bg-primary/90"
+            className="bg-primary hover:bg-primary/90 w-full lg:w-auto"
           >
             <Plus className="w-4 h-4 mr-2" />
             Create New Bin
@@ -296,7 +296,7 @@ export default function BinsPage() {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
           <KpiCard
             title="Total Bins"
             value={totalBins.toString()}
@@ -325,8 +325,8 @@ export default function BinsPage() {
         </div>
 
         {/* Filters and Search */}
-        <Card className="p-4">
-          <div className="flex items-center gap-4">
+        <Card className="p-3 md:p-4">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 lg:gap-4">
             {/* Filter By Dropdown (Multi-select) */}
             <MultiSelectDropdown
               label="Filter By"
@@ -340,7 +340,7 @@ export default function BinsPage() {
             />
 
             {/* Search Bar */}
-            <div className="relative flex-1 max-w-md">
+            <div className="relative flex-1 lg:max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
@@ -352,7 +352,7 @@ export default function BinsPage() {
             </div>
 
             {/* Status Segmented Control */}
-            <div className="flex items-center ml-auto">
+            <div className="flex items-center lg:ml-auto">
               <SegmentedControl
                 value={statusFilter}
                 options={[
@@ -367,236 +367,367 @@ export default function BinsPage() {
         </Card>
 
         {/* Bins List */}
-        <Card>
-          {bins && bins.length === 0 ? (
+        {bins && bins.length === 0 ? (
+          <Card>
             <div className="text-center py-12">
               <PackageSearch className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500">No bins found matching your filters</p>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="py-4 px-4 w-[5%] align-middle rounded-tl-2xl">
-                      <div className="flex items-center justify-center">
-                        <input
-                          type="checkbox"
-                          checked={bins && bins.length > 0 && selectedBins.size === bins.length}
-                          onChange={() => handleSelectAll(bins || [])}
-                          className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
-                          title="Select all"
-                        />
-                      </div>
-                    </th>
-                    <th
-                      className="text-center py-4 px-4 text-sm font-semibold text-gray-700 w-[8%] cursor-pointer align-middle"
-                      onClick={() => handleSort('bin_number')}
-                    >
-                      <div className="flex items-center justify-center gap-1.5">
-                        <span>Bin</span>
-                        <ChevronsUpDown className="w-4 h-4 text-gray-400" />
-                      </div>
-                    </th>
-                    <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle">
-                      Location
-                    </th>
-                    <th
-                      className="text-left py-4 px-4 text-sm font-semibold text-gray-700 cursor-pointer align-middle"
-                      onClick={() => handleSort('priority')}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span>Priority</span>
-                        <ChevronsUpDown className="w-4 h-4 text-gray-400" />
-                      </div>
-                    </th>
-                    <th
-                      className="text-left py-4 px-4 text-sm font-semibold text-gray-700 cursor-pointer whitespace-nowrap align-middle"
-                      onClick={() => handleSort('fill_percentage')}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span>Fill Level</span>
-                        <ChevronsUpDown className="w-4 h-4 text-gray-400" />
-                      </div>
-                    </th>
-                    <th
-                      className="text-left py-4 px-4 text-sm font-semibold text-gray-700 cursor-pointer align-middle"
-                      onClick={() => handleSort('status')}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span>Status</span>
-                        <ChevronsUpDown className="w-4 h-4 text-gray-400" />
-                      </div>
-                    </th>
-                    <th
-                      className="text-left py-4 px-4 text-sm font-semibold text-gray-700 whitespace-nowrap cursor-pointer align-middle"
-                      onClick={() => handleSort('days_since_check')}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span>Last Checked</span>
-                        <ChevronsUpDown className="w-4 h-4 text-gray-400" />
-                      </div>
-                    </th>
-                    <th className="text-center py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tr-2xl">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {bins?.map((bin) => {
-                    const priority = getPriorityBadge(bin.priority_score);
-                    const fill = getFillBadge(bin.fill_percentage);
-                    const status = getStatusBadge(bin.status);
-
-                    return (
-                      <tr
-                        key={bin.id}
-                        className="hover:bg-gray-50 transition-colors cursor-pointer"
-                        onClick={() => setSelectedBin(bin)}
+          </Card>
+        ) : (
+          <>
+            {/* Desktop Table View */}
+            <Card className="hidden lg:block">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="py-4 px-4 w-[5%] align-middle rounded-tl-2xl">
+                        <div className="flex items-center justify-center">
+                          <input
+                            type="checkbox"
+                            checked={bins && bins.length > 0 && selectedBins.size === bins.length}
+                            onChange={() => handleSelectAll(bins || [])}
+                            className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+                            title="Select all"
+                          />
+                        </div>
+                      </th>
+                      <th
+                        className="text-center py-4 px-4 text-sm font-semibold text-gray-700 w-[8%] cursor-pointer align-middle"
+                        onClick={() => handleSort('bin_number')}
                       >
-                        <td className="py-4 px-4 align-middle" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-center">
-                            <input
-                              type="checkbox"
-                              checked={selectedBins.has(bin.id)}
-                              onChange={() => handleSelectBin(bin.id)}
-                              className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
-                            />
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 align-middle">
-                          <div className="flex items-center justify-center">
-                            <span className="font-semibold text-gray-900">{bin.bin_number}</span>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 align-middle">
-                          <div className="text-sm">
-                            <div className="text-gray-900 font-medium">{bin.current_street}</div>
-                            <div className="text-gray-500 text-xs">
-                              {bin.city}, {bin.zip}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 align-middle">
-                          <Badge className={cn('border', priority.color)}>
-                            {priority.label}
-                          </Badge>
-                        </td>
-                        <td className="py-4 px-4 align-middle">
-                          <div className="flex items-center justify-center">
-                            <Badge className={fill.color}>{fill.label}</Badge>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 align-middle">
-                          <Badge className={cn(status.color, 'whitespace-nowrap')}>{status.label}</Badge>
-                        </td>
-                        <td className="py-4 px-4 align-middle">
-                          <div className="flex items-center justify-center">
-                            <span
-                              className={cn(
-                                'text-sm font-medium',
-                                bin.days_since_check !== undefined && bin.days_since_check !== null
-                                  ? bin.days_since_check >= 7
-                                    ? 'text-red-600'
-                                    : 'text-gray-700'
-                                  : 'text-gray-500'
-                              )}
-                            >
-                              {bin.days_since_check !== undefined && bin.days_since_check !== null
-                                ? `${bin.days_since_check} days ago`
-                                : 'Never'}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 align-middle">
-                          <div className="flex items-center justify-center gap-2">
-                            {/* View Details Icon */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedBin(bin);
-                              }}
-                              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                              title="View Details"
-                            >
-                              <Eye className="w-4 h-4 text-gray-600" />
-                            </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span>Bin</span>
+                          <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                        </div>
+                      </th>
+                      <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle">
+                        Location
+                      </th>
+                      <th
+                        className="text-left py-4 px-4 text-sm font-semibold text-gray-700 cursor-pointer align-middle"
+                        onClick={() => handleSort('priority')}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Priority</span>
+                          <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                        </div>
+                      </th>
+                      <th
+                        className="text-left py-4 px-4 text-sm font-semibold text-gray-700 cursor-pointer whitespace-nowrap align-middle"
+                        onClick={() => handleSort('fill_percentage')}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Fill Level</span>
+                          <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                        </div>
+                      </th>
+                      <th
+                        className="text-left py-4 px-4 text-sm font-semibold text-gray-700 cursor-pointer align-middle"
+                        onClick={() => handleSort('status')}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Status</span>
+                          <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                        </div>
+                      </th>
+                      <th
+                        className="text-left py-4 px-4 text-sm font-semibold text-gray-700 whitespace-nowrap cursor-pointer align-middle"
+                        onClick={() => handleSort('days_since_check')}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Last Checked</span>
+                          <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                        </div>
+                      </th>
+                      <th className="text-center py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tr-2xl">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {bins?.map((bin) => {
+                      const priority = getPriorityBadge(bin.priority_score);
+                      const fill = getFillBadge(bin.fill_percentage);
+                      const status = getStatusBadge(bin.status);
 
-                            {/* More Actions Menu */}
-                            <div className="relative">
+                      return (
+                        <tr
+                          key={bin.id}
+                          className="hover:bg-gray-50 transition-colors cursor-pointer"
+                          onClick={() => setSelectedBin(bin)}
+                        >
+                          <td className="py-4 px-4 align-middle" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-center">
+                              <input
+                                type="checkbox"
+                                checked={selectedBins.has(bin.id)}
+                                onChange={() => handleSelectBin(bin.id)}
+                                className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+                              />
+                            </div>
+                          </td>
+                          <td className="py-4 px-4 align-middle">
+                            <div className="flex items-center justify-center">
+                              <span className="font-semibold text-gray-900">{bin.bin_number}</span>
+                            </div>
+                          </td>
+                          <td className="py-4 px-4 align-middle">
+                            <div className="text-sm">
+                              <div className="text-gray-900 font-medium">{bin.current_street}</div>
+                              <div className="text-gray-500 text-xs">
+                                {bin.city}, {bin.zip}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-4 px-4 align-middle">
+                            <Badge className={cn('border', priority.color)}>
+                              {priority.label}
+                            </Badge>
+                          </td>
+                          <td className="py-4 px-4 align-middle">
+                            <div className="flex items-center justify-center">
+                              <Badge className={fill.color}>{fill.label}</Badge>
+                            </div>
+                          </td>
+                          <td className="py-4 px-4 align-middle">
+                            <Badge className={cn(status.color, 'whitespace-nowrap')}>{status.label}</Badge>
+                          </td>
+                          <td className="py-4 px-4 align-middle">
+                            <div className="flex items-center justify-center">
+                              <span
+                                className={cn(
+                                  'text-sm font-medium',
+                                  bin.days_since_check !== undefined && bin.days_since_check !== null
+                                    ? bin.days_since_check >= 7
+                                      ? 'text-red-600'
+                                      : 'text-gray-700'
+                                    : 'text-gray-500'
+                                )}
+                              >
+                                {bin.days_since_check !== undefined && bin.days_since_check !== null
+                                  ? `${bin.days_since_check} days ago`
+                                  : 'Never'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-4 px-4 align-middle">
+                            <div className="flex items-center justify-center gap-2">
+                              {/* View Details Icon */}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setOpenMenuId(openMenuId === bin.id ? null : bin.id);
+                                  setSelectedBin(bin);
                                 }}
                                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                                title="More Actions"
+                                title="View Details"
                               >
-                                <MoreVertical className="w-4 h-4 text-gray-600" />
+                                <Eye className="w-4 h-4 text-gray-600" />
                               </button>
 
-                              {/* Dropdown Menu */}
-                              {openMenuId === bin.id && (
-                                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[160px] animate-slide-in-down">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setModalTargetBin(bin);
-                                      setShowScheduleModal(true);
-                                      setOpenMenuId(null);
-                                    }}
-                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-t-lg whitespace-nowrap"
-                                  >
-                                    <Calendar className="w-4 h-4" />
-                                    Schedule Move
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setModalTargetBin(bin);
-                                      setShowRetireModal(true);
-                                      setOpenMenuId(null);
-                                    }}
-                                    className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 rounded-b-lg whitespace-nowrap"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                    Retire Bin
-                                  </button>
-                                </div>
-                              )}
+                              {/* More Actions Menu */}
+                              <div className="relative">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenMenuId(openMenuId === bin.id ? null : bin.id);
+                                  }}
+                                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                  title="More Actions"
+                                >
+                                  <MoreVertical className="w-4 h-4 text-gray-600" />
+                                </button>
+
+                                {/* Dropdown Menu */}
+                                {openMenuId === bin.id && (
+                                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[160px] animate-slide-in-down">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setModalTargetBin(bin);
+                                        setShowScheduleModal(true);
+                                        setOpenMenuId(null);
+                                      }}
+                                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-t-lg whitespace-nowrap"
+                                    >
+                                      <Calendar className="w-4 h-4" />
+                                      Schedule Move
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setModalTargetBin(bin);
+                                        setShowRetireModal(true);
+                                        setOpenMenuId(null);
+                                      }}
+                                      className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 rounded-b-lg whitespace-nowrap"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                      Retire Bin
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            {/* Mobile Card View */}
+            <div className="lg:hidden space-y-3">
+              {bins?.map((bin) => {
+                const priority = getPriorityBadge(bin.priority_score);
+                const fill = getFillBadge(bin.fill_percentage);
+                const status = getStatusBadge(bin.status);
+
+                return (
+                  <Card
+                    key={bin.id}
+                    className="p-4 hover:shadow-lg transition-all cursor-pointer active:scale-[0.98]"
+                    onClick={() => setSelectedBin(bin)}
+                  >
+                    {/* Header Row: Checkbox, Bin Number, Actions */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedBins.has(bin.id)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleSelectBin(bin.id);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+                        />
+                        <span className="text-lg font-bold text-gray-900">Bin #{bin.bin_number}</span>
+                      </div>
+
+                      {/* Actions Menu */}
+                      <div className="relative">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(openMenuId === bin.id ? null : bin.id);
+                          }}
+                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                          title="More Actions"
+                        >
+                          <MoreVertical className="w-5 h-5 text-gray-600" />
+                        </button>
+
+                        {openMenuId === bin.id && (
+                          <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[160px] animate-slide-in-down">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setModalTargetBin(bin);
+                                setShowScheduleModal(true);
+                                setOpenMenuId(null);
+                              }}
+                              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-t-lg whitespace-nowrap"
+                            >
+                              <Calendar className="w-4 h-4" />
+                              Schedule Move
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setModalTargetBin(bin);
+                                setShowRetireModal(true);
+                                setOpenMenuId(null);
+                              }}
+                              className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 rounded-b-lg whitespace-nowrap"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Retire Bin
+                            </button>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Location */}
+                    <div className="flex items-start gap-2 mb-3">
+                      <MapPin className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                      <div className="text-sm">
+                        <div className="text-gray-900 font-medium">{bin.current_street}</div>
+                        <div className="text-gray-500">
+                          {bin.city}, {bin.zip}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Badges Row */}
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      <Badge className={cn('border', priority.color)}>
+                        {priority.label}
+                      </Badge>
+                      <Badge className={fill.color}>{fill.label}</Badge>
+                      <Badge className={cn(status.color, 'whitespace-nowrap')}>{status.label}</Badge>
+                    </div>
+
+                    {/* Last Checked */}
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      <span className="text-gray-500">Last checked:</span>
+                      <span
+                        className={cn(
+                          'font-medium',
+                          bin.days_since_check !== undefined && bin.days_since_check !== null
+                            ? bin.days_since_check >= 7
+                              ? 'text-red-600'
+                              : 'text-gray-700'
+                            : 'text-gray-500'
+                        )}
+                      >
+                        {bin.days_since_check !== undefined && bin.days_since_check !== null
+                          ? `${bin.days_since_check} days ago`
+                          : 'Never'}
+                      </span>
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
-          )}
-        </Card>
+          </>
+        )}
       </div>
 
       {/* Bulk Action Bar */}
       {selectedBins.size > 0 && (
-        <div className="fixed bottom-6 left-0 right-0 z-40 flex justify-center animate-slide-in-up">
-          <Card className="px-6 py-4 shadow-2xl border-2 border-primary/20">
-            <div className="flex items-center gap-6">
+        <div className="fixed bottom-20 lg:bottom-6 left-0 right-0 z-40 flex justify-center px-3 lg:px-0 animate-slide-in-up">
+          <Card className="px-4 lg:px-6 py-3 lg:py-4 shadow-2xl border-2 border-primary/20 w-full lg:w-auto max-w-full lg:max-w-none">
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 lg:gap-6">
               {/* Selection Count */}
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
                   <span className="text-sm font-bold text-primary">{selectedBins.size}</span>
                 </div>
                 <span className="text-sm font-semibold text-gray-900">
                   {selectedBins.size} bin{selectedBins.size !== 1 ? 's' : ''} selected
                 </span>
+
+                {/* Cancel Button - Mobile only, inline with count */}
+                <button
+                  onClick={clearSelection}
+                  className="lg:hidden ml-auto p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Clear selection"
+                >
+                  <X className="w-4 h-4 text-gray-500" />
+                </button>
               </div>
 
-              {/* Divider */}
-              <div className="w-px h-8 bg-gray-200" />
+              {/* Divider - Desktop only */}
+              <div className="hidden lg:block w-px h-8 bg-gray-200" />
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 lg:gap-3">
                 <Button
                   onClick={() => {
                     const selectedBinsData = bins?.filter((b) => selectedBins.has(b.id)) || [];
@@ -604,7 +735,7 @@ export default function BinsPage() {
                     setModalTargetBins(selectedBinsData);
                     setShowScheduleModal(true);
                   }}
-                  className="bg-primary hover:bg-primary/90"
+                  className="bg-primary hover:bg-primary/90 flex-1 lg:flex-none"
                   size="sm"
                 >
                   <Calendar className="w-4 h-4 mr-2" />
@@ -618,7 +749,7 @@ export default function BinsPage() {
                     setShowRetireModal(true);
                   }}
                   variant="outline"
-                  className="border-red-200 text-red-600 hover:bg-red-50"
+                  className="border-red-200 text-red-600 hover:bg-red-50 flex-1 lg:flex-none"
                   size="sm"
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
@@ -626,13 +757,13 @@ export default function BinsPage() {
                 </Button>
               </div>
 
-              {/* Divider */}
-              <div className="w-px h-8 bg-gray-200" />
+              {/* Divider - Desktop only */}
+              <div className="hidden lg:block w-px h-8 bg-gray-200" />
 
-              {/* Cancel Button */}
+              {/* Cancel Button - Desktop only */}
               <button
                 onClick={clearSelection}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="hidden lg:block p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 title="Clear selection"
               >
                 <X className="w-4 h-4 text-gray-500" />
