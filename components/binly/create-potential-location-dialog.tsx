@@ -774,18 +774,28 @@ export function CreatePotentialLocationDialog({
 
             {/* Instructions */}
             {!markerPosition && (
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-sm rounded-full shadow-lg border border-gray-200 px-6 py-3">
-                <p className="text-sm text-gray-700 font-medium flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-orange-500" />
-                  Click anywhere on the map to place a potential location
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-sm rounded-full shadow-lg border border-gray-200 px-4 py-2">
+                <p className="text-xs text-gray-700 font-medium flex items-center gap-2 whitespace-nowrap">
+                  <MapPin className="w-3.5 h-3.5 text-orange-500" />
+                  Click anywhere on the map to place a location
                 </p>
               </div>
             )}
 
-            {/* Bin count badge */}
-            <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm rounded-full shadow-lg border border-gray-200 px-4 py-2">
-              <p className="text-xs text-gray-600 font-medium">
-                <span className="font-bold text-gray-900">{mappableBins.length}</span> active bins
+            {/* Queue counter badge */}
+            <div className={`absolute top-4 right-4 backdrop-blur-sm rounded-full shadow-lg px-4 py-2 transition-colors ${
+              locationQueue.length > 0
+                ? 'bg-green-50/95 border-2 border-green-200'
+                : 'bg-white/95 border border-gray-200'
+            }`}>
+              <p className="text-xs font-medium flex items-center gap-1.5">
+                {locationQueue.length > 0 && <Layers className="w-3.5 h-3.5 text-green-600" />}
+                <span className={`font-bold ${locationQueue.length > 0 ? 'text-green-900' : 'text-gray-900'}`}>
+                  {locationQueue.length}
+                </span>
+                <span className={locationQueue.length > 0 ? 'text-green-700' : 'text-gray-600'}>
+                  {locationQueue.length === 1 ? 'location queued' : 'locations queued'}
+                </span>
               </p>
             </div>
           </div>
