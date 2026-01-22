@@ -1167,8 +1167,8 @@ export function MoveRequestsList() {
                     </button>
                   )}
 
-                  {/* Cancel Move (for pending only) */}
-                  {move.status === 'pending' && (
+                  {/* Cancel Move (for pending and assigned) */}
+                  {(move.status === 'pending' || move.status === 'assigned') && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
