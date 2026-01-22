@@ -256,7 +256,7 @@ export function CreatePotentialLocationDialog({
 
     setLocationQueue((prev) => [...prev, newLocation]);
 
-    // Clear form for next location (keep marker position)
+    // Clear form and marker for next location
     setFormData({
       street: '',
       city: '',
@@ -265,6 +265,7 @@ export function CreatePotentialLocationDialog({
       longitude: '',
       notes: '',
     });
+    setMarkerPosition(null); // Clear orange marker - user must click map again
     setError('');
 
     console.log('✅ Added location to queue:', newLocation);
