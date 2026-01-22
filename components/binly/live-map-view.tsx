@@ -301,7 +301,7 @@ export function LiveMapView() {
   };
 
   return (
-    <div className="relative h-[calc(100vh-80px)] w-full">
+    <div className="relative h-[calc(100vh-64px)] lg:h-[calc(100vh-80px)] w-full">
       {/* Loading State */}
       {loading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-gray-100">
@@ -323,7 +323,7 @@ export function LiveMapView() {
 
       {/* Search Bar - Top Center */}
       {!loading && (
-        <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10 w-full max-w-md px-4">
+        <div className="absolute top-4 lg:top-8 left-1/2 -translate-x-1/2 z-10 w-full max-w-md px-3 lg:px-4">
           <MapSearchBar
             bins={bins}
             zones={zones}
@@ -360,7 +360,7 @@ export function LiveMapView() {
 
       {/* Collapsible Legend Panel - Top Right */}
       {showLegend && (
-        <div className="absolute top-16 right-4 z-10 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-4 w-64 animate-scale-in">
+        <div className="absolute top-16 right-3 lg:right-4 z-10 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-3 lg:p-4 w-56 lg:w-64 animate-scale-in">
           {/* Fill Levels Legend */}
           {showFillLevels && (
             <div className="mb-4">
@@ -396,51 +396,53 @@ export function LiveMapView() {
 
       {/* Bottom Stats Bar - Glassmorphism */}
       {!loading && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 bg-white/90 backdrop-blur-md rounded-full shadow-xl border border-gray-100 px-6 py-3 flex items-center gap-4">
+        <div className="absolute bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 z-10 w-[calc(100%-2rem)] lg:w-auto max-w-full">
+          <div className="bg-white/90 backdrop-blur-md rounded-full shadow-xl border border-gray-100 px-3 lg:px-6 py-2 lg:py-3 overflow-x-auto scrollbar-hide">
+            <div className="flex items-center gap-2 lg:gap-4 min-w-max">
           {/* Toggle: Fill Levels */}
           <button
             onClick={() => setShowFillLevels(!showFillLevels)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors ${
+            className={`flex items-center gap-1.5 lg:gap-2 px-2 lg:px-3 py-1.5 rounded-full transition-colors ${
               showFillLevels
                 ? 'bg-primary text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             <div className="w-2 h-2 rounded-full bg-current shrink-0" />
-            <span className="text-sm font-medium whitespace-nowrap">Fill Levels</span>
+            <span className="text-xs lg:text-sm font-medium whitespace-nowrap">Fill Levels</span>
           </button>
 
           {/* Toggle: No-Go Zones */}
           <button
             onClick={() => setShowNoGoZones(!showNoGoZones)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors ${
+            className={`flex items-center gap-1.5 lg:gap-2 px-2 lg:px-3 py-1.5 rounded-full transition-colors ${
               showNoGoZones
                 ? 'bg-red-600 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             <div className="w-2 h-2 rounded-full bg-current shrink-0" />
-            <span className="text-sm font-medium whitespace-nowrap">No-Go Zones</span>
+            <span className="text-xs lg:text-sm font-medium whitespace-nowrap">No-Go Zones</span>
           </button>
 
           {/* Toggle: Potential Locations */}
           <button
             onClick={() => setShowPotentialLocations(!showPotentialLocations)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors ${
+            className={`flex items-center gap-1.5 lg:gap-2 px-2 lg:px-3 py-1.5 rounded-full transition-colors ${
               showPotentialLocations
                 ? 'bg-orange-500 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             <div className="w-2 h-2 rounded-full bg-current shrink-0" />
-            <span className="text-sm font-medium whitespace-nowrap">Potential Locations</span>
+            <span className="text-xs lg:text-sm font-medium whitespace-nowrap">Potential Locations</span>
           </button>
 
           {/* Divider */}
           <div className="w-px h-6 bg-gray-300" />
 
           {/* Stats */}
-          <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-2 lg:gap-4 text-xs lg:text-sm">
             <div className="flex items-center gap-1.5">
               <span className="text-gray-600">Total:</span>
               <span className="font-bold text-gray-900">{bins.length}</span>
@@ -463,6 +465,7 @@ export function LiveMapView() {
                 <span className="font-bold text-orange-600">{potentialLocations.length}</span>
               </div>
             )}
+            </div>
           </div>
         </div>
       )}
