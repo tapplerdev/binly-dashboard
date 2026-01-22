@@ -92,6 +92,7 @@ export function CreatePotentialLocationDialog({
   const [markerPosition, setMarkerPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [locationQueue, setLocationQueue] = useState<QueuedLocation[]>([]);
+  const [hasInteractedWithMap, setHasInteractedWithMap] = useState(false);
   const [formData, setFormData] = useState({
     street: '',
     city: '',
@@ -116,6 +117,7 @@ export function CreatePotentialLocationDialog({
       setSearchQuery('');
       setError('');
       setLocationQueue([]);
+      setHasInteractedWithMap(false);
     }
   }, [open]);
 
@@ -169,6 +171,7 @@ export function CreatePotentialLocationDialog({
     (lat: number, lng: number) => {
       setMarkerPosition({ lat, lng });
       setMapCenter({ lat, lng });
+      setHasInteractedWithMap(true);
       reverseGeocode(lat, lng);
     },
     [reverseGeocode]
@@ -773,7 +776,7 @@ export function CreatePotentialLocationDialog({
             </div>
 
             {/* Instructions */}
-            {!markerPosition && (
+            {!hasInteractedWithMap && (
               <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-sm rounded-full shadow-lg border border-gray-200 px-4 py-2">
                 <p className="text-xs text-gray-700 font-medium flex items-center gap-2 whitespace-nowrap">
                   <MapPin className="w-3.5 h-3.5 text-orange-500" />
