@@ -184,7 +184,7 @@ export function PlacesAutocomplete({
           }
         }
       );
-    }, 1); // Debounce - Wait 1ms after user stops typing
+    }, 500); // Debounce - Wait 500ms after user stops typing
 
     return () => clearTimeout(timer);
   }, [value, disabled, isAutoFilled]);

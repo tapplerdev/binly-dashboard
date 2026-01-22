@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { MapPin, X, Loader2, Search, Plus, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
-import { inputStyles } from '@/lib/utils';
+import { inputStyles, cn } from '@/lib/utils';
 import { useBins } from '@/lib/hooks/use-bins';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 
@@ -87,6 +87,7 @@ export function CreatePotentialLocationDialog({
 
   const [loading, setLoading] = useState(false);
   const [reverseGeocoding, setReverseGeocoding] = useState(false);
+  const [isGeocodingCoordinates, setIsGeocodingCoordinates] = useState(false);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [markerPosition, setMarkerPosition] = useState<{ lat: number; lng: number } | null>(null);
@@ -101,6 +102,15 @@ export function CreatePotentialLocationDialog({
     longitude: '',
     notes: '',
   });
+  const [autoFilled, setAutoFilled] = useState({
+    street: false,
+    city: false,
+    zip: false,
+    coordinates: false,
+  });
+
+  // Ref for coordinate debounce timer
+  const coordinateTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Reset form when modal closes
   useEffect(() => {
@@ -113,15 +123,27 @@ export function CreatePotentialLocationDialog({
         longitude: '',
         notes: '',
       });
+      setAutoFilled({
+        street: false,
+        city: false,
+        zip: false,
+        coordinates: false,
+      });
       setMarkerPosition(null);
       setSearchQuery('');
       setError('');
       setLocationQueue([]);
       setHasInteractedWithMap(false);
+      setIsGeocodingCoordinates(false);
+      // Clear debounce timer if modal closes
+      if (coordinateTimerRef.current) {
+        clearTimeout(coordinateTimerRef.current);
+        coordinateTimerRef.current = null;
+      }
     }
   }, [open]);
 
-  // Reverse geocode coordinates to address
+  // Reverse geocode coordinates to address (for map clicks)
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     setReverseGeocoding(true);
     try {
@@ -156,6 +178,12 @@ export function CreatePotentialLocationDialog({
           latitude: lat.toString(),
           longitude: lng.toString(),
           notes: '',
+        });
+        setAutoFilled({
+          street: true,
+          city: true,
+          zip: true,
+          coordinates: false, // Coordinates were set from map click, not auto-filled
         });
       }
     } catch (error) {
@@ -236,11 +264,119 @@ export function CreatePotentialLocationDialog({
       longitude: lng.toString(),
     });
 
+    // Mark fields as auto-filled
+    setAutoFilled({
+      street: false, // User typed this (from autocomplete)
+      city: true,
+      zip: true,
+      coordinates: true,
+    });
+
     // Create marker and pan map to location
     setMarkerPosition({ lat, lng });
     setMapCenter({ lat, lng });
     setHasInteractedWithMap(true);
   }, [formData]);
+
+  // Handle coordinate change with debounced reverse geocoding
+  const handleCoordinateChange = useCallback((field: 'latitude' | 'longitude', value: string) => {
+    // Clear existing timer
+    if (coordinateTimerRef.current) {
+      clearTimeout(coordinateTimerRef.current);
+      coordinateTimerRef.current = null;
+    }
+
+    // Update the field immediately
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+
+    // Mark coordinates as manually changed
+    setAutoFilled((prev) => ({
+      ...prev,
+      coordinates: false,
+    }));
+
+    // Get the updated values (consider the change we just made)
+    const lat = field === 'latitude' ? value : formData.latitude;
+    const lng = field === 'longitude' ? value : formData.longitude;
+
+    // Only proceed if both fields have values
+    if (!lat || !lng) {
+      return;
+    }
+
+    // Validate that both are valid numbers
+    const latNum = parseFloat(lat);
+    const lngNum = parseFloat(lng);
+
+    if (isNaN(latNum) || isNaN(lngNum)) {
+      return;
+    }
+
+    // Additional validation: check reasonable coordinate ranges
+    if (latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180) {
+      return;
+    }
+
+    // Debounce: Wait 1.5 seconds after user stops typing
+    coordinateTimerRef.current = setTimeout(async () => {
+      setIsGeocodingCoordinates(true);
+
+      try {
+        const geocoder = new google.maps.Geocoder();
+        const result = await geocoder.geocode({ location: { lat: latNum, lng: lngNum } });
+
+        if (result.results && result.results[0]) {
+          const place = result.results[0];
+          let street = '';
+          let city = '';
+          let zip = '';
+
+          place.address_components.forEach((component) => {
+            if (component.types.includes('street_number')) {
+              street = component.long_name + ' ';
+            }
+            if (component.types.includes('route')) {
+              street += component.long_name;
+            }
+            if (component.types.includes('locality')) {
+              city = component.long_name;
+            }
+            if (component.types.includes('postal_code')) {
+              zip = component.long_name;
+            }
+          });
+
+          setFormData((prev) => ({
+            ...prev,
+            street: street.trim() || place.formatted_address,
+            city: city,
+            zip: zip,
+          }));
+
+          setAutoFilled({
+            street: true,
+            city: true,
+            zip: true,
+            coordinates: false, // Coordinates were manually entered
+          });
+
+          // Create marker on map
+          setMarkerPosition({ lat: latNum, lng: lngNum });
+          setMapCenter({ lat: latNum, lng: lngNum });
+          setHasInteractedWithMap(true);
+        }
+      } catch (error) {
+        console.error('Reverse geocoding from coordinates error:', error);
+      } finally {
+        setIsGeocodingCoordinates(false);
+      }
+
+      coordinateTimerRef.current = null;
+    }, 1500); // 1.5 second debounce
+  }, [formData.latitude, formData.longitude]);
 
   // Forward geocode address from form fields
   const forwardGeocodeAddress = useCallback(async () => {
@@ -538,8 +674,12 @@ export function CreatePotentialLocationDialog({
                     value={formData.street}
                     onChange={(value) => {
                       setFormData({ ...formData, street: value });
+                      setAutoFilled((prev) => ({ ...prev, street: false }));
                     }}
                     onPlaceSelect={handleStreetPlaceSelect}
+                    disabled={isGeocodingCoordinates}
+                    isAutoFilled={autoFilled.street}
+                    isLoading={isGeocodingCoordinates}
                     placeholder="123 Main St"
                     className={inputStyles()}
                   />
@@ -555,9 +695,17 @@ export function CreatePotentialLocationDialog({
                       type="text"
                       required
                       value={formData.city}
-                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, city: e.target.value });
+                        setAutoFilled((prev) => ({ ...prev, city: false }));
+                      }}
+                      disabled={isGeocodingCoordinates}
                       placeholder="Dallas"
-                      className={inputStyles()}
+                      className={cn(
+                        inputStyles(),
+                        isGeocodingCoordinates && 'bg-gray-200 animate-pulse',
+                        autoFilled.city && !isGeocodingCoordinates && 'bg-blue-50 border-blue-200'
+                      )}
                     />
                   </div>
                   <div>
@@ -568,14 +716,22 @@ export function CreatePotentialLocationDialog({
                       type="text"
                       required
                       value={formData.zip}
-                      onChange={(e) => setFormData({ ...formData, zip: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, zip: e.target.value });
+                        setAutoFilled((prev) => ({ ...prev, zip: false }));
+                      }}
+                      disabled={isGeocodingCoordinates}
                       placeholder="75201"
-                      className={inputStyles()}
+                      className={cn(
+                        inputStyles(),
+                        isGeocodingCoordinates && 'bg-gray-200 animate-pulse',
+                        autoFilled.zip && !isGeocodingCoordinates && 'bg-blue-50 border-blue-200'
+                      )}
                     />
                   </div>
                 </div>
 
-                {/* Coordinates (Read-only) */}
+                {/* Coordinates (Editable with debounced reverse geocoding) */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1.5">
@@ -583,10 +739,14 @@ export function CreatePotentialLocationDialog({
                     </label>
                     <input
                       type="text"
-                      readOnly
                       value={formData.latitude}
-                      placeholder="Auto-filled"
-                      className={`${inputStyles()} bg-gray-100`}
+                      onChange={(e) => handleCoordinateChange('latitude', e.target.value)}
+                      placeholder="37.7749"
+                      className={cn(
+                        inputStyles(),
+                        isGeocodingCoordinates && 'bg-gray-200 animate-pulse',
+                        autoFilled.coordinates && !isGeocodingCoordinates && 'bg-blue-50 border-blue-200'
+                      )}
                     />
                   </div>
                   <div>
@@ -595,10 +755,14 @@ export function CreatePotentialLocationDialog({
                     </label>
                     <input
                       type="text"
-                      readOnly
                       value={formData.longitude}
-                      placeholder="Auto-filled"
-                      className={`${inputStyles()} bg-gray-100`}
+                      onChange={(e) => handleCoordinateChange('longitude', e.target.value)}
+                      placeholder="-122.4194"
+                      className={cn(
+                        inputStyles(),
+                        isGeocodingCoordinates && 'bg-gray-200 animate-pulse',
+                        autoFilled.coordinates && !isGeocodingCoordinates && 'bg-blue-50 border-blue-200'
+                      )}
                     />
                   </div>
                 </div>
