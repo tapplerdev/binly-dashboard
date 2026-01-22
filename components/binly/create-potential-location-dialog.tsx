@@ -636,6 +636,7 @@ export function CreatePotentialLocationDialog({
                       </>
                     )}
                 </Button>
+                </div>
               </div>
             </form>
           </div>
