@@ -56,13 +56,13 @@ export function PotentialLocationDetailsDrawer({
       />
 
       {/* Drawer */}
-      <div className="fixed top-0 right-0 h-full w-96 bg-white shadow-2xl z-50 overflow-hidden flex flex-col animate-slide-in-right">
+      <div className="fixed top-0 right-0 h-full w-full md:w-[500px] lg:w-[600px] bg-white shadow-2xl z-50 flex flex-col animate-slide-in-right">
         {/* Header */}
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <h2 className="text-xl font-bold text-primary">Potential Location</h2>
+        <div className="p-4 md:p-6 border-b border-gray-200 shrink-0">
+          <div className="flex items-start justify-between mb-3 md:mb-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <h2 className="text-lg md:text-xl font-bold text-primary">Potential Location</h2>
                 {isConverted && (
                   <Badge variant="default" className="gap-1">
                     <Check className="w-3 h-3" />
@@ -74,17 +74,17 @@ export function PotentialLocationDetailsDrawer({
             </div>
             <button
               onClick={onClose}
-              className="flex-shrink-0 w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors"
+              className="flex-shrink-0 w-9 h-9 md:w-8 md:h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors"
             >
               <X className="w-5 h-5 text-gray-600" />
             </button>
           </div>
         </div>
 
-        {/* Content */}
+        {/* Content - Scrollable */}
         <div className="flex-1 overflow-y-auto">
           {/* Address Section */}
-          <div className="p-6 border-b border-gray-200">
+          <div className="p-4 md:p-6 border-b border-gray-200">
             <div className="flex items-start gap-3 mb-3">
               <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
                 <MapPin className="w-5 h-5 text-blue-600" />
@@ -115,7 +115,7 @@ export function PotentialLocationDetailsDrawer({
           </div>
 
           {/* Requested By Section */}
-          <div className="p-6 border-b border-gray-200">
+          <div className="p-4 md:p-6 border-b border-gray-200">
             <div className="flex items-start gap-3">
               <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center">
                 <User className="w-5 h-5 text-purple-600" />
@@ -133,7 +133,7 @@ export function PotentialLocationDetailsDrawer({
           </div>
 
           {/* Date Created Section */}
-          <div className="p-6 border-b border-gray-200">
+          <div className="p-4 md:p-6 border-b border-gray-200">
             <div className="flex items-start gap-3">
               <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center">
                 <Calendar className="w-5 h-5 text-green-600" />
@@ -149,7 +149,7 @@ export function PotentialLocationDetailsDrawer({
 
           {/* Notes Section */}
           {location.notes && (
-            <div className="p-6 border-b border-gray-200">
+            <div className="p-4 md:p-6 border-b border-gray-200">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-yellow-50 flex items-center justify-center">
                   <FileText className="w-5 h-5 text-yellow-600" />
@@ -166,7 +166,7 @@ export function PotentialLocationDetailsDrawer({
 
           {/* Conversion Info (if converted) */}
           {isConverted && (
-            <div className="p-6 border-b border-gray-200 bg-green-50">
+            <div className="p-4 md:p-6 border-b border-gray-200 bg-green-50">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
                   <Check className="w-5 h-5 text-green-600" />
@@ -194,10 +194,10 @@ export function PotentialLocationDetailsDrawer({
 
         {/* Footer Actions */}
         {!isConverted && (
-          <div className="p-6 border-t border-gray-200 bg-gray-50 space-y-3">
+          <div className="p-4 md:p-6 border-t border-gray-200 bg-gray-50 space-y-3 shrink-0">
             <Button
               onClick={onConvert}
-              className="w-full gap-2"
+              className="w-full gap-2 h-11"
             >
               <Check className="w-4 h-4" />
               Convert to Bin
@@ -205,7 +205,7 @@ export function PotentialLocationDetailsDrawer({
             <Button
               onClick={onDelete}
               variant="destructive"
-              className="w-full gap-2"
+              className="w-full gap-2 h-11"
             >
               <Trash2 className="w-4 h-4" />
               Delete Location

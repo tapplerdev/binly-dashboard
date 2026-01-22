@@ -58,9 +58,9 @@ export function RouteDetailsDrawer({ route, onClose, onEdit, onDelete, onDuplica
       <div className={`fixed inset-0 bg-black/20 z-40 ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`} />
 
       {/* Drawer */}
-      <div className={`fixed top-0 right-0 bottom-0 w-full max-w-2xl bg-white shadow-2xl z-50 overflow-hidden flex flex-col ${isClosing ? 'animate-slide-out-right' : 'animate-slide-in-right'}`}>
+      <div className={`fixed top-0 right-0 bottom-0 w-full md:max-w-2xl bg-white shadow-2xl z-50 overflow-hidden flex flex-col ${isClosing ? 'animate-slide-out-right' : 'animate-slide-in-right'}`}>
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 bg-gray-50 shrink-0">
           <div className="flex-1">
             <h2 className="text-xl font-semibold text-gray-900 mb-2">{route.name}</h2>
             {route.description && (
@@ -78,9 +78,9 @@ export function RouteDetailsDrawer({ route, onClose, onEdit, onDelete, onDuplica
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
           {/* Key Metrics */}
-          <div className="p-6 border-b border-gray-100 bg-gray-50">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">Route Metrics</h3>
-            <div className="grid grid-cols-2 gap-4">
+          <div className="p-4 md:p-6 border-b border-gray-100 bg-gray-50">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3 md:mb-4">Route Metrics</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
               <div className="bg-white rounded-lg p-4 border border-gray-200">
                 <div className="flex items-center gap-2 mb-2">
                   <Package className="w-5 h-5 text-gray-400" />
@@ -118,9 +118,9 @@ export function RouteDetailsDrawer({ route, onClose, onEdit, onDelete, onDuplica
           </div>
 
           {/* Route Map Preview */}
-          <div className="p-6 border-b border-gray-100">
+          <div className="p-4 md:p-6 border-b border-gray-100">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Route Visualization</h3>
-            <div className="w-full h-96 rounded-lg overflow-hidden border border-gray-200">
+            <div className="w-full h-64 md:h-96 rounded-lg overflow-hidden border border-gray-200">
               <RouteMapView route={route} />
             </div>
             <p className="text-xs text-gray-500 mt-2">
@@ -129,7 +129,7 @@ export function RouteDetailsDrawer({ route, onClose, onEdit, onDelete, onDuplica
           </div>
 
           {/* Assigned Bins */}
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-gray-700">Assigned Bins ({route.bin_count})</h3>
               <button className="text-sm text-primary hover:text-primary/80 font-medium transition-fast">
@@ -201,9 +201,9 @@ export function RouteDetailsDrawer({ route, onClose, onEdit, onDelete, onDuplica
           </div>
 
           {/* Usage Statistics */}
-          <div className="p-6 border-t border-gray-100 bg-gray-50">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">Usage Statistics</h3>
-            <div className="grid grid-cols-3 gap-4">
+          <div className="p-4 md:p-6 border-t border-gray-100 bg-gray-50">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3 md:mb-4">Usage Statistics</h3>
+            <div className="grid grid-cols-3 gap-3 md:gap-4">
               <div className="bg-white rounded-lg p-3 border border-gray-200">
                 <p className="text-xs text-gray-500 mb-1">Times Used</p>
                 <p className="text-xl font-bold text-gray-900">0</p>
@@ -221,27 +221,27 @@ export function RouteDetailsDrawer({ route, onClose, onEdit, onDelete, onDuplica
         </div>
 
         {/* Actions Footer */}
-        <div className="border-t border-gray-200 p-4 bg-gray-50 flex gap-3">
+        <div className="border-t border-gray-200 p-3 md:p-4 bg-gray-50 flex flex-col sm:flex-row gap-2 md:gap-3 shrink-0">
           <button
             onClick={onEdit}
-            className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-fast flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-fast flex items-center justify-center gap-2 h-10 md:h-auto"
           >
             <Edit className="w-4 h-4" />
-            Edit Route
+            <span className="text-sm md:text-base">Edit Route</span>
           </button>
           <button
             onClick={onDuplicate}
-            className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-fast flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-fast flex items-center justify-center gap-2 h-10 md:h-auto"
           >
             <Copy className="w-4 h-4" />
-            Duplicate
+            <span className="text-sm md:text-base">Duplicate</span>
           </button>
           <button
             onClick={onDelete}
-            className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-fast flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-fast flex items-center justify-center gap-2 h-10 md:h-auto"
           >
             <Trash2 className="w-4 h-4" />
-            Delete Route
+            <span className="text-sm md:text-base">Delete Route</span>
           </button>
         </div>
       </div>

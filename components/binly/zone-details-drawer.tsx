@@ -53,9 +53,9 @@ export function ZoneDetailsDrawer({ zone, onClose }: ZoneDetailsDrawerProps) {
   const incidentsWithPhotos = incidents.filter((i) => i.photo_url);
 
   return (
-    <div className={`absolute top-0 right-0 h-full w-96 bg-white shadow-2xl z-20 overflow-hidden flex flex-col ${isClosing ? 'animate-slide-out-right' : 'animate-slide-in-right'}`}>
+    <div className={`fixed top-0 right-0 h-full w-full md:w-[500px] lg:w-[600px] bg-white shadow-2xl z-20 overflow-hidden flex flex-col ${isClosing ? 'animate-slide-out-right' : 'animate-slide-in-right'}`}>
       {/* Header */}
-      <div className="p-6 border-b border-gray-200">
+      <div className="p-4 md:p-6 border-b border-gray-200 shrink-0">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
@@ -96,7 +96,7 @@ export function ZoneDetailsDrawer({ zone, onClose }: ZoneDetailsDrawerProps) {
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
         {/* Stats Cards */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-4 md:p-6 border-b border-gray-200">
           <div className="grid grid-cols-2 gap-3">
             <StatCard
               icon="🔨"
@@ -112,7 +112,7 @@ export function ZoneDetailsDrawer({ zone, onClose }: ZoneDetailsDrawerProps) {
         </div>
 
         {/* Evidence Timeline */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-4 md:p-6 border-b border-gray-200">
           <div className="flex items-center gap-2 mb-4">
             <FileText className="w-4 h-4 text-gray-600" />
             <h3 className="text-sm font-semibold text-gray-900">
@@ -139,11 +139,11 @@ export function ZoneDetailsDrawer({ zone, onClose }: ZoneDetailsDrawerProps) {
 
         {/* Evidence Gallery */}
         {incidentsWithPhotos.length > 0 && (
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-4">
               Evidence Gallery
             </h3>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {incidentsWithPhotos.map((incident) => (
                 <div
                   key={incident.id}
@@ -162,12 +162,12 @@ export function ZoneDetailsDrawer({ zone, onClose }: ZoneDetailsDrawerProps) {
       </div>
 
       {/* Footer Actions */}
-      <div className="p-6 border-t border-gray-200 bg-gray-50">
-        <div className="flex gap-3">
-          <button className="flex-1 px-4 py-2.5 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors">
+      <div className="p-4 md:p-6 border-t border-gray-200 bg-gray-50 shrink-0">
+        <div className="flex gap-2 md:gap-3">
+          <button className="flex-1 px-4 py-2.5 md:py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors h-10 md:h-auto">
             Clear Zone
           </button>
-          <button className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
+          <button className="flex-1 px-4 py-2.5 md:py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors h-10 md:h-auto">
             Add Note
           </button>
         </div>
