@@ -782,8 +782,8 @@ export function CreatePotentialLocationDialog({
               </div>
             )}
 
-            {/* Queue counter badge */}
-            <div className={`absolute top-4 right-4 backdrop-blur-sm rounded-full shadow-lg px-4 py-2 transition-colors ${
+            {/* Queue counter badge - below search bar */}
+            <div className={`absolute top-16 right-4 backdrop-blur-sm rounded-full shadow-lg px-4 py-2 transition-colors ${
               locationQueue.length > 0
                 ? 'bg-green-50/95 border-2 border-green-200'
                 : 'bg-white/95 border border-gray-200'
@@ -794,7 +794,7 @@ export function CreatePotentialLocationDialog({
                   {locationQueue.length}
                 </span>
                 <span className={locationQueue.length > 0 ? 'text-green-700' : 'text-gray-600'}>
-                  {locationQueue.length === 1 ? 'location queued' : 'locations queued'}
+                  {locationQueue.length === 1 ? 'location' : 'locations'}
                 </span>
               </p>
             </div>
