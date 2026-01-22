@@ -67,11 +67,11 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
   const [insertPosition, setInsertPosition] = useState<'start' | 'end'>('end');
   const [insertAfterBinId, setInsertAfterBinId] = useState<string>('');
 
-  // Fetch users for user assignment
+  // Fetch users for user assignment (always fetch for store type since it's required)
   const { data: users, isLoading: usersLoading } = useQuery({
     queryKey: ['users'],
     queryFn: getUsers,
-    enabled: assignmentMode === 'user',
+    enabled: formData.move_type === 'store' || assignmentMode === 'user',
   });
 
   // Fetch shifts for shift assignment
@@ -219,6 +219,12 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
     // Validate bin selection in standalone mode
     if (isStandalone && selectedBins.length === 0) {
       alert('Please select at least one bin to schedule a move request.');
+      return;
+    }
+
+    // Validate store type requires user assignment
+    if (formData.move_type === 'store' && !selectedUserId) {
+      alert('Store requests must be assigned to a person. Please select someone.');
       return;
     }
 
@@ -698,33 +704,90 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
               />
             </div>
 
-            {/* Assignment Section (Collapsible) */}
-            <div className="pt-4 border-t border-gray-200">
-              <button
-                type="button"
-                onClick={() => setShowAssignmentSection(!showAssignmentSection)}
-                className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <Truck className="w-5 h-5 text-gray-600" />
+            {/* Assignment Section - Different behavior based on move type */}
+            {formData.move_type === 'store' ? (
+              /* STORE: Must assign to person immediately */
+              <div className="pt-4 border-t border-gray-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <User className="w-5 h-5 text-gray-600" />
                   <span className="text-sm font-semibold text-gray-900">
-                    Assignment (Optional)
+                    Assign to Person *
                   </span>
-                  {assignmentMode !== 'unassigned' && (
-                    <Badge className="bg-primary text-white text-xs">
-                      {assignmentMode === 'user' ? 'User Assigned' :
-                       assignmentMode === 'active_shift' ? 'Active Shift' : 'Future Shift'}
-                    </Badge>
-                  )}
+                  <Badge className="bg-purple-100 text-purple-700 text-xs">
+                    Required
+                  </Badge>
                 </div>
-                {showAssignmentSection ? (
-                  <ChevronDown className="w-5 h-5 text-gray-500" />
-                ) : (
-                  <ChevronRight className="w-5 h-5 text-gray-500" />
-                )}
-              </button>
+                <p className="text-xs text-gray-500 mb-3">
+                  Store requests are one-off tasks and must be assigned to someone immediately
+                </p>
 
-              {showAssignmentSection && (
+                {usersLoading ? (
+                  <div className="text-center py-8 bg-white rounded-lg border border-gray-200">
+                    <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Loading users...</p>
+                  </div>
+                ) : users && users.length > 0 ? (
+                  <div className="space-y-2">
+                    {users.map((user) => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedUserId(user.id);
+                          setAssignmentMode('user');
+                        }}
+                        className={cn(
+                          'w-full text-left p-4 rounded-xl border-2 transition-all',
+                          selectedUserId === user.id
+                            ? 'border-primary bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300 bg-white'
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <User className="w-4 h-4 text-gray-600" />
+                          <div>
+                            <div className="font-semibold text-gray-900">{user.name}</div>
+                            <div className="text-sm text-gray-500 capitalize">{user.role}</div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 bg-white rounded-lg border border-gray-200">
+                    <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">No users found</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* RELOCATION: Optional shift assignment (collapsible) */
+              <div className="pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setShowAssignmentSection(!showAssignmentSection)}
+                  className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Truck className="w-5 h-5 text-gray-600" />
+                    <span className="text-sm font-semibold text-gray-900">
+                      Assignment (Optional)
+                    </span>
+                    {assignmentMode !== 'unassigned' && (
+                      <Badge className="bg-primary text-white text-xs">
+                        {assignmentMode === 'user' ? 'User Assigned' :
+                         assignmentMode === 'active_shift' ? 'Active Shift' : 'Future Shift'}
+                      </Badge>
+                    )}
+                  </div>
+                  {showAssignmentSection ? (
+                    <ChevronDown className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronRight className="w-5 h-5 text-gray-500" />
+                  )}
+                </button>
+
+                {showAssignmentSection && (
                 <div className="space-y-4 mt-4 p-4 bg-gray-50 rounded-lg">
                   {/* Assignment Mode Radio Buttons */}
                   <div className="space-y-2">
@@ -1029,7 +1092,8 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
                   )}
                 </div>
               )}
-            </div>
+              </div>
+            )}
 
             {/* Actions */}
             <div className="flex gap-3 pt-4">

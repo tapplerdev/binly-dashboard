@@ -271,14 +271,27 @@ export function MoveRequestDetailDrawer({
             ) : (
               <div className="text-center py-6">
                 <User className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 font-medium mb-4">Not yet assigned to a driver</p>
+                <p className="text-gray-500 font-medium mb-4">
+                  {moveRequest.move_type === 'store'
+                    ? 'Not yet assigned to a person'
+                    : 'Not yet assigned to a driver'}
+                </p>
                 {isPending && onAssign && (
                   <Button
                     onClick={() => onAssign(moveRequest)}
                     className="bg-primary hover:bg-primary/90"
                   >
-                    <Truck className="h-4 w-4 mr-2" />
-                    Assign to Shift
+                    {moveRequest.move_type === 'store' ? (
+                      <>
+                        <User className="h-4 w-4 mr-2" />
+                        Assign to Person
+                      </>
+                    ) : (
+                      <>
+                        <Truck className="h-4 w-4 mr-2" />
+                        Assign to Shift
+                      </>
+                    )}
                   </Button>
                 )}
               </div>

@@ -19,6 +19,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { AssignMovesModal } from '@/components/binly/assign-moves-modal';
 import { ScheduleMoveModal } from '@/components/binly/bin-modals';
 import { MoveRequestDetailDrawer } from '@/components/binly/move-request-detail-drawer';
+import { AssignUserModal } from '@/components/binly/assign-user-modal';
 import {
   Calendar,
   Clock,
@@ -57,6 +58,7 @@ export function MoveRequestsList() {
 
   // Modal state
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showAssignUserModal, setShowAssignUserModal] = useState(false);
   const [showScheduleMoveModal, setShowScheduleMoveModal] = useState(false);
   const [showBulkEditDateModal, setShowBulkEditDateModal] = useState(false);
   const [showBulkCancelModal, setShowBulkCancelModal] = useState(false);
@@ -64,6 +66,7 @@ export function MoveRequestsList() {
   const [showDetailDrawer, setShowDetailDrawer] = useState(false);
   const [bulkEditDate, setBulkEditDate] = useState('');
   const [movesToAssign, setMovesToAssign] = useState<MoveRequest[]>([]); // For single or bulk assignment
+  const [moveToAssignUser, setMoveToAssignUser] = useState<MoveRequest | null>(null); // For user assignment
   const [moveToEdit, setMoveToEdit] = useState<MoveRequest | null>(null); // For editing individual move
   const [moveToCancel, setMoveToCancel] = useState<MoveRequest | null>(null); // For canceling individual move
   const [selectedMoveForDetail, setSelectedMoveForDetail] = useState<MoveRequest | null>(null); // For detail drawer
@@ -835,7 +838,7 @@ export function MoveRequestsList() {
         </div>
       </Card>
 
-      {/* Assignment Modal */}
+      {/* Assignment Modal (for shift assignment) */}
       {showAssignModal && (
         <AssignMovesModal
           moveRequests={movesToAssign}
@@ -848,6 +851,22 @@ export function MoveRequestsList() {
             refetch();
             setShowAssignModal(false);
             setMovesToAssign([]);
+          }}
+        />
+      )}
+
+      {/* User Assignment Modal (for manual/one-off assignment) */}
+      {showAssignUserModal && moveToAssignUser && (
+        <AssignUserModal
+          moveRequest={moveToAssignUser}
+          onClose={() => {
+            setShowAssignUserModal(false);
+            setMoveToAssignUser(null);
+          }}
+          onSuccess={() => {
+            refetch();
+            setShowAssignUserModal(false);
+            setMoveToAssignUser(null);
           }}
         />
       )}
@@ -1183,7 +1202,13 @@ export function MoveRequestsList() {
           }}
           onAssign={(move) => {
             setShowDetailDrawer(false);
-            handleSingleAssign(move);
+            // Check move type to determine which assignment modal to show
+            if (move.move_type === 'store') {
+              setMoveToAssignUser(move);
+              setShowAssignUserModal(true);
+            } else {
+              handleSingleAssign(move);
+            }
           }}
           onClearAssignment={(move) => {
             setShowDetailDrawer(false);
