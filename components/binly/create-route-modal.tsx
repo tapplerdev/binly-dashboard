@@ -772,7 +772,7 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
   }, [optimizeMode, beforeStats, afterStats]);
 
   return (
-    <div className={`fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 transition-opacity duration-200 ${isClosing ? 'opacity-0' : isOpening ? 'opacity-0' : 'opacity-100'}`}>
+    <div className={`fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4 transition-opacity duration-200 ${isClosing ? 'opacity-0' : isOpening ? 'opacity-0' : 'opacity-100'}`}>
       <div className={`bg-white rounded-2xl w-full h-[90vh] max-w-7xl overflow-hidden flex flex-col shadow-2xl transition-all duration-200 ease-in-out ${isClosing ? 'scale-95 opacity-0' : isOpening ? 'scale-95 opacity-0' : 'scale-100 opacity-100'}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">

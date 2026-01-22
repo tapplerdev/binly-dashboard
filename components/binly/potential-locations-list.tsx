@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MapPin, User, Calendar, Check, Trash2, Loader2 } from 'lucide-react';
+import { MapPin, User, Calendar, Check, Trash2, Loader2, MoreVertical, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PotentialLocationDetailsDrawer } from './potential-location-details-drawer';
@@ -38,6 +38,7 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [locationToDelete, setLocationToDelete] = useState<PotentialLocation | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLocations();
@@ -49,6 +50,15 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
     window.addEventListener('potential-location-created', handleRefresh);
     return () => window.removeEventListener('potential-location-created', handleRefresh);
   }, [filter]);
+
+  // Close menu on click outside
+  useEffect(() => {
+    const handleClickOutside = () => setOpenMenuId(null);
+    if (openMenuId) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [openMenuId]);
 
   const fetchLocations = async () => {
     try {
@@ -103,7 +113,7 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
-                Potential Locations ({locations.length})
+                Potential Locations
               </h2>
               <p className="text-sm text-gray-600 mt-1">
                 {filter === 'active' ? 'Active location requests' : 'Converted to bins'}
@@ -162,91 +172,102 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
             </div>
           ) : (
             <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4" />
-                      Address
-                    </div>
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tl-2xl">
+                    Address
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      Requested By
-                    </div>
+                  <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle">
+                    Requested By
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      Date Created
-                    </div>
+                  <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle">
+                    Date Created
                   </th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  <th className="text-center py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tr-2xl">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-100">
                 {locations.map((location) => (
                   <tr
                     key={location.id}
                     className="hover:bg-gray-50 cursor-pointer transition-colors"
                     onClick={() => setSelectedLocation(location)}
                   >
-                    <td className="px-6 py-4">
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
-                          <MapPin className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-gray-900">{location.street}</p>
-                          <p className="text-sm text-gray-600">
-                            {location.city}, {location.zip}
-                          </p>
+                    <td className="py-4 px-4 align-middle">
+                      <div className="text-sm">
+                        <div className="text-gray-900 font-medium">{location.street}</div>
+                        <div className="text-gray-500 text-xs">
+                          {location.city}, {location.zip}
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
-                          <User className="w-4 h-4 text-purple-600" />
-                        </div>
-                        <span className="text-sm font-medium text-gray-900">
-                          {location.requested_by_name}
-                        </span>
-                      </div>
+                    <td className="py-4 px-4 align-middle">
+                      <span className="text-sm text-gray-900">
+                        {location.requested_by_name}
+                      </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-600">
-                          {formatDate(location.created_at_iso)}
-                        </span>
-                      </div>
+                    <td className="py-4 px-4 align-middle">
+                      <span className="text-sm text-gray-600">
+                        {formatDate(location.created_at_iso)}
+                      </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                    <td className="py-4 px-4 align-middle">
+                      <div className="flex items-center justify-center gap-2">
                         {filter === 'active' ? (
                           <>
-                            <Button
-                              variant="default"
-                              size="sm"
-                              className="gap-2"
-                              onClick={() => handleConvert(location)}
+                            {/* View Details Icon */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedLocation(location);
+                              }}
+                              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="View Details"
                             >
-                              <Check className="w-4 h-4" />
-                              Convert to Bin
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              className="gap-2"
-                              onClick={() => handleDelete(location)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              Remove
-                            </Button>
+                              <Eye className="w-4 h-4 text-gray-600" />
+                            </button>
+
+                            {/* More Actions Menu */}
+                            <div className="relative">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenMenuId(openMenuId === location.id ? null : location.id);
+                                }}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                title="More Actions"
+                              >
+                                <MoreVertical className="w-4 h-4 text-gray-600" />
+                              </button>
+
+                              {/* Dropdown Menu */}
+                              {openMenuId === location.id && (
+                                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[160px] animate-slide-in-down">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenMenuId(null);
+                                      handleConvert(location);
+                                    }}
+                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors rounded-t-lg"
+                                  >
+                                    Convert to Bin
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenMenuId(null);
+                                      handleDelete(location);
+                                    }}
+                                    className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors rounded-b-lg"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </>
                         ) : (
                           <Badge variant="default" className="gap-1">

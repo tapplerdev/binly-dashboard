@@ -14,9 +14,11 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { KpiCard } from '@/components/binly/kpi-card';
-import { Dropdown, MultiSelectDropdown } from '@/components/ui/dropdown';
+import { MultiSelectDropdown } from '@/components/ui/dropdown';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { AssignMovesModal } from '@/components/binly/assign-moves-modal';
 import { ScheduleMoveModal } from '@/components/binly/bin-modals';
+import { MoveRequestDetailDrawer } from '@/components/binly/move-request-detail-drawer';
 import {
   Calendar,
   Clock,
@@ -38,11 +40,12 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
 type SortColumn = 'bin_number' | 'scheduled_date' | 'urgency' | 'status' | 'assigned_driver_name';
+type MoveFilterOption = 'overdue' | 'urgent' | 'pending' | 'in_progress' | 'completed' | 'pickup_only' | 'relocation';
 
 export function MoveRequestsList() {
   // State
   const queryClient = useQueryClient();
-  const [statusFilter, setStatusFilter] = useState<MoveRequestStatus | 'all'>('all');
+  const [filters, setFilters] = useState<MoveFilterOption[]>([]);
   const [assignedFilter, setAssignedFilter] = useState<'all' | 'assigned' | 'unassigned'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMoves, setSelectedMoves] = useState<Set<string>>(new Set());
@@ -58,10 +61,12 @@ export function MoveRequestsList() {
   const [showBulkEditDateModal, setShowBulkEditDateModal] = useState(false);
   const [showBulkCancelModal, setShowBulkCancelModal] = useState(false);
   const [showSingleCancelModal, setShowSingleCancelModal] = useState(false);
+  const [showDetailDrawer, setShowDetailDrawer] = useState(false);
   const [bulkEditDate, setBulkEditDate] = useState('');
   const [movesToAssign, setMovesToAssign] = useState<MoveRequest[]>([]); // For single or bulk assignment
   const [moveToEdit, setMoveToEdit] = useState<MoveRequest | null>(null); // For editing individual move
   const [moveToCancel, setMoveToCancel] = useState<MoveRequest | null>(null); // For canceling individual move
+  const [selectedMoveForDetail, setSelectedMoveForDetail] = useState<MoveRequest | null>(null); // For detail drawer
 
   // Fetch all move requests
   const { data: allMoves, isLoading, error, refetch } = useQuery({
@@ -70,6 +75,24 @@ export function MoveRequestsList() {
     refetchInterval: 30000,
     staleTime: 10000,
   });
+
+  // Debug: Log assigned moves to see driver_name data
+  useEffect(() => {
+    if (allMoves) {
+      const assignedMoves = allMoves.filter(m => m.status === 'assigned');
+      if (assignedMoves.length > 0) {
+        console.log('🔍 Assigned moves:', assignedMoves.map(m => ({
+          bin: m.bin_number,
+          status: m.status,
+          assigned_shift_id: m.assigned_shift_id,
+          assigned_user_id: m.assigned_user_id,
+          driver_name: m.driver_name,
+          assigned_driver_name: m.assigned_driver_name,
+          assigned_user_name: m.assigned_user_name,
+        })));
+      }
+    }
+  }, [allMoves]);
 
   // Calculate KPIs
   const urgentCount = useMemo(() => {
@@ -108,9 +131,32 @@ export function MoveRequestsList() {
   const filteredMoves = useMemo(() => {
     return allMoves
       ?.filter((move) => {
-        // Status filter
-        if (statusFilter !== 'all' && move.status !== statusFilter) {
-          return false;
+        // Multi-select filters
+        if (filters.length > 0) {
+          const matchesFilter = filters.some((filter) => {
+            const urgency = getMoveRequestUrgency(move.scheduled_date);
+
+            switch (filter) {
+              case 'overdue':
+                return urgency === 'overdue';
+              case 'urgent':
+                return urgency === 'urgent';
+              case 'pending':
+                return move.status === 'pending';
+              case 'in_progress':
+                return move.status === 'in_progress';
+              case 'completed':
+                return move.status === 'completed';
+              case 'pickup_only':
+                return move.move_type === 'pickup_only';
+              case 'relocation':
+                return move.move_type === 'relocation';
+              default:
+                return false;
+            }
+          });
+
+          if (!matchesFilter) return false;
         }
 
         // Assigned filter
@@ -180,7 +226,7 @@ export function MoveRequestsList() {
         // If same urgency, sort by date (soonest first)
         return a.scheduled_date - b.scheduled_date;
       });
-  }, [allMoves, statusFilter, assignedFilter, searchQuery, sortColumn, sortDirection]);
+  }, [allMoves, filters, assignedFilter, searchQuery, sortColumn, sortDirection]);
 
   // Multi-select handlers
   const handleSelectMove = (moveId: string) => {
@@ -297,6 +343,12 @@ export function MoveRequestsList() {
     setShowAssignModal(true);
   };
 
+  // Handler for opening detail drawer
+  const handleRowClick = (move: MoveRequest) => {
+    setSelectedMoveForDetail(move);
+    setShowDetailDrawer(true);
+  };
+
   // Handle three-dot menu open
   const handleMenuOpen = (moveId: string, buttonElement: HTMLButtonElement) => {
     if (openMenuId === moveId) {
@@ -393,12 +445,12 @@ export function MoveRequestsList() {
   // Get status badge
   const getStatusBadge = (status: MoveRequestStatus) => {
     const config = {
-      pending: { label: 'Pending', color: 'bg-gray-500 text-white' },
-      assigned: { label: 'Assigned', color: 'bg-blue-500 text-white' },
-      in_progress: { label: 'In Progress', color: 'bg-amber-500 text-white' },
-      completed: { label: 'Completed', color: 'bg-green-500 text-white' },
-      cancelled: { label: 'Cancelled', color: 'bg-gray-400 text-white' },
-      overdue: { label: 'Overdue', color: 'bg-red-500 text-white' },
+      pending: { label: 'Pending', color: 'bg-orange-500 text-white border-orange-600' },
+      assigned: { label: 'Assigned', color: 'bg-blue-600 text-white border-blue-700' },
+      in_progress: { label: 'In Progress', color: 'bg-purple-600 text-white border-purple-700' },
+      completed: { label: 'Completed', color: 'bg-green-600 text-white border-green-700' },
+      cancelled: { label: 'Cancelled', color: 'bg-gray-500 text-white border-gray-600' },
+      overdue: { label: 'Overdue', color: 'bg-red-600 text-white border-red-700' },
     };
 
     const { label, color } = config[status];
@@ -480,57 +532,46 @@ export function MoveRequestsList() {
 
       {/* Filters and Actions */}
       <Card className="p-4">
-        <div className="flex flex-col lg:flex-row gap-4">
-          {/* Select All Checkbox */}
-          <div className="flex items-center">
+        <div className="flex items-center gap-4">
+          {/* Multi-select Filter Dropdown */}
+          <MultiSelectDropdown
+            label="Filter By"
+            selectedValues={filters}
+            options={[
+              { value: 'overdue', label: 'Overdue' },
+              { value: 'urgent', label: 'Urgent' },
+              { value: 'pending', label: 'Pending' },
+              { value: 'in_progress', label: 'In Progress' },
+              { value: 'completed', label: 'Completed' },
+              { value: 'pickup_only', label: 'Store/Pickup' },
+              { value: 'relocation', label: 'Relocation' },
+            ]}
+            onChange={(values) => setFilters(values as MoveFilterOption[])}
+          />
+
+          {/* Search Bar */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
-              type="checkbox"
-              checked={filteredMoves && filteredMoves.length > 0 && selectedMoves.size === filteredMoves.length}
-              onChange={handleSelectAll}
-              className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+              type="text"
+              placeholder="Search bin #, address, driver..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             />
-            <span className="ml-2 text-sm text-gray-600">
-              {selectedMoves.size > 0 ? `${selectedMoves.size} selected` : 'Select all'}
-            </span>
           </div>
 
-          {/* Filters */}
-          <div className="flex flex-wrap gap-3 flex-1">
-            <Dropdown
-              label="Status"
-              value={statusFilter}
-              onChange={(value) => setStatusFilter(value as MoveRequestStatus | 'all')}
-              options={[
-                { value: 'all', label: 'All Statuses' },
-                { value: 'pending', label: 'Pending' },
-                { value: 'assigned', label: 'Assigned' },
-                { value: 'in_progress', label: 'In Progress' },
-                { value: 'completed', label: 'Completed' },
-              ]}
-            />
-
-            <Dropdown
-              label="Assignment"
+          {/* Assignment Segmented Control */}
+          <div className="flex items-center ml-auto">
+            <SegmentedControl
               value={assignedFilter}
-              onChange={(value) => setAssignedFilter(value as 'all' | 'assigned' | 'unassigned')}
               options={[
                 { value: 'all', label: 'All' },
                 { value: 'assigned', label: 'Assigned' },
                 { value: 'unassigned', label: 'Unassigned' },
               ]}
+              onChange={(value) => setAssignedFilter(value as 'all' | 'assigned' | 'unassigned')}
             />
-
-            {/* Search */}
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search bin #, address, driver..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-            </div>
           </div>
 
           {/* Create Button */}
@@ -603,9 +644,19 @@ export function MoveRequestsList() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="py-3 px-4 w-[5%]"></th>
+                <th className="py-4 px-4 w-[5%] align-middle rounded-tl-2xl">
+                  <div className="flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={filteredMoves && filteredMoves.length > 0 && selectedMoves.size === filteredMoves.length}
+                      onChange={handleSelectAll}
+                      className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+                      title="Select all"
+                    />
+                  </div>
+                </th>
                 <th
-                  className="text-center py-3 px-4 text-sm font-semibold text-gray-700 w-[8%] cursor-pointer"
+                  className="text-center py-4 px-4 text-sm font-semibold text-gray-700 w-[8%] cursor-pointer align-middle"
                   onClick={() => handleSort('bin_number')}
                 >
                   <div className="flex items-center justify-center gap-1.5">
@@ -613,11 +664,11 @@ export function MoveRequestsList() {
                     <ChevronsUpDown className="w-4 h-4 text-gray-400" />
                   </div>
                 </th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 w-[18%]">
+                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700 w-[18%] align-middle">
                   Location
                 </th>
                 <th
-                  className="text-left py-3 px-4 text-sm font-semibold text-gray-700 whitespace-nowrap cursor-pointer"
+                  className="text-left py-4 px-4 text-sm font-semibold text-gray-700 whitespace-nowrap cursor-pointer align-middle"
                   onClick={() => handleSort('scheduled_date')}
                 >
                   <div className="flex items-center gap-1.5">
@@ -626,7 +677,7 @@ export function MoveRequestsList() {
                   </div>
                 </th>
                 <th
-                  className="text-left py-3 px-4 text-sm font-semibold text-gray-700 cursor-pointer"
+                  className="text-left py-4 px-4 text-sm font-semibold text-gray-700 cursor-pointer align-middle"
                   onClick={() => handleSort('urgency')}
                 >
                   <div className="flex items-center gap-1.5">
@@ -635,7 +686,7 @@ export function MoveRequestsList() {
                   </div>
                 </th>
                 <th
-                  className="text-left py-3 px-4 text-sm font-semibold text-gray-700 cursor-pointer"
+                  className="text-left py-4 px-4 text-sm font-semibold text-gray-700 cursor-pointer align-middle"
                   onClick={() => handleSort('status')}
                 >
                   <div className="flex items-center gap-1.5">
@@ -644,7 +695,7 @@ export function MoveRequestsList() {
                   </div>
                 </th>
                 <th
-                  className="text-left py-3 px-4 text-sm font-semibold text-gray-700 whitespace-nowrap cursor-pointer"
+                  className="text-left py-4 px-4 text-sm font-semibold text-gray-700 whitespace-nowrap cursor-pointer align-middle"
                   onClick={() => handleSort('assigned_driver_name')}
                 >
                   <div className="flex items-center gap-1.5">
@@ -652,10 +703,10 @@ export function MoveRequestsList() {
                     <ChevronsUpDown className="w-4 h-4 text-gray-400" />
                   </div>
                 </th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
+                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle">
                   Type
                 </th>
-                <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700">
+                <th className="text-center py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tr-2xl">
                   Actions
                 </th>
               </tr>
@@ -664,13 +715,14 @@ export function MoveRequestsList() {
               {filteredMoves?.map((move) => (
                 <tr
                   key={move.id}
+                  onClick={() => handleRowClick(move)}
                   className={cn(
-                    'hover:bg-gray-50 transition-colors',
+                    'hover:bg-gray-50 transition-colors cursor-pointer',
                     selectedMoves.has(move.id) && 'bg-blue-50'
                   )}
                 >
                   {/* Checkbox */}
-                  <td className="py-4 px-4">
+                  <td className="py-4 px-4 align-middle" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={selectedMoves.has(move.id)}
@@ -680,12 +732,12 @@ export function MoveRequestsList() {
                   </td>
 
                   {/* Bin Number */}
-                  <td className="py-4 px-4 text-center">
+                  <td className="py-4 px-4 text-center align-middle">
                     <span className="font-semibold text-gray-900">{move.bin_number}</span>
                   </td>
 
                   {/* Location */}
-                  <td className="py-4 px-4 min-w-[200px]">
+                  <td className="py-4 px-4 min-w-[200px] align-middle">
                     <div className="text-sm">
                       <div className="text-gray-900 font-medium whitespace-nowrap">{move.current_street}</div>
                       <div className="text-gray-500 text-xs">
@@ -695,7 +747,7 @@ export function MoveRequestsList() {
                   </td>
 
                   {/* Requested Date */}
-                  <td className="py-4 px-4">
+                  <td className="py-4 px-4 align-middle">
                     <div className="text-sm">
                       <div className="text-gray-900 font-medium">
                         {format(new Date(move.scheduled_date * 1000), 'MMM dd, yyyy')}
@@ -707,16 +759,16 @@ export function MoveRequestsList() {
                   </td>
 
                   {/* Urgency */}
-                  <td className="py-4 px-4">{getUrgencyBadge(move)}</td>
+                  <td className="py-4 px-4 align-middle">{getUrgencyBadge(move)}</td>
 
                   {/* Status */}
-                  <td className="py-4 px-4">{getStatusBadge(move.status)}</td>
+                  <td className="py-4 px-4 align-middle">{getStatusBadge(move.status)}</td>
 
                   {/* Assigned To */}
-                  <td className="py-4 px-4">
-                    {move.assigned_driver_name ? (
+                  <td className="py-4 px-4 align-middle">
+                    {move.driver_name ? (
                       <div className="text-sm">
-                        <div className="text-gray-900 font-medium">{move.assigned_driver_name}</div>
+                        <div className="text-gray-900 font-medium">{move.driver_name}</div>
                       </div>
                     ) : (
                       <span className="text-sm text-gray-500 font-medium">Unassigned</span>
@@ -724,75 +776,43 @@ export function MoveRequestsList() {
                   </td>
 
                   {/* Type */}
-                  <td className="py-4 px-4">
-                    {move.move_type === 'pickup_only' ? (
-                      <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4 text-gray-400" />
-                        <span className="text-sm text-gray-900 font-medium">Pickup</span>
-                      </div>
-                    ) : (
+                  <td className="py-4 px-4 align-middle">
+                    {move.move_type === 'relocation' ? (
                       <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-gray-400" />
                         <span className="text-sm text-gray-900 font-medium">Relocation</span>
+                      </div>
+                    ) : move.move_type === 'store' ? (
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-gray-400" />
+                        <span className="text-sm text-gray-900 font-medium">Store</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-gray-400" />
+                        <span className="text-sm text-gray-900 font-medium">Pickup</span>
                       </div>
                     )}
                   </td>
 
                   {/* Actions */}
-                  <td className="py-4 px-4">
-                    <div className="flex items-center justify-center gap-2">
-                      {/* Primary Action Button - context aware */}
-                      {move.status === 'pending' && !move.assigned_shift_id && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleSingleAssign(move)}
-                          className="bg-primary hover:bg-primary/90 text-white"
-                        >
-                          <Truck className="h-3.5 w-3.5 mr-1.5" />
-                          Assign
-                        </Button>
-                      )}
-
-                      {move.status === 'pending' && move.assigned_shift_id && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleSingleAssign(move)}
-                          className="border-gray-300"
-                        >
-                          <Truck className="h-3.5 w-3.5 mr-1.5" />
-                          Re-assign
-                        </Button>
-                      )}
-
-                      {(move.status === 'in_progress' || move.status === 'completed' || move.status === 'cancelled') && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-gray-300"
-                        >
-                          <Eye className="h-3.5 w-3.5 mr-1.5" />
-                          View
-                        </Button>
-                      )}
-
-                      {/* Three-dot Menu - for secondary actions */}
-                      {move.status === 'pending' && (
-                        <button
-                          ref={(el) => {
-                            if (el) menuButtonRefs.current.set(move.id, el);
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const button = e.currentTarget as HTMLButtonElement;
-                            handleMenuOpen(move.id, button);
-                          }}
-                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                          aria-label="More actions"
-                        >
-                          <MoreVertical className="h-4 w-4 text-gray-600" />
-                        </button>
-                      )}
+                  <td className="py-4 px-4 align-middle" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-center">
+                      {/* Three-dot Menu */}
+                      <button
+                        ref={(el) => {
+                          if (el) menuButtonRefs.current.set(move.id, el);
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const button = e.currentTarget as HTMLButtonElement;
+                          handleMenuOpen(move.id, button);
+                        }}
+                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                        aria-label="More actions"
+                      >
+                        <MoreVertical className="h-4 w-4 text-gray-600" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -806,7 +826,7 @@ export function MoveRequestsList() {
               <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-500 font-semibold mb-2">No move requests found</p>
               <p className="text-gray-400 text-sm">
-                {searchQuery || statusFilter !== 'all' || assignedFilter !== 'all'
+                {searchQuery || filters.length > 0 || assignedFilter !== 'all'
                   ? 'Try adjusting your filters'
                   : 'Create a move request to get started'}
               </p>
@@ -814,13 +834,6 @@ export function MoveRequestsList() {
           )}
         </div>
       </Card>
-
-      {/* Results Count */}
-      {filteredMoves && filteredMoves.length > 0 && (
-        <div className="text-sm text-gray-500 text-center">
-          Showing {filteredMoves.length} of {allMoves?.length} move request{allMoves?.length !== 1 ? 's' : ''}
-        </div>
-      )}
 
       {/* Assignment Modal */}
       {showAssignModal && (
@@ -843,7 +856,7 @@ export function MoveRequestsList() {
       {showBulkEditDateModal && (
         <>
           <div
-            className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/30 z-40 flex items-center justify-center p-4"
             onClick={() => setShowBulkEditDateModal(false)}
           >
             <div
@@ -907,7 +920,7 @@ export function MoveRequestsList() {
       {showBulkCancelModal && (
         <>
           <div
-            className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/30 z-40 flex items-center justify-center p-4"
             onClick={() => setShowBulkCancelModal(false)}
           >
             <div
@@ -979,7 +992,7 @@ export function MoveRequestsList() {
       {showSingleCancelModal && moveToCancel && (
         <>
           <div
-            className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/30 z-40 flex items-center justify-center p-4"
             onClick={() => setShowSingleCancelModal(false)}
           >
             <div
@@ -1071,19 +1084,44 @@ export function MoveRequestsList() {
               const move = filteredMoves?.find((m) => m.id === openMenuId);
               if (!move) return null;
 
+              const isCompletedOrCancelled = move.status === 'completed' || move.status === 'cancelled';
+              const canAssign = move.status === 'pending' || move.status === 'assigned';
+
               return (
                 <>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditDetails(move);
-                    }}
-                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-t-lg"
-                  >
-                    <Edit className="h-4 w-4" />
-                    Edit Details
-                  </button>
-                  {move.assigned_shift_id && (
+                  {/* Assign / Re-assign Option (for pending/assigned statuses) */}
+                  {canAssign && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSingleAssign(move);
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-t-lg"
+                    >
+                      <Truck className="h-4 w-4" />
+                      {move.assigned_shift_id ? 'Re-assign to Shift' : 'Assign to Shift'}
+                    </button>
+                  )}
+
+                  {/* Edit Details (for pending only) */}
+                  {move.status === 'pending' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditDetails(move);
+                      }}
+                      className={cn(
+                        "w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2",
+                        !canAssign && "rounded-t-lg"
+                      )}
+                    >
+                      <Edit className="h-4 w-4" />
+                      Edit Details
+                    </button>
+                  )}
+
+                  {/* Clear Assignment (if assigned) */}
+                  {move.assigned_shift_id && move.status === 'pending' && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1095,22 +1133,67 @@ export function MoveRequestsList() {
                       Clear Assignment
                     </button>
                   )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCancelMove(move);
-                    }}
-                    className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 rounded-b-lg"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Cancel Move
-                  </button>
+
+                  {/* View Details (for completed/cancelled/in_progress) */}
+                  {(move.status === 'in_progress' || isCompletedOrCancelled) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditDetails(move);
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-t-lg"
+                    >
+                      <Eye className="h-4 w-4" />
+                      View Details
+                    </button>
+                  )}
+
+                  {/* Cancel Move (for pending only) */}
+                  {move.status === 'pending' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCancelMove(move);
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 rounded-b-lg"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Cancel Move
+                    </button>
+                  )}
                 </>
               );
             })()}
           </div>
         </>,
         document.body
+      )}
+
+      {/* Detail Drawer */}
+      {showDetailDrawer && selectedMoveForDetail && (
+        <MoveRequestDetailDrawer
+          moveRequest={selectedMoveForDetail}
+          onClose={() => {
+            setShowDetailDrawer(false);
+            setSelectedMoveForDetail(null);
+          }}
+          onEdit={(move) => {
+            setShowDetailDrawer(false);
+            handleEditDetails(move);
+          }}
+          onAssign={(move) => {
+            setShowDetailDrawer(false);
+            handleSingleAssign(move);
+          }}
+          onClearAssignment={(move) => {
+            setShowDetailDrawer(false);
+            handleClearAssignment(move);
+          }}
+          onCancel={(move) => {
+            setShowDetailDrawer(false);
+            handleCancelMove(move);
+          }}
+        />
       )}
     </div>
   );

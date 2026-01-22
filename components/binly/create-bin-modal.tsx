@@ -60,7 +60,7 @@ export function CreateBinModal({ onClose, onSuccess }: CreateBinModalProps) {
     <>
       {/* Overlay */}
       <div
-        className={`fixed inset-0 z-50 bg-black/50 ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
+        className={`fixed inset-0 z-40 bg-black/50 ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
         onClick={handleClose}
       />
 

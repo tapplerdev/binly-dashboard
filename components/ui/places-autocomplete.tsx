@@ -92,16 +92,31 @@ export function PlacesAutocomplete({
     }
   }, [isLoaded, disabled]);
 
-  // Update dropdown position when input position changes
+  // Update dropdown position when input position changes or on scroll
   useEffect(() => {
-    if (isOpen && inputRef.current) {
+    if (!isOpen || !inputRef.current) return;
+
+    const updatePosition = () => {
+      if (!inputRef.current) return;
       const rect = inputRef.current.getBoundingClientRect();
       setDropdownPosition({
-        top: rect.bottom + window.scrollY + 4,
-        left: rect.left + window.scrollX,
+        top: rect.bottom + 4, // Use viewport coordinates directly (no window.scrollY)
+        left: rect.left,      // Use viewport coordinates directly (no window.scrollX)
         width: rect.width,
       });
-    }
+    };
+
+    // Initial position
+    updatePosition();
+
+    // Update on scroll (for modals/scrollable containers)
+    window.addEventListener('scroll', updatePosition, true); // Use capture phase to catch all scrolls
+    window.addEventListener('resize', updatePosition);
+
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
   }, [isOpen]);
 
   // Fetch suggestions

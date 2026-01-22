@@ -1258,8 +1258,6 @@ function CreateShiftDrawer({
   const { data: drivers = [], isLoading: loadingDrivers } = useDrivers();
   const [formData, setFormData] = useState({
     date: '2025-12-28',
-    startTime: '08:00',
-    endTime: '16:00',
     driverId: '',
     selectionType: 'route' as 'route' | 'custom',
     routeId: '',
@@ -1386,43 +1384,11 @@ function CreateShiftDrawer({
               />
             </div>
 
-            {/* Step 2: Time Range */}
+            {/* Step 2: Driver */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-medium">
                   2
-                </div>
-                <label className="text-sm font-semibold text-gray-900">Time Range</label>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Start Time</label>
-                  <input
-                    type="time"
-                    value={formData.startTime}
-                    onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">End Time</label>
-                  <input
-                    type="time"
-                    value={formData.endTime}
-                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Step 3: Driver */}
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-medium">
-                  3
                 </div>
                 <label className="text-sm font-semibold text-gray-900">Driver</label>
               </div>
@@ -1510,11 +1476,11 @@ function CreateShiftDrawer({
               </div>
             </div>
 
-            {/* Step 4: Bin Assignment */}
+            {/* Step 3: Bin Assignment */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-medium">
-                  4
+                  3
                 </div>
                 <label className="text-sm font-semibold text-gray-900">Bin Assignment</label>
               </div>

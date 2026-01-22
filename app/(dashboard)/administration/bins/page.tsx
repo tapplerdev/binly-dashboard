@@ -352,8 +352,7 @@ export default function BinsPage() {
             </div>
 
             {/* Status Segmented Control */}
-            <div className="flex items-center gap-3 ml-auto">
-              <span className="text-sm font-medium text-gray-700">Status:</span>
+            <div className="flex items-center ml-auto">
               <SegmentedControl
                 value={statusFilter}
                 options={[
@@ -368,11 +367,7 @@ export default function BinsPage() {
         </Card>
 
         {/* Bins List */}
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            Bins ({bins?.length || 0})
-          </h2>
-
+        <Card>
           {bins && bins.length === 0 ? (
             <div className="text-center py-12">
               <PackageSearch className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -383,17 +378,19 @@ export default function BinsPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="py-5 px-4 w-[5%] align-middle">
-                      <input
-                        type="checkbox"
-                        checked={bins && bins.length > 0 && selectedBins.size === bins.length}
-                        onChange={() => handleSelectAll(bins || [])}
-                        className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
-                        title="Select all"
-                      />
+                    <th className="py-4 px-4 w-[5%] align-middle rounded-tl-2xl">
+                      <div className="flex items-center justify-center">
+                        <input
+                          type="checkbox"
+                          checked={bins && bins.length > 0 && selectedBins.size === bins.length}
+                          onChange={() => handleSelectAll(bins || [])}
+                          className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+                          title="Select all"
+                        />
+                      </div>
                     </th>
                     <th
-                      className="text-center py-5 px-4 text-sm font-semibold text-gray-700 w-[8%] cursor-pointer align-middle"
+                      className="text-center py-4 px-4 text-sm font-semibold text-gray-700 w-[8%] cursor-pointer align-middle"
                       onClick={() => handleSort('bin_number')}
                     >
                       <div className="flex items-center justify-center gap-1.5">
@@ -401,11 +398,11 @@ export default function BinsPage() {
                         <ChevronsUpDown className="w-4 h-4 text-gray-400" />
                       </div>
                     </th>
-                    <th className="text-left py-5 px-4 text-sm font-semibold text-gray-700 align-middle">
+                    <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle">
                       Location
                     </th>
                     <th
-                      className="text-left py-5 px-4 text-sm font-semibold text-gray-700 cursor-pointer align-middle"
+                      className="text-left py-4 px-4 text-sm font-semibold text-gray-700 cursor-pointer align-middle"
                       onClick={() => handleSort('priority')}
                     >
                       <div className="flex items-center gap-1.5">
@@ -414,7 +411,7 @@ export default function BinsPage() {
                       </div>
                     </th>
                     <th
-                      className="text-left py-5 px-4 text-sm font-semibold text-gray-700 cursor-pointer whitespace-nowrap align-middle"
+                      className="text-left py-4 px-4 text-sm font-semibold text-gray-700 cursor-pointer whitespace-nowrap align-middle"
                       onClick={() => handleSort('fill_percentage')}
                     >
                       <div className="flex items-center gap-1.5">
@@ -423,7 +420,7 @@ export default function BinsPage() {
                       </div>
                     </th>
                     <th
-                      className="text-left py-5 px-4 text-sm font-semibold text-gray-700 cursor-pointer align-middle"
+                      className="text-left py-4 px-4 text-sm font-semibold text-gray-700 cursor-pointer align-middle"
                       onClick={() => handleSort('status')}
                     >
                       <div className="flex items-center gap-1.5">
@@ -432,7 +429,7 @@ export default function BinsPage() {
                       </div>
                     </th>
                     <th
-                      className="text-left py-5 px-4 text-sm font-semibold text-gray-700 whitespace-nowrap cursor-pointer align-middle"
+                      className="text-left py-4 px-4 text-sm font-semibold text-gray-700 whitespace-nowrap cursor-pointer align-middle"
                       onClick={() => handleSort('days_since_check')}
                     >
                       <div className="flex items-center gap-1.5">
@@ -440,7 +437,7 @@ export default function BinsPage() {
                         <ChevronsUpDown className="w-4 h-4 text-gray-400" />
                       </div>
                     </th>
-                    <th className="text-center py-5 px-4 text-sm font-semibold text-gray-700 align-middle">
+                    <th className="text-center py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tr-2xl">
                       Actions
                     </th>
                   </tr>
@@ -457,18 +454,22 @@ export default function BinsPage() {
                         className="hover:bg-gray-50 transition-colors cursor-pointer"
                         onClick={() => setSelectedBin(bin)}
                       >
-                        <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={selectedBins.has(bin.id)}
-                            onChange={() => handleSelectBin(bin.id)}
-                            className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
-                          />
+                        <td className="py-4 px-4 align-middle" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedBins.has(bin.id)}
+                              onChange={() => handleSelectBin(bin.id)}
+                              className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+                            />
+                          </div>
                         </td>
-                        <td className="py-4 px-4 text-center">
-                          <span className="font-semibold text-gray-900">{bin.bin_number}</span>
+                        <td className="py-4 px-4 align-middle">
+                          <div className="flex items-center justify-center">
+                            <span className="font-semibold text-gray-900">{bin.bin_number}</span>
+                          </div>
                         </td>
-                        <td className="py-4 px-4">
+                        <td className="py-4 px-4 align-middle">
                           <div className="text-sm">
                             <div className="text-gray-900 font-medium">{bin.current_street}</div>
                             <div className="text-gray-500 text-xs">
@@ -476,34 +477,38 @@ export default function BinsPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="py-4 px-4">
+                        <td className="py-4 px-4 align-middle">
                           <Badge className={cn('border', priority.color)}>
                             {priority.label}
                           </Badge>
                         </td>
-                        <td className="py-4 px-4">
-                          <Badge className={fill.color}>{fill.label}</Badge>
+                        <td className="py-4 px-4 align-middle">
+                          <div className="flex items-center justify-center">
+                            <Badge className={fill.color}>{fill.label}</Badge>
+                          </div>
                         </td>
-                        <td className="py-4 px-4">
-                          <Badge className={status.color}>{status.label}</Badge>
+                        <td className="py-4 px-4 align-middle">
+                          <Badge className={cn(status.color, 'whitespace-nowrap')}>{status.label}</Badge>
                         </td>
-                        <td className="py-4 px-4">
-                          <span
-                            className={cn(
-                              'text-sm font-medium',
-                              bin.days_since_check !== undefined && bin.days_since_check !== null
-                                ? bin.days_since_check >= 7
-                                  ? 'text-red-600'
-                                  : 'text-gray-700'
-                                : 'text-gray-500'
-                            )}
-                          >
-                            {bin.days_since_check !== undefined && bin.days_since_check !== null
-                              ? `${bin.days_since_check} days ago`
-                              : 'Never'}
-                          </span>
+                        <td className="py-4 px-4 align-middle">
+                          <div className="flex items-center justify-center">
+                            <span
+                              className={cn(
+                                'text-sm font-medium',
+                                bin.days_since_check !== undefined && bin.days_since_check !== null
+                                  ? bin.days_since_check >= 7
+                                    ? 'text-red-600'
+                                    : 'text-gray-700'
+                                  : 'text-gray-500'
+                              )}
+                            >
+                              {bin.days_since_check !== undefined && bin.days_since_check !== null
+                                ? `${bin.days_since_check} days ago`
+                                : 'Never'}
+                            </span>
+                          </div>
                         </td>
-                        <td className="py-4 px-4">
+                        <td className="py-4 px-4 align-middle">
                           <div className="flex items-center justify-center gap-2">
                             {/* View Details Icon */}
                             <button
@@ -540,7 +545,7 @@ export default function BinsPage() {
                                       setShowScheduleModal(true);
                                       setOpenMenuId(null);
                                     }}
-                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-t-lg"
+                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-t-lg whitespace-nowrap"
                                   >
                                     <Calendar className="w-4 h-4" />
                                     Schedule Move
@@ -552,7 +557,7 @@ export default function BinsPage() {
                                       setShowRetireModal(true);
                                       setOpenMenuId(null);
                                     }}
-                                    className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 rounded-b-lg"
+                                    className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 rounded-b-lg whitespace-nowrap"
                                   >
                                     <Trash2 className="w-4 h-4" />
                                     Retire Bin

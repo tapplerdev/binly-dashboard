@@ -170,7 +170,7 @@ export function AssignMovesModal({ moveRequests, onClose, onSuccess }: AssignMov
     <>
       {/* Overlay */}
       <div
-        className={`fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4 ${
+        className={`fixed inset-0 bg-black/30 z-40 flex items-center justify-center p-4 ${
           isClosing ? 'animate-fade-out' : 'animate-fade-in'
         }`}
         onClick={handleClose}
@@ -190,7 +190,10 @@ export function AssignMovesModal({ moveRequests, onClose, onSuccess }: AssignMov
                   Assign Move{moveRequests.length > 1 ? 's' : ''} to Shift
                 </h2>
                 <p className="text-sm text-gray-600">
-                  Assigning {moveRequests.length} move request{moveRequests.length > 1 ? 's' : ''}
+                  Add {moveRequests.length} move request{moveRequests.length > 1 ? 's' : ''} to a driver's shift route
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  This will add the move{moveRequests.length > 1 ? 's' : ''} to either an active shift (currently in progress) or a future scheduled shift
                 </p>
               </div>
               <button
@@ -220,7 +223,7 @@ export function AssignMovesModal({ moveRequests, onClose, onSuccess }: AssignMov
                         </span>
                       </div>
                       <Badge className="bg-blue-100 text-blue-700 text-xs">
-                        {move.move_type === 'pickup_only' ? 'Pickup' : 'Relocation'}
+                        {move.move_type === 'relocation' ? 'Relocation' : move.move_type === 'store' ? 'Store' : 'Pickup'}
                       </Badge>
                     </div>
                   </Card>
@@ -230,7 +233,10 @@ export function AssignMovesModal({ moveRequests, onClose, onSuccess }: AssignMov
 
             {/* Select Shift */}
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Select Shift:</h3>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Select Shift Route:</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Choose a shift to add this move to the driver's route
+              </p>
               {shiftsLoading ? (
                 <div className="text-center py-8">
                   <Clock className="w-8 h-8 text-gray-300 animate-pulse mx-auto mb-2" />
@@ -272,7 +278,7 @@ export function AssignMovesModal({ moveRequests, onClose, onSuccess }: AssignMov
                                     : 'bg-blue-100 text-blue-700'
                                 )}
                               >
-                                {mode === 'active' ? 'Active Now' : 'Future Shift'}
+                                {mode === 'active' ? '🚚 Active Now' : '📅 Scheduled'}
                               </Badge>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -284,8 +290,8 @@ export function AssignMovesModal({ moveRequests, onClose, onSuccess }: AssignMov
                             {shift.route_bins && (
                               <div className="mt-2 text-sm text-gray-500">
                                 {mode === 'active'
-                                  ? `${shift.route_bins.filter((b) => b.completed).length} completed, ${shift.route_bins.filter((b) => !b.completed).length} remaining`
-                                  : `${shift.route_bins.length} bins planned`}
+                                  ? `Driver is on route - ${shift.route_bins.filter((b) => b.completed).length} completed, ${shift.route_bins.filter((b) => !b.completed).length} remaining`
+                                  : `Future shift - ${shift.route_bins.length} bins planned`}
                               </div>
                             )}
                           </div>
@@ -305,9 +311,12 @@ export function AssignMovesModal({ moveRequests, onClose, onSuccess }: AssignMov
             {/* Mode-Specific Options */}
             {selectedShift && shiftMode === 'future' && (
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                  Insert Position:
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                  Route Position:
                 </h3>
+                <p className="text-xs text-gray-500 mb-3">
+                  Choose where to place this move in the future shift route
+                </p>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={() => setInsertPosition('start')}
@@ -318,9 +327,9 @@ export function AssignMovesModal({ moveRequests, onClose, onSuccess }: AssignMov
                         : 'border-gray-200 hover:border-gray-300'
                     )}
                   >
-                    <div className="font-semibold text-gray-900 mb-1">At Start</div>
+                    <div className="font-semibold text-gray-900 mb-1">🏁 First Stop</div>
                     <div className="text-sm text-gray-600">
-                      Insert at the beginning of the route
+                      Driver will handle this first
                     </div>
                   </button>
                   <button
@@ -332,9 +341,9 @@ export function AssignMovesModal({ moveRequests, onClose, onSuccess }: AssignMov
                         : 'border-gray-200 hover:border-gray-300'
                     )}
                   >
-                    <div className="font-semibold text-gray-900 mb-1">At End</div>
+                    <div className="font-semibold text-gray-900 mb-1">🎯 Last Stop</div>
                     <div className="text-sm text-gray-600">
-                      Insert at the end of the route
+                      Driver will handle this last
                     </div>
                   </button>
                 </div>
@@ -343,13 +352,13 @@ export function AssignMovesModal({ moveRequests, onClose, onSuccess }: AssignMov
 
             {selectedShift && shiftMode === 'active' && (
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                  Insert After Bin:
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                  Insert Into Active Route:
                 </h3>
+                <p className="text-xs text-gray-500 mb-3">
+                  This driver is currently on their route. Choose where to add this move after one of their remaining stops.
+                </p>
                 <div className="space-y-2 bg-gray-50 rounded-xl p-4">
-                  <div className="text-sm text-gray-600 mb-3">
-                    Select where to insert the move(s) in the active route:
-                  </div>
                   {remainingBins.length > 0 ? (
                     <div className="space-y-2">
                       {remainingBins.map((bin, index) => (
