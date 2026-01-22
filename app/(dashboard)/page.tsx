@@ -85,10 +85,10 @@ export default function PulsePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-[1600px] mx-auto space-y-6">
+    <div className="min-h-screen bg-background p-3 md:p-6">
+      <div className="max-w-[1600px] mx-auto space-y-4 md:space-y-6">
         {/* KPI Cards Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2.5">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 md:gap-2.5">
           <KpiCard
             title="Total customers"
             value="567,899"
@@ -126,8 +126,8 @@ export default function PulsePage() {
             onClick={() => console.log('Navigate to Returns')}
           />
 
-          {/* Add Data Card */}
-          <Card className="p-3 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all duration-200 bg-white border-2 border-dashed border-gray-300 hover:border-primary">
+          {/* Add Data Card - Hidden on mobile */}
+          <Card className="hidden lg:flex p-3 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all duration-200 bg-white border-2 border-dashed border-gray-300 hover:border-primary">
             <div className="flex flex-col items-center justify-center text-center h-full space-y-1.5">
               <div className="p-1.5 rounded-md bg-gray-100 text-gray-400">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -140,14 +140,14 @@ export default function PulsePage() {
         </div>
 
         {/* Main Content - Map + Right Sidebar */}
-        <div className="flex gap-4 items-stretch min-h-[600px]">
+        <div className="flex flex-col lg:flex-row gap-3 md:gap-4 items-stretch">
           {/* Map Section - Flexible Width */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 h-[400px] lg:min-h-[600px] lg:h-auto">
             <TacticalMap />
           </div>
 
-          {/* Right Sidebar - Fixed 320px */}
-          <div className="w-[320px] shrink-0 space-y-4 flex flex-col">
+          {/* Right Sidebar - Fixed 320px on desktop, full width on mobile */}
+          <div className="w-full lg:w-[320px] shrink-0 space-y-3 md:space-y-4 flex flex-col">
             {/* Field Feed */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden">
               <div className="px-3 py-2.5 bg-gray-50 border-b border-gray-200">

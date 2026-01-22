@@ -5,14 +5,14 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left Panel - Login Form */}
-      <div className="flex-1 flex items-center justify-center bg-white p-8">
+      <div className="flex-1 flex items-center justify-center bg-white p-4 md:p-8">
         <div className="w-full max-w-md">
           {/* Elevated Card Container */}
-          <div className="bg-white rounded-3xl shadow-2xl p-10 space-y-8 border border-gray-100">
+          <div className="bg-white rounded-2xl md:rounded-3xl shadow-xl md:shadow-2xl p-6 md:p-10 space-y-6 md:space-y-8 border border-gray-100">
             {/* Logo */}
             <div>
               <h1
-                className="text-4xl font-bold leading-none"
+                className="text-3xl md:text-4xl font-bold leading-none"
                 style={{
                   background: 'linear-gradient(to right, #5E9646, #4AA0B5)',
                   WebkitBackgroundClip: 'text',

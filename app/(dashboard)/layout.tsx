@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Sidebar } from '@/components/binly/sidebar';
+import { MobileBottomNav } from '@/components/binly/mobile-bottom-nav';
 import { MapProvider } from '@/components/binly/map-provider';
 import { TopNavBar } from '@/components/binly/top-nav-bar';
 import { AIAssistantDrawer } from '@/components/binly/ai-assistant-drawer';
@@ -31,10 +32,13 @@ export default function DashboardLayout({
           <TopNavBar onOpenAIAssistant={() => setIsAIDrawerOpen(true)} />
 
           {/* Main Content */}
-          <main className="flex-1 overflow-y-auto relative">
+          <main className="flex-1 overflow-y-auto relative pb-16 lg:pb-0">
             {children}
           </main>
         </div>
+
+        {/* Mobile Bottom Navigation */}
+        <MobileBottomNav />
 
         {/* AI Assistant Drawer - Full screen overlay */}
         {isAIDrawerOpen && (
