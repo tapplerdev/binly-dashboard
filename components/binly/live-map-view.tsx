@@ -1,9 +1,12 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { useBins } from '@/lib/hooks/use-bins';
 import { useNoGoZones } from '@/lib/hooks/use-zones';
+import { usePotentialLocations, potentialLocationKeys } from '@/lib/hooks/use-potential-locations';
+import { useWebSocket, WebSocketMessage } from '@/lib/hooks/use-websocket';
 import {
   Bin,
   isMappableBin,
@@ -11,11 +14,17 @@ import {
   getFillLevelCategory,
 } from '@/lib/types/bin';
 import { NoGoZone, getZoneColor, getZoneColorRgba, getZoneOpacity } from '@/lib/types/zone';
+import { PotentialLocation } from '@/lib/api/potential-locations';
 import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { ZoneDetailsDrawer } from './zone-details-drawer';
 import { BinDetailDrawer } from './bin-detail-drawer';
+import { PotentialLocationDetailsDrawer } from './potential-location-details-drawer';
 import { MapSearchBar } from './map-search-bar';
+import { PotentialLocationPin } from '@/components/ui/potential-location-pin';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const WS_URL = API_URL.replace(/^https/, 'wss').replace(/^http/, 'ws');
 
 // Default map center (San Jose, CA area - center of bin operations)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -160,17 +169,87 @@ function ZoneCircles({
 }
 
 export function LiveMapView() {
+  const queryClient = useQueryClient();
+
   // React Query hooks for data fetching
   const { data: bins = [], isLoading: loadingBins, error: binsError } = useBins();
   const { data: zones = [], isLoading: loadingZones, error: zonesError } = useNoGoZones('active');
+  const { data: potentialLocations = [], isLoading: loadingLocations, error: locationsError } = usePotentialLocations('active');
 
   const [selectedBin, setSelectedBin] = useState<Bin | null>(null);
   const [selectedZone, setSelectedZone] = useState<NoGoZone | null>(null);
+  const [selectedPotentialLocation, setSelectedPotentialLocation] = useState<PotentialLocation | null>(null);
   const [showFillLevels, setShowFillLevels] = useState(true);
   const [showNoGoZones, setShowNoGoZones] = useState(true);
+  const [showPotentialLocations, setShowPotentialLocations] = useState(true);
   const [currentZoom, setCurrentZoom] = useState(DEFAULT_ZOOM);
   const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
   const [showLegend, setShowLegend] = useState(false);
+
+  // Get auth token from localStorage (Zustand persist storage)
+  const getAuthToken = () => {
+    try {
+      const authStorage = localStorage.getItem('binly-auth-storage');
+      if (!authStorage) return null;
+
+      const parsed = JSON.parse(authStorage);
+      return parsed?.state?.token || null;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  };
+
+  const token = getAuthToken();
+  const wsUrl = token ? `${WS_URL}/ws?token=${token}` : `${WS_URL}/ws`;
+
+  // WebSocket connection for real-time updates
+  const { status: wsStatus } = useWebSocket({
+    url: wsUrl,
+    onMessage: (message: WebSocketMessage) => {
+      switch (message.type) {
+        case 'potential_location_created':
+          // Invalidate and refetch to get the new location
+          queryClient.invalidateQueries({ queryKey: potentialLocationKeys.list('active') });
+          break;
+
+        case 'potential_location_deleted':
+          // Remove from cache immediately for instant UI update
+          const deleteData = message.data as { location_id: string };
+          queryClient.setQueryData<PotentialLocation[]>(
+            potentialLocationKeys.list('active'),
+            (old) => old?.filter((loc) => loc.id !== deleteData.location_id) || []
+          );
+          // Close drawer if it's the deleted location
+          setSelectedPotentialLocation((current) =>
+            current?.id === deleteData.location_id ? null : current
+          );
+          break;
+
+        case 'potential_location_converted':
+          // Remove from potential locations list
+          const convertData = message.data as { location_id: string; bin: unknown };
+          queryClient.setQueryData<PotentialLocation[]>(
+            potentialLocationKeys.list('active'),
+            (old) => old?.filter((loc) => loc.id !== convertData.location_id) || []
+          );
+          // Close drawer if it's the converted location
+          setSelectedPotentialLocation((current) =>
+            current?.id === convertData.location_id ? null : current
+          );
+          // Refetch bins to show the new bin on the map
+          queryClient.invalidateQueries({ queryKey: ['bins'] });
+          break;
+
+        default:
+          // Ignore other message types
+          break;
+      }
+    },
+    autoReconnect: true,
+    reconnectInterval: 3000,
+    reconnectAttempts: 5,
+  });
 
   // Check URL params for bin ID and zoom to it
   useEffect(() => {
@@ -192,11 +271,17 @@ export function LiveMapView() {
   }, [bins]);
 
   // Combined loading and error states
-  const loading = loadingBins || loadingZones;
-  const error = binsError?.message || zonesError?.message || null;
+  const loading = loadingBins || loadingZones || loadingLocations;
+  const error = binsError?.message || zonesError?.message || locationsError?.message || null;
 
   // Memoize filtered bins to prevent recalculation on every render
   const mappableBins = useMemo(() => bins.filter(isMappableBin), [bins]);
+
+  // Memoize potential locations with valid coordinates
+  const mappablePotentialLocations = useMemo(
+    () => potentialLocations.filter((loc) => loc.latitude != null && loc.longitude != null),
+    [potentialLocations]
+  );
 
   // Handle search result selection
   const handleSearchResult = (result: { type: 'bin' | 'zone'; data: Bin | NoGoZone }) => {
@@ -338,6 +423,19 @@ export function LiveMapView() {
             <span className="text-sm font-medium whitespace-nowrap">No-Go Zones</span>
           </button>
 
+          {/* Toggle: Potential Locations */}
+          <button
+            onClick={() => setShowPotentialLocations(!showPotentialLocations)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors ${
+              showPotentialLocations
+                ? 'bg-orange-500 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <div className="w-2 h-2 rounded-full bg-current shrink-0" />
+            <span className="text-sm font-medium whitespace-nowrap">Potential Locations</span>
+          </button>
+
           {/* Divider */}
           <div className="w-px h-6 bg-gray-300" />
 
@@ -359,6 +457,12 @@ export function LiveMapView() {
                 <span className="font-bold text-red-600">{zones.length}</span>
               </div>
             )}
+            {showPotentialLocations && potentialLocations.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-gray-600">Potential:</span>
+                <span className="font-bold text-orange-600">{potentialLocations.length}</span>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -376,6 +480,16 @@ export function LiveMapView() {
         <ZoneDetailsDrawer
           zone={selectedZone}
           onClose={() => setSelectedZone(null)}
+        />
+      )}
+
+      {/* Potential Location Details Drawer - Right Side */}
+      {selectedPotentialLocation && (
+        <PotentialLocationDetailsDrawer
+          location={selectedPotentialLocation}
+          onClose={() => setSelectedPotentialLocation(null)}
+          onConvert={() => {}}
+          onDelete={() => {}}
         />
       )}
 
@@ -464,6 +578,24 @@ export function LiveMapView() {
                 <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
                   {bin.bin_number}
                 </div>
+              </div>
+            </AdvancedMarker>
+          ))}
+
+        {/* Render potential location markers */}
+        {showPotentialLocations &&
+          mappablePotentialLocations.map((location) => (
+            <AdvancedMarker
+              key={location.id}
+              position={{ lat: location.latitude!, lng: location.longitude! }}
+              zIndex={9}
+              onClick={() => setSelectedPotentialLocation(location)}
+            >
+              <div
+                className="cursor-pointer transition-all duration-300 hover:scale-110 animate-scale-in"
+                title={`Potential Location: ${location.street}, ${location.city}`}
+              >
+                <PotentialLocationPin size={40} />
               </div>
             </AdvancedMarker>
           ))}
