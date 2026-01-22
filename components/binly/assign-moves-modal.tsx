@@ -3,7 +3,9 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { assignMoveToShift, bulkAssignMoves } from '@/lib/api/move-requests';
+import { getShifts, getShiftDetailsByDriverId } from '@/lib/api/shifts';
 import { MoveRequest } from '@/lib/types/bin';
+import { Shift } from '@/lib/types/shift';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,25 +19,10 @@ import {
   Navigation,
   GripVertical,
   AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-
-// TODO: Replace with actual Shift type from backend
-interface Shift {
-  id: string;
-  driver_id: string;
-  driver_name: string;
-  status: 'not_started' | 'active' | 'completed' | 'cancelled';
-  start_time: number; // Unix timestamp
-  end_time?: number | null;
-  route_bins?: Array<{
-    bin_id: string;
-    bin_number: number;
-    order: number;
-    completed: boolean;
-  }>;
-}
 
 interface AssignMovesModalProps {
   moveRequests: MoveRequest[]; // Can be single or multiple
@@ -57,38 +44,10 @@ export function AssignMovesModal({ moveRequests, onClose, onSuccess }: AssignMov
     }, 300);
   };
 
-  // TODO: Replace with actual API call to fetch shifts
+  // Fetch shifts from real API
   const { data: shifts, isLoading: shiftsLoading } = useQuery<Shift[]>({
-    queryKey: ['shifts', 'available'],
-    queryFn: async () => {
-      // Mock data for now
-      return [
-        {
-          id: 'shift-1',
-          driver_id: 'driver-1',
-          driver_name: 'John Smith',
-          status: 'active',
-          start_time: Date.now() / 1000 - 3600, // Started 1 hour ago
-          route_bins: [
-            { bin_id: 'bin-1', bin_number: 101, order: 1, completed: true },
-            { bin_id: 'bin-2', bin_number: 102, order: 2, completed: true },
-            { bin_id: 'bin-3', bin_number: 103, order: 3, completed: false },
-            { bin_id: 'bin-4', bin_number: 104, order: 4, completed: false },
-          ],
-        },
-        {
-          id: 'shift-2',
-          driver_id: 'driver-2',
-          driver_name: 'Sarah Johnson',
-          status: 'not_started',
-          start_time: Date.now() / 1000 + 7200, // Starts in 2 hours
-          route_bins: [
-            { bin_id: 'bin-5', bin_number: 105, order: 1, completed: false },
-            { bin_id: 'bin-6', bin_number: 106, order: 2, completed: false },
-          ],
-        },
-      ] as Shift[];
-    },
+    queryKey: ['shifts'],
+    queryFn: getShifts,
   });
 
   // Determine shift mode (future vs active)
@@ -99,20 +58,29 @@ export function AssignMovesModal({ moveRequests, onClose, onSuccess }: AssignMov
   const shiftMode = useMemo(() => {
     if (!selectedShift) return null;
 
-    const now = Date.now() / 1000;
-    if (selectedShift.status === 'not_started' || selectedShift.start_time > now) {
-      return 'future';
-    } else if (selectedShift.status === 'active') {
+    if (selectedShift.status === 'active') {
       return 'active';
+    } else if (selectedShift.status === 'scheduled') {
+      return 'future';
     }
     return null;
   }, [selectedShift]);
 
+  // Fetch shift details (bins) when a shift is selected
+  const { data: shiftDetails, isLoading: shiftDetailsLoading } = useQuery({
+    queryKey: ['shift-details', selectedShift?.driverId],
+    queryFn: () => {
+      if (!selectedShift) return null;
+      return getShiftDetailsByDriverId(selectedShift.driverId);
+    },
+    enabled: !!selectedShift && shiftMode === 'active',
+  });
+
   // Get remaining bins for active shift
   const remainingBins = useMemo(() => {
-    if (shiftMode !== 'active' || !selectedShift?.route_bins) return [];
-    return selectedShift.route_bins.filter((bin) => !bin.completed);
-  }, [shiftMode, selectedShift]);
+    if (shiftMode !== 'active' || !shiftDetails?.bins) return [];
+    return shiftDetails.bins.filter((bin) => bin.is_completed === 0);
+  }, [shiftMode, shiftDetails]);
 
   // Assign mutation
   const assignMutation = useMutation({
@@ -245,11 +213,7 @@ export function AssignMovesModal({ moveRequests, onClose, onSuccess }: AssignMov
               ) : shifts && shifts.length > 0 ? (
                 <div className="space-y-2">
                   {shifts.map((shift) => {
-                    const now = Date.now() / 1000;
-                    const mode =
-                      shift.status === 'not_started' || shift.start_time > now
-                        ? 'future'
-                        : 'active';
+                    const mode = shift.status === 'active' ? 'active' : 'future';
                     const isSelected = selectedShiftId === shift.id;
 
                     return (
@@ -268,7 +232,7 @@ export function AssignMovesModal({ moveRequests, onClose, onSuccess }: AssignMov
                             <div className="flex items-center gap-2 mb-2">
                               <User className="w-4 h-4 text-gray-600" />
                               <span className="font-semibold text-gray-900">
-                                {shift.driver_name}
+                                {shift.driverName}
                               </span>
                               <Badge
                                 className={cn(
@@ -284,16 +248,14 @@ export function AssignMovesModal({ moveRequests, onClose, onSuccess }: AssignMov
                             <div className="flex items-center gap-2 text-sm text-gray-600">
                               <Calendar className="w-3 h-3" />
                               <span>
-                                {format(new Date(shift.start_time * 1000), 'PPp')}
+                                {shift.date} • {shift.startTime}
                               </span>
                             </div>
-                            {shift.route_bins && (
-                              <div className="mt-2 text-sm text-gray-500">
-                                {mode === 'active'
-                                  ? `Driver is on route - ${shift.route_bins.filter((b) => b.completed).length} completed, ${shift.route_bins.filter((b) => !b.completed).length} remaining`
-                                  : `Future shift - ${shift.route_bins.length} bins planned`}
-                              </div>
-                            )}
+                            <div className="mt-2 text-sm text-gray-500">
+                              {mode === 'active'
+                                ? `Driver is on route - ${shift.binsCollected || 0} completed, ${shift.binCount - (shift.binsCollected || 0)} remaining`
+                                : `Future shift - ${shift.binCount} bins planned`}
+                            </div>
                           </div>
                         </div>
                       </button>
@@ -359,7 +321,12 @@ export function AssignMovesModal({ moveRequests, onClose, onSuccess }: AssignMov
                   This driver is currently on their route. Choose where to add this move after one of their remaining stops.
                 </p>
                 <div className="space-y-2 bg-gray-50 rounded-xl p-4">
-                  {remainingBins.length > 0 ? (
+                  {shiftDetailsLoading ? (
+                    <div className="text-center py-8">
+                      <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto mb-2" />
+                      <p className="text-sm text-gray-500">Loading route bins...</p>
+                    </div>
+                  ) : remainingBins.length > 0 ? (
                     <div className="space-y-2">
                       {remainingBins.map((bin, index) => (
                         <button
@@ -375,14 +342,14 @@ export function AssignMovesModal({ moveRequests, onClose, onSuccess }: AssignMov
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-sm font-semibold text-gray-600">
-                                {index + 1}
+                                {bin.sequence_order}
                               </div>
                               <div>
                                 <div className="font-semibold text-gray-900">
                                   Bin #{bin.bin_number}
                                 </div>
                                 <div className="text-xs text-gray-500">
-                                  Insert after this bin
+                                  {bin.current_street}
                                 </div>
                               </div>
                             </div>
@@ -417,7 +384,7 @@ export function AssignMovesModal({ moveRequests, onClose, onSuccess }: AssignMov
                 <Truck className="w-4 h-4 mr-2" />
                 {assignMutation.isPending
                   ? 'Assigning...'
-                  : `Assign to ${selectedShift?.driver_name || 'Shift'}`}
+                  : `Assign to ${selectedShift?.driverName || 'Shift'}`}
               </Button>
             </div>
           </div>
