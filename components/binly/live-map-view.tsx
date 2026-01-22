@@ -302,6 +302,11 @@ export function LiveMapView() {
 
   return (
     <div className="relative h-[calc(100vh-64px)] lg:h-[calc(100vh-80px)] w-full">
+      {/* Mobile Drag Handle - Top of screen for scrolling */}
+      <div className="lg:hidden absolute top-0 left-0 right-0 h-20 z-20 pointer-events-auto">
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1 bg-gray-400/50 rounded-full" />
+      </div>
+
       {/* Loading State */}
       {loading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-gray-100">
@@ -323,7 +328,7 @@ export function LiveMapView() {
 
       {/* Search Bar - Top Center */}
       {!loading && (
-        <div className="absolute top-4 lg:top-8 left-1/2 -translate-x-1/2 z-10 w-full max-w-md px-3 lg:px-4">
+        <div className="absolute top-4 lg:top-8 left-1/2 -translate-x-1/2 z-10 w-full max-w-md px-3 lg:px-4 pointer-events-auto">
           <MapSearchBar
             bins={bins}
             zones={zones}
