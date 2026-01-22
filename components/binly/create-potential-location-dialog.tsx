@@ -564,22 +564,58 @@ export function CreatePotentialLocationDialog({
                 />
               </div>
 
-              {/* Queue Counter Badge */}
+              {/* Queue - Show queued locations as cards */}
               {locationQueue.length > 0 && (
-                <div className="p-3 bg-green-50 border border-green-200 rounded-xl flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-green-600" />
-                    <p className="text-sm font-semibold text-green-900">
-                      {locationQueue.length} location{locationQueue.length > 1 ? 's' : ''} queued
-                    </p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-green-600" />
+                      <p className="text-sm font-semibold text-gray-900">
+                        Queued Locations ({locationQueue.length})
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setLocationQueue([])}
+                      className="text-xs text-red-600 hover:text-red-800 font-medium"
+                    >
+                      Clear All
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setLocationQueue([])}
-                    className="text-xs text-green-700 hover:text-green-900 font-medium"
-                  >
-                    Clear All
-                  </button>
+
+                  {/* Scrollable queue container */}
+                  <div className="max-h-[200px] overflow-y-auto space-y-2">
+                    {locationQueue.map((loc, index) => (
+                      <div
+                        key={index}
+                        className="bg-green-50 border border-green-200 rounded-xl p-3 flex items-start justify-between group hover:bg-green-100 transition-colors"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-green-900 truncate">
+                            {loc.street}
+                          </p>
+                          <p className="text-xs text-green-700">
+                            {loc.city}, {loc.zip}
+                          </p>
+                          {loc.notes && (
+                            <p className="text-xs text-green-600 mt-1 truncate">
+                              {loc.notes}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLocationQueue((prev) => prev.filter((_, i) => i !== index));
+                          }}
+                          className="ml-2 w-6 h-6 rounded-lg hover:bg-red-100 flex items-center justify-center transition-colors flex-shrink-0"
+                          title="Remove from queue"
+                        >
+                          <X className="w-4 h-4 text-red-600" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
