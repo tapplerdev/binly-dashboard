@@ -465,6 +465,7 @@ export function LiveMapView() {
                 <span className="font-bold text-orange-600">{potentialLocations.length}</span>
               </div>
             )}
+          </div>
             </div>
           </div>
         </div>
