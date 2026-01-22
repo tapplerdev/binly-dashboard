@@ -35,8 +35,9 @@ export function DeleteConfirmDialog({
     setLoading(true);
 
     try {
-      // Get auth token from localStorage
-      const token = localStorage.getItem('authToken');
+      // Get auth token from Zustand persist storage
+      const authStorage = localStorage.getItem('binly-auth-storage');
+      const token = authStorage ? JSON.parse(authStorage)?.state?.token : null;
       if (!token) {
         setError('You must be logged in to delete locations');
         setLoading(false);

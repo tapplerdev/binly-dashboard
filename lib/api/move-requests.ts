@@ -179,9 +179,10 @@ export async function cancelMoveRequest(moveRequestId: string, reason?: string):
 }
 
 /**
- * Update a move request (edit date, notes, etc.)
+ * Update a move request (edit date, notes, location, assignment, etc.)
  */
 export interface UpdateMoveRequestParams {
+  // Basic fields
   scheduled_date?: number;
   reason?: string;
   notes?: string;
@@ -190,6 +191,17 @@ export interface UpdateMoveRequestParams {
   new_zip?: string;
   new_latitude?: number;
   new_longitude?: number;
+
+  // Assignment fields
+  assigned_shift_id?: string | null;
+  assigned_user_id?: string | null;
+  assignment_type?: 'shift' | 'manual' | '';
+
+  // Edge case handling
+  client_updated_at?: number;                // For optimistic locking
+  confirm_active_shift_change?: boolean;      // User confirmed warning
+  in_progress_action?: 'remove_from_route' | 'insert_after_current' | 'reoptimize_route'; // For in-progress moves
+  insert_after_waypoint?: number;             // For manual waypoint insertion
 }
 
 export async function updateMoveRequest(
@@ -203,7 +215,12 @@ export async function updateMoveRequest(
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to update move request: ${response.statusText}`);
+    const errorText = await response.text();
+    // Check for specific error codes
+    if (response.status === 409) {
+      throw new Error(errorText || 'This move request was modified by another user. Please refresh and try again.');
+    }
+    throw new Error(errorText || `Failed to update move request: ${response.statusText}`);
   }
 
   return response.json();

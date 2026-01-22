@@ -48,6 +48,7 @@ export function PlacesAutocomplete({
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const justSelectedRef = useRef(false); // Track if we just selected a place
   const lastSelectedValueRef = useRef<string>(''); // Track the last selected value
+  const userHasTypedRef = useRef(false); // Track if user has actually typed
 
   // Try to get Google Maps state, with fallback
   let isLoaded = false;
@@ -121,6 +122,11 @@ export function PlacesAutocomplete({
 
   // Fetch suggestions
   useEffect(() => {
+    // Don't fetch if user hasn't typed yet (e.g., pre-populated value)
+    if (!userHasTypedRef.current) {
+      return;
+    }
+
     // Don't fetch if we just selected a place
     if (justSelectedRef.current) {
       justSelectedRef.current = false;
@@ -178,7 +184,7 @@ export function PlacesAutocomplete({
           }
         }
       );
-    }, 500); // Debounce - Wait 500ms after user stops typing
+    }, 1); // Debounce - Wait 1ms after user stops typing
 
     return () => clearTimeout(timer);
   }, [value, disabled, isAutoFilled]);
@@ -196,6 +202,7 @@ export function PlacesAutocomplete({
         if (status === google.maps.places.PlacesServiceStatus.OK && place) {
           justSelectedRef.current = true; // Prevent dropdown from reopening
           lastSelectedValueRef.current = place.formatted_address || ''; // Store the selected value
+          userHasTypedRef.current = false; // Reset typing state after selection
           onPlaceSelect(place);
           setIsOpen(false);
           setSuggestions([]);
@@ -291,6 +298,7 @@ export function PlacesAutocomplete({
           value={value}
           onChange={(e) => {
             console.log('📝 Input changed:', e.target.value);
+            userHasTypedRef.current = true; // Mark that user has typed
             onChange(e.target.value);
           }}
           onKeyDown={handleKeyDown}

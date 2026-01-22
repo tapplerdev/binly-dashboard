@@ -1,21 +1,87 @@
 'use client';
 
-import { useState } from 'react';
-import { MapPin, X, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
+import { MapPin, X, Loader2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
 import { inputStyles } from '@/lib/utils';
+import { useBins } from '@/lib/hooks/use-bins';
+import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 
 interface CreatePotentialLocationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
+
+// Map click handler component
+function MapClickHandler({
+  onMapClick,
+}: {
+  onMapClick: (lat: number, lng: number) => void;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+
+    const clickListener = map.addListener('click', (e: google.maps.MapMouseEvent) => {
+      if (e.latLng) {
+        onMapClick(e.latLng.lat(), e.latLng.lng());
+      }
+    });
+
+    return () => {
+      google.maps.event.removeListener(clickListener);
+    };
+  }, [map, onMapClick]);
+
+  return null;
+}
+
+// Map center controller - only pans when center changes
+function MapCenterController({
+  center,
+  onComplete,
+}: {
+  center: { lat: number; lng: number } | null;
+  onComplete: () => void;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || !center) return;
+
+    // Pan to the new center and zoom in
+    map.panTo(center);
+    map.setZoom(16);
+
+    // Reset center after animation completes
+    const timeout = setTimeout(() => {
+      onComplete();
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [map, center, onComplete]);
+
+  return null;
+}
+
 export function CreatePotentialLocationDialog({
   open,
   onOpenChange,
 }: CreatePotentialLocationDialogProps) {
+  const { data: bins = [] } = useBins();
+  const mappableBins = bins.filter(isMappableBin);
+
   const [loading, setLoading] = useState(false);
+  const [reverseGeocoding, setReverseGeocoding] = useState(false);
   const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [markerPosition, setMarkerPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [formData, setFormData] = useState({
     street: '',
     city: '',
@@ -25,18 +91,179 @@ export function CreatePotentialLocationDialog({
     notes: '',
   });
 
+  // Reset form when modal closes
+  useEffect(() => {
+    if (!open) {
+      setFormData({
+        street: '',
+        city: '',
+        zip: '',
+        latitude: '',
+        longitude: '',
+        notes: '',
+      });
+      setMarkerPosition(null);
+      setSearchQuery('');
+      setError('');
+    }
+  }, [open]);
+
+  // Reverse geocode coordinates to address
+  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
+    setReverseGeocoding(true);
+    try {
+      const geocoder = new google.maps.Geocoder();
+      const result = await geocoder.geocode({ location: { lat, lng } });
+
+      if (result.results && result.results[0]) {
+        const place = result.results[0];
+        let street = '';
+        let city = '';
+        let zip = '';
+
+        place.address_components.forEach((component) => {
+          if (component.types.includes('street_number')) {
+            street = component.long_name + ' ';
+          }
+          if (component.types.includes('route')) {
+            street += component.long_name;
+          }
+          if (component.types.includes('locality')) {
+            city = component.long_name;
+          }
+          if (component.types.includes('postal_code')) {
+            zip = component.long_name;
+          }
+        });
+
+        setFormData({
+          street: street.trim() || place.formatted_address,
+          city: city,
+          zip: zip,
+          latitude: lat.toString(),
+          longitude: lng.toString(),
+          notes: '',
+        });
+      }
+    } catch (error) {
+      console.error('Reverse geocoding error:', error);
+      setError('Failed to get address from location');
+    } finally {
+      setReverseGeocoding(false);
+    }
+  }, []);
+
+  // Handle map click
+  const handleMapClick = useCallback(
+    (lat: number, lng: number) => {
+      setMarkerPosition({ lat, lng });
+      setMapCenter({ lat, lng });
+      reverseGeocode(lat, lng);
+    },
+    [reverseGeocode]
+  );
+
+  // Handle place selection from autocomplete
+  const handlePlaceSelect = useCallback(
+    (place: google.maps.places.PlaceResult) => {
+      if (!place.geometry?.location) return;
+
+      const lat = place.geometry.location.lat();
+      const lng = place.geometry.location.lng();
+
+      setMarkerPosition({ lat, lng });
+      setMapCenter({ lat, lng });
+
+      let street = '';
+      let city = '';
+      let zip = '';
+
+      place.address_components?.forEach((component) => {
+        if (component.types.includes('street_number')) {
+          street = component.long_name + ' ';
+        }
+        if (component.types.includes('route')) {
+          street += component.long_name;
+        }
+        if (component.types.includes('locality')) {
+          city = component.long_name;
+        }
+        if (component.types.includes('postal_code')) {
+          zip = component.long_name;
+        }
+      });
+
+      setFormData({
+        street: street.trim() || place.formatted_address || '',
+        city: city,
+        zip: zip,
+        latitude: lat.toString(),
+        longitude: lng.toString(),
+        notes: '',
+      });
+    },
+    []
+  );
+
+  // Get auth token from Zustand persist storage
+  const getAuthToken = (): string | null => {
+    if (typeof window === 'undefined') return null;
+
+    try {
+      const authStorage = localStorage.getItem('binly-auth-storage');
+      if (!authStorage) return null;
+
+      const parsed = JSON.parse(authStorage);
+      return parsed?.state?.token || null;
+    } catch (error) {
+      console.error('Failed to get auth token:', error);
+      return null;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      // Get auth token from localStorage
-      const token = localStorage.getItem('authToken');
+      const token = getAuthToken();
       if (!token) {
         setError('You must be logged in to create a potential location');
         setLoading(false);
         return;
+      }
+
+      // Debug logging
+      console.log('🔍 Creating potential location...');
+      console.log('   Token preview:', token.substring(0, 20) + '...');
+      console.log('   Token length:', token.length);
+
+      // Decode JWT to inspect claims (without verification)
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]));
+          console.log('   Token payload:', payload);
+
+          // Check expiration
+          if (payload.exp) {
+            const expirationDate = new Date(payload.exp * 1000);
+            const now = new Date();
+            console.log('   Token expires:', expirationDate.toISOString());
+            console.log('   Current time:', now.toISOString());
+            console.log('   Token expired?', now > expirationDate);
+
+            if (now > expirationDate) {
+              throw new Error('Token has expired. Please log out and log back in.');
+            }
+          }
+        }
+      } catch (decodeError) {
+        console.error('   Failed to decode token:', decodeError);
+        if (decodeError instanceof Error && decodeError.message.includes('expired')) {
+          throw decodeError;
+        }
       }
 
       const payload: any = {
@@ -45,7 +272,6 @@ export function CreatePotentialLocationDialog({
         zip: formData.zip,
       };
 
-      // Add optional fields if provided
       if (formData.latitude) {
         payload.latitude = parseFloat(formData.latitude);
       }
@@ -56,8 +282,13 @@ export function CreatePotentialLocationDialog({
         payload.notes = formData.notes;
       }
 
+      console.log('   Payload:', JSON.stringify(payload, null, 2));
+
+      // Use environment variable or default to production
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://ropacal-backend-production.up.railway.app';
+
       const response = await fetch(
-        'https://ropacal-backend-production.up.railway.app/api/potential-locations',
+        `${apiUrl}/api/potential-locations`,
         {
           method: 'POST',
           headers: {
@@ -68,25 +299,29 @@ export function CreatePotentialLocationDialog({
         }
       );
 
+      console.log('   Response status:', response.status);
+      console.log('   Response headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
         const errorData = await response.text();
+        console.log('   Error response:', errorData);
         throw new Error(errorData || 'Failed to create potential location');
       }
 
-      // Success - reset form and close dialog
-      setFormData({
-        street: '',
-        city: '',
-        zip: '',
-        latitude: '',
-        longitude: '',
-        notes: '',
-      });
-      onOpenChange(false);
+      // Backend now returns an array (batch endpoint)
+      const successData = await response.json();
+      console.log('✅ Success: Created', Array.isArray(successData) ? successData.length : 1, 'location(s)');
+      console.log('   Response:', successData);
 
-      // Trigger a refresh by emitting a custom event
+      // Extract the created location (first item in array)
+      const createdLocation = Array.isArray(successData) ? successData[0] : successData;
+      console.log('   Created location:', createdLocation);
+
+      // Success
+      onOpenChange(false);
       window.dispatchEvent(new CustomEvent('potential-location-created'));
     } catch (err) {
+      console.error('❌ Create potential location error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
@@ -99,22 +334,28 @@ export function CreatePotentialLocationDialog({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 z-50 animate-fade-in"
+        className="fixed inset-0 bg-black/50 z-50 animate-fade-in flex items-center justify-center"
         onClick={() => onOpenChange(false)}
-      />
-
-      {/* Dialog */}
-      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-white rounded-2xl shadow-2xl z-50 animate-scale-in">
+      >
+        {/* Modal - Larger for map view */}
+        <div
+          className="w-[90vw] max-w-6xl h-[85vh] bg-white rounded-2xl shadow-2xl z-50 animate-scale-in overflow-hidden flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Header */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-6 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
-                <MapPin className="w-5 h-5 text-blue-600" />
+              <div className="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center">
+                <MapPin className="w-5 h-5 text-orange-600" />
               </div>
               <div>
                 <h2 className="text-xl font-bold text-gray-900">New Potential Location</h2>
-                <p className="text-sm text-gray-600">Add a location for future bin placement</p>
+                <p className="text-sm text-gray-600">
+                  {markerPosition
+                    ? 'Fine-tune the location or add notes'
+                    : 'Search for an address or click on the map'}
+                </p>
               </div>
             </div>
             <button
@@ -126,134 +367,225 @@ export function CreatePotentialLocationDialog({
           </div>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Error Message */}
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
-          )}
-
-          {/* Street */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Street Address <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.street}
-              onChange={(e) => setFormData({ ...formData, street: e.target.value })}
-              placeholder="123 Main St"
-              className={inputStyles()}
-            />
-          </div>
-
-          {/* City and Zip */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                City <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.city}
-                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                placeholder="Dallas"
-                className={inputStyles()}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                ZIP Code <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.zip}
-                onChange={(e) => setFormData({ ...formData, zip: e.target.value })}
-                placeholder="75201"
-                className={inputStyles()}
-              />
-            </div>
-          </div>
-
-          {/* Coordinates (Optional) */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Latitude <span className="text-gray-400 text-xs">(Optional)</span>
-              </label>
-              <input
-                type="number"
-                step="any"
-                value={formData.latitude}
-                onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
-                placeholder="32.776665"
-                className={inputStyles()}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Longitude <span className="text-gray-400 text-xs">(Optional)</span>
-              </label>
-              <input
-                type="number"
-                step="any"
-                value={formData.longitude}
-                onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
-                placeholder="-96.796989"
-                className={inputStyles()}
-              />
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Notes <span className="text-gray-400 text-xs">(Optional)</span>
-            </label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Any additional information about this location..."
-              rows={3}
-              className={inputStyles()}
-            />
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              className="flex-1"
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              className="flex-1 gap-2"
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <MapPin className="w-4 h-4" />
-                  Create Location
-                </>
+        {/* Split View Content */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Side - Form */}
+          <div className="w-[35%] p-6 overflow-y-auto border-r border-gray-200">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Error Message */}
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
               )}
-            </Button>
+
+              {/* Reverse Geocoding Indicator */}
+              {reverseGeocoding && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                  <p className="text-sm text-blue-600">Finding address...</p>
+                </div>
+              )}
+
+              {/* Location Card */}
+              <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Location Details</h3>
+
+                {/* Street */}
+                <div className="mb-3">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                    Street Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.street}
+                    onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+                    placeholder="123 Main St"
+                    className={inputStyles()}
+                  />
+                </div>
+
+                {/* City and Zip */}
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                      City <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      placeholder="Dallas"
+                      className={inputStyles()}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                      ZIP <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.zip}
+                      onChange={(e) => setFormData({ ...formData, zip: e.target.value })}
+                      placeholder="75201"
+                      className={inputStyles()}
+                    />
+                  </div>
+                </div>
+
+                {/* Coordinates (Read-only) */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                      Latitude
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={formData.latitude}
+                      placeholder="Auto-filled"
+                      className={`${inputStyles()} bg-gray-100`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                      Longitude
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={formData.longitude}
+                      placeholder="Auto-filled"
+                      className={`${inputStyles()} bg-gray-100`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Notes <span className="text-gray-400 text-xs">(Optional)</span>
+                </label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Any additional information about this location..."
+                  rows={3}
+                  className={inputStyles()}
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  className="flex-1"
+                  disabled={loading}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1 gap-2" disabled={loading || !markerPosition}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <MapPin className="w-4 h-4" />
+                      Create Location
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
           </div>
-        </form>
+
+          {/* Right Side - Map */}
+          <div className="w-[65%] relative">
+            <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
+              <Map
+                mapId="potential-location-map"
+                defaultCenter={DEFAULT_CENTER}
+                defaultZoom={11}
+                minZoom={3}
+                maxZoom={20}
+                gestureHandling="greedy"
+                disableDefaultUI={false}
+                zoomControl={true}
+                mapTypeControl={false}
+                streetViewControl={false}
+                fullscreenControl={false}
+                style={{ width: '100%', height: '100%' }}
+              >
+                <MapClickHandler onMapClick={handleMapClick} />
+                <MapCenterController center={mapCenter} onComplete={() => setMapCenter(null)} />
+
+                {/* Render existing bins (gray markers) */}
+                {mappableBins.map((bin) => (
+                  <AdvancedMarker
+                    key={bin.id}
+                    position={{ lat: bin.latitude, lng: bin.longitude }}
+                    zIndex={1}
+                  >
+                    <div
+                      className="w-6 h-6 rounded-full border-2 border-white shadow-md"
+                      style={{ backgroundColor: getBinMarkerColor(bin.fill_percentage) }}
+                      title={`Bin #${bin.bin_number}`}
+                    />
+                  </AdvancedMarker>
+                ))}
+
+                {/* Potential location marker (orange) */}
+                {markerPosition && (
+                  <AdvancedMarker position={markerPosition} zIndex={10}>
+                    <div className="relative animate-bounce">
+                      <div className="w-10 h-10 rounded-full bg-orange-500 border-4 border-white shadow-xl" />
+                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-r-[8px] border-t-[12px] border-l-transparent border-r-transparent border-t-orange-500" />
+                    </div>
+                  </AdvancedMarker>
+                )}
+              </Map>
+            </APIProvider>
+
+            {/* Search Bar Overlay */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 w-full max-w-md px-4 z-10">
+              <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-2">
+                <PlacesAutocomplete
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  onPlaceSelect={handlePlaceSelect}
+                  placeholder="Search for an address..."
+                  className="border-0 focus:ring-0"
+                />
+              </div>
+            </div>
+
+            {/* Instructions */}
+            {!markerPosition && (
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-sm rounded-full shadow-lg border border-gray-200 px-6 py-3">
+                <p className="text-sm text-gray-700 font-medium flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-orange-500" />
+                  Click anywhere on the map to place a potential location
+                </p>
+              </div>
+            )}
+
+            {/* Bin count badge */}
+            <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm rounded-full shadow-lg border border-gray-200 px-4 py-2">
+              <p className="text-xs text-gray-600 font-medium">
+                <span className="font-bold text-gray-900">{mappableBins.length}</span> active bins
+              </p>
+            </div>
+          </div>
+        </div>
+        </div>
       </div>
     </>
   );

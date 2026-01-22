@@ -25,9 +25,7 @@ import {
 interface MoveRequestDetailDrawerProps {
   moveRequest: MoveRequest;
   onClose: () => void;
-  onEdit?: (move: MoveRequest) => void;
-  onAssign?: (move: MoveRequest) => void;
-  onClearAssignment?: (move: MoveRequest) => void;
+  onEdit?: (move: MoveRequest) => void; // Opens edit modal with all fields
   onCancel?: (move: MoveRequest) => void;
 }
 
@@ -35,8 +33,6 @@ export function MoveRequestDetailDrawer({
   moveRequest,
   onClose,
   onEdit,
-  onAssign,
-  onClearAssignment,
   onCancel,
 }: MoveRequestDetailDrawerProps) {
   const [isClosing, setIsClosing] = useState(false);
@@ -65,7 +61,7 @@ export function MoveRequestDetailDrawer({
     cancelled: { label: 'Cancelled', color: 'bg-gray-500 text-white' },
   };
 
-  const isPending = moveRequest.status === 'pending';
+  const isEditable = moveRequest.status !== 'completed' && moveRequest.status !== 'cancelled';
   const isAssigned = !!moveRequest.assigned_shift_id || !!moveRequest.assigned_user_id;
   const isRelocation = moveRequest.move_type === 'relocation';
 
@@ -111,7 +107,7 @@ export function MoveRequestDetailDrawer({
         </div>
 
         {/* Content */}
-        <div className={cn("p-6 space-y-6", isPending ? "pb-32" : "pb-12")}>
+        <div className={cn("p-6 space-y-6", isEditable ? "pb-32" : "pb-12")}>
           {/* Move Request Details Card */}
           <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
             <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -255,45 +251,16 @@ export function MoveRequestDetailDrawer({
                     {moveRequest.driver_name || 'Unknown'}
                   </p>
                 </div>
-
-                {isPending && onClearAssignment && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onClearAssignment(moveRequest)}
-                    className="w-full"
-                  >
-                    <XIcon className="h-4 w-4 mr-2" />
-                    Clear Assignment
-                  </Button>
-                )}
               </div>
             ) : (
               <div className="text-center py-6">
                 <User className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 font-medium mb-4">
-                  {moveRequest.move_type === 'store'
-                    ? 'Not yet assigned to a person'
-                    : 'Not yet assigned to a driver'}
+                <p className="text-gray-500 font-medium">
+                  Not yet assigned
                 </p>
-                {isPending && onAssign && (
-                  <Button
-                    onClick={() => onAssign(moveRequest)}
-                    className="bg-primary hover:bg-primary/90"
-                  >
-                    {moveRequest.move_type === 'store' ? (
-                      <>
-                        <User className="h-4 w-4 mr-2" />
-                        Assign to Person
-                      </>
-                    ) : (
-                      <>
-                        <Truck className="h-4 w-4 mr-2" />
-                        Assign to Shift
-                      </>
-                    )}
-                  </Button>
-                )}
+                <p className="text-sm text-gray-400 mt-1">
+                  Use the Edit button below to assign this move
+                </p>
               </div>
             )}
           </div>
@@ -357,20 +324,19 @@ export function MoveRequestDetailDrawer({
           </div>
         </div>
 
-        {/* Footer Actions */}
-        {isPending && (
+        {/* Footer Actions - Show for all editable statuses */}
+        {isEditable && (
           <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center gap-3">
             {onEdit && (
               <Button
-                variant="outline"
                 onClick={() => onEdit(moveRequest)}
-                className="flex-1"
+                className="flex-1 bg-primary hover:bg-primary/90"
               >
                 <Edit className="h-4 w-4 mr-2" />
-                Edit Details
+                Edit Move Request
               </Button>
             )}
-            {onCancel && (
+            {onCancel && moveRequest.status === 'pending' && (
               <Button
                 variant="destructive"
                 onClick={() => onCancel(moveRequest)}

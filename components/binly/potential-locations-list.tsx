@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MapPin, User, Calendar, Check, Trash2, Loader2, MoreVertical, Eye } from 'lucide-react';
+import { MapPin, User, Calendar, Check, Trash2, Loader2, MoreVertical, Eye, ChevronsUpDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PotentialLocationDetailsDrawer } from './potential-location-details-drawer';
 import { ConvertToBinDialog } from './convert-to-bin-dialog';
 import { DeleteConfirmDialog } from './delete-confirm-dialog';
+import { cn } from '@/lib/utils';
 
 interface PotentialLocation {
   id: string;
@@ -30,6 +31,8 @@ interface PotentialLocationsListProps {
   onCreateNew: () => void;
 }
 
+type SortColumn = 'street' | 'requested_by_name' | 'created_at_iso';
+
 export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListProps) {
   const [locations, setLocations] = useState<PotentialLocation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +42,8 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [locationToDelete, setLocationToDelete] = useState<PotentialLocation | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     fetchLocations();
@@ -97,6 +102,16 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
     fetchLocations();
   };
 
+  // Handle column sorting
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
   const formatDate = (isoDate: string) => {
     return new Date(isoDate).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -104,6 +119,28 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
       day: 'numeric',
     });
   };
+
+  // Sort locations based on selected column
+  const sortedLocations = [...locations].sort((a, b) => {
+    if (!sortColumn) return 0;
+
+    let comparison = 0;
+    switch (sortColumn) {
+      case 'street':
+        comparison = a.street.localeCompare(b.street);
+        break;
+      case 'requested_by_name':
+        comparison = a.requested_by_name.localeCompare(b.requested_by_name);
+        break;
+      case 'created_at_iso':
+        comparison = new Date(a.created_at_iso).getTime() - new Date(b.created_at_iso).getTime();
+        break;
+      default:
+        return 0;
+    }
+
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
 
   return (
     <>
@@ -120,8 +157,19 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
               </p>
             </div>
 
-            {/* Filter Toggle */}
-            <div className="flex gap-2">
+            {/* Filter Toggle and Create Button */}
+            <div className="flex items-center gap-3">
+              {/* Create Button */}
+              <Button
+                onClick={onCreateNew}
+                className="bg-primary hover:bg-primary/90 gap-2"
+              >
+                <MapPin className="w-4 h-4" />
+                Add Location
+              </Button>
+
+              {/* Filter Toggle */}
+              <div className="flex gap-2">
               <button
                 onClick={() => setFilter('active')}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -142,6 +190,7 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
               >
                 Converted
               </button>
+              </div>
             </div>
           </div>
         </div>
@@ -174,14 +223,32 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tl-2xl">
-                    Address
+                  <th
+                    className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tl-2xl cursor-pointer"
+                    onClick={() => handleSort('street')}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Address</span>
+                      <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                    </div>
                   </th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle">
-                    Requested By
+                  <th
+                    className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle cursor-pointer"
+                    onClick={() => handleSort('requested_by_name')}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Requested By</span>
+                      <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                    </div>
                   </th>
-                  <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle">
-                    Date Created
+                  <th
+                    className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle cursor-pointer"
+                    onClick={() => handleSort('created_at_iso')}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Date Created</span>
+                      <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                    </div>
                   </th>
                   <th className="text-center py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tr-2xl">
                     Actions
@@ -189,7 +256,7 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {locations.map((location) => (
+                {sortedLocations.map((location) => (
                   <tr
                     key={location.id}
                     className="hover:bg-gray-50 cursor-pointer transition-colors"

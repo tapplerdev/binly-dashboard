@@ -1,15 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
-import { BinWithPriority } from '@/lib/types/bin';
+import { BinWithPriority, MoveRequest } from '@/lib/types/bin';
 import { getBinsWithPriority } from '@/lib/api/bins';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Calendar, Trash2, Loader2, MapPin, Search, AlertTriangle, Truck, User, ChevronDown, ChevronRight } from 'lucide-react';
-import { createMoveRequest, assignMoveToShift, assignMoveToUser } from '@/lib/api/move-requests';
+import { X, Calendar, Trash2, Loader2, MapPin, Search, AlertTriangle, Truck, User, ChevronDown, ChevronRight, Route } from 'lucide-react';
+import { createMoveRequest, updateMoveRequest, assignMoveToShift, assignMoveToUser } from '@/lib/api/move-requests';
 import { getShifts, getShiftDetailsByDriverId } from '@/lib/api/shifts';
 import { getUsers, User as UserType } from '@/lib/api/users';
 import { cn } from '@/lib/utils';
@@ -20,13 +20,15 @@ import { format } from 'date-fns';
 interface ScheduleMoveModalProps {
   bin?: BinWithPriority;
   bins?: BinWithPriority[];
+  moveRequest?: MoveRequest; // For editing existing move request
   onClose: () => void;
   onSuccess?: () => void;
 }
 
-export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMoveModalProps) {
+export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }: ScheduleMoveModalProps) {
+  const isEditing = !!moveRequest; // Editing mode if moveRequest is provided
   const isBulk = bins && bins.length > 0;
-  const isStandalone = !bin && !bins; // No bin provided - show bin selector
+  const isStandalone = !bin && !bins && !moveRequest; // No bin provided - show bin selector
 
   // Support both single bin mode and multi-select standalone mode
   const [selectedBins, setSelectedBins] = useState<BinWithPriority[]>(
@@ -67,11 +69,20 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
   const [insertPosition, setInsertPosition] = useState<'start' | 'end'>('end');
   const [insertAfterBinId, setInsertAfterBinId] = useState<string>('');
 
-  // Fetch users for user assignment (always fetch for store type since it's required)
+  // Warning modal state
+  const [showInProgressWarning, setShowInProgressWarning] = useState(false);
+  const [showActiveShiftWarning, setShowActiveShiftWarning] = useState(false);
+  const [warningData, setWarningData] = useState<{
+    driverName?: string;
+    waypointInfo?: string;
+  }>({});
+  const [pendingUpdateParams, setPendingUpdateParams] = useState<any>(null);
+
+  // Fetch users for user assignment (fetch when assignment section is shown or user mode is selected)
   const { data: users, isLoading: usersLoading } = useQuery({
     queryKey: ['users'],
     queryFn: getUsers,
-    enabled: formData.move_type === 'store' || assignmentMode === 'user',
+    enabled: assignmentMode === 'user' || showAssignmentSection,
   });
 
   // Fetch shifts for shift assignment
@@ -107,6 +118,52 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
     queryFn: () => getBinsWithPriority({ status: 'active', limit: 1000 }),
     enabled: isStandalone,
   });
+
+  // PRE-POPULATE FORM WHEN EDITING
+  useEffect(() => {
+    if (isEditing && moveRequest) {
+      console.log('[EDIT MODE] Pre-populating form with moveRequest:', moveRequest);
+
+      // Convert scheduled_date (Unix timestamp) to date string
+      const scheduledDate = new Date(moveRequest.scheduled_date * 1000);
+      const dateString = scheduledDate.toISOString().split('T')[0];
+
+      // Pre-fill basic fields
+      setFormData({
+        scheduled_date: dateString,
+        move_type: (moveRequest.move_type as 'store' | 'relocation') || 'store',
+        new_street: moveRequest.new_street || '',
+        new_city: moveRequest.new_city || '',
+        new_zip: moveRequest.new_zip || '',
+        new_latitude: moveRequest.new_latitude || null,
+        new_longitude: moveRequest.new_longitude || null,
+        reason: moveRequest.reason || '',
+        notes: moveRequest.notes || '',
+      });
+
+      // Pre-fill assignment state
+      if (moveRequest.assigned_user_id) {
+        // Assigned to person (manual one-off)
+        setAssignmentMode('user');
+        setSelectedUserId(moveRequest.assigned_user_id);
+        setShowAssignmentSection(true);
+      } else if (moveRequest.assigned_shift_id) {
+        // Assigned to shift
+        const shift = shifts?.find(s => s.id === moveRequest.assigned_shift_id);
+        if (shift) {
+          setAssignmentMode(shift.status === 'active' ? 'active_shift' : 'future_shift');
+          setSelectedShiftId(moveRequest.assigned_shift_id);
+          setShowAssignmentSection(true);
+        }
+      } else {
+        // Unassigned
+        setAssignmentMode('unassigned');
+        setShowAssignmentSection(false);
+      }
+
+      console.log('[EDIT MODE] Form pre-populated successfully');
+    }
+  }, [isEditing, moveRequest, shifts]);
 
   // Filter bins for dropdown
   const availableBins = allBins?.filter((b) => {
@@ -206,25 +263,184 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
     }, 200);
   };
 
+  // Handle in-progress warning confirmation
+  const handleInProgressConfirm = async (action: 'remove_from_route' | 'insert_after_current' | 'reoptimize_route') => {
+    console.log('✅ [IN-PROGRESS WARNING] User confirmed action:', action);
+
+    if (!pendingUpdateParams || !moveRequest) return;
+
+    setIsSubmitting(true);
+    setShowInProgressWarning(false);
+
+    try {
+      // Add the in_progress_action to the update params
+      const paramsWithAction = {
+        ...pendingUpdateParams,
+        in_progress_action: action,
+      };
+
+      console.log('✏️ [EDIT MODE] Retrying with in_progress_action:', paramsWithAction);
+      await updateMoveRequest(moveRequest.id, paramsWithAction);
+
+      console.log('✅ [EDIT MODE] Successfully updated move request after in-progress confirmation');
+      onSuccess?.();
+      handleClose();
+    } catch (error) {
+      console.error('❌ [EDIT MODE] Failed to update after in-progress confirmation:', error);
+      alert(`Failed to update move. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSubmitting(false);
+      setPendingUpdateParams(null);
+      setWarningData({});
+    }
+  };
+
+  // Handle active shift warning confirmation
+  const handleActiveShiftConfirm = async () => {
+    console.log('✅ [ACTIVE SHIFT WARNING] User confirmed changes');
+
+    if (!pendingUpdateParams || !moveRequest) return;
+
+    setIsSubmitting(true);
+    setShowActiveShiftWarning(false);
+
+    try {
+      // Add the confirmation flag to the update params
+      const paramsWithConfirmation = {
+        ...pendingUpdateParams,
+        confirm_active_shift_change: true,
+      };
+
+      console.log('✏️ [EDIT MODE] Retrying with confirm_active_shift_change:', paramsWithConfirmation);
+      await updateMoveRequest(moveRequest.id, paramsWithConfirmation);
+
+      console.log('✅ [EDIT MODE] Successfully updated move request after active shift confirmation');
+      onSuccess?.();
+      handleClose();
+    } catch (error) {
+      console.error('❌ [EDIT MODE] Failed to update after active shift confirmation:', error);
+      alert(`Failed to update move. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSubmitting(false);
+      setPendingUpdateParams(null);
+      setWarningData({});
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    console.log('🚀 [MOVE REQUEST] Starting submission...');
+    console.log(isEditing ? '✏️ [EDIT MODE]' : '🚀 [CREATE MODE]', 'Starting submission...');
     console.log('📋 [MOVE REQUEST] Assignment mode:', assignmentMode);
     console.log('👤 [MOVE REQUEST] Selected user ID:', selectedUserId);
     console.log('🚚 [MOVE REQUEST] Selected shift ID:', selectedShiftId);
-    console.log('📍 [MOVE REQUEST] Insert after bin ID:', insertAfterBinId);
-    console.log('📦 [MOVE REQUEST] Target bins:', targetBins.length);
+
+    // EDIT MODE: Update existing move request
+    if (isEditing && moveRequest) {
+      console.log('✏️ [EDIT MODE] Updating move request:', moveRequest.id);
+
+      setIsSubmitting(true);
+
+      try {
+        const scheduledDate = Math.floor(new Date(formData.scheduled_date).getTime() / 1000);
+
+        // Prepare update parameters
+        const updateParams: any = {
+          scheduled_date: scheduledDate,
+          move_type: formData.move_type, // Include move type in update
+          reason: formData.reason || undefined,
+          notes: formData.notes || undefined,
+          client_updated_at: moveRequest.updated_at, // For optimistic locking
+        };
+
+        // Add location fields if relocation
+        if (formData.move_type === 'relocation') {
+          updateParams.new_street = formData.new_street || undefined;
+          updateParams.new_city = formData.new_city || undefined;
+          updateParams.new_zip = formData.new_zip || undefined;
+          updateParams.new_latitude = formData.new_latitude || undefined;
+          updateParams.new_longitude = formData.new_longitude || undefined;
+        }
+
+        // Add assignment fields based on mode
+        if (assignmentMode === 'unassigned') {
+          updateParams.assigned_shift_id = '';
+          updateParams.assigned_user_id = '';
+          updateParams.assignment_type = '';
+        } else if (assignmentMode === 'user' && selectedUserId) {
+          updateParams.assigned_user_id = selectedUserId;
+          updateParams.assigned_shift_id = '';
+          updateParams.assignment_type = 'manual';
+        } else if ((assignmentMode === 'active_shift' || assignmentMode === 'future_shift') && selectedShiftId) {
+          updateParams.assigned_shift_id = selectedShiftId;
+          updateParams.assigned_user_id = '';
+          updateParams.assignment_type = 'shift';
+        }
+
+        console.log('✏️ [EDIT MODE] Update parameters:', updateParams);
+
+        // Call update API
+        await updateMoveRequest(moveRequest.id, updateParams);
+
+        console.log('✅ [EDIT MODE] Successfully updated move request');
+        onSuccess?.();
+        handleClose();
+      } catch (error) {
+        console.error('❌ [EDIT MODE] Failed to update move request:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+        // Check for in-progress warning (driver at location)
+        if (errorMessage.includes('is currently at this location') || errorMessage.includes('Stop ')) {
+          console.log('⚠️ [EDIT MODE] In-progress warning detected');
+
+          // Parse driver name and waypoint info from error message
+          // Example: "⚠️ Driver John Doe is currently at this location (Stop 3 of 8)..."
+          const driverMatch = errorMessage.match(/Driver\s+(.+?)\s+is currently/);
+          const waypointMatch = errorMessage.match(/\(Stop\s+\d+\s+of\s+\d+\)/);
+
+          setWarningData({
+            driverName: driverMatch ? driverMatch[1] : 'Unknown Driver',
+            waypointInfo: waypointMatch ? waypointMatch[0].replace(/[()]/g, '') : 'Unknown position',
+          });
+          setPendingUpdateParams(updateParams);
+          setShowInProgressWarning(true);
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Check for active shift warning
+        if (errorMessage.includes('is on driver\'s active route') || errorMessage.includes('driver\'s active shift')) {
+          console.log('⚠️ [EDIT MODE] Active shift warning detected');
+
+          // Parse driver name from error message
+          const driverMatch = errorMessage.match(/driver\s+(.+?)['']s active/i);
+
+          setWarningData({
+            driverName: driverMatch ? driverMatch[1] : moveRequest.assigned_driver_name || 'Unknown Driver',
+          });
+          setPendingUpdateParams(updateParams);
+          setShowActiveShiftWarning(true);
+          setIsSubmitting(false);
+          return;
+        }
+
+        // For other errors, show alert
+        alert(`Failed to update move. Error: ${errorMessage}`);
+        setIsSubmitting(false);
+      }
+      return; // Exit early for edit mode
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // CREATE MODE: Rest of the original create logic below
+    // ══════════════════════════════════════════════════════════════
+
+    console.log('📍 [CREATE MODE] Insert after bin ID:', insertAfterBinId);
+    console.log('📦 [CREATE MODE] Target bins:', targetBins.length);
 
     // Validate bin selection in standalone mode
     if (isStandalone && selectedBins.length === 0) {
       alert('Please select at least one bin to schedule a move request.');
-      return;
-    }
-
-    // Validate store type requires user assignment
-    if (formData.move_type === 'store' && !selectedUserId) {
-      alert('Store requests must be assigned to a person. Please select someone.');
       return;
     }
 
@@ -249,12 +465,12 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
     try {
       // Convert date string to Unix timestamp
       const scheduledDate = Math.floor(new Date(formData.scheduled_date).getTime() / 1000);
-      console.log('📅 [MOVE REQUEST] Scheduled date:', scheduledDate, new Date(formData.scheduled_date));
+      console.log('📅 [CREATE MODE] Scheduled date:', scheduledDate, new Date(formData.scheduled_date));
 
       // Create move requests for each target bin
       const createdMoveRequestIds: string[] = [];
       for (const targetBin of targetBins) {
-        console.log('📦 [MOVE REQUEST] Creating move request for bin:', targetBin.bin_number);
+        console.log('📦 [CREATE MODE] Creating move request for bin:', targetBin.bin_number);
         const moveRequest = await createMoveRequest({
           bin_id: targetBin.id,
           scheduled_date: scheduledDate,
@@ -267,11 +483,11 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
           reason: formData.reason || undefined,
           notes: formData.notes || undefined,
         });
-        console.log('✅ [MOVE REQUEST] Created move request:', moveRequest.id);
+        console.log('✅ [CREATE MODE] Created move request:', moveRequest.id);
         createdMoveRequestIds.push(moveRequest.id);
       }
 
-      console.log('✅ [MOVE REQUEST] All move requests created:', createdMoveRequestIds);
+      console.log('✅ [CREATE MODE] All move requests created:', createdMoveRequestIds);
 
       // Handle assignment based on mode
       if (assignmentMode === 'user' && selectedUserId) {
@@ -312,12 +528,12 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
         console.log('⏭️ [ASSIGNMENT] Skipping assignment - mode is unassigned');
       }
 
-      console.log('🎉 [MOVE REQUEST] Submission complete!');
+      console.log('🎉 [CREATE MODE] Submission complete!');
       onSuccess?.();
       handleClose();
     } catch (error) {
-      console.error('❌ [MOVE REQUEST] Failed to create move request:', error);
-      console.error('❌ [MOVE REQUEST] Error details:', JSON.stringify(error, null, 2));
+      console.error('❌ [CREATE MODE] Failed to create move request:', error);
+      console.error('❌ [CREATE MODE] Error details:', JSON.stringify(error, null, 2));
       alert(`Failed to schedule move. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
@@ -343,10 +559,18 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
           <div className="flex items-start justify-between mb-6">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">
-                {selectedBins.length > 1 ? 'Schedule Bulk Moves' : 'Schedule Bin Move'}
+                {isEditing
+                  ? 'Edit Move Request'
+                  : selectedBins.length > 1
+                  ? 'Schedule Bulk Moves'
+                  : 'Schedule Bin Move'}
               </h2>
               <p className="text-sm text-gray-600 mt-1">
-                {selectedBins.length > 1
+                {isEditing
+                  ? moveRequest?.bin_number
+                    ? `Bin ${moveRequest.bin_number} - ${moveRequest.bin_street || 'Unknown location'}`
+                    : 'Loading bin details...'
+                  : selectedBins.length > 1
                   ? `${selectedBins.length} bins selected`
                   : selectedBins.length === 1
                   ? `Bin ${selectedBins[0].bin_number} - ${selectedBins[0].current_street}`
@@ -358,8 +582,8 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
             </button>
           </div>
 
-          {/* Bin Selector (Standalone Mode Only) */}
-          {isStandalone && (
+          {/* Bin Selector (Standalone Mode Only - Hidden in Edit Mode) */}
+          {isStandalone && !isEditing && (
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Select Bin *
@@ -467,45 +691,63 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
             </div>
           )}
 
-          {/* Selected Bins Display (shown in all modes) */}
-          {selectedBins.length > 1 && (
+          {/* Selected Bins Display (shown in bulk mode or when editing with bin info) */}
+          {(selectedBins.length > 1 || (isEditing && moveRequest?.bin_number)) && (
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Selected Bins ({selectedBins.length})
+                {isEditing ? 'Bin' : `Selected Bins (${selectedBins.length})`}
               </label>
               <div className="flex flex-wrap gap-2">
-                {selectedBins.map((selectedBin) => (
-                  <div
-                    key={selectedBin.id}
-                    className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 border-2 border-blue-200 rounded-xl"
-                  >
+                {isEditing && moveRequest ? (
+                  <div className="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 border-2 border-gray-300 rounded-xl">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm text-gray-900">Bin #{selectedBin.bin_number}</span>
-                      {selectedBin.fill_percentage !== null && (
+                      <span className="font-semibold text-sm text-gray-900">Bin #{moveRequest.bin_number}</span>
+                      {moveRequest.bin_fill_percentage !== null && moveRequest.bin_fill_percentage !== undefined && (
                         <span className={cn(
                           'text-xs px-1.5 py-0.5 rounded-full font-medium',
-                          selectedBin.fill_percentage >= 80 ? 'bg-red-100 text-red-700' :
-                          selectedBin.fill_percentage >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                          moveRequest.bin_fill_percentage >= 80 ? 'bg-red-100 text-red-700' :
+                          moveRequest.bin_fill_percentage >= 50 ? 'bg-yellow-100 text-yellow-700' :
                           'bg-green-100 text-green-700'
                         )}>
-                          {selectedBin.fill_percentage}%
+                          {moveRequest.bin_fill_percentage}%
                         </span>
                       )}
                     </div>
-                    {/* Only show remove button in standalone mode */}
-                    {isStandalone && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedBins(selectedBins.filter((b) => b.id !== selectedBin.id));
-                        }}
-                        className="p-0.5 hover:bg-blue-200 rounded transition-colors"
-                      >
-                        <X className="w-3.5 h-3.5 text-gray-600" />
-                      </button>
-                    )}
                   </div>
-                ))}
+                ) : (
+                  selectedBins.map((selectedBin) => (
+                    <div
+                      key={selectedBin.id}
+                      className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 border-2 border-blue-200 rounded-xl"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm text-gray-900">Bin #{selectedBin.bin_number}</span>
+                        {selectedBin.fill_percentage !== null && (
+                          <span className={cn(
+                            'text-xs px-1.5 py-0.5 rounded-full font-medium',
+                            selectedBin.fill_percentage >= 80 ? 'bg-red-100 text-red-700' :
+                            selectedBin.fill_percentage >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-green-100 text-green-700'
+                          )}>
+                            {selectedBin.fill_percentage}%
+                          </span>
+                        )}
+                      </div>
+                      {/* Only show remove button in standalone create mode (not edit mode) */}
+                      {isStandalone && !isEditing && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedBins(selectedBins.filter((b) => b.id !== selectedBin.id));
+                          }}
+                          className="p-0.5 hover:bg-blue-200 rounded transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5 text-gray-600" />
+                        </button>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -704,64 +946,7 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
               />
             </div>
 
-            {/* Assignment Section - Different behavior based on move type */}
-            {formData.move_type === 'store' ? (
-              /* STORE: Must assign to person immediately */
-              <div className="pt-4 border-t border-gray-200">
-                <div className="flex items-center gap-2 mb-3">
-                  <User className="w-5 h-5 text-gray-600" />
-                  <span className="text-sm font-semibold text-gray-900">
-                    Assign to Person *
-                  </span>
-                  <Badge className="bg-purple-100 text-purple-700 text-xs">
-                    Required
-                  </Badge>
-                </div>
-                <p className="text-xs text-gray-500 mb-3">
-                  Store requests are one-off tasks and must be assigned to someone immediately
-                </p>
-
-                {usersLoading ? (
-                  <div className="text-center py-8 bg-white rounded-lg border border-gray-200">
-                    <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">Loading users...</p>
-                  </div>
-                ) : users && users.length > 0 ? (
-                  <div className="space-y-2">
-                    {users.map((user) => (
-                      <button
-                        key={user.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedUserId(user.id);
-                          setAssignmentMode('user');
-                        }}
-                        className={cn(
-                          'w-full text-left p-4 rounded-xl border-2 transition-all',
-                          selectedUserId === user.id
-                            ? 'border-primary bg-blue-50'
-                            : 'border-gray-200 hover:border-gray-300 bg-white'
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <User className="w-4 h-4 text-gray-600" />
-                          <div>
-                            <div className="font-semibold text-gray-900">{user.name}</div>
-                            <div className="text-sm text-gray-500 capitalize">{user.role}</div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 bg-white rounded-lg border border-gray-200">
-                    <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">No users found</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* RELOCATION: Optional shift assignment (collapsible) */
+            {/* Assignment Section - Unified for both Store and Relocation */}
               <div className="pt-4 border-t border-gray-200">
                 <button
                   type="button"
@@ -1093,7 +1278,6 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
                 </div>
               )}
               </div>
-            )}
 
             {/* Actions */}
             <div className="flex gap-3 pt-4">
@@ -1106,7 +1290,13 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Scheduling...</>
+                  isEditing ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
+                  ) : (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Scheduling...</>
+                  )
+                ) : isEditing ? (
+                  <><Calendar className="w-4 h-4 mr-2" />Save Changes</>
                 ) : (
                   <><Calendar className="w-4 h-4 mr-2" />Schedule Move</>
                 )}
@@ -1115,6 +1305,291 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
           </form>
         </div>
       </Card>
+      </div>
+
+      {/* Warning Modals */}
+      {showInProgressWarning && warningData.driverName && warningData.waypointInfo && (
+        <InProgressWarningModal
+          driverName={warningData.driverName}
+          waypointInfo={warningData.waypointInfo}
+          onClose={() => {
+            setShowInProgressWarning(false);
+            setPendingUpdateParams(null);
+            setWarningData({});
+            setIsSubmitting(false);
+          }}
+          onConfirm={handleInProgressConfirm}
+        />
+      )}
+
+      {showActiveShiftWarning && warningData.driverName && (
+        <ActiveShiftWarningModal
+          driverName={warningData.driverName}
+          onClose={() => {
+            setShowActiveShiftWarning(false);
+            setPendingUpdateParams(null);
+            setWarningData({});
+            setIsSubmitting(false);
+          }}
+          onConfirm={handleActiveShiftConfirm}
+        />
+      )}
+    </>,
+    document.body
+  ) : null;
+}
+
+// In-Progress Warning Modal
+interface InProgressWarningModalProps {
+  driverName: string;
+  waypointInfo: string; // e.g., "Stop 3 of 8"
+  onClose: () => void;
+  onConfirm: (action: 'remove_from_route' | 'insert_after_current' | 'reoptimize_route') => void;
+}
+
+export function InProgressWarningModal({ driverName, waypointInfo, onClose, onConfirm }: InProgressWarningModalProps) {
+  const [selectedAction, setSelectedAction] = useState<'remove_from_route' | 'insert_after_current' | 'reoptimize_route'>('insert_after_current');
+  const [isClosing, setIsClosing] = useState(false);
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+    }, 200);
+  };
+
+  const handleConfirm = () => {
+    onConfirm(selectedAction);
+    handleClose();
+  };
+
+  return typeof window !== 'undefined' ? createPortal(
+    <>
+      {/* Overlay */}
+      <div
+        className={`fixed inset-0 z-[60] bg-black/50 ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
+        onClick={handleClose}
+      />
+
+      {/* Modal */}
+      <div className="fixed inset-0 z-[70] flex items-center justify-center pointer-events-none">
+        <Card
+          className={`w-full max-w-lg m-4 pointer-events-auto ${isClosing ? 'animate-scale-out' : 'animate-scale-in'}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-6">
+            {/* Header */}
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <AlertTriangle className="w-6 h-6 text-orange-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Driver at Location</h2>
+                  <p className="text-sm text-gray-600">Action required for in-progress move</p>
+                </div>
+              </div>
+              <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Warning Message */}
+            <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+              <p className="text-sm text-orange-900">
+                <span className="font-semibold">{driverName}</span> is currently at this location ({waypointInfo}).
+                What should happen to this bin in their route?
+              </p>
+            </div>
+
+            {/* Action Selection */}
+            <div className="space-y-3 mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Choose Action *
+              </label>
+
+              {/* Remove from Route */}
+              <label className={cn(
+                "flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-gray-50",
+                selectedAction === 'remove_from_route' && "border-primary bg-blue-50"
+              )}>
+                <input
+                  type="radio"
+                  name="inProgressAction"
+                  value="remove_from_route"
+                  checked={selectedAction === 'remove_from_route'}
+                  onChange={() => setSelectedAction('remove_from_route')}
+                  className="mt-0.5 w-4 h-4 text-primary border-gray-300 focus:ring-primary"
+                />
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-900 mb-1">Remove from Route</div>
+                  <div className="text-sm text-gray-600">
+                    Remove this bin from the driver's route immediately
+                  </div>
+                </div>
+              </label>
+
+              {/* Insert After Current */}
+              <label className={cn(
+                "flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-gray-50",
+                selectedAction === 'insert_after_current' && "border-primary bg-blue-50"
+              )}>
+                <input
+                  type="radio"
+                  name="inProgressAction"
+                  value="insert_after_current"
+                  checked={selectedAction === 'insert_after_current'}
+                  onChange={() => setSelectedAction('insert_after_current')}
+                  className="mt-0.5 w-4 h-4 text-primary border-gray-300 focus:ring-primary"
+                />
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-900 mb-1">Insert After Current Bin</div>
+                  <div className="text-sm text-gray-600">
+                    Keep in route, insert right after the driver finishes this bin
+                  </div>
+                </div>
+              </label>
+
+              {/* Re-optimize Route */}
+              <label className={cn(
+                "flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-gray-50",
+                selectedAction === 'reoptimize_route' && "border-primary bg-blue-50"
+              )}>
+                <input
+                  type="radio"
+                  name="inProgressAction"
+                  value="reoptimize_route"
+                  checked={selectedAction === 'reoptimize_route'}
+                  onChange={() => setSelectedAction('reoptimize_route')}
+                  className="mt-0.5 w-4 h-4 text-primary border-gray-300 focus:ring-primary"
+                />
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-900 mb-1">Re-optimize Route</div>
+                  <div className="text-sm text-gray-600">
+                    Smart re-order remaining bins for optimal route efficiency
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <Button type="button" variant="outline" onClick={handleClose} className="flex-1">
+                Cancel
+              </Button>
+              <Button onClick={handleConfirm} className="flex-1 bg-primary hover:bg-primary/90">
+                <Route className="w-4 h-4 mr-2" />
+                Confirm Changes
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    </>,
+    document.body
+  ) : null;
+}
+
+// Active Shift Warning Modal
+interface ActiveShiftWarningModalProps {
+  driverName: string;
+  onClose: () => void;
+  onConfirm: () => void;
+}
+
+export function ActiveShiftWarningModal({ driverName, onClose, onConfirm }: ActiveShiftWarningModalProps) {
+  const [isClosing, setIsClosing] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+    }, 200);
+  };
+
+  const handleConfirm = () => {
+    if (!confirmed) {
+      alert('Please confirm that you understand this will affect the active route.');
+      return;
+    }
+    onConfirm();
+    handleClose();
+  };
+
+  return typeof window !== 'undefined' ? createPortal(
+    <>
+      {/* Overlay */}
+      <div
+        className={`fixed inset-0 z-[60] bg-black/50 ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
+        onClick={handleClose}
+      />
+
+      {/* Modal */}
+      <div className="fixed inset-0 z-[70] flex items-center justify-center pointer-events-none">
+        <Card
+          className={`w-full max-w-lg m-4 pointer-events-auto ${isClosing ? 'animate-scale-out' : 'animate-scale-in'}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-6">
+            {/* Header */}
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-yellow-100 rounded-lg">
+                  <Truck className="w-6 h-6 text-yellow-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Active Route Change</h2>
+                  <p className="text-sm text-gray-600">This will affect driver's navigation</p>
+                </div>
+              </div>
+              <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Warning Message */}
+            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-900 mb-3">
+                <span className="font-semibold">{driverName}</span> is currently on route with this move assigned.
+              </p>
+              <p className="text-sm text-yellow-900">
+                Editing this move request will update their active navigation and route. The driver will be notified of the changes.
+              </p>
+            </div>
+
+            {/* Confirmation Checkbox */}
+            <label className="flex items-start gap-3 p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-all mb-6">
+              <input
+                type="checkbox"
+                checked={confirmed}
+                onChange={(e) => setConfirmed(e.target.checked)}
+                className="mt-0.5 w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+              />
+              <div className="flex-1 text-sm text-gray-900">
+                I understand this will modify the driver's active route and they will be notified of the change
+              </div>
+            </label>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <Button type="button" variant="outline" onClick={handleClose} className="flex-1">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirm}
+                disabled={!confirmed}
+                className={cn(
+                  "flex-1",
+                  confirmed ? "bg-primary hover:bg-primary/90" : "bg-gray-300 cursor-not-allowed"
+                )}
+              >
+                <AlertTriangle className="w-4 h-4 mr-2" />
+                Confirm Changes
+              </Button>
+            </div>
+          </div>
+        </Card>
       </div>
     </>,
     document.body

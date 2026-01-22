@@ -36,12 +36,13 @@ import {
   CheckCircle,
   Trash2,
   ChevronsUpDown,
+  User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
 type SortColumn = 'bin_number' | 'scheduled_date' | 'urgency' | 'status' | 'assigned_driver_name';
-type MoveFilterOption = 'overdue' | 'urgent' | 'pending' | 'in_progress' | 'completed' | 'pickup_only' | 'relocation';
+type MoveFilterOption = 'overdue' | 'urgent' | 'pending' | 'assigned' | 'in_progress' | 'completed' | 'store' | 'relocation';
 
 export function MoveRequestsList() {
   // State
@@ -150,12 +151,14 @@ export function MoveRequestsList() {
                 return urgency === 'urgent';
               case 'pending':
                 return move.status === 'pending';
+              case 'assigned':
+                return move.status === 'assigned';
               case 'in_progress':
                 return move.status === 'in_progress';
               case 'completed':
                 return move.status === 'completed';
-              case 'pickup_only':
-                return move.move_type === 'pickup_only';
+              case 'store':
+                return move.move_type === 'store' || move.move_type === 'pickup_only'; // backward compatibility
               case 'relocation':
                 return move.move_type === 'relocation';
               default:
@@ -350,6 +353,13 @@ export function MoveRequestsList() {
     setShowAssignModal(true);
   };
 
+  const handleSingleAssignUser = (move: MoveRequest) => {
+    setMoveToAssignUser(move);
+    setShowAssignUserModal(true);
+    setOpenMenuId(null);
+    setMenuPosition(null);
+  };
+
   // Handler for opening detail drawer
   const handleRowClick = (move: MoveRequest) => {
     setSelectedMoveForDetail(move);
@@ -518,9 +528,8 @@ export function MoveRequestsList() {
           icon={<AlertTriangle className="w-5 h-5" />}
           iconBgColor="bg-red-100 text-red-600"
           onClick={() => {
-            setStatusFilter('all');
+            setFilters(['urgent']);
             setAssignedFilter('all');
-            // TODO: Add urgency filter
           }}
         />
         <KpiCard
@@ -529,7 +538,7 @@ export function MoveRequestsList() {
           icon={<Clock className="w-5 h-5" />}
           iconBgColor="bg-blue-100 text-blue-600"
           onClick={() => {
-            setStatusFilter('pending');
+            setFilters(['pending']);
             setAssignedFilter('all');
           }}
         />
@@ -539,7 +548,7 @@ export function MoveRequestsList() {
           icon={<Truck className="w-5 h-5" />}
           iconBgColor="bg-green-100 text-green-600"
           onClick={() => {
-            setStatusFilter('in_progress');
+            setFilters(['in_progress']);
             setAssignedFilter('all');
           }}
         />
@@ -549,8 +558,8 @@ export function MoveRequestsList() {
           icon={<AlertTriangle className="w-5 h-5" />}
           iconBgColor="bg-orange-100 text-orange-600"
           onClick={() => {
-            setStatusFilter('all');
-            // TODO: Add overdue filter
+            setFilters(['overdue']);
+            setAssignedFilter('all');
           }}
         />
       </div>
@@ -566,9 +575,10 @@ export function MoveRequestsList() {
               { value: 'overdue', label: 'Overdue' },
               { value: 'urgent', label: 'Urgent' },
               { value: 'pending', label: 'Pending' },
+              { value: 'assigned', label: 'Assigned' },
               { value: 'in_progress', label: 'In Progress' },
               { value: 'completed', label: 'Completed' },
-              { value: 'pickup_only', label: 'Store/Pickup' },
+              { value: 'store', label: 'Store' },
               { value: 'relocation', label: 'Relocation' },
             ]}
             onChange={(values) => setFilters(values as MoveFilterOption[])}
@@ -1134,57 +1144,29 @@ export function MoveRequestsList() {
               if (!move) return null;
 
               const isCompletedOrCancelled = move.status === 'completed' || move.status === 'cancelled';
-              const canAssign = move.status === 'pending' || move.status === 'assigned';
+              const isPending = move.status === 'pending';
+              const canReassign = move.status === 'pending' || move.status === 'assigned';
+              const isAssignedToShift = !!move.assigned_shift_id;
+              const isEditable = move.status !== 'completed' && move.status !== 'cancelled';
 
               return (
                 <>
-                  {/* Assign / Re-assign Option (for pending/assigned statuses) */}
-                  {canAssign && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSingleAssign(move);
-                      }}
-                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-t-lg"
-                    >
-                      <Truck className="h-4 w-4" />
-                      {move.assigned_shift_id ? 'Re-assign to Shift' : 'Assign to Shift'}
-                    </button>
-                  )}
-
-                  {/* Edit Details (for pending only) */}
-                  {move.status === 'pending' && (
+                  {/* Edit - for all editable statuses (pending, assigned, in_progress) */}
+                  {isEditable && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleEditDetails(move);
                       }}
-                      className={cn(
-                        "w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2",
-                        !canAssign && "rounded-t-lg"
-                      )}
+                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-t-lg"
                     >
                       <Edit className="h-4 w-4" />
-                      Edit Details
+                      Edit Move Request
                     </button>
                   )}
 
-                  {/* Clear Assignment (if assigned) */}
-                  {move.assigned_shift_id && move.status === 'pending' && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleClearAssignment(move);
-                      }}
-                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
-                    >
-                      <XIcon className="h-4 w-4" />
-                      Clear Assignment
-                    </button>
-                  )}
-
-                  {/* View Details (for completed/cancelled/in_progress) */}
-                  {(move.status === 'in_progress' || isCompletedOrCancelled) && (
+                  {/* View Details - for completed/cancelled */}
+                  {!isEditable && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1228,21 +1210,8 @@ export function MoveRequestsList() {
           }}
           onEdit={(move) => {
             setShowDetailDrawer(false);
-            handleEditDetails(move);
-          }}
-          onAssign={(move) => {
-            setShowDetailDrawer(false);
-            // Check move type to determine which assignment modal to show
-            if (move.move_type === 'store') {
-              setMoveToAssignUser(move);
-              setShowAssignUserModal(true);
-            } else {
-              handleSingleAssign(move);
-            }
-          }}
-          onClearAssignment={(move) => {
-            setShowDetailDrawer(false);
-            handleClearAssignment(move);
+            setMoveToEdit(move);
+            setShowScheduleMoveModal(true);
           }}
           onCancel={(move) => {
             setShowDetailDrawer(false);
