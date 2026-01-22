@@ -564,7 +564,7 @@ export function CreatePotentialLocationDialog({
                 />
               </div>
 
-              {/* Queue - Show queued locations as cards */}
+              {/* Queue - Show queued locations as full detail cards */}
               {locationQueue.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -584,35 +584,70 @@ export function CreatePotentialLocationDialog({
                   </div>
 
                   {/* Scrollable queue container */}
-                  <div className="max-h-[200px] overflow-y-auto space-y-2">
+                  <div className="max-h-[300px] overflow-y-auto space-y-3">
                     {locationQueue.map((loc, index) => (
                       <div
                         key={index}
-                        className="bg-green-50 border border-green-200 rounded-xl p-3 flex items-start justify-between group hover:bg-green-100 transition-colors"
+                        className="bg-green-50 border-2 border-green-200 rounded-xl p-4 space-y-3"
                       >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-green-900 truncate">
-                            {loc.street}
-                          </p>
-                          <p className="text-xs text-green-700">
-                            {loc.city}, {loc.zip}
-                          </p>
-                          {loc.notes && (
-                            <p className="text-xs text-green-600 mt-1 truncate">
-                              {loc.notes}
+                        {/* Header with remove button */}
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-lg bg-green-600 text-white flex items-center justify-center text-xs font-bold">
+                              {index + 1}
+                            </div>
+                            <p className="text-xs font-semibold text-green-900 uppercase tracking-wide">
+                              Location {index + 1}
                             </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setLocationQueue((prev) => prev.filter((_, i) => i !== index));
+                            }}
+                            className="w-6 h-6 rounded-lg hover:bg-red-100 flex items-center justify-center transition-colors"
+                            title="Remove from queue"
+                          >
+                            <X className="w-4 h-4 text-red-600" />
+                          </button>
+                        </div>
+
+                        {/* Address details */}
+                        <div className="space-y-2">
+                          <div>
+                            <p className="text-xs font-semibold text-gray-600 mb-1">Street Address</p>
+                            <p className="text-sm text-gray-900">{loc.street}</p>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <p className="text-xs font-semibold text-gray-600 mb-1">City</p>
+                              <p className="text-sm text-gray-900">{loc.city}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold text-gray-600 mb-1">ZIP</p>
+                              <p className="text-sm text-gray-900">{loc.zip}</p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <p className="text-xs font-semibold text-gray-600 mb-1">Latitude</p>
+                              <p className="text-xs text-gray-700 font-mono">{loc.latitude.toFixed(6)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold text-gray-600 mb-1">Longitude</p>
+                              <p className="text-xs text-gray-700 font-mono">{loc.longitude.toFixed(6)}</p>
+                            </div>
+                          </div>
+
+                          {loc.notes && (
+                            <div>
+                              <p className="text-xs font-semibold text-gray-600 mb-1">Notes</p>
+                              <p className="text-xs text-gray-700">{loc.notes}</p>
+                            </div>
                           )}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setLocationQueue((prev) => prev.filter((_, i) => i !== index));
-                          }}
-                          className="ml-2 w-6 h-6 rounded-lg hover:bg-red-100 flex items-center justify-center transition-colors flex-shrink-0"
-                          title="Remove from queue"
-                        >
-                          <X className="w-4 h-4 text-red-600" />
-                        </button>
                       </div>
                     ))}
                   </div>
