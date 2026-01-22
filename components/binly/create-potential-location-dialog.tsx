@@ -553,7 +553,12 @@ export function CreatePotentialLocationDialog({
 
       // Validate we have at least one location
       if (locationsToCreate.length === 0) {
-        setError('Please add at least one location');
+        // Only show error if they have started filling the form or have queue items
+        // (prevents accidental Enter key presses from showing errors)
+        const hasStartedForm = formData.street || formData.city || formData.zip || formData.latitude || formData.longitude;
+        if (hasStartedForm || locationQueue.length > 0) {
+          setError('Please add at least one location to the queue or fill in all required fields');
+        }
         setLoading(false);
         return;
       }
@@ -699,11 +704,15 @@ export function CreatePotentialLocationDialog({
                     </label>
                     <input
                       type="text"
-                      required
                       value={formData.city}
                       onChange={(e) => {
                         setFormData({ ...formData, city: e.target.value });
                         setAutoFilled((prev) => ({ ...prev, city: false }));
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                        }
                       }}
                       disabled={isGeocodingCoordinates}
                       placeholder="Dallas"
@@ -720,11 +729,15 @@ export function CreatePotentialLocationDialog({
                     </label>
                     <input
                       type="text"
-                      required
                       value={formData.zip}
                       onChange={(e) => {
                         setFormData({ ...formData, zip: e.target.value });
                         setAutoFilled((prev) => ({ ...prev, zip: false }));
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                        }
                       }}
                       disabled={isGeocodingCoordinates}
                       placeholder="75201"
@@ -747,6 +760,11 @@ export function CreatePotentialLocationDialog({
                       type="text"
                       value={formData.latitude}
                       onChange={(e) => handleCoordinateChange('latitude', e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                        }
+                      }}
                       placeholder="37.7749"
                       className={cn(
                         inputStyles(),
@@ -763,6 +781,11 @@ export function CreatePotentialLocationDialog({
                       type="text"
                       value={formData.longitude}
                       onChange={(e) => handleCoordinateChange('longitude', e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                        }
+                      }}
                       placeholder="-122.4194"
                       className={cn(
                         inputStyles(),
