@@ -111,11 +111,10 @@ export interface PotentialLocation {
 }
 
 /**
- * Move Request - A request to move a bin to a new location or pick it up
+ * Move Request - A request to move a bin to a new location or store in warehouse
  */
 export type MoveRequestStatus = 'pending' | 'assigned' | 'in_progress' | 'completed' | 'cancelled' | 'overdue';
-export type MoveRequestType = 'pickup_only' | 'relocation';
-export type DisposalAction = 'retire' | 'store';
+export type MoveRequestType = 'store' | 'relocation';
 
 export interface MoveRequest {
   id: string;
@@ -128,7 +127,6 @@ export interface MoveRequest {
   move_type: MoveRequestType;
   scheduled_date: number; // Unix timestamp
   scheduled_date_iso: string; // ISO string for display
-  disposal_action?: DisposalAction | null;
   new_street?: string | null;
   new_city?: string | null;
   new_zip?: string | null;
@@ -137,12 +135,17 @@ export interface MoveRequest {
   reason?: string | null;
   notes?: string | null;
   status: MoveRequestStatus;
+  assignment_type?: 'shift' | 'manual';
   assigned_shift_id?: string | null;
   assigned_driver_name?: string | null;
+  assigned_user_id?: string | null;
+  assigned_user_name?: string | null;
+  driver_name?: string | null; // Unified field - contains driver or user name
   completed_at?: number | null;
   completed_at_iso?: string | null;
   created_by_user_id: string;
   created_by_name?: string | null;
+  requested_by_name?: string | null; // Name of user who requested the move
   created_at: number;
   created_at_iso: string;
   updated_at: number;

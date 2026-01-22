@@ -2,7 +2,7 @@
  * API functions for bin move requests
  */
 
-import { MoveRequest, MoveRequestStatus, MoveRequestType, DisposalAction } from '@/lib/types/bin';
+import { MoveRequest, MoveRequestStatus, MoveRequestType } from '@/lib/types/bin';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -87,8 +87,7 @@ export async function getMoveRequests(params?: GetMoveRequestsParams): Promise<M
 export interface CreateMoveRequestParams {
   bin_id: string;
   scheduled_date: number; // Unix timestamp
-  move_type: MoveRequestType;
-  disposal_action?: DisposalAction;
+  move_type: MoveRequestType; // 'store' or 'relocation'
   new_street?: string;
   new_city?: string;
   new_zip?: string;
@@ -233,6 +232,28 @@ export async function getMoveRequest(moveRequestId: string): Promise<MoveRequest
   }
 
   return response.json();
+}
+
+/**
+ * Assign move request to a user (one-off assignment)
+ */
+export interface AssignMoveToUserParams {
+  move_request_id: string;
+  user_id: string;
+}
+
+export async function assignMoveToUser(params: AssignMoveToUserParams): Promise<void> {
+  const { move_request_id, user_id } = params;
+
+  const response = await fetch(`${API_BASE_URL}/api/manager/bins/move-requests/${move_request_id}/assign-to-user`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ user_id }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to assign move to user: ${response.statusText}`);
+  }
 }
 
 /**

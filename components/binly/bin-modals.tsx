@@ -1,15 +1,20 @@
 'use client';
 
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { BinWithPriority } from '@/lib/types/bin';
 import { getBinsWithPriority } from '@/lib/api/bins';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Calendar, Trash2, Loader2, MapPin, Search, AlertTriangle } from 'lucide-react';
-import { createMoveRequest } from '@/lib/api/move-requests';
+import { X, Calendar, Trash2, Loader2, MapPin, Search, AlertTriangle, Truck, User, ChevronDown, ChevronRight } from 'lucide-react';
+import { createMoveRequest, assignMoveToShift, assignMoveToUser } from '@/lib/api/move-requests';
+import { getShifts, getShiftDetailsByDriverId } from '@/lib/api/shifts';
+import { getUsers, User as UserType } from '@/lib/api/users';
 import { cn } from '@/lib/utils';
+import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
+import { format } from 'date-fns';
 
 // Schedule Move Modal
 interface ScheduleMoveModalProps {
@@ -36,14 +41,65 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
   const [dateOption, setDateOption] = useState<'24h' | '3days' | 'week' | 'custom'>('custom');
   const [formData, setFormData] = useState({
     scheduled_date: new Date().toISOString().split('T')[0],
-    move_type: 'pickup_only' as 'pickup_only' | 'relocation',
-    disposal_action: 'retire' as 'retire' | 'store',
+    move_type: 'store' as 'store' | 'relocation',
     new_street: '',
     new_city: '',
     new_zip: '',
+    new_latitude: null as number | null,
+    new_longitude: null as number | null,
     reason: '',
     notes: '',
   });
+
+  // Track auto-filled state for visual feedback
+  const [newLocationAutoFilled, setNewLocationAutoFilled] = useState({
+    street: false,
+    city: false,
+    zip: false,
+  });
+
+  // Assignment state
+  type AssignmentMode = 'unassigned' | 'user' | 'active_shift' | 'future_shift';
+  const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>('unassigned');
+  const [showAssignmentSection, setShowAssignmentSection] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [selectedShiftId, setSelectedShiftId] = useState<string>('');
+  const [insertPosition, setInsertPosition] = useState<'start' | 'end'>('end');
+  const [insertAfterBinId, setInsertAfterBinId] = useState<string>('');
+
+  // Fetch users for user assignment
+  const { data: users, isLoading: usersLoading } = useQuery({
+    queryKey: ['users'],
+    queryFn: getUsers,
+    enabled: assignmentMode === 'user',
+  });
+
+  // Fetch shifts for shift assignment
+  const { data: shifts, isLoading: shiftsLoading } = useQuery({
+    queryKey: ['shifts'],
+    queryFn: getShifts,
+    enabled: assignmentMode === 'active_shift' || assignmentMode === 'future_shift',
+  });
+
+  // Fetch selected shift details (to show bins for active shifts)
+  const { data: shiftDetails } = useQuery({
+    queryKey: ['shift-details', selectedShiftId],
+    queryFn: () => {
+      const selectedShift = shifts?.find(s => s.id === selectedShiftId);
+      if (!selectedShift) return null;
+      return getShiftDetailsByDriverId(selectedShift.driverId);
+    },
+    enabled: !!selectedShiftId && (assignmentMode === 'active_shift' || assignmentMode === 'future_shift'),
+  });
+
+  // Get shift mode from selected shift
+  const selectedShift = shifts?.find(s => s.id === selectedShiftId);
+  const shiftMode = selectedShift?.status === 'active' ? 'active' : 'future';
+
+  // Get remaining bins for active shift
+  const remainingBins = shiftMode === 'active' && shiftDetails?.bins
+    ? shiftDetails.bins.filter(b => b.is_completed === 0)
+    : [];
 
   // Fetch all active bins for standalone mode
   const { data: allBins, isLoading: binsLoading } = useQuery({
@@ -93,6 +149,56 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
     }
   };
 
+  // Handle Google Places autocomplete selection for new location
+  const handleNewLocationPlaceSelect = (place: google.maps.places.PlaceResult) => {
+    if (!place.address_components || !place.geometry) return;
+
+    // Parse address components
+    let street = '';
+    let city = '';
+    let zip = '';
+
+    place.address_components.forEach((component) => {
+      const types = component.types;
+
+      if (types.includes('street_number')) {
+        street = component.long_name;
+      }
+      if (types.includes('route')) {
+        street = street ? `${street} ${component.long_name}` : component.long_name;
+      }
+      if (types.includes('locality')) {
+        city = component.long_name;
+      }
+      if (!city && types.includes('sublocality_level_1')) {
+        city = component.long_name;
+      }
+      if (types.includes('postal_code')) {
+        zip = component.long_name;
+      }
+    });
+
+    const lat = place.geometry.location?.lat();
+    const lng = place.geometry.location?.lng();
+
+    // Update all fields with auto-filled data
+    setFormData({
+      ...formData,
+      new_street: street.trim(),
+      new_city: city.trim(),
+      new_zip: zip.trim(),
+      new_latitude: lat || null,
+      new_longitude: lng || null,
+    });
+
+    // Mark fields as auto-filled for visual feedback
+    setNewLocationAutoFilled({
+      street: false, // Street is user-input (from autocomplete)
+      city: true,
+      zip: true,
+    });
+  };
+
   const handleClose = () => {
     setIsClosing(true);
     setTimeout(() => {
@@ -103,9 +209,32 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    console.log('🚀 [MOVE REQUEST] Starting submission...');
+    console.log('📋 [MOVE REQUEST] Assignment mode:', assignmentMode);
+    console.log('👤 [MOVE REQUEST] Selected user ID:', selectedUserId);
+    console.log('🚚 [MOVE REQUEST] Selected shift ID:', selectedShiftId);
+    console.log('📍 [MOVE REQUEST] Insert after bin ID:', insertAfterBinId);
+    console.log('📦 [MOVE REQUEST] Target bins:', targetBins.length);
+
     // Validate bin selection in standalone mode
     if (isStandalone && selectedBins.length === 0) {
       alert('Please select at least one bin to schedule a move request.');
+      return;
+    }
+
+    // Validate assignment options
+    if (assignmentMode === 'user' && !selectedUserId) {
+      alert('Please select a user to assign to.');
+      return;
+    }
+
+    if ((assignmentMode === 'active_shift' || assignmentMode === 'future_shift') && !selectedShiftId) {
+      alert('Please select a shift to assign to.');
+      return;
+    }
+
+    if (assignmentMode === 'active_shift' && !insertAfterBinId) {
+      alert('Please select where to insert the move(s) in the active route.');
       return;
     }
 
@@ -114,42 +243,91 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
     try {
       // Convert date string to Unix timestamp
       const scheduledDate = Math.floor(new Date(formData.scheduled_date).getTime() / 1000);
+      console.log('📅 [MOVE REQUEST] Scheduled date:', scheduledDate, new Date(formData.scheduled_date));
 
       // Create move requests for each target bin
+      const createdMoveRequestIds: string[] = [];
       for (const targetBin of targetBins) {
-        await createMoveRequest({
+        console.log('📦 [MOVE REQUEST] Creating move request for bin:', targetBin.bin_number);
+        const moveRequest = await createMoveRequest({
           bin_id: targetBin.id,
           scheduled_date: scheduledDate,
           move_type: formData.move_type,
-          disposal_action: formData.move_type === 'pickup_only' ? formData.disposal_action : undefined,
           new_street: formData.move_type === 'relocation' ? formData.new_street : undefined,
           new_city: formData.move_type === 'relocation' ? formData.new_city : undefined,
           new_zip: formData.move_type === 'relocation' ? formData.new_zip : undefined,
+          new_latitude: formData.move_type === 'relocation' && formData.new_latitude ? formData.new_latitude : undefined,
+          new_longitude: formData.move_type === 'relocation' && formData.new_longitude ? formData.new_longitude : undefined,
           reason: formData.reason || undefined,
           notes: formData.notes || undefined,
         });
+        console.log('✅ [MOVE REQUEST] Created move request:', moveRequest.id);
+        createdMoveRequestIds.push(moveRequest.id);
       }
 
+      console.log('✅ [MOVE REQUEST] All move requests created:', createdMoveRequestIds);
+
+      // Handle assignment based on mode
+      if (assignmentMode === 'user' && selectedUserId) {
+        console.log('👤 [ASSIGNMENT] Assigning to user:', selectedUserId);
+        // Assign to user (one-off)
+        for (const moveRequestId of createdMoveRequestIds) {
+          console.log('👤 [ASSIGNMENT] Assigning move request:', moveRequestId);
+          try {
+            await assignMoveToUser({
+              move_request_id: moveRequestId,
+              user_id: selectedUserId,
+            });
+            console.log('✅ [ASSIGNMENT] Successfully assigned move request to user:', moveRequestId);
+          } catch (assignError) {
+            console.error('❌ [ASSIGNMENT] Failed to assign move request to user:', moveRequestId, assignError);
+            throw assignError;
+          }
+        }
+      } else if ((assignmentMode === 'active_shift' || assignmentMode === 'future_shift') && selectedShiftId) {
+        console.log('🚚 [ASSIGNMENT] Assigning to shift:', selectedShiftId);
+        // Assign to shift
+        for (const moveRequestId of createdMoveRequestIds) {
+          console.log('🚚 [ASSIGNMENT] Assigning move request:', moveRequestId);
+          try {
+            await assignMoveToShift({
+              move_request_id: moveRequestId,
+              shift_id: selectedShiftId,
+              insert_after_bin_id: assignmentMode === 'active_shift' ? insertAfterBinId || undefined : undefined,
+              insert_position: assignmentMode === 'future_shift' ? insertPosition : undefined,
+            });
+            console.log('✅ [ASSIGNMENT] Successfully assigned move request to shift:', moveRequestId);
+          } catch (assignError) {
+            console.error('❌ [ASSIGNMENT] Failed to assign move request to shift:', moveRequestId, assignError);
+            throw assignError;
+          }
+        }
+      } else {
+        console.log('⏭️ [ASSIGNMENT] Skipping assignment - mode is unassigned');
+      }
+
+      console.log('🎉 [MOVE REQUEST] Submission complete!');
       onSuccess?.();
       handleClose();
     } catch (error) {
-      console.error('Failed to create move request:', error);
-      alert('Failed to schedule move. Please try again.');
+      console.error('❌ [MOVE REQUEST] Failed to create move request:', error);
+      console.error('❌ [MOVE REQUEST] Error details:', JSON.stringify(error, null, 2));
+      alert(`Failed to schedule move. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  return (
+  return typeof window !== 'undefined' ? createPortal(
     <>
       {/* Overlay */}
       <div
-        className={`fixed inset-0 z-[60] bg-black/50 ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
+        className={`fixed inset-0 z-40 bg-black/50 ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
         onClick={handleClose}
       />
 
       {/* Modal */}
-      <div className="fixed inset-0 z-[70] flex items-center justify-center pointer-events-none">
+      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
         <Card
           className={`w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4 pointer-events-auto ${isClosing ? 'animate-scale-out' : 'animate-scale-in'}`}
           onClick={(e) => e.stopPropagation()}
@@ -207,41 +385,6 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
                   className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all"
                 />
               </div>
-
-              {/* Selected Bins Display (Multi-select badges) */}
-              {selectedBins.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {selectedBins.map((selectedBin) => (
-                    <div
-                      key={selectedBin.id}
-                      className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 border-2 border-blue-200 rounded-xl"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm text-gray-900">Bin #{selectedBin.bin_number}</span>
-                        {selectedBin.fill_percentage !== null && (
-                          <span className={cn(
-                            'text-xs px-1.5 py-0.5 rounded-full font-medium',
-                            selectedBin.fill_percentage >= 80 ? 'bg-red-100 text-red-700' :
-                            selectedBin.fill_percentage >= 50 ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-green-100 text-green-700'
-                          )}>
-                            {selectedBin.fill_percentage}%
-                          </span>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedBins(selectedBins.filter((b) => b.id !== selectedBin.id));
-                        }}
-                        className="p-0.5 hover:bg-blue-200 rounded transition-colors"
-                      >
-                        <X className="w-3.5 h-3.5 text-gray-600" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
 
               {/* Dropdown Results */}
               {showBinDropdown && (
@@ -315,6 +458,49 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {/* Selected Bins Display (shown in all modes) */}
+          {selectedBins.length > 1 && (
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Selected Bins ({selectedBins.length})
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {selectedBins.map((selectedBin) => (
+                  <div
+                    key={selectedBin.id}
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 border-2 border-blue-200 rounded-xl"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm text-gray-900">Bin #{selectedBin.bin_number}</span>
+                      {selectedBin.fill_percentage !== null && (
+                        <span className={cn(
+                          'text-xs px-1.5 py-0.5 rounded-full font-medium',
+                          selectedBin.fill_percentage >= 80 ? 'bg-red-100 text-red-700' :
+                          selectedBin.fill_percentage >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-green-100 text-green-700'
+                        )}>
+                          {selectedBin.fill_percentage}%
+                        </span>
+                      )}
+                    </div>
+                    {/* Only show remove button in standalone mode */}
+                    {isStandalone && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedBins(selectedBins.filter((b) => b.id !== selectedBin.id));
+                        }}
+                        className="p-0.5 hover:bg-blue-200 rounded transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5 text-gray-600" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -394,15 +580,15 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, move_type: 'pickup_only' })}
+                  onClick={() => setFormData({ ...formData, move_type: 'store' })}
                   className={`p-4 border-2 rounded-lg text-left transition-colors ${
-                    formData.move_type === 'pickup_only'
+                    formData.move_type === 'store'
                       ? 'border-primary bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="font-semibold text-gray-900">Pickup Only</div>
-                  <div className="text-sm text-gray-600">Remove without relocation</div>
+                  <div className="font-semibold text-gray-900">Store in Warehouse</div>
+                  <div className="text-sm text-gray-600">Pick up and store for future use</div>
                 </button>
                 <button
                   type="button"
@@ -419,39 +605,6 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
               </div>
             </div>
 
-            {/* Disposal Action (for pickup_only) */}
-            {formData.move_type === 'pickup_only' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  After Pickup *
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, disposal_action: 'retire' })}
-                    className={`p-3 border-2 rounded-lg text-center transition-colors ${
-                      formData.disposal_action === 'retire'
-                        ? 'border-primary bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="font-semibold text-gray-900">Retire</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, disposal_action: 'store' })}
-                    className={`p-3 border-2 rounded-lg text-center transition-colors ${
-                      formData.disposal_action === 'store'
-                        ? 'border-primary bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="font-semibold text-gray-900">Store</div>
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* New Location (for relocation) */}
             {formData.move_type === 'relocation' && (
               <div className="space-y-4 p-4 bg-blue-50 rounded-lg">
@@ -459,31 +612,61 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
                   <MapPin className="w-4 h-4" />
                   New Location
                 </h4>
-                <input
-                  type="text"
-                  required={formData.move_type === 'relocation'}
-                  value={formData.new_street}
-                  onChange={(e) => setFormData({ ...formData, new_street: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  placeholder="Street Address"
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Street Address *
+                  </label>
+                  <PlacesAutocomplete
+                    value={formData.new_street}
+                    onChange={(value) => {
+                      setFormData({ ...formData, new_street: value });
+                      // Reset auto-filled state when user types
+                      setNewLocationAutoFilled({ street: false, city: false, zip: false });
+                    }}
+                    onPlaceSelect={handleNewLocationPlaceSelect}
+                    placeholder="123 Main Street"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+                  />
+                </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <input
-                    type="text"
-                    required={formData.move_type === 'relocation'}
-                    value={formData.new_city}
-                    onChange={(e) => setFormData({ ...formData, new_city: e.target.value })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg"
-                    placeholder="City"
-                  />
-                  <input
-                    type="text"
-                    required={formData.move_type === 'relocation'}
-                    value={formData.new_zip}
-                    onChange={(e) => setFormData({ ...formData, new_zip: e.target.value })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg"
-                    placeholder="ZIP"
-                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      City *
+                    </label>
+                    <input
+                      type="text"
+                      required={formData.move_type === 'relocation'}
+                      value={formData.new_city}
+                      onChange={(e) => {
+                        setFormData({ ...formData, new_city: e.target.value });
+                        setNewLocationAutoFilled({ ...newLocationAutoFilled, city: false });
+                      }}
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary transition-colors",
+                        newLocationAutoFilled.city ? "bg-blue-50 border-blue-300" : "bg-white border-gray-300"
+                      )}
+                      placeholder="City"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      ZIP *
+                    </label>
+                    <input
+                      type="text"
+                      required={formData.move_type === 'relocation'}
+                      value={formData.new_zip}
+                      onChange={(e) => {
+                        setFormData({ ...formData, new_zip: e.target.value });
+                        setNewLocationAutoFilled({ ...newLocationAutoFilled, zip: false });
+                      }}
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary transition-colors",
+                        newLocationAutoFilled.zip ? "bg-blue-50 border-blue-300" : "bg-white border-gray-300"
+                      )}
+                      placeholder="ZIP"
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -515,6 +698,339 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
               />
             </div>
 
+            {/* Assignment Section (Collapsible) */}
+            <div className="pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => setShowAssignmentSection(!showAssignmentSection)}
+                className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Truck className="w-5 h-5 text-gray-600" />
+                  <span className="text-sm font-semibold text-gray-900">
+                    Assignment (Optional)
+                  </span>
+                  {assignmentMode !== 'unassigned' && (
+                    <Badge className="bg-primary text-white text-xs">
+                      {assignmentMode === 'user' ? 'User Assigned' :
+                       assignmentMode === 'active_shift' ? 'Active Shift' : 'Future Shift'}
+                    </Badge>
+                  )}
+                </div>
+                {showAssignmentSection ? (
+                  <ChevronDown className="w-5 h-5 text-gray-500" />
+                ) : (
+                  <ChevronRight className="w-5 h-5 text-gray-500" />
+                )}
+              </button>
+
+              {showAssignmentSection && (
+                <div className="space-y-4 mt-4 p-4 bg-gray-50 rounded-lg">
+                  {/* Assignment Mode Radio Buttons */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Choose Assignment Type
+                    </label>
+
+                    {/* Leave Unassigned */}
+                    <label className="flex items-start gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all hover:bg-white">
+                      <input
+                        type="radio"
+                        name="assignmentMode"
+                        value="unassigned"
+                        checked={assignmentMode === 'unassigned'}
+                        onChange={() => setAssignmentMode('unassigned')}
+                        className="mt-0.5 w-4 h-4 text-primary border-gray-300 focus:ring-primary"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">Leave Unassigned</div>
+                        <div className="text-sm text-gray-600">Assign to driver later</div>
+                      </div>
+                    </label>
+
+                    {/* Assign to User */}
+                    <label className={cn(
+                      "flex items-start gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all hover:bg-white",
+                      assignmentMode === 'user' && "border-primary bg-blue-50"
+                    )}>
+                      <input
+                        type="radio"
+                        name="assignmentMode"
+                        value="user"
+                        checked={assignmentMode === 'user'}
+                        onChange={() => setAssignmentMode('user')}
+                        className="mt-0.5 w-4 h-4 text-primary border-gray-300 focus:ring-primary"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4" />
+                          <span className="font-medium text-gray-900">Assign to User (one-off)</span>
+                        </div>
+                        <div className="text-sm text-gray-600">Manual one-time assignment</div>
+                      </div>
+                    </label>
+
+                    {/* Assign to Active Shift */}
+                    <label className={cn(
+                      "flex items-start gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all hover:bg-white",
+                      assignmentMode === 'active_shift' && "border-primary bg-blue-50"
+                    )}>
+                      <input
+                        type="radio"
+                        name="assignmentMode"
+                        value="active_shift"
+                        checked={assignmentMode === 'active_shift'}
+                        onChange={() => setAssignmentMode('active_shift')}
+                        className="mt-0.5 w-4 h-4 text-primary border-gray-300 focus:ring-primary"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Truck className="w-4 h-4" />
+                          <span className="font-medium text-gray-900">Assign to Active Shift</span>
+                        </div>
+                        <div className="text-sm text-gray-600">Add to driver currently on route</div>
+                      </div>
+                    </label>
+
+                    {/* Assign to Future Shift */}
+                    <label className={cn(
+                      "flex items-start gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all hover:bg-white",
+                      assignmentMode === 'future_shift' && "border-primary bg-blue-50"
+                    )}>
+                      <input
+                        type="radio"
+                        name="assignmentMode"
+                        value="future_shift"
+                        checked={assignmentMode === 'future_shift'}
+                        onChange={() => setAssignmentMode('future_shift')}
+                        className="mt-0.5 w-4 h-4 text-primary border-gray-300 focus:ring-primary"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4" />
+                          <span className="font-medium text-gray-900">Assign to Future Shift</span>
+                        </div>
+                        <div className="text-sm text-gray-600">Add to upcoming scheduled shift</div>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Conditional: User Selection */}
+                  {assignmentMode === 'user' && (
+                    <div className="pt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Select User *
+                      </label>
+                      {usersLoading ? (
+                        <div className="text-center py-8 bg-white rounded-lg">
+                          <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto mb-2" />
+                          <p className="text-sm text-gray-500">Loading users...</p>
+                        </div>
+                      ) : users && users.length > 0 ? (
+                        <div className="space-y-2">
+                          {users.map((user) => (
+                            <button
+                              key={user.id}
+                              type="button"
+                              onClick={() => setSelectedUserId(user.id)}
+                              className={cn(
+                                'w-full text-left p-4 rounded-xl border-2 transition-all',
+                                selectedUserId === user.id
+                                  ? 'border-primary bg-white'
+                                  : 'border-gray-200 hover:border-gray-300 bg-white'
+                              )}
+                            >
+                              <div className="flex items-center gap-3">
+                                <User className="w-4 h-4 text-gray-600" />
+                                <div>
+                                  <div className="font-semibold text-gray-900">{user.name}</div>
+                                  <div className="text-sm text-gray-500 capitalize">{user.role}</div>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 bg-white rounded-lg">
+                          <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                          <p className="text-sm text-gray-500">No users found</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Conditional: Shift Selection (Active or Future) */}
+                  {(assignmentMode === 'active_shift' || assignmentMode === 'future_shift') && (
+                    <div className="pt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Select Shift *
+                      </label>
+                      {shiftsLoading ? (
+                        <div className="text-center py-8 bg-white rounded-lg">
+                          <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto mb-2" />
+                          <p className="text-sm text-gray-500">Loading shifts...</p>
+                        </div>
+                      ) : shifts && shifts.filter(s =>
+                          assignmentMode === 'active_shift' ? s.status === 'active' : s.status !== 'active'
+                        ).length > 0 ? (
+                        <div className="space-y-2">
+                          {shifts
+                            .filter(s => assignmentMode === 'active_shift' ? s.status === 'active' : s.status !== 'active')
+                            .map((shift) => {
+                              const isActive = shift.status === 'active';
+                              const isSelected = selectedShiftId === shift.id;
+
+                              return (
+                            <button
+                              key={shift.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedShiftId(shift.id);
+                                setInsertAfterBinId(''); // Reset selection when changing shifts
+                              }}
+                              className={cn(
+                                'w-full text-left p-4 rounded-xl border-2 transition-all',
+                                isSelected
+                                  ? 'border-primary bg-blue-50'
+                                  : 'border-gray-200 hover:border-gray-300 bg-white'
+                              )}
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <User className="w-4 h-4 text-gray-600" />
+                                    <span className="font-semibold text-gray-900">
+                                      {shift.driverName}
+                                    </span>
+                                    <Badge
+                                      className={cn(
+                                        'text-xs',
+                                        isActive
+                                          ? 'bg-green-100 text-green-700'
+                                          : 'bg-blue-100 text-blue-700'
+                                      )}
+                                    >
+                                      {isActive ? 'Active Now' : 'Future Shift'}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                                    <Calendar className="w-3 h-3" />
+                                    <span>
+                                      {shift.date} • {shift.startTime}
+                                    </span>
+                                  </div>
+                                  <div className="mt-1 text-sm text-gray-500">
+                                    {shift.binCount} bins • {shift.binsCollected || 0} completed
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 bg-gray-50 rounded-lg">
+                        <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500">No available shifts found</p>
+                        <p className="text-xs text-gray-400 mt-1">Create a shift first</p>
+                      </div>
+                    )}
+                    </div>
+                  )}
+
+                  {/* Position Selection - Future Shift */}
+                  {assignmentMode === 'future_shift' && selectedShiftId && (
+                    <div className="pt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Insert Position *
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setInsertPosition('start')}
+                          className={cn(
+                            'p-4 rounded-xl border-2 text-left transition-all',
+                            insertPosition === 'start'
+                              ? 'border-primary bg-blue-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          )}
+                        >
+                          <div className="font-semibold text-gray-900 mb-1">At Start</div>
+                          <div className="text-sm text-gray-600">
+                            Insert at the beginning of the route
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setInsertPosition('end')}
+                          className={cn(
+                            'p-4 rounded-xl border-2 text-left transition-all',
+                            insertPosition === 'end'
+                              ? 'border-primary bg-blue-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          )}
+                        >
+                          <div className="font-semibold text-gray-900 mb-1">At End</div>
+                          <div className="text-sm text-gray-600">
+                            Insert at the end of the route
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Position Selection - Active Shift */}
+                  {assignmentMode === 'active_shift' && selectedShiftId && (
+                    <div className="pt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Insert After Bin *
+                      </label>
+                      <div className="space-y-2 bg-gray-50 rounded-xl p-4 max-h-64 overflow-y-auto">
+                        {remainingBins.length > 0 ? (
+                          remainingBins.map((bin, index) => (
+                            <button
+                              key={bin.bin_id}
+                              type="button"
+                              onClick={() => setInsertAfterBinId(bin.bin_id)}
+                              className={cn(
+                                'w-full text-left p-3 rounded-lg border-2 transition-all',
+                                insertAfterBinId === bin.bin_id
+                                  ? 'border-primary bg-white'
+                                  : 'border-gray-200 hover:border-gray-300 bg-white'
+                              )}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-sm font-semibold text-gray-600">
+                                    {index + 1}
+                                  </div>
+                                  <div>
+                                    <div className="font-semibold text-gray-900">
+                                      Bin #{bin.bin_number}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      Insert after this bin
+                                    </div>
+                                  </div>
+                                </div>
+                                <MapPin className="w-4 h-4 text-gray-400" />
+                              </div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="text-center py-4">
+                            <p className="text-sm text-gray-500">
+                              No remaining bins in this shift
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Actions */}
             <div className="flex gap-3 pt-4">
               <Button type="button" variant="outline" onClick={onClose} className="flex-1">
@@ -536,8 +1052,9 @@ export function ScheduleMoveModal({ bin, bins, onClose, onSuccess }: ScheduleMov
         </div>
       </Card>
       </div>
-    </>
-  );
+    </>,
+    document.body
+  ) : null;
 }
 
 // Retire Bin Modal
@@ -579,11 +1096,11 @@ export function RetireBinModal({ bin, bins, onClose, onSuccess }: RetireBinModal
     }, 1000);
   };
 
-  return (
+  return typeof window !== 'undefined' ? createPortal(
     <>
       {/* Overlay */}
       <div
-        className={`fixed inset-0 z-50 bg-black/50 ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
+        className={`fixed inset-0 z-40 bg-black/50 ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
         onClick={handleClose}
       />
 
@@ -692,6 +1209,7 @@ export function RetireBinModal({ bin, bins, onClose, onSuccess }: RetireBinModal
         </div>
       </Card>
       </div>
-    </>
-  );
+    </>,
+    document.body
+  ) : null;
 }
