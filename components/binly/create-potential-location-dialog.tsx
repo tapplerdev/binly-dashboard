@@ -192,6 +192,56 @@ export function CreatePotentialLocationDialog({
     []
   );
 
+  // Handle Google Places autocomplete selection for street address
+  const handleStreetPlaceSelect = useCallback((place: google.maps.places.PlaceResult) => {
+    if (!place.address_components || !place.geometry) return;
+
+    // Parse address components
+    let street = '';
+    let city = '';
+    let zip = '';
+
+    place.address_components.forEach((component) => {
+      const types = component.types;
+
+      if (types.includes('street_number')) {
+        street = component.long_name;
+      }
+      if (types.includes('route')) {
+        street = street ? `${street} ${component.long_name}` : component.long_name;
+      }
+      if (types.includes('locality')) {
+        city = component.long_name;
+      }
+      if (!city && types.includes('sublocality_level_1')) {
+        city = component.long_name;
+      }
+      if (types.includes('postal_code')) {
+        zip = component.long_name;
+      }
+    });
+
+    const lat = place.geometry.location?.lat();
+    const lng = place.geometry.location?.lng();
+
+    if (!lat || !lng) return;
+
+    // Update all fields with auto-filled data
+    setFormData({
+      ...formData,
+      street: street.trim(),
+      city: city.trim(),
+      zip: zip.trim(),
+      latitude: lat.toString(),
+      longitude: lng.toString(),
+    });
+
+    // Create marker and pan map to location
+    setMarkerPosition({ lat, lng });
+    setMapCenter({ lat, lng });
+    setHasInteractedWithMap(true);
+  }, [formData]);
+
   // Forward geocode address from form fields
   const forwardGeocodeAddress = useCallback(async () => {
     if (!formData.street || !formData.city || !formData.zip) return;
@@ -484,11 +534,12 @@ export function CreatePotentialLocationDialog({
                   <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                     Street Address <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    required
+                  <PlacesAutocomplete
                     value={formData.street}
-                    onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+                    onChange={(value) => {
+                      setFormData({ ...formData, street: value });
+                    }}
+                    onPlaceSelect={handleStreetPlaceSelect}
                     placeholder="123 Main St"
                     className={inputStyles()}
                   />
