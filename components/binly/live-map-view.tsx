@@ -590,7 +590,7 @@ export function LiveMapView() {
           drivers
             .filter((driver) => driver.currentLocation)
             .map((driver) => {
-              const initial = driver.driverName.charAt(0).toUpperCase();
+              const initials = driver.driverName.split(' ').map(n => n[0]).join('').toUpperCase();
               const statusColor =
                 driver.status === 'active'
                   ? '#10B981' // Green for active
@@ -611,23 +611,31 @@ export function LiveMapView() {
                     console.log('Driver clicked:', driver.driverName);
                   }}
                 >
-                  <div
-                    className="relative cursor-pointer transition-all duration-300 hover:scale-110 animate-scale-in"
-                    title={`${driver.driverName} - ${driver.status}`}
-                  >
-                    {/* Driver Circle with Initial */}
+                  <div className="relative">
+                    {/* Driver avatar - simple circle with initials */}
                     <div
-                      className="w-12 h-12 rounded-full border-4 border-white shadow-2xl flex items-center justify-center font-bold text-white text-lg"
+                      className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-xs cursor-pointer transition-all duration-300 shadow-lg hover:scale-110 ${
+                        driver.status === 'active' ? 'animate-pulse' : ''
+                      }`}
                       style={{ backgroundColor: statusColor }}
+                      title={`${driver.driverName} - ${driver.status}`}
                     >
-                      {initial}
+                      {initials}
                     </div>
-                    {/* Status Indicator Pulse (Active only) */}
-                    {driver.status === 'active' && (
+
+                    {/* Heading indicator (optional - only if heading is available) */}
+                    {driver.currentLocation!.heading !== undefined && driver.status === 'active' && (
                       <div
-                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white animate-pulse"
-                        style={{ backgroundColor: '#10B981' }}
-                      />
+                        className="absolute -top-2 left-1/2 -translate-x-1/2"
+                        style={{
+                          transform: `translateX(-50%) rotate(${driver.currentLocation!.heading}deg)`,
+                        }}
+                      >
+                        <div
+                          className="w-0 h-0 border-l-4 border-r-4 border-b-8 border-transparent"
+                          style={{ borderBottomColor: statusColor }}
+                        />
+                      </div>
                     )}
                   </div>
                 </AdvancedMarker>
