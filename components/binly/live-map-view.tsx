@@ -339,8 +339,10 @@ export function LiveMapView() {
                 onSelectResult={handleSearchResult}
               />
             </div>
-            {/* Operations Nav Tabs - Always visible */}
-            <OperationsNavTabs />
+            {/* Operations Nav Tabs - Hidden on mobile (use hamburger menu instead) */}
+            <div className="hidden lg:block">
+              <OperationsNavTabs />
+            </div>
           </div>
         </div>
       )}

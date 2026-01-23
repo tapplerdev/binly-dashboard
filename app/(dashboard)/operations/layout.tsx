@@ -19,8 +19,8 @@ export default function OperationsLayout({
 
   return (
     <div className="h-full flex flex-col">
-      {/* Navigation Tabs - Sticky at top for non-map pages */}
-      <div className="sticky top-0 z-20 bg-gray-50 border-b border-gray-200 px-4 py-3">
+      {/* Navigation Tabs - Sticky at top for non-map pages, hidden on mobile (use hamburger menu instead) */}
+      <div className="hidden lg:block sticky top-0 z-20 bg-gray-50 border-b border-gray-200 px-4 py-3">
         <OperationsNavTabs />
       </div>
 

@@ -549,23 +549,23 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
       />
 
       {/* Modal */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none p-0 md:p-4">
         <Card
-          className={`w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4 pointer-events-auto ${isClosing ? 'animate-scale-out' : 'animate-scale-in'}`}
+          className={`w-full md:max-w-2xl h-full md:h-auto md:max-h-[90vh] overflow-y-auto md:m-4 md:rounded-2xl rounded-none pointer-events-auto ${isClosing ? 'animate-scale-out' : 'animate-scale-in'}`}
           onClick={(e) => e.stopPropagation()}
         >
-        <div className="p-6 relative">
+        <div className="p-4 md:p-6 relative">
           {/* Header */}
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">
+          <div className="flex items-start justify-between mb-4 md:mb-6">
+            <div className="flex-1 mr-2">
+              <h2 className="text-lg md:text-2xl font-bold text-gray-900">
                 {isEditing
                   ? 'Edit Move Request'
                   : selectedBins.length > 1
                   ? 'Schedule Bulk Moves'
                   : 'Schedule Bin Move'}
               </h2>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-xs md:text-sm text-gray-600 mt-1">
                 {isEditing
                   ? moveRequest?.bin_number
                     ? `Bin ${moveRequest.bin_number} - ${moveRequest.bin_street || 'Unknown location'}`
@@ -577,7 +577,7 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
                   : 'Select bin(s) to schedule move request(s)'}
               </p>
             </div>
-            <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
               <X className="w-5 h-5 text-gray-500" />
             </button>
           </div>
@@ -760,11 +760,11 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
               </label>
 
               {/* Quick Date Buttons */}
-              <div className="grid grid-cols-4 gap-2 mb-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
                 <button
                   type="button"
                   onClick={() => handleDateQuickSelect('24h')}
-                  className={`px-3 py-2 text-sm border-2 rounded-lg transition-colors ${
+                  className={`px-2 md:px-3 py-2 text-xs md:text-sm border-2 rounded-lg transition-colors ${
                     dateOption === '24h'
                       ? 'border-red-500 bg-red-50 text-red-700 font-semibold'
                       : 'border-gray-200 hover:border-gray-300 text-gray-700'
@@ -775,7 +775,7 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
                 <button
                   type="button"
                   onClick={() => handleDateQuickSelect('3days')}
-                  className={`px-3 py-2 text-sm border-2 rounded-lg transition-colors ${
+                  className={`px-2 md:px-3 py-2 text-xs md:text-sm border-2 rounded-lg transition-colors ${
                     dateOption === '3days'
                       ? 'border-orange-500 bg-orange-50 text-orange-700 font-semibold'
                       : 'border-gray-200 hover:border-gray-300 text-gray-700'
@@ -786,7 +786,7 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
                 <button
                   type="button"
                   onClick={() => handleDateQuickSelect('week')}
-                  className={`px-3 py-2 text-sm border-2 rounded-lg transition-colors ${
+                  className={`px-2 md:px-3 py-2 text-xs md:text-sm border-2 rounded-lg transition-colors ${
                     dateOption === 'week'
                       ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
                       : 'border-gray-200 hover:border-gray-300 text-gray-700'
@@ -797,7 +797,7 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
                 <button
                   type="button"
                   onClick={() => handleDateQuickSelect('custom')}
-                  className={`px-3 py-2 text-sm border-2 rounded-lg transition-colors ${
+                  className={`px-2 md:px-3 py-2 text-xs md:text-sm border-2 rounded-lg transition-colors ${
                     dateOption === 'custom'
                       ? 'border-primary bg-blue-50 text-blue-700 font-semibold'
                       : 'border-gray-200 hover:border-gray-300 text-gray-700'
@@ -825,30 +825,30 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Move Type *
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, move_type: 'store' })}
-                  className={`p-4 border-2 rounded-lg text-left transition-colors ${
+                  className={`p-3 md:p-4 border-2 rounded-lg text-left transition-colors ${
                     formData.move_type === 'store'
                       ? 'border-primary bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="font-semibold text-gray-900">Store in Warehouse</div>
-                  <div className="text-sm text-gray-600">Pick up and store for future use</div>
+                  <div className="font-semibold text-sm md:text-base text-gray-900">Store in Warehouse</div>
+                  <div className="text-xs md:text-sm text-gray-600">Pick up and store for future use</div>
                 </button>
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, move_type: 'relocation' })}
-                  className={`p-4 border-2 rounded-lg text-left transition-colors ${
+                  className={`p-3 md:p-4 border-2 rounded-lg text-left transition-colors ${
                     formData.move_type === 'relocation'
                       ? 'border-primary bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="font-semibold text-gray-900">Relocation</div>
-                  <div className="text-sm text-gray-600">Move to new address</div>
+                  <div className="font-semibold text-sm md:text-base text-gray-900">Relocation</div>
+                  <div className="text-xs md:text-sm text-gray-600">Move to new address</div>
                 </button>
               </div>
             </div>
@@ -876,9 +876,9 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
                       City *
                     </label>
                     <input
@@ -890,14 +890,14 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
                         setNewLocationAutoFilled({ ...newLocationAutoFilled, city: false });
                       }}
                       className={cn(
-                        "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary transition-colors",
+                        "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary transition-colors text-sm",
                         newLocationAutoFilled.city ? "bg-blue-50 border-blue-300" : "bg-white border-gray-300"
                       )}
                       placeholder="City"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
                       ZIP *
                     </label>
                     <input
@@ -909,7 +909,7 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
                         setNewLocationAutoFilled({ ...newLocationAutoFilled, zip: false });
                       }}
                       className={cn(
-                        "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary transition-colors",
+                        "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary transition-colors text-sm",
                         newLocationAutoFilled.zip ? "bg-blue-50 border-blue-300" : "bg-white border-gray-300"
                       )}
                       placeholder="ZIP"
@@ -1189,22 +1189,22 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
                   {/* Position Selection - Future Shift */}
                   {assignmentMode === 'future_shift' && selectedShiftId && (
                     <div className="pt-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
                         Insert Position *
                       </label>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <button
                           type="button"
                           onClick={() => setInsertPosition('start')}
                           className={cn(
-                            'p-4 rounded-xl border-2 text-left transition-all',
+                            'p-3 md:p-4 rounded-xl border-2 text-left transition-all',
                             insertPosition === 'start'
                               ? 'border-primary bg-blue-50'
                               : 'border-gray-200 hover:border-gray-300'
                           )}
                         >
-                          <div className="font-semibold text-gray-900 mb-1">At Start</div>
-                          <div className="text-sm text-gray-600">
+                          <div className="font-semibold text-sm md:text-base text-gray-900 mb-1">At Start</div>
+                          <div className="text-xs md:text-sm text-gray-600">
                             Insert at the beginning of the route
                           </div>
                         </button>
@@ -1212,14 +1212,14 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
                           type="button"
                           onClick={() => setInsertPosition('end')}
                           className={cn(
-                            'p-4 rounded-xl border-2 text-left transition-all',
+                            'p-3 md:p-4 rounded-xl border-2 text-left transition-all',
                             insertPosition === 'end'
                               ? 'border-primary bg-blue-50'
                               : 'border-gray-200 hover:border-gray-300'
                           )}
                         >
-                          <div className="font-semibold text-gray-900 mb-1">At End</div>
-                          <div className="text-sm text-gray-600">
+                          <div className="font-semibold text-sm md:text-base text-gray-900 mb-1">At End</div>
+                          <div className="text-xs md:text-sm text-gray-600">
                             Insert at the end of the route
                           </div>
                         </button>
@@ -1280,13 +1280,13 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
               </div>
 
             {/* Actions */}
-            <div className="flex gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+            <div className="flex flex-col md:flex-row gap-3 pt-4">
+              <Button type="button" variant="outline" onClick={onClose} className="flex-1 w-full">
                 Cancel
               </Button>
               <Button
                 type="submit"
-                className="flex-1 bg-primary hover:bg-primary/90"
+                className="flex-1 w-full bg-primary hover:bg-primary/90"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
@@ -1372,24 +1372,24 @@ export function InProgressWarningModal({ driverName, waypointInfo, onClose, onCo
       />
 
       {/* Modal */}
-      <div className="fixed inset-0 z-[70] flex items-center justify-center pointer-events-none">
+      <div className="fixed inset-0 z-[70] flex items-center justify-center pointer-events-none p-0 md:p-4">
         <Card
-          className={`w-full max-w-lg m-4 pointer-events-auto ${isClosing ? 'animate-scale-out' : 'animate-scale-in'}`}
+          className={`w-full md:max-w-lg h-full md:h-auto m-0 md:m-4 md:rounded-2xl rounded-none pointer-events-auto ${isClosing ? 'animate-scale-out' : 'animate-scale-in'}`}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             {/* Header */}
             <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <AlertTriangle className="w-6 h-6 text-orange-600" />
+              <div className="flex items-center gap-2 md:gap-3 flex-1">
+                <div className="p-1.5 md:p-2 bg-orange-100 rounded-lg flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">Driver at Location</h2>
-                  <p className="text-sm text-gray-600">Action required for in-progress move</p>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-base md:text-xl font-bold text-gray-900">Driver at Location</h2>
+                  <p className="text-xs md:text-sm text-gray-600">Action required for in-progress move</p>
                 </div>
               </div>
-              <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
@@ -1473,11 +1473,11 @@ export function InProgressWarningModal({ driverName, waypointInfo, onClose, onCo
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3">
-              <Button type="button" variant="outline" onClick={handleClose} className="flex-1">
+            <div className="flex flex-col md:flex-row gap-3">
+              <Button type="button" variant="outline" onClick={handleClose} className="flex-1 w-full">
                 Cancel
               </Button>
-              <Button onClick={handleConfirm} className="flex-1 bg-primary hover:bg-primary/90">
+              <Button onClick={handleConfirm} className="flex-1 w-full bg-primary hover:bg-primary/90">
                 <Route className="w-4 h-4 mr-2" />
                 Confirm Changes
               </Button>
@@ -1526,24 +1526,24 @@ export function ActiveShiftWarningModal({ driverName, onClose, onConfirm }: Acti
       />
 
       {/* Modal */}
-      <div className="fixed inset-0 z-[70] flex items-center justify-center pointer-events-none">
+      <div className="fixed inset-0 z-[70] flex items-center justify-center pointer-events-none p-0 md:p-4">
         <Card
-          className={`w-full max-w-lg m-4 pointer-events-auto ${isClosing ? 'animate-scale-out' : 'animate-scale-in'}`}
+          className={`w-full md:max-w-lg h-full md:h-auto m-0 md:m-4 md:rounded-2xl rounded-none pointer-events-auto ${isClosing ? 'animate-scale-out' : 'animate-scale-in'}`}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             {/* Header */}
             <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-yellow-100 rounded-lg">
-                  <Truck className="w-6 h-6 text-yellow-600" />
+              <div className="flex items-center gap-2 md:gap-3 flex-1">
+                <div className="p-1.5 md:p-2 bg-yellow-100 rounded-lg flex-shrink-0">
+                  <Truck className="w-5 h-5 md:w-6 md:h-6 text-yellow-600" />
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">Active Route Change</h2>
-                  <p className="text-sm text-gray-600">This will affect driver's navigation</p>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-base md:text-xl font-bold text-gray-900">Active Route Change</h2>
+                  <p className="text-xs md:text-sm text-gray-600">This will affect driver's navigation</p>
                 </div>
               </div>
-              <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
@@ -1572,15 +1572,15 @@ export function ActiveShiftWarningModal({ driverName, onClose, onConfirm }: Acti
             </label>
 
             {/* Actions */}
-            <div className="flex gap-3">
-              <Button type="button" variant="outline" onClick={handleClose} className="flex-1">
+            <div className="flex flex-col md:flex-row gap-3">
+              <Button type="button" variant="outline" onClick={handleClose} className="flex-1 w-full">
                 Cancel
               </Button>
               <Button
                 onClick={handleConfirm}
                 disabled={!confirmed}
                 className={cn(
-                  "flex-1",
+                  "flex-1 w-full",
                   confirmed ? "bg-primary hover:bg-primary/90" : "bg-gray-300 cursor-not-allowed"
                 )}
               >
@@ -1644,19 +1644,19 @@ export function RetireBinModal({ bin, bins, onClose, onSuccess }: RetireBinModal
       />
 
       {/* Modal */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none p-0 md:p-4">
         <Card
-          className={`w-full max-w-md m-4 pointer-events-auto ${isClosing ? 'animate-scale-out' : 'animate-scale-in'}`}
+          className={`w-full md:max-w-md h-full md:h-auto m-0 md:m-4 md:rounded-2xl rounded-none pointer-events-auto ${isClosing ? 'animate-scale-out' : 'animate-scale-in'}`}
           onClick={(e) => e.stopPropagation()}
         >
-        <div className="p-6">
+        <div className="p-4 md:p-6">
           {/* Header */}
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">
+          <div className="flex items-start justify-between mb-4 md:mb-6">
+            <div className="flex-1 mr-2">
+              <h2 className="text-lg md:text-2xl font-bold text-gray-900">
                 {isBulk ? 'Retire Multiple Bins' : 'Retire Bin'}
               </h2>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-xs md:text-sm text-gray-600 mt-1">
                 {isBulk
                   ? `${targetBins.length} bins selected`
                   : bin
@@ -1664,7 +1664,7 @@ export function RetireBinModal({ bin, bins, onClose, onSuccess }: RetireBinModal
                   : ''}
               </p>
             </div>
-            <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
               <X className="w-5 h-5 text-gray-500" />
             </button>
           </div>
@@ -1681,32 +1681,32 @@ export function RetireBinModal({ bin, bins, onClose, onSuccess }: RetireBinModal
 
             {/* Disposal Action */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
                 Action *
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, disposal_action: 'retire' })}
-                  className={`p-4 border-2 rounded-lg text-center transition-colors ${
+                  className={`p-3 md:p-4 border-2 rounded-lg text-center transition-colors ${
                     formData.disposal_action === 'retire'
                       ? 'border-red-500 bg-red-50'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="font-semibold text-gray-900">Retire</div>
+                  <div className="font-semibold text-sm md:text-base text-gray-900">Retire</div>
                   <div className="text-xs text-gray-600">Permanently remove</div>
                 </button>
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, disposal_action: 'store' })}
-                  className={`p-4 border-2 rounded-lg text-center transition-colors ${
+                  className={`p-3 md:p-4 border-2 rounded-lg text-center transition-colors ${
                     formData.disposal_action === 'store'
                       ? 'border-primary bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="font-semibold text-gray-900">Store</div>
+                  <div className="font-semibold text-sm md:text-base text-gray-900">Store</div>
                   <div className="text-xs text-gray-600">Keep in warehouse</div>
                 </button>
               </div>
@@ -1728,13 +1728,13 @@ export function RetireBinModal({ bin, bins, onClose, onSuccess }: RetireBinModal
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+            <div className="flex flex-col md:flex-row gap-3 pt-4">
+              <Button type="button" variant="outline" onClick={onClose} className="flex-1 w-full">
                 Cancel
               </Button>
               <Button
                 type="submit"
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                className="flex-1 w-full bg-red-600 hover:bg-red-700 text-white"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
