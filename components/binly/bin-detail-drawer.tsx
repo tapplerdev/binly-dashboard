@@ -233,15 +233,15 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
 
       {/* Drawer */}
       <div
-        className={`fixed top-0 right-0 bottom-0 w-full max-w-2xl bg-white shadow-2xl z-50 overflow-hidden flex flex-col ${isClosing ? 'animate-slide-out-right' : 'animate-slide-in-right'}`}
+        className={`fixed top-0 right-0 bottom-0 w-full md:max-w-2xl bg-white shadow-2xl z-50 overflow-hidden flex flex-col ${isClosing ? 'animate-slide-out-right' : 'animate-slide-in-right'}`}
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-6">
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-4 md:p-6">
           <div className="flex items-start justify-between">
             <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h2 className="text-2xl font-bold text-gray-900">Bin {bin.bin_number}</h2>
-                <Badge className={status.color}>{status.label}</Badge>
+              <div className="flex items-center gap-2 md:gap-3 mb-2">
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Bin {bin.bin_number}</h2>
+                <Badge className={cn('text-xs md:text-sm', status.color)}>{status.label}</Badge>
               </div>
               <div className="flex items-center gap-2 text-gray-600">
                 <MapPin className="w-4 h-4" />
@@ -259,7 +259,7 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
           </div>
 
           {/* Action Buttons */}
-          <div className="mt-4 flex gap-2">
+          <div className="mt-3 md:mt-4 flex flex-col md:flex-row gap-2">
             <Button
               onClick={() => onScheduleMove?.(bin)}
               className="flex-1 bg-primary hover:bg-primary/90"
@@ -279,8 +279,8 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-200 px-6">
-          <div className="flex gap-6">
+        <div className="border-b border-gray-200 px-4 md:px-6 overflow-x-auto scrollbar-hide">
+          <div className="flex gap-4 md:gap-6 min-w-max">
             {[
               { key: 'overview', label: 'Overview' },
               { key: 'checks', label: 'Check History' },
@@ -303,11 +303,11 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
         </div>
 
         {/* Tab Content */}
-        <div className="p-6">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6">
           {activeTab === 'overview' && (
-            <div className="space-y-6">
+            <div className="space-y-4 md:space-y-6">
               {/* Key Metrics */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                 <Card className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-blue-50 rounded-lg">
@@ -357,13 +357,13 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
                             {activeMoveRequest.move_type === 'pickup_only' ? 'Pickup Only' : 'Relocation'}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Badge
-                            className={getMoveRequestBadgeColor(activeMoveRequest.scheduled_date)}
+                            className={cn('text-xs md:text-sm', getMoveRequestBadgeColor(activeMoveRequest.scheduled_date))}
                           >
                             {getMoveRequestUrgency(activeMoveRequest.scheduled_date).toUpperCase()}
                           </Badge>
-                          <Badge className="bg-gray-100 text-gray-700">
+                          <Badge className="bg-gray-100 text-gray-700 text-xs md:text-sm">
                             {activeMoveRequest.status.replace('_', ' ').toUpperCase()}
                           </Badge>
                         </div>
@@ -500,7 +500,7 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
               </div>
 
               {/* Two Column Layout: Map + Routes */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                 {/* Left Column: Map View */}
                 <div className="space-y-4">
                   {/* Static Map */}
