@@ -78,22 +78,22 @@ export function MoveRequestDetailDrawer({
 
       {/* Drawer */}
       <div className={cn(
-        "fixed top-0 right-0 h-full w-full max-w-2xl bg-white shadow-2xl z-50 overflow-y-auto",
+        "fixed top-0 right-0 h-full w-full md:max-w-2xl bg-white shadow-2xl z-50 overflow-y-auto",
         isClosing ? "animate-slide-out-right" : "animate-slide-in-right"
       )}>
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-          <div className="flex items-center gap-4">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 md:px-6 md:py-4 flex items-center justify-between z-10">
+          <div className="flex items-center gap-3 md:gap-4">
             <div className="flex items-center gap-2">
-              <Package className="h-6 w-6 text-gray-600" />
-              <h2 className="text-2xl font-bold text-gray-900">
+              <Package className="h-5 w-5 md:h-6 md:w-6 text-gray-600" />
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900">
                 Bin #{moveRequest.bin_number}
               </h2>
             </div>
-            <Badge className={cn('font-semibold', statusConfig[moveRequest.status].color)}>
+            <Badge className={cn('text-xs md:text-sm font-semibold', statusConfig[moveRequest.status].color)}>
               {statusConfig[moveRequest.status].label}
             </Badge>
-            <Badge className={cn('font-semibold', urgencyColors)}>
+            <Badge className={cn('text-xs md:text-sm font-semibold', urgencyColors)}>
               {urgencyLabels[urgency]}
             </Badge>
           </div>
@@ -107,15 +107,15 @@ export function MoveRequestDetailDrawer({
         </div>
 
         {/* Content */}
-        <div className={cn("p-6 space-y-6", isEditable ? "pb-32" : "pb-12")}>
+        <div className={cn("p-4 md:p-6 space-y-4 md:space-y-6", isEditable ? "pb-28 md:pb-32" : "pb-8 md:pb-12")}>
           {/* Move Request Details Card */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
+          <div className="bg-white border border-gray-200 rounded-xl md:rounded-2xl p-4 md:p-6 space-y-3 md:space-y-4">
+            <h3 className="text-base md:text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Calendar className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               Move Request Details
             </h3>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
               <div>
                 <label className="text-sm font-medium text-gray-500">Scheduled Date</label>
                 <p className="text-gray-900 font-semibold mt-1">
@@ -165,9 +165,9 @@ export function MoveRequestDetailDrawer({
           </div>
 
           {/* Current Location Card */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-primary" />
+          <div className="bg-white border border-gray-200 rounded-xl md:rounded-2xl p-4 md:p-6 space-y-3 md:space-y-4">
+            <h3 className="text-base md:text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <MapPin className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               Current Location
             </h3>
             <div>
@@ -180,9 +180,9 @@ export function MoveRequestDetailDrawer({
 
           {/* New Location Card (if relocation) */}
           {isRelocation && (moveRequest.new_street || moveRequest.new_address) && (
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-green-600" />
+            <div className="bg-white border border-gray-200 rounded-xl md:rounded-2xl p-4 md:p-6 space-y-3 md:space-y-4">
+              <h3 className="text-base md:text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <MapPin className="h-4 w-4 md:h-5 md:w-5 text-green-600" />
                 New Location
               </h3>
               <div>
@@ -199,9 +199,9 @@ export function MoveRequestDetailDrawer({
           )}
 
           {/* Assignment Information Card */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Truck className="h-5 w-5 text-primary" />
+          <div className="bg-white border border-gray-200 rounded-xl md:rounded-2xl p-4 md:p-6 space-y-3 md:space-y-4">
+            <h3 className="text-base md:text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Truck className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               Assignment Information
             </h3>
 
@@ -267,9 +267,9 @@ export function MoveRequestDetailDrawer({
 
           {/* Additional Information Card */}
           {(moveRequest.reason || moveRequest.notes) && (
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
+            <div className="bg-white border border-gray-200 rounded-xl md:rounded-2xl p-4 md:p-6 space-y-3 md:space-y-4">
+              <h3 className="text-base md:text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <FileText className="h-4 w-4 md:h-5 md:w-5 text-primary" />
                 Additional Information
               </h3>
 
@@ -290,7 +290,7 @@ export function MoveRequestDetailDrawer({
           )}
 
           {/* Timestamps Card */}
-          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 space-y-3">
+          <div className="bg-gray-50 border border-gray-200 rounded-xl md:rounded-2xl p-4 md:p-6 space-y-2 md:space-y-3">
             <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
               <Clock className="h-4 w-4 text-gray-500" />
               Timeline
@@ -326,7 +326,7 @@ export function MoveRequestDetailDrawer({
 
         {/* Footer Actions - Show for all editable statuses */}
         {isEditable && (
-          <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center gap-3">
+          <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 md:px-6 md:py-4 flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3">
             {onEdit && (
               <Button
                 onClick={() => onEdit(moveRequest)}
