@@ -16,7 +16,7 @@ import {
 import { NoGoZone, getZoneColor, getZoneColorRgba, getZoneOpacity } from '@/lib/types/zone';
 import { PotentialLocation } from '@/lib/api/potential-locations';
 import { Card } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Menu, X } from 'lucide-react';
 import { ZoneDetailsDrawer } from './zone-details-drawer';
 import { BinDetailDrawer } from './bin-detail-drawer';
 import { PotentialLocationDetailsDrawer } from './potential-location-details-drawer';
@@ -186,6 +186,7 @@ export function LiveMapView() {
   const [currentZoom, setCurrentZoom] = useState(DEFAULT_ZOOM);
   const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
   const [showLegend, setShowLegend] = useState(false);
+  const [showMobileNav, setShowMobileNav] = useState(false);
 
   // Get auth token from localStorage (Zustand persist storage)
   const getAuthToken = () => {
@@ -327,9 +328,9 @@ export function LiveMapView() {
         </div>
       )}
 
-      {/* Search Bar and Navigation - Top Center */}
+      {/* Search Bar and Navigation - Top Center (Desktop only) */}
       {!loading && (
-        <div className="absolute top-4 lg:top-8 left-1/2 -translate-x-1/2 z-10 w-full max-w-2xl px-3 lg:px-4 pointer-events-auto">
+        <div className="hidden md:block absolute top-4 lg:top-8 left-1/2 -translate-x-1/2 z-10 w-full max-w-2xl px-3 lg:px-4 pointer-events-auto">
           <div className="flex flex-col gap-3">
             <MapSearchBar
               bins={bins}
@@ -339,6 +340,17 @@ export function LiveMapView() {
             <OperationsNavTabs />
           </div>
         </div>
+      )}
+
+      {/* Hamburger Menu Button - Top Left (Mobile only) */}
+      {!loading && (
+        <button
+          onClick={() => setShowMobileNav(!showMobileNav)}
+          className="md:hidden fixed top-4 left-4 z-20 w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center hover:bg-gray-50 transition-all duration-200"
+          title="Navigation Menu"
+        >
+          <Menu className="w-6 h-6 text-gray-700" />
+        </button>
       )}
 
       {/* Legend/Info Button - Bottom Right (Floating) */}
@@ -504,6 +516,36 @@ export function LiveMapView() {
           onConvert={() => {}}
           onDelete={() => {}}
         />
+      )}
+
+      {/* Mobile Navigation Drawer - Left Side (Mobile only) */}
+      {showMobileNav && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/30 z-40 animate-fade-in md:hidden"
+            onClick={() => setShowMobileNav(false)}
+          />
+
+          {/* Drawer */}
+          <div className="fixed top-0 left-0 bottom-0 w-64 bg-white shadow-2xl z-50 animate-slide-in-left md:hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-bold text-gray-900">Navigation</h2>
+              <button
+                onClick={() => setShowMobileNav(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="p-4">
+              <OperationsNavTabs />
+            </div>
+          </div>
+        </>
       )}
 
       {/* Google Map */}
