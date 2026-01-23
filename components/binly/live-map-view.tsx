@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { useBins } from '@/lib/hooks/use-bins';
@@ -16,7 +17,7 @@ import {
 import { NoGoZone, getZoneColor, getZoneColorRgba, getZoneOpacity } from '@/lib/types/zone';
 import { PotentialLocation } from '@/lib/api/potential-locations';
 import { Card } from '@/components/ui/card';
-import { Loader2, Menu, X } from 'lucide-react';
+import { Loader2, Menu, X, Map as MapIcon, Route, Calendar, AlertCircle } from 'lucide-react';
 import { ZoneDetailsDrawer } from './zone-details-drawer';
 import { BinDetailDrawer } from './bin-detail-drawer';
 import { PotentialLocationDetailsDrawer } from './potential-location-details-drawer';
@@ -170,6 +171,8 @@ function ZoneCircles({
 }
 
 export function LiveMapView() {
+  const router = useRouter();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
 
   // React Query hooks for data fetching
@@ -328,7 +331,7 @@ export function LiveMapView() {
         </div>
       )}
 
-      {/* Search Bar and Navigation - Top Center (Desktop only) */}
+      {/* Desktop: Search Bar and Navigation - Top Center */}
       {!loading && (
         <div className="hidden md:block absolute top-4 lg:top-8 left-1/2 -translate-x-1/2 z-10 w-full max-w-2xl px-3 lg:px-4 pointer-events-auto">
           <div className="flex flex-col gap-3">
@@ -342,15 +345,26 @@ export function LiveMapView() {
         </div>
       )}
 
-      {/* Hamburger Menu Button - Top Left (Mobile only) */}
+      {/* Mobile: Header Bar with Hamburger - Top */}
       {!loading && (
-        <button
-          onClick={() => setShowMobileNav(!showMobileNav)}
-          className="md:hidden fixed top-4 left-4 z-20 w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center hover:bg-gray-50 transition-all duration-200"
-          title="Navigation Menu"
-        >
-          <Menu className="w-6 h-6 text-gray-700" />
-        </button>
+        <div className="md:hidden fixed top-4 left-4 right-4 z-20 pointer-events-auto">
+          <div className="bg-white rounded-2xl shadow-xl px-4 py-3 flex items-center justify-between">
+            {/* Hamburger Menu */}
+            <button
+              onClick={() => setShowMobileNav(!showMobileNav)}
+              className="p-2 -ml-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Navigation Menu"
+            >
+              <Menu className="w-6 h-6 text-gray-700" />
+            </button>
+
+            {/* Title */}
+            <h1 className="text-base font-bold text-gray-900">Operations</h1>
+
+            {/* Placeholder for balance */}
+            <div className="w-10" />
+          </div>
+        </div>
       )}
 
       {/* Legend/Info Button - Bottom Right (Floating) */}
@@ -523,27 +537,117 @@ export function LiveMapView() {
         <>
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-black/30 z-40 animate-fade-in md:hidden"
+            className="fixed inset-0 bg-black/40 z-40 animate-fade-in md:hidden"
             onClick={() => setShowMobileNav(false)}
           />
 
           {/* Drawer */}
-          <div className="fixed top-0 left-0 bottom-0 w-64 bg-white shadow-2xl z-50 animate-slide-in-left md:hidden">
+          <div className="fixed top-0 left-0 bottom-0 w-80 bg-white shadow-2xl z-50 animate-slide-in-left md:hidden flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h2 className="text-lg font-bold text-gray-900">Navigation</h2>
-              <button
-                onClick={() => setShowMobileNav(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
+            <div className="px-6 py-6 border-b border-gray-100">
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="text-xl font-bold text-gray-900">Operations</h2>
+                <button
+                  onClick={() => setShowMobileNav(false)}
+                  className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                  aria-label="Close menu"
+                >
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-500">Navigate to different sections</p>
             </div>
 
-            {/* Navigation Tabs */}
-            <div className="p-4">
-              <OperationsNavTabs />
-            </div>
+            {/* Navigation Items */}
+            <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
+              {/* Live Map */}
+              <button
+                onClick={() => {
+                  router.push('/operations/live-map');
+                  setShowMobileNav(false);
+                }}
+                className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-xl transition-all duration-200 ${
+                  pathname === '/operations/live-map'
+                    ? 'bg-primary text-white shadow-md'
+                    : 'text-gray-700 hover:bg-gray-50 active:scale-[0.98]'
+                }`}
+              >
+                <div className={`p-2 rounded-lg ${
+                  pathname === '/operations/live-map'
+                    ? 'bg-white/20'
+                    : 'bg-gray-100'
+                }`}>
+                  <MapIcon className="w-5 h-5" />
+                </div>
+                <span className="text-[15px] font-semibold">Live Map</span>
+              </button>
+
+              {/* Routes */}
+              <button
+                onClick={() => {
+                  router.push('/operations/routes');
+                  setShowMobileNav(false);
+                }}
+                className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-xl transition-all duration-200 ${
+                  pathname === '/operations/routes'
+                    ? 'bg-primary text-white shadow-md'
+                    : 'text-gray-700 hover:bg-gray-50 active:scale-[0.98]'
+                }`}
+              >
+                <div className={`p-2 rounded-lg ${
+                  pathname === '/operations/routes'
+                    ? 'bg-white/20'
+                    : 'bg-gray-100'
+                }`}>
+                  <Route className="w-5 h-5" />
+                </div>
+                <span className="text-[15px] font-semibold">Routes</span>
+              </button>
+
+              {/* Shifts */}
+              <button
+                onClick={() => {
+                  router.push('/operations/shifts');
+                  setShowMobileNav(false);
+                }}
+                className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-xl transition-all duration-200 ${
+                  pathname === '/operations/shifts'
+                    ? 'bg-primary text-white shadow-md'
+                    : 'text-gray-700 hover:bg-gray-50 active:scale-[0.98]'
+                }`}
+              >
+                <div className={`p-2 rounded-lg ${
+                  pathname === '/operations/shifts'
+                    ? 'bg-white/20'
+                    : 'bg-gray-100'
+                }`}>
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <span className="text-[15px] font-semibold">Shifts</span>
+              </button>
+
+              {/* Issues & Alerts */}
+              <button
+                onClick={() => {
+                  router.push('/operations/issues');
+                  setShowMobileNav(false);
+                }}
+                className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-xl transition-all duration-200 ${
+                  pathname === '/operations/issues'
+                    ? 'bg-primary text-white shadow-md'
+                    : 'text-gray-700 hover:bg-gray-50 active:scale-[0.98]'
+                }`}
+              >
+                <div className={`p-2 rounded-lg ${
+                  pathname === '/operations/issues'
+                    ? 'bg-white/20'
+                    : 'bg-gray-100'
+                }`}>
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <span className="text-[15px] font-semibold">Issues & Alerts</span>
+              </button>
+            </nav>
           </div>
         </>
       )}
