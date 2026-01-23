@@ -108,6 +108,7 @@ export function MoveRequestDetailDrawer({
             <XIcon className="h-5 w-5 text-gray-500" />
           </button>
         </div>
+        </div>
 
         {/* Content - Scrollable */}
         <div className="flex-1 overflow-y-auto">
