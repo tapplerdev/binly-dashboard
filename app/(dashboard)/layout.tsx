@@ -32,13 +32,13 @@ export default function DashboardLayout({
           <TopNavBar onOpenAIAssistant={() => setIsAIDrawerOpen(true)} />
 
           {/* Main Content */}
-          <main className="flex-1 overflow-y-auto relative pb-16 lg:pb-0">
+          <main className="flex-1 overflow-y-auto relative">
             {children}
           </main>
         </div>
 
-        {/* Mobile Bottom Navigation */}
-        <MobileBottomNav />
+        {/* Mobile Bottom Navigation - Hidden (replaced with hamburger menu) */}
+        {/* <MobileBottomNav /> */}
 
         {/* AI Assistant Drawer - Full screen overlay */}
         {isAIDrawerOpen && (
