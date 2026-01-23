@@ -22,7 +22,6 @@ import { BinDetailDrawer } from './bin-detail-drawer';
 import { PotentialLocationDetailsDrawer } from './potential-location-details-drawer';
 import { MapSearchBar } from './map-search-bar';
 import { PotentialLocationPin } from '@/components/ui/potential-location-pin';
-import { OperationsNavTabs } from './operations-nav-tabs';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 const WS_URL = API_URL.replace(/^https/, 'wss').replace(/^http/, 'ws');
@@ -338,10 +337,6 @@ export function LiveMapView() {
                 zones={zones}
                 onSelectResult={handleSearchResult}
               />
-            </div>
-            {/* Operations Nav Tabs - Hidden on mobile (use hamburger menu instead) */}
-            <div className="hidden lg:block">
-              <OperationsNavTabs />
             </div>
           </div>
         </div>

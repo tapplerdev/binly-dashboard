@@ -30,7 +30,7 @@ export function ShiftsView() {
   const assignRouteMutation = useAssignRoute();
 
   // Local state
-  const [viewMode, setViewMode] = useState<ViewMode>('live');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [filters, setFilters] = useState<ShiftFilters>({
@@ -199,6 +199,55 @@ export function ShiftsView() {
                   <span className="sm:hidden">Create</span>
                 </button>
               )}
+            </div>
+
+            {/* View Mode Toggle */}
+            <div className="flex items-center justify-center mb-4">
+              <div className="inline-flex items-center gap-2 bg-gray-100 rounded-lg p-1 relative">
+                {/* Sliding background */}
+                <div
+                  className="absolute bg-white rounded-md shadow-sm transition-all duration-200 ease-in-out"
+                  style={{
+                    left: `${sliderStyle.left}px`,
+                    width: `${sliderStyle.width}px`,
+                    top: '4px',
+                    bottom: '4px',
+                  }}
+                />
+                <button
+                  ref={liveButtonRef}
+                  onClick={() => setViewMode('live')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-fast relative z-10 ${
+                    viewMode === 'live'
+                      ? 'text-gray-900'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Live Map
+                </button>
+                <button
+                  ref={listButtonRef}
+                  onClick={() => setViewMode('list')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-fast relative z-10 ${
+                    viewMode === 'list'
+                      ? 'text-gray-900'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  List
+                </button>
+                <button
+                  ref={timelineButtonRef}
+                  onClick={() => setViewMode('timeline')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-fast relative z-10 ${
+                    viewMode === 'timeline'
+                      ? 'text-gray-900'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Timeline
+                </button>
+              </div>
             </div>
 
             {/* Filter Bar - Hidden in Live Ops mode */}
