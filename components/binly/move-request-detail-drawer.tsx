@@ -326,7 +326,6 @@ export function MoveRequestDetailDrawer({
               )}
             </div>
           </div>
-          </div>
         </div>
 
         {/* Footer Actions - Show for all editable statuses */}
