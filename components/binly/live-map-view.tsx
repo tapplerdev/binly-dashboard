@@ -6,6 +6,7 @@ import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-m
 import { useBins } from '@/lib/hooks/use-bins';
 import { useNoGoZones } from '@/lib/hooks/use-zones';
 import { usePotentialLocations, potentialLocationKeys } from '@/lib/hooks/use-potential-locations';
+import { useActiveDrivers } from '@/lib/hooks/use-active-drivers';
 import { useWebSocket, WebSocketMessage } from '@/lib/hooks/use-websocket';
 import {
   Bin,
@@ -171,21 +172,6 @@ function ZoneCircles({
 export function LiveMapView() {
   const queryClient = useQueryClient();
 
-  // React Query hooks for data fetching
-  const { data: bins = [], isLoading: loadingBins, error: binsError } = useBins();
-  const { data: zones = [], isLoading: loadingZones, error: zonesError } = useNoGoZones('active');
-  const { data: potentialLocations = [], isLoading: loadingLocations, error: locationsError } = usePotentialLocations('active');
-
-  const [selectedBin, setSelectedBin] = useState<Bin | null>(null);
-  const [selectedZone, setSelectedZone] = useState<NoGoZone | null>(null);
-  const [selectedPotentialLocation, setSelectedPotentialLocation] = useState<PotentialLocation | null>(null);
-  const [showFillLevels, setShowFillLevels] = useState(true);
-  const [showNoGoZones, setShowNoGoZones] = useState(true);
-  const [showPotentialLocations, setShowPotentialLocations] = useState(true);
-  const [currentZoom, setCurrentZoom] = useState(DEFAULT_ZOOM);
-  const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
-  const [showLegend, setShowLegend] = useState(false);
-
   // Get auth token from localStorage (Zustand persist storage)
   const getAuthToken = () => {
     try {
@@ -201,6 +187,24 @@ export function LiveMapView() {
   };
 
   const token = getAuthToken();
+
+  // React Query hooks for data fetching
+  const { data: bins = [], isLoading: loadingBins, error: binsError } = useBins();
+  const { data: zones = [], isLoading: loadingZones, error: zonesError } = useNoGoZones('active');
+  const { data: potentialLocations = [], isLoading: loadingLocations, error: locationsError } = usePotentialLocations('active');
+  const { drivers = [], isLoading: loadingDrivers } = useActiveDrivers({ token: token || undefined });
+
+  const [selectedBin, setSelectedBin] = useState<Bin | null>(null);
+  const [selectedZone, setSelectedZone] = useState<NoGoZone | null>(null);
+  const [selectedPotentialLocation, setSelectedPotentialLocation] = useState<PotentialLocation | null>(null);
+  const [showFillLevels, setShowFillLevels] = useState(true);
+  const [showNoGoZones, setShowNoGoZones] = useState(true);
+  const [showPotentialLocations, setShowPotentialLocations] = useState(true);
+  const [showDrivers, setShowDrivers] = useState(true);
+  const [currentZoom, setCurrentZoom] = useState(DEFAULT_ZOOM);
+  const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
+  const [showLegend, setShowLegend] = useState(false);
+
   const wsUrl = token ? `${WS_URL}/ws?token=${token}` : `${WS_URL}/ws`;
 
   // WebSocket connection for real-time updates
@@ -433,6 +437,14 @@ export function LiveMapView() {
                 <span className="font-bold text-orange-600">{potentialLocations.length}</span>
               </div>
             )}
+            {drivers.filter(d => d.currentLocation).length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-gray-600">Drivers:</span>
+                <span className="font-bold text-green-600">
+                  {drivers.filter(d => d.currentLocation).length}
+                </span>
+              </div>
+            )}
           </div>
             </div>
           </div>
@@ -572,6 +584,55 @@ export function LiveMapView() {
               </div>
             </AdvancedMarker>
           ))}
+
+        {/* Render driver markers with initials */}
+        {showDrivers &&
+          drivers
+            .filter((driver) => driver.currentLocation)
+            .map((driver) => {
+              const initial = driver.driverName.charAt(0).toUpperCase();
+              const statusColor =
+                driver.status === 'active'
+                  ? '#10B981' // Green for active
+                  : driver.status === 'paused'
+                  ? '#F59E0B' // Orange for paused
+                  : '#6B7280'; // Gray for inactive/ended
+
+              return (
+                <AdvancedMarker
+                  key={driver.driverId}
+                  position={{
+                    lat: driver.currentLocation!.latitude,
+                    lng: driver.currentLocation!.longitude,
+                  }}
+                  zIndex={15} // Higher than bins so drivers appear on top
+                  onClick={() => {
+                    // TODO: Add driver detail drawer if needed
+                    console.log('Driver clicked:', driver.driverName);
+                  }}
+                >
+                  <div
+                    className="relative cursor-pointer transition-all duration-300 hover:scale-110 animate-scale-in"
+                    title={`${driver.driverName} - ${driver.status}`}
+                  >
+                    {/* Driver Circle with Initial */}
+                    <div
+                      className="w-12 h-12 rounded-full border-4 border-white shadow-2xl flex items-center justify-center font-bold text-white text-lg"
+                      style={{ backgroundColor: statusColor }}
+                    >
+                      {initial}
+                    </div>
+                    {/* Status Indicator Pulse (Active only) */}
+                    {driver.status === 'active' && (
+                      <div
+                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white animate-pulse"
+                        style={{ backgroundColor: '#10B981' }}
+                      />
+                    )}
+                  </div>
+                </AdvancedMarker>
+              );
+            })}
         </Map>
       </APIProvider>
     </div>
