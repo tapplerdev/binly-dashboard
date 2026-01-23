@@ -47,10 +47,10 @@ export function ConvertToBinDialog({
         return;
       }
 
-      const payload: any = {};
-      if (fillPercentage) {
-        payload.fill_percentage = parseInt(fillPercentage, 10);
-      }
+      // Always send fill_percentage, default to 0 if empty
+      const payload: any = {
+        fill_percentage: fillPercentage ? parseInt(fillPercentage, 10) : 0,
+      };
 
       const response = await fetch(
         `https://ropacal-backend-production.up.railway.app/api/potential-locations/${location.id}/convert`,

@@ -50,7 +50,7 @@ export function CreateBinModal({ onClose, onSuccess }: CreateBinModalProps) {
       city: formData.city,
       zip: formData.zip,
       status: 'active',
-      fill_percentage: formData.fill_percentage || undefined,
+      fill_percentage: formData.fill_percentage, // Always send the value (defaults to 0)
       latitude: formData.latitude ? parseFloat(formData.latitude) : undefined,
       longitude: formData.longitude ? parseFloat(formData.longitude) : undefined,
     });
