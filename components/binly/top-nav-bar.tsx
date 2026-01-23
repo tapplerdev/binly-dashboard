@@ -1,12 +1,13 @@
 'use client';
 
-import { Search, Sparkles, Bell, Settings, LogOut, ChevronDown, Menu, X, Home, Map, Package, Brain, User } from 'lucide-react';
+import { Search, Sparkles, Bell, Settings, LogOut, ChevronDown, Menu, X, ChevronUp } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/lib/auth/store';
 import { cn } from '@/lib/utils';
+import { sidebarNavItems } from './sidebar-nav-items';
 
 interface TopNavBarProps {
   onOpenAIAssistant: () => void;
@@ -22,6 +23,28 @@ export function TopNavBar({ onOpenAIAssistant }: TopNavBarProps) {
   const { user, clearAuth } = useAuthStore();
 
   const userInitial = user?.name?.charAt(0).toUpperCase() || 'U';
+
+  // Find which section contains the current path for default open state
+  const defaultOpenSection = sidebarNavItems.find((section) =>
+    section.children.some((item) => item.path === pathname)
+  );
+
+  // State for expandable sections in mobile nav
+  const [openSections, setOpenSections] = useState<Set<string>>(
+    new Set(defaultOpenSection ? [defaultOpenSection.key] : [])
+  );
+
+  const toggleSection = (key: string) => {
+    setOpenSections((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
+      }
+      return newSet;
+    });
+  };
 
   const handleLogout = () => {
     clearAuth();
@@ -45,19 +68,12 @@ export function TopNavBar({ onOpenAIAssistant }: TopNavBarProps) {
     };
   }, [profileOpen]);
 
-  const mainNavItems = [
-    { key: 'home', title: 'Home', icon: Home, path: '/' },
-    { key: 'operations', title: 'Operations', icon: Map, path: '/operations/live-map' },
-    { key: 'inventory', title: 'Inventory', icon: Package, path: '/administration/inventory' },
-    { key: 'intelligence', title: 'Intelligence', icon: Brain, path: '/intelligence/analytics' },
-    { key: 'profile', title: 'Profile', icon: User, path: '/profile' },
-  ];
-
-  const isActive = (path: string) => {
+  const isActive = (path?: string) => {
+    if (!path) return false;
     if (path === '/') {
       return pathname === '/';
     }
-    return pathname.startsWith(path);
+    return pathname === path;
   };
 
   return (
@@ -179,35 +195,75 @@ export function TopNavBar({ onOpenAIAssistant }: TopNavBarProps) {
               </button>
             </div>
 
-            {/* Navigation Items */}
-            <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-              {mainNavItems.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.path);
-                return (
+            {/* Navigation Items with Expandable Sections */}
+            <nav className="flex-1 px-4 py-4 space-y-4 overflow-y-auto">
+              {sidebarNavItems.map((section) => (
+                <div key={section.key}>
+                  {/* Section Header */}
                   <button
-                    key={item.key}
-                    onClick={() => {
-                      router.push(item.path);
-                      setMobileNavOpen(false);
-                    }}
+                    onClick={() => section.children.length > 1 && toggleSection(section.key)}
                     className={cn(
-                      'w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200',
-                      active
-                        ? 'bg-primary text-white shadow-md'
-                        : 'text-gray-700 hover:bg-gray-50 active:scale-[0.98]'
+                      'w-full flex items-center justify-between px-3 py-2 text-left',
+                      section.children.length > 1 && 'cursor-pointer hover:bg-gray-50 rounded-lg transition-colors'
                     )}
                   >
-                    <div className={cn(
-                      'p-2 rounded-lg',
-                      active ? 'bg-white/20' : 'bg-gray-100'
-                    )}>
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <span className="text-[15px] font-semibold">{item.title}</span>
+                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      {section.title}
+                    </h3>
+                    {section.children.length > 1 && (
+                      <ChevronUp
+                        className={cn(
+                          'w-4 h-4 text-gray-400 transition-transform duration-200',
+                          !openSections.has(section.key) && 'rotate-180'
+                        )}
+                      />
+                    )}
                   </button>
-                );
-              })}
+
+                  {/* Section Items */}
+                  <div
+                    className={cn(
+                      'overflow-hidden transition-all duration-300 ease-in-out',
+                      section.children.length === 1 || openSections.has(section.key)
+                        ? 'max-h-96 opacity-100 mt-1'
+                        : 'max-h-0 opacity-0'
+                    )}
+                  >
+                    <div className="space-y-1">
+                      {section.children.map((item) => {
+                        const active = isActive(item.path);
+                        return (
+                          <button
+                            key={item.key}
+                            onClick={() => {
+                              if (item.path) {
+                                router.push(item.path);
+                                setMobileNavOpen(false);
+                              }
+                            }}
+                            className={cn(
+                              'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
+                              active
+                                ? 'bg-[#EDF0FF] text-[#4880FF] font-bold'
+                                : 'text-gray-700 font-medium hover:bg-gray-50'
+                            )}
+                          >
+                            {item.icon && (
+                              <span className={cn(
+                                'transition-colors duration-200',
+                                active ? 'text-[#4880FF]' : 'text-[#809FB8]'
+                              )}>
+                                {item.icon}
+                              </span>
+                            )}
+                            <span className="text-sm">{item.title}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </nav>
           </div>
         </>
