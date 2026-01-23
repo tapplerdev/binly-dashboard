@@ -160,7 +160,7 @@ export function PlacesAutocomplete({
         {
           input: value,
           types: ['address'],
-          componentRestrictions: { country: 'us' },
+          componentRestrictions: { country: ['us', 'co'] },
         },
         (predictions, status) => {
           console.log('📍 Places API response:', status, predictions?.length || 0, 'results');
