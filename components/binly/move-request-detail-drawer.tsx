@@ -78,28 +78,25 @@ export function MoveRequestDetailDrawer({
 
       {/* Drawer */}
       <div className={cn(
-        "fixed top-0 right-0 h-full w-full md:max-w-2xl bg-white shadow-2xl z-50 flex flex-col",
+        "fixed top-0 right-0 h-full w-full max-w-2xl bg-white shadow-2xl z-50 overflow-y-auto",
         isClosing ? "animate-slide-out-right" : "animate-slide-in-right"
       )}>
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 z-10 shrink-0">
-          <div className="flex items-start md:items-center justify-between gap-3">
-            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 min-w-0 flex-1">
-              <div className="flex items-center gap-2 shrink-0">
-                <Package className="h-5 w-5 md:h-6 md:w-6 text-gray-600" />
-                <h2 className="text-lg md:text-2xl font-bold text-gray-900 whitespace-nowrap">
-                  Bin #{moveRequest.bin_number}
-                </h2>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge className={cn('font-semibold text-xs', statusConfig[moveRequest.status].color)}>
-                  {statusConfig[moveRequest.status].label}
-                </Badge>
-                <Badge className={cn('font-semibold text-xs whitespace-nowrap', urgencyColors)}>
-                  {urgencyLabels[urgency]}
-                </Badge>
-              </div>
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Package className="h-6 w-6 text-gray-600" />
+              <h2 className="text-2xl font-bold text-gray-900">
+                Bin #{moveRequest.bin_number}
+              </h2>
             </div>
+            <Badge className={cn('font-semibold', statusConfig[moveRequest.status].color)}>
+              {statusConfig[moveRequest.status].label}
+            </Badge>
+            <Badge className={cn('font-semibold', urgencyColors)}>
+              {urgencyLabels[urgency]}
+            </Badge>
+          </div>
           <button
             onClick={handleClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -108,12 +105,10 @@ export function MoveRequestDetailDrawer({
             <XIcon className="h-5 w-5 text-gray-500" />
           </button>
         </div>
-        </div>
 
-        {/* Content - Scrollable */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-            {/* Move Request Details Card */}
+        {/* Content */}
+        <div className={cn("p-6 space-y-6", isEditable ? "pb-32" : "pb-12")}>
+          {/* Move Request Details Card */}
           <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
             <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
               <Calendar className="h-5 w-5 text-primary" />
@@ -331,24 +326,24 @@ export function MoveRequestDetailDrawer({
 
         {/* Footer Actions - Show for all editable statuses */}
         {isEditable && (
-          <div className="shrink-0 bg-white border-t border-gray-200 px-4 md:px-6 py-3 md:py-4 flex items-center gap-2 md:gap-3">
+          <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center gap-3">
             {onEdit && (
               <Button
                 onClick={() => onEdit(moveRequest)}
-                className="flex-1 bg-primary hover:bg-primary/90 h-10 md:h-9"
+                className="flex-1 bg-primary hover:bg-primary/90"
               >
-                <Edit className="h-4 w-4 mr-1.5 md:mr-2" />
-                <span className="text-sm md:text-base">Edit Move Request</span>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Move Request
               </Button>
             )}
             {onCancel && moveRequest.status === 'pending' && (
               <Button
                 variant="destructive"
                 onClick={() => onCancel(moveRequest)}
-                className="flex-1 h-10 md:h-9"
+                className="flex-1"
               >
-                <Trash2 className="h-4 w-4 mr-1.5 md:mr-2" />
-                <span className="text-sm md:text-base">Cancel Move</span>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Cancel Move
               </Button>
             )}
           </div>
