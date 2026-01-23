@@ -412,48 +412,6 @@ export function LiveMapView() {
         <div className="absolute bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 z-10 w-[calc(100%-2rem)] lg:w-auto max-w-full">
           <div className="bg-white/90 backdrop-blur-md rounded-full shadow-xl border border-gray-100 px-3 lg:px-6 py-2 lg:py-3 overflow-x-auto scrollbar-hide">
             <div className="flex items-center gap-2 lg:gap-4 min-w-max">
-          {/* Toggle: Fill Levels */}
-          <button
-            onClick={() => setShowFillLevels(!showFillLevels)}
-            className={`flex items-center gap-1.5 lg:gap-2 px-2 lg:px-3 py-1.5 rounded-full transition-colors ${
-              showFillLevels
-                ? 'bg-primary text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <div className="w-2 h-2 rounded-full bg-current shrink-0" />
-            <span className="text-xs lg:text-sm font-medium whitespace-nowrap">Fill Levels</span>
-          </button>
-
-          {/* Toggle: No-Go Zones */}
-          <button
-            onClick={() => setShowNoGoZones(!showNoGoZones)}
-            className={`flex items-center gap-1.5 lg:gap-2 px-2 lg:px-3 py-1.5 rounded-full transition-colors ${
-              showNoGoZones
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <div className="w-2 h-2 rounded-full bg-current shrink-0" />
-            <span className="text-xs lg:text-sm font-medium whitespace-nowrap">No-Go Zones</span>
-          </button>
-
-          {/* Toggle: Potential Locations */}
-          <button
-            onClick={() => setShowPotentialLocations(!showPotentialLocations)}
-            className={`flex items-center gap-1.5 lg:gap-2 px-2 lg:px-3 py-1.5 rounded-full transition-colors ${
-              showPotentialLocations
-                ? 'bg-orange-500 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <div className="w-2 h-2 rounded-full bg-current shrink-0" />
-            <span className="text-xs lg:text-sm font-medium whitespace-nowrap">Potential Locations</span>
-          </button>
-
-          {/* Divider */}
-          <div className="w-px h-6 bg-gray-300" />
-
           {/* Stats */}
           <div className="flex items-center gap-2 lg:gap-4 text-xs lg:text-sm">
             <div className="flex items-center gap-1.5">
@@ -466,13 +424,13 @@ export function LiveMapView() {
                 {bins.filter((b) => (b.fill_percentage ?? 0) >= 80).length}
               </span>
             </div>
-            {showNoGoZones && zones.length > 0 && (
+            {zones.length > 0 && (
               <div className="flex items-center gap-1.5">
                 <span className="text-gray-600">No-Go:</span>
                 <span className="font-bold text-red-600">{zones.length}</span>
               </div>
             )}
-            {showPotentialLocations && potentialLocations.length > 0 && (
+            {potentialLocations.length > 0 && (
               <div className="flex items-center gap-1.5">
                 <span className="text-gray-600">Potential:</span>
                 <span className="font-bold text-orange-600">{potentialLocations.length}</span>

@@ -217,55 +217,6 @@ export function ShiftsView() {
               />
             )}
 
-            {/* View Toggle */}
-            <div className="flex items-center justify-center gap-2 bg-gray-100 rounded-lg p-1 w-fit mx-auto relative">
-              {/* Sliding background */}
-              <div
-                className="absolute bg-white rounded-md shadow-sm transition-all duration-200 ease-in-out"
-                style={{
-                  left: `${sliderStyle.left}px`,
-                  width: `${sliderStyle.width}px`,
-                  top: '4px',
-                  bottom: '4px',
-                }}
-              />
-              <button
-                ref={liveButtonRef}
-                onClick={() => setViewMode('live')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-fast relative z-10 ${
-                  viewMode === 'live'
-                    ? 'text-gray-900'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <MapPin className="w-4 h-4" />
-                Live
-              </button>
-              <button
-                ref={listButtonRef}
-                onClick={() => setViewMode('list')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-fast relative z-10 ${
-                  viewMode === 'list'
-                    ? 'text-gray-900'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <List className="w-4 h-4" />
-                List
-              </button>
-              <button
-                ref={timelineButtonRef}
-                onClick={() => setViewMode('timeline')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-fast relative z-10 ${
-                  viewMode === 'timeline'
-                    ? 'text-gray-900'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Calendar className="w-4 h-4" />
-                Timeline
-              </button>
-            </div>
           </div>
 
           {/* View Content - Different widths per view */}
