@@ -182,27 +182,71 @@ export async function assignRoute(data: {
   route_id: string;
   bin_ids: string[];
 }): Promise<BackendShift> {
+  console.log('🚀 assignRoute called with data:', JSON.stringify(data, null, 2));
+  console.log('📊 Data details:');
+  console.log('   - driver_id:', data.driver_id);
+  console.log('   - route_id:', data.route_id);
+  console.log('   - bin_ids count:', data.bin_ids.length);
+  console.log('   - bin_ids:', data.bin_ids);
+
   try {
-    const response = await fetch(`${API_BASE_URL}/api/manager/assign-route`, {
+    const url = `${API_BASE_URL}/api/manager/assign-route`;
+    console.log('🌐 Making request to:', url);
+
+    const headers = getAuthHeaders();
+    console.log('🔑 Request headers:', JSON.stringify(headers, null, 2));
+
+    const bodyString = JSON.stringify(data);
+    console.log('📦 Request body:', bodyString);
+
+    const response = await fetch(url, {
       method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
+      headers,
+      body: bodyString,
     });
+
+    console.log('📡 Response received:');
+    console.log('   - Status:', response.status);
+    console.log('   - Status Text:', response.statusText);
+    console.log('   - OK:', response.ok);
 
     // Handle authentication errors with clear message
     if (response.status === 401) {
+      console.error('❌ Authentication error (401)');
       throw new Error('Authentication required. Please implement login to create shifts.');
     }
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Failed to assign route: ${response.statusText}`);
+      console.error('❌ Request failed with status:', response.status);
+      const responseText = await response.text();
+      console.error('📄 Raw response text:', responseText);
+
+      let errorData: any = {};
+      try {
+        errorData = JSON.parse(responseText);
+        console.error('📄 Parsed error data:', JSON.stringify(errorData, null, 2));
+      } catch (e) {
+        console.error('⚠️  Could not parse error response as JSON');
+      }
+
+      const errorMessage = errorData.error || `Failed to assign route: ${response.statusText}`;
+      console.error('💥 Throwing error:', errorMessage);
+      throw new Error(errorMessage);
     }
 
-    const result = await response.json();
+    console.log('✅ Request successful, parsing response...');
+    const responseText = await response.text();
+    console.log('📄 Raw response text:', responseText);
+
+    const result = JSON.parse(responseText);
+    console.log('✅ Parsed response:', JSON.stringify(result, null, 2));
+    console.log('✅ Returning shift data:', result.data);
     return result.data;
   } catch (error) {
-    console.error('Error assigning route:', error);
+    console.error('💥 Error in assignRoute:', error);
+    console.error('💥 Error type:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('💥 Error message:', error instanceof Error ? error.message : String(error));
+    console.error('💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     throw error;
   }
 }

@@ -1304,6 +1304,9 @@ function CreateShiftDrawer({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('🎬 handleSubmit called');
+    console.log('📋 Current formData:', JSON.stringify(formData, null, 2));
+
     setError(null);
     setIsSubmitting(true);
 
@@ -1312,34 +1315,55 @@ function CreateShiftDrawer({
       let binIds: string[] = [];
 
       if (formData.selectionType === 'route') {
+        console.log('📍 Getting bins from route:', formData.routeId);
         // Use bins from selected route
         const selectedRoute = routes.find(r => r.id === formData.routeId);
+        console.log('🔍 Found route:', selectedRoute);
+
         if (!selectedRoute || !selectedRoute.bin_ids) {
+          console.error('❌ Selected route has no bins');
           throw new Error('Selected route has no bins');
         }
         binIds = selectedRoute.bin_ids;
+        console.log('✅ Got', binIds.length, 'bins from route');
       } else {
+        console.log('📍 Using custom selected bins');
         // Use custom selected bins
         binIds = formData.selectedBins;
+        console.log('✅ Got', binIds.length, 'custom bins');
       }
 
       if (binIds.length === 0) {
+        console.error('❌ No bins selected (after processing)');
         throw new Error('No bins selected');
       }
 
-      // Call backend API to assign route (create shift) with React Query mutation
-      await assignRouteMutation.mutateAsync({
+      console.log('📦 Bin IDs to assign:', binIds);
+
+      const mutationData = {
         driver_id: formData.driverId,
         route_id: formData.routeId || 'custom',
         bin_ids: binIds,
-      });
+      };
+
+      console.log('🚀 Calling assignRouteMutation.mutateAsync with:', JSON.stringify(mutationData, null, 2));
+
+      // Call backend API to assign route (create shift) with React Query mutation
+      const result = await assignRouteMutation.mutateAsync(mutationData);
+
+      console.log('✅ Mutation successful! Result:', result);
 
       // Success! Close drawer
+      console.log('✅ Closing drawer');
       onClose();
     } catch (err) {
-      console.error('Failed to create shift:', err);
+      console.error('💥 Failed to create shift:', err);
+      console.error('💥 Error type:', err instanceof Error ? err.constructor.name : typeof err);
+      console.error('💥 Error message:', err instanceof Error ? err.message : String(err));
+      console.error('💥 Error stack:', err instanceof Error ? err.stack : 'No stack trace');
       setError(err instanceof Error ? err.message : 'Failed to create shift. Please try again.');
     } finally {
+      console.log('🏁 Setting isSubmitting to false');
       setIsSubmitting(false);
     }
   };
