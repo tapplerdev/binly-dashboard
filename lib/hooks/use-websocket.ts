@@ -148,7 +148,7 @@ export function useWebSocket({
       // console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       setStatus('error');
     }
-  }, [url, autoReconnect, reconnectInterval, reconnectAttempts, status]);
+  }, [url, autoReconnect, reconnectInterval, reconnectAttempts]);
 
   const disconnect = useCallback(() => {
     // console.log('Disconnecting WebSocket...');
