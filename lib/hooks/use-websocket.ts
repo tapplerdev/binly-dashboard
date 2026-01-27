@@ -25,8 +25,8 @@ export function useWebSocket({
   onDisconnect,
   onError,
   autoReconnect = true,
-  reconnectInterval = 3000,
-  reconnectAttempts = 5,
+  reconnectInterval = 5000,
+  reconnectAttempts = 3,
 }: UseWebSocketOptions) {
   const [status, setStatus] = useState<WebSocketStatus>('disconnected');
   const wsRef = useRef<WebSocket | null>(null);
