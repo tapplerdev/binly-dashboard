@@ -4,6 +4,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getMoveRequests, updateMoveRequest, bulkCancelMoves, cancelMoveRequest, clearMoveAssignment } from '@/lib/api/move-requests';
+import { useWebSocket, WebSocketMessage } from '@/lib/hooks/use-websocket';
 import {
   MoveRequest,
   MoveRequestStatus,
@@ -44,10 +45,44 @@ import { format } from 'date-fns';
 type SortColumn = 'bin_number' | 'scheduled_date' | 'urgency' | 'status' | 'assigned_driver_name';
 type MoveFilterOption = 'overdue' | 'urgent' | 'pending' | 'assigned' | 'in_progress' | 'completed' | 'store' | 'relocation';
 
+// Get auth token helper function
+function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const authStorage = localStorage.getItem('binly-auth-storage');
+    if (!authStorage) return null;
+    const parsed = JSON.parse(authStorage);
+    return parsed?.state?.token || null;
+  } catch {
+    return null;
+  }
+}
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const WS_URL = API_URL.replace(/^https/, 'wss').replace(/^http/, 'ws');
+
 export function MoveRequestsList() {
   // State
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<MoveFilterOption[]>([]);
+
+  // WebSocket connection for real-time updates
+  const token = getAuthToken();
+  const wsUrl = token ? `${WS_URL}/ws?token=${token}` : `${WS_URL}/ws`;
+
+  useWebSocket({
+    url: wsUrl,
+    onMessage: (message: WebSocketMessage) => {
+      if (message.type === 'move_request_status_updated') {
+        console.log('📡 Received move request status update:', message.data);
+        // Invalidate and refetch move requests to show updated status
+        queryClient.invalidateQueries({ queryKey: ['move-requests'] });
+      }
+    },
+    autoReconnect: true,
+    reconnectInterval: 3000,
+    reconnectAttempts: 5,
+  });
   const [assignedFilter, setAssignedFilter] = useState<'all' | 'assigned' | 'unassigned'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMoves, setSelectedMoves] = useState<Set<string>>(new Set());
