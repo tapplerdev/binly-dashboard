@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shift';
-import { getShiftDetails } from '@/lib/api/shifts';
+import { getShiftDetails, cancelShift } from '@/lib/api/shifts';
 
 interface ShiftBin {
   id: number;
@@ -30,6 +30,8 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
   const [isClosing, setIsClosing] = useState(false);
   const [bins, setBins] = useState<ShiftBin[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   // Fetch shift details on mount
   useEffect(() => {
@@ -52,6 +54,33 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
     setTimeout(() => {
       onClose();
     }, 300); // Match animation duration
+  };
+
+  const handleCancelShift = async () => {
+    // Confirmation dialog
+    if (!confirm(`Are you sure you want to cancel this shift for ${shift.driverName}? This will stop navigation and notify the driver.`)) {
+      return;
+    }
+
+    setIsCancelling(true);
+    setCancelError(null);
+
+    try {
+      await cancelShift(shift.id);
+      console.log('✅ Shift cancelled successfully');
+
+      // Close drawer and let parent handle refresh
+      handleClose();
+
+      // Optional: Trigger a page refresh or refetch shifts
+      // The parent component should handle this via WebSocket or polling
+      window.location.reload();
+    } catch (error) {
+      console.error('❌ Failed to cancel shift:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to cancel shift';
+      setCancelError(errorMessage);
+      setIsCancelling(false);
+    }
   };
 
   const statusColor = getShiftStatusColor(shift.status);
@@ -271,24 +300,46 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
 
         {/* Actions Footer */}
         {shift.status === 'scheduled' && (
-          <div className="border-t border-gray-200 p-4 bg-gray-50 flex gap-3">
-            <button className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-fast">
-              Edit Shift
-            </button>
-            <button className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-fast">
-              Cancel Shift
-            </button>
+          <div className="border-t border-gray-200 p-4 bg-gray-50">
+            {cancelError && (
+              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{cancelError}</p>
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-fast">
+                Edit Shift
+              </button>
+              <button
+                onClick={handleCancelShift}
+                disabled={isCancelling}
+                className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-fast disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCancelling ? 'Cancelling...' : 'Cancel Shift'}
+              </button>
+            </div>
           </div>
         )}
 
         {shift.status === 'active' && (
-          <div className="border-t border-gray-200 p-4 bg-gray-50 flex gap-3">
-            <button className="flex-1 px-4 py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-fast">
-              Contact Driver
-            </button>
-            <button className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-fast">
-              Cancel Shift
-            </button>
+          <div className="border-t border-gray-200 p-4 bg-gray-50">
+            {cancelError && (
+              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{cancelError}</p>
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button className="flex-1 px-4 py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-fast">
+                Contact Driver
+              </button>
+              <button
+                onClick={handleCancelShift}
+                disabled={isCancelling}
+                className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-fast disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCancelling ? 'Cancelling...' : 'Cancel Shift'}
+              </button>
+            </div>
           </div>
         )}
       </div>

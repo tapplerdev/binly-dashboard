@@ -252,6 +252,37 @@ export async function assignRoute(data: {
 }
 
 /**
+ * Cancels a specific shift by ID
+ * @param shiftId - The shift ID to cancel
+ */
+export async function cancelShift(shiftId: string): Promise<void> {
+  console.log('🚫 Cancelling shift:', shiftId);
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}/cancel`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+    });
+
+    console.log('📡 Cancel shift response status:', response.status);
+
+    if (response.status === 401) {
+      throw new Error('Authentication required');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.error || `Failed to cancel shift: ${response.statusText}`;
+      throw new Error(errorMessage);
+    }
+
+    console.log('✅ Shift cancelled successfully');
+  } catch (error) {
+    console.error('❌ Error cancelling shift:', error);
+    throw error;
+  }
+}
+
+/**
  * Clears all shifts (for testing - admin only)
  */
 export async function clearAllShifts(): Promise<void> {
