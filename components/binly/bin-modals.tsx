@@ -507,9 +507,14 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
         // Detect if assignment changed
         assignmentChanged = (newShiftId !== oldShiftId || newUserId !== oldUserId);
 
-        console.log('✏️ [EDIT MODE] Old assignment - Shift:', oldShiftId, 'User:', oldUserId);
-        console.log('✏️ [EDIT MODE] New assignment - Shift:', newShiftId, 'User:', newUserId);
-        console.log('✏️ [EDIT MODE] Assignment changed:', assignmentChanged);
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('🔍 [ASSIGNMENT DETECTION]');
+        console.log('   Assignment Mode:', assignmentMode);
+        console.log('   Old assignment - Shift:', oldShiftId, 'User:', oldUserId);
+        console.log('   New assignment - Shift:', newShiftId, 'User:', newUserId);
+        console.log('   Assignment changed:', assignmentChanged);
+        console.log('   Is unassigning:', assignmentChanged && !newShiftId && !newUserId);
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
         if (assignmentChanged) {
           // Assignment changed - use specialized assignment APIs
@@ -540,13 +545,40 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
             });
           } else if (!newShiftId && !newUserId) {
             // Unassigning (back to pending)
-            console.log('⭕ [EDIT MODE] Unassigning move request (back to pending)');
-            await updateMoveRequest(moveRequest.id, {
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('⭕ [UNASSIGNMENT] Starting unassignment flow');
+            console.log('   Move Request ID:', moveRequest.id);
+            console.log('   Old Shift ID:', oldShiftId);
+            console.log('   Old User ID:', oldUserId);
+            console.log('   Old Assignment Type:', moveRequest.assignment_type);
+            console.log('   Was on active shift:', moveRequest.status === 'in_progress');
+            console.log('   Current status:', moveRequest.status);
+            console.log('   Assigned driver:', moveRequest.assigned_driver_name);
+
+            const unassignParams = {
               assigned_shift_id: '',
               assigned_user_id: '',
               assignment_type: '',
               client_updated_at: moveRequest.updated_at,
-            });
+            };
+
+            console.log('   Update params:', JSON.stringify(unassignParams, null, 2));
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+            try {
+              const result = await updateMoveRequest(moveRequest.id, unassignParams);
+              console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+              console.log('✅ [UNASSIGNMENT] Successfully unassigned move request');
+              console.log('   Updated move request:', result);
+              console.log('   Backend should send WebSocket to driver:', oldShiftId);
+              console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            } catch (error) {
+              console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+              console.error('❌ [UNASSIGNMENT] Failed to unassign');
+              console.error('   Error:', error);
+              console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+              throw error;
+            }
           }
         } else {
           // Assignment didn't change - just update fields via standard update
