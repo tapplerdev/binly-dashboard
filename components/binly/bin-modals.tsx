@@ -333,14 +333,26 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
         console.log('   Insert after bin ID:', insertAfterBinId);
         console.log('   Insert position:', insertPosition);
 
-        // First update non-assignment fields with confirmation flag
+        // Update fields with confirmation flag
         if (Object.keys(baseUpdateParams).length > 1) {
-          console.log('📝 [ACTIVE SHIFT WARNING] Updating non-assignment fields with confirmation...');
-          await updateMoveRequest(moveRequest.id, {
+          console.log('📝 [ACTIVE SHIFT WARNING] Updating fields with confirmation...');
+
+          const updateParams = {
             ...baseUpdateParams,
             confirm_active_shift_change: true,
-          });
-          console.log('✅ [ACTIVE SHIFT WARNING] Non-assignment fields updated');
+          };
+
+          // If assignment didn't change, we need to preserve the existing assignment
+          if (!assignmentChanged) {
+            console.log('📌 [ACTIVE SHIFT WARNING] Preserving existing assignment in update');
+            updateParams.assigned_shift_id = newShiftId || '';
+            updateParams.assigned_user_id = newUserId || '';
+            updateParams.assignment_type = moveRequest.assignment_type || '';
+          }
+
+          console.log('📝 [ACTIVE SHIFT WARNING] Full update params:', JSON.stringify(updateParams, null, 2));
+          await updateMoveRequest(moveRequest.id, updateParams);
+          console.log('✅ [ACTIVE SHIFT WARNING] Fields updated');
         }
 
         // Then handle assignment if it changed
