@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BinWithPriority, MoveRequest } from '@/lib/types/bin';
 import { getBinsWithPriority } from '@/lib/api/bins';
 import { Card } from '@/components/ui/card';
@@ -26,6 +26,7 @@ interface ScheduleMoveModalProps {
 }
 
 export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }: ScheduleMoveModalProps) {
+  const queryClient = useQueryClient();
   const isEditing = !!moveRequest; // Editing mode if moveRequest is provided
   const isBulk = bins && bins.length > 0;
   const isStandalone = !bin && !bins && !moveRequest; // No bin provided - show bin selector
@@ -283,6 +284,11 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
       await updateMoveRequest(moveRequest.id, paramsWithAction);
 
       console.log('✅ [EDIT MODE] Successfully updated move request after in-progress confirmation');
+
+      // Invalidate all move request queries to refresh the UI
+      await queryClient.invalidateQueries({ queryKey: ['move-requests'] });
+      console.log('✅ [EDIT MODE] Invalidated all move request queries');
+
       onSuccess?.();
       handleClose();
     } catch (error) {
@@ -297,9 +303,15 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
 
   // Handle active shift warning confirmation
   const handleActiveShiftConfirm = async () => {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('✅ [ACTIVE SHIFT WARNING] User confirmed changes');
+    console.log('   Move Request ID:', moveRequest?.id);
+    console.log('   Pending Update Params:', JSON.stringify(pendingUpdateParams, null, 2));
 
-    if (!pendingUpdateParams || !moveRequest) return;
+    if (!pendingUpdateParams || !moveRequest) {
+      console.log('❌ [ACTIVE SHIFT WARNING] Missing pendingUpdateParams or moveRequest');
+      return;
+    }
 
     setIsSubmitting(true);
     setShowActiveShiftWarning(false);
@@ -307,34 +319,49 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
     try {
       // Check if this is a new-style pending update with assignment metadata
       const hasMetadata = 'assignmentChanged' in pendingUpdateParams;
+      console.log('📋 [ACTIVE SHIFT WARNING] Has metadata:', hasMetadata);
 
       if (hasMetadata) {
         // New-style: Use the stored metadata to retry the correct operation
         const { assignmentChanged, newShiftId, newUserId, baseUpdateParams, insertAfterBinId, insertPosition } = pendingUpdateParams as any;
 
-        console.log('✏️ [EDIT MODE] Retrying with metadata - Assignment changed:', assignmentChanged);
+        console.log('✏️ [ACTIVE SHIFT WARNING] Metadata details:');
+        console.log('   Assignment changed:', assignmentChanged);
+        console.log('   New shift ID:', newShiftId);
+        console.log('   New user ID:', newUserId);
+        console.log('   Base update params:', JSON.stringify(baseUpdateParams, null, 2));
+        console.log('   Insert after bin ID:', insertAfterBinId);
+        console.log('   Insert position:', insertPosition);
 
         // First update non-assignment fields with confirmation flag
         if (Object.keys(baseUpdateParams).length > 1) {
+          console.log('📝 [ACTIVE SHIFT WARNING] Updating non-assignment fields with confirmation...');
           await updateMoveRequest(moveRequest.id, {
             ...baseUpdateParams,
             confirm_active_shift_change: true,
           });
+          console.log('✅ [ACTIVE SHIFT WARNING] Non-assignment fields updated');
         }
 
         // Then handle assignment if it changed
         if (assignmentChanged && newShiftId) {
+          console.log('🚚 [ACTIVE SHIFT WARNING] Assigning to shift:', newShiftId);
           await assignMoveToShift({
             move_request_id: moveRequest.id,
             shift_id: newShiftId,
-            insert_after_bin_id: insertAfterBinId,
-            insert_position: insertPosition,
+            insert_after_bin_id: insertAfterBinId || undefined,
+            insert_position: insertPosition || undefined,
           });
+          console.log('✅ [ACTIVE SHIFT WARNING] Assigned to shift');
         } else if (assignmentChanged && newUserId) {
+          console.log('👤 [ACTIVE SHIFT WARNING] Assigning to user:', newUserId);
           await assignMoveToUser({
             move_request_id: moveRequest.id,
             user_id: newUserId,
           });
+          console.log('✅ [ACTIVE SHIFT WARNING] Assigned to user');
+        } else if (!assignmentChanged) {
+          console.log('⏭️ [ACTIVE SHIFT WARNING] No assignment change, fields-only update completed');
         }
       } else {
         // Old-style: Just retry with confirmation flag (backward compatibility)
@@ -348,6 +375,11 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
       }
 
       console.log('✅ [EDIT MODE] Successfully updated move request after active shift confirmation');
+
+      // Invalidate all move request queries to refresh the UI
+      await queryClient.invalidateQueries({ queryKey: ['move-requests'] });
+      console.log('✅ [EDIT MODE] Invalidated all move request queries');
+
       onSuccess?.();
       handleClose();
     } catch (error) {
@@ -468,6 +500,11 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
         }
 
         console.log('✅ [EDIT MODE] Successfully updated move request');
+
+        // Invalidate all move request queries to refresh the UI
+        await queryClient.invalidateQueries({ queryKey: ['move-requests'] });
+        console.log('✅ [EDIT MODE] Invalidated all move request queries');
+
         onSuccess?.();
         handleClose();
       } catch (error) {
@@ -505,13 +542,22 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
         const lowerError = errorMessage.toLowerCase();
         if (lowerError.includes('active route') || lowerError.includes('active shift')) {
           console.log('⚠️ [EDIT MODE] Active shift warning detected');
+          console.log('⚠️ [EDIT MODE] Full error message:', errorMessage);
 
           // Parse driver name from error message
           // Example: "⚠️ This move is on John Driver's active route..."
-          const driverMatch = errorMessage.match(/on\s+(.+?)['']s active/i);
+          // Support both regular apostrophe (') and fancy apostrophes (' ')
+          const driverMatch = errorMessage.match(/on\s+(.+?)['']?'?s active/i);
+
+          console.log('⚠️ [EDIT MODE] Driver match result:', driverMatch);
+          console.log('⚠️ [EDIT MODE] Parsed driver name:', driverMatch ? driverMatch[1] : 'NO MATCH');
+          console.log('⚠️ [EDIT MODE] Fallback driver name:', moveRequest.assigned_driver_name);
+
+          const finalDriverName = driverMatch ? driverMatch[1] : moveRequest.assigned_driver_name || 'Unknown Driver';
+          console.log('⚠️ [EDIT MODE] Final driver name for warning:', finalDriverName);
 
           setWarningData({
-            driverName: driverMatch ? driverMatch[1] : moveRequest.assigned_driver_name || 'Unknown Driver',
+            driverName: finalDriverName,
           });
           // Store the original params for retry
           setPendingUpdateParams({
@@ -522,8 +568,14 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
             insertAfterBinId,
             insertPosition,
           } as any);
+
+          console.log('⚠️ [EDIT MODE] About to show active shift warning dialog');
+          console.log('⚠️ [EDIT MODE] Warning data being set:', { driverName: finalDriverName });
+
           setShowActiveShiftWarning(true);
           setIsSubmitting(false);
+
+          console.log('⚠️ [EDIT MODE] Active shift warning dialog state set to TRUE');
           return;
         }
 
@@ -632,6 +684,11 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
       }
 
       console.log('🎉 [CREATE MODE] Submission complete!');
+
+      // Invalidate all move request queries to refresh the UI
+      await queryClient.invalidateQueries({ queryKey: ['move-requests'] });
+      console.log('✅ [CREATE MODE] Invalidated all move request queries');
+
       onSuccess?.();
       handleClose();
     } catch (error) {
