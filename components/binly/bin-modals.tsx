@@ -344,10 +344,10 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
       try {
         const scheduledDate = Math.floor(new Date(formData.scheduled_date).getTime() / 1000);
 
-        // Prepare update parameters
-        const updateParams: any = {
+        // Prepare base update parameters (non-assignment fields)
+        const baseUpdateParams: any = {
           scheduled_date: scheduledDate,
-          move_type: formData.move_type, // Include move type in update
+          move_type: formData.move_type,
           reason: formData.reason || undefined,
           notes: formData.notes || undefined,
           client_updated_at: moveRequest.updated_at, // For optimistic locking
@@ -355,32 +355,76 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
 
         // Add location fields if relocation
         if (formData.move_type === 'relocation') {
-          updateParams.new_street = formData.new_street || undefined;
-          updateParams.new_city = formData.new_city || undefined;
-          updateParams.new_zip = formData.new_zip || undefined;
-          updateParams.new_latitude = formData.new_latitude || undefined;
-          updateParams.new_longitude = formData.new_longitude || undefined;
+          baseUpdateParams.new_street = formData.new_street || undefined;
+          baseUpdateParams.new_city = formData.new_city || undefined;
+          baseUpdateParams.new_zip = formData.new_zip || undefined;
+          baseUpdateParams.new_latitude = formData.new_latitude || undefined;
+          baseUpdateParams.new_longitude = formData.new_longitude || undefined;
         }
 
-        // Add assignment fields based on mode
-        if (assignmentMode === 'unassigned') {
-          updateParams.assigned_shift_id = '';
-          updateParams.assigned_user_id = '';
-          updateParams.assignment_type = '';
-        } else if (assignmentMode === 'user' && selectedUserId) {
-          updateParams.assigned_user_id = selectedUserId;
-          updateParams.assigned_shift_id = '';
-          updateParams.assignment_type = 'manual';
-        } else if ((assignmentMode === 'active_shift' || assignmentMode === 'future_shift') && selectedShiftId) {
-          updateParams.assigned_shift_id = selectedShiftId;
-          updateParams.assigned_user_id = '';
-          updateParams.assignment_type = 'shift';
+        // Determine old and new assignment values
+        const oldShiftId = moveRequest.assigned_shift_id || null;
+        const oldUserId = moveRequest.assigned_user_id || null;
+        const newShiftId = (assignmentMode === 'active_shift' || assignmentMode === 'future_shift') && selectedShiftId ? selectedShiftId : null;
+        const newUserId = assignmentMode === 'user' && selectedUserId ? selectedUserId : null;
+
+        // Detect if assignment changed
+        const assignmentChanged = (newShiftId !== oldShiftId || newUserId !== oldUserId);
+
+        console.log('✏️ [EDIT MODE] Old assignment - Shift:', oldShiftId, 'User:', oldUserId);
+        console.log('✏️ [EDIT MODE] New assignment - Shift:', newShiftId, 'User:', newUserId);
+        console.log('✏️ [EDIT MODE] Assignment changed:', assignmentChanged);
+
+        if (assignmentChanged) {
+          // Assignment changed - use specialized assignment APIs
+          console.log('🔄 [EDIT MODE] Assignment changed, using specialized APIs');
+
+          // First update non-assignment fields if needed
+          if (Object.keys(baseUpdateParams).length > 1) { // More than just client_updated_at
+            console.log('📝 [EDIT MODE] Updating non-assignment fields first:', baseUpdateParams);
+            await updateMoveRequest(moveRequest.id, baseUpdateParams);
+          }
+
+          // Then handle assignment change
+          if (newShiftId && newShiftId !== oldShiftId) {
+            // Assigning to a shift (or changing shift)
+            console.log('🚚 [EDIT MODE] Assigning to shift:', newShiftId);
+            await assignMoveToShift({
+              move_request_id: moveRequest.id,
+              shift_id: newShiftId,
+              insert_after_bin_id: assignmentMode === 'active_shift' ? insertAfterBinId || undefined : undefined,
+              insert_position: assignmentMode === 'future_shift' ? insertPosition : undefined,
+            });
+          } else if (newUserId && newUserId !== oldUserId) {
+            // Assigning to a user (or changing user)
+            console.log('👤 [EDIT MODE] Assigning to user:', newUserId);
+            await assignMoveToUser({
+              move_request_id: moveRequest.id,
+              user_id: newUserId,
+            });
+          } else if (!newShiftId && !newUserId) {
+            // Unassigning (back to pending)
+            console.log('⭕ [EDIT MODE] Unassigning move request (back to pending)');
+            await updateMoveRequest(moveRequest.id, {
+              assigned_shift_id: '',
+              assigned_user_id: '',
+              assignment_type: '',
+              client_updated_at: moveRequest.updated_at,
+            });
+          }
+        } else {
+          // Assignment didn't change - just update fields via standard update
+          console.log('📝 [EDIT MODE] No assignment change, updating fields only');
+          const updateParams = {
+            ...baseUpdateParams,
+            // Keep existing assignment
+            assigned_shift_id: oldShiftId || '',
+            assigned_user_id: oldUserId || '',
+            assignment_type: moveRequest.assignment_type || '',
+          };
+          console.log('✏️ [EDIT MODE] Update parameters:', updateParams);
+          await updateMoveRequest(moveRequest.id, updateParams);
         }
-
-        console.log('✏️ [EDIT MODE] Update parameters:', updateParams);
-
-        // Call update API
-        await updateMoveRequest(moveRequest.id, updateParams);
 
         console.log('✅ [EDIT MODE] Successfully updated move request');
         onSuccess?.();
