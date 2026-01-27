@@ -345,8 +345,9 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
           // If assignment didn't change, we need to preserve the existing assignment
           if (!assignmentChanged) {
             console.log('📌 [ACTIVE SHIFT WARNING] Preserving existing assignment in update');
-            updateParams.assigned_shift_id = newShiftId || '';
-            updateParams.assigned_user_id = newUserId || '';
+            // Use EXISTING assignment values, not the NEW (potentially empty) values
+            updateParams.assigned_shift_id = moveRequest.assigned_shift_id || '';
+            updateParams.assigned_user_id = moveRequest.assigned_user_id || '';
             updateParams.assignment_type = moveRequest.assignment_type || '';
           }
 
