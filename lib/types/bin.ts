@@ -123,7 +123,7 @@ export interface MoveRequest {
   current_street: string;
   city: string;
   zip: string;
-  urgency: 'urgent' | 'scheduled';
+  urgency: 'urgent' | 'soon' | 'scheduled' | 'overdue' | 'resolved';
   move_type: MoveRequestType;
   scheduled_date: number; // Unix timestamp
   scheduled_date_iso: string; // ISO string for display
@@ -155,7 +155,7 @@ export interface MoveRequest {
 /**
  * Calculate urgency status based on scheduled date
  */
-export function getMoveRequestUrgency(scheduledDate: number): 'urgent' | 'soon' | 'scheduled' | 'overdue' {
+export function getMoveRequestUrgency(scheduledDate: number): 'urgent' | 'soon' | 'scheduled' | 'overdue' | 'resolved' {
   const now = Date.now() / 1000; // Convert to Unix timestamp
   const daysUntil = (scheduledDate - now) / 86400;
 

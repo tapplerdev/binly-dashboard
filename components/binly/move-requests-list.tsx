@@ -495,19 +495,37 @@ export function MoveRequestsList() {
 
   // Get urgency badge
   const getUrgencyBadge = (move: MoveRequest) => {
-    const urgency = getMoveRequestUrgency(move.scheduled_date);
-    const colors = getMoveRequestBadgeColor(move.scheduled_date);
+    // Use urgency from API (backend now returns "resolved" for completed/cancelled)
+    const urgency = move.urgency;
 
-    const labels = {
-      overdue: '⚠️ Overdue',
-      urgent: '🔴 Urgent',
-      soon: 'Move Soon',
-      scheduled: 'Scheduled',
+    const config = {
+      overdue: {
+        label: '⚠️ Overdue',
+        colors: 'bg-red-500 text-white',
+      },
+      urgent: {
+        label: '🔴 Urgent',
+        colors: 'bg-red-500 text-white',
+      },
+      soon: {
+        label: 'Move Soon',
+        colors: 'bg-orange-500 text-white',
+      },
+      scheduled: {
+        label: 'Scheduled',
+        colors: 'bg-blue-500 text-white',
+      },
+      resolved: {
+        label: '✓ Resolved',
+        colors: 'bg-green-600 text-white',
+      },
     };
+
+    const { label, colors } = config[urgency] || config.scheduled;
 
     return (
       <Badge className={cn('font-semibold whitespace-nowrap', colors)}>
-        {labels[urgency]}
+        {label}
       </Badge>
     );
   };
