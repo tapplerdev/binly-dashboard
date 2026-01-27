@@ -126,14 +126,42 @@ export interface AssignMoveToShiftParams {
 export async function assignMoveToShift(params: AssignMoveToShiftParams): Promise<void> {
   const { move_request_id, ...body } = params;
 
-  const response = await fetch(`${API_BASE_URL}/api/manager/bins/move-requests/${move_request_id}/assign-to-shift`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(body),
-  });
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('🚚 [API] assignMoveToShift CALLED');
+  console.log('   Move Request ID:', move_request_id);
+  console.log('   Shift ID:', body.shift_id || 'auto-find active');
+  console.log('   Insert after bin:', body.insert_after_bin_id || 'N/A');
+  console.log('   Insert position:', body.insert_position || 'N/A');
+  console.log('   Full body:', JSON.stringify(body, null, 2));
 
-  if (!response.ok) {
-    throw new Error(`Failed to assign move to shift: ${response.statusText}`);
+  const url = `${API_BASE_URL}/api/manager/bins/move-requests/${move_request_id}/assign-to-shift`;
+  console.log('   API URL:', url);
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(body),
+    });
+
+    console.log('   Response status:', response.status, response.statusText);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ [API] assignMoveToShift FAILED');
+      console.error('   Status:', response.status);
+      console.error('   Error:', errorText);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      throw new Error(`Failed to assign move to shift: ${response.statusText} - ${errorText}`);
+    }
+
+    console.log('✅ [API] assignMoveToShift SUCCESS');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  } catch (error) {
+    console.error('❌ [API] assignMoveToShift EXCEPTION');
+    console.error('   Error:', error);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    throw error;
   }
 }
 
@@ -262,14 +290,39 @@ export interface AssignMoveToUserParams {
 export async function assignMoveToUser(params: AssignMoveToUserParams): Promise<void> {
   const { move_request_id, user_id } = params;
 
-  const response = await fetch(`${API_BASE_URL}/api/manager/bins/move-requests/${move_request_id}/assign-to-user`, {
-    method: 'PUT',
-    headers: getAuthHeaders(),
-    body: JSON.stringify({ user_id }),
-  });
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('👤 [API] assignMoveToUser CALLED');
+  console.log('   Move Request ID:', move_request_id);
+  console.log('   User ID:', user_id);
 
-  if (!response.ok) {
-    throw new Error(`Failed to assign move to user: ${response.statusText}`);
+  const url = `${API_BASE_URL}/api/manager/bins/move-requests/${move_request_id}/assign-to-user`;
+  console.log('   API URL:', url);
+
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ user_id }),
+    });
+
+    console.log('   Response status:', response.status, response.statusText);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ [API] assignMoveToUser FAILED');
+      console.error('   Status:', response.status);
+      console.error('   Error:', errorText);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      throw new Error(`Failed to assign move to user: ${response.statusText} - ${errorText}`);
+    }
+
+    console.log('✅ [API] assignMoveToUser SUCCESS');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  } catch (error) {
+    console.error('❌ [API] assignMoveToUser EXCEPTION');
+    console.error('   Error:', error);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    throw error;
   }
 }
 
