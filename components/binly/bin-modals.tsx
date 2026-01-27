@@ -274,14 +274,46 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
     setShowInProgressWarning(false);
 
     try {
-      // Add the in_progress_action to the update params
-      const paramsWithAction = {
-        ...pendingUpdateParams,
-        in_progress_action: action,
-      };
+      const { assignmentChanged, newShiftId, newUserId, baseUpdateParams } = pendingUpdateParams;
 
-      console.log('✏️ [EDIT MODE] Retrying with in_progress_action:', paramsWithAction);
-      await updateMoveRequest(moveRequest.id, paramsWithAction);
+      // Check if this is an unassignment
+      const isUnassigning = assignmentChanged && !newShiftId && !newUserId;
+
+      if (isUnassigning) {
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('⭕ [UNASSIGNMENT] Executing with in_progress_action');
+        console.log('   Action:', action);
+        console.log('   Move Request ID:', moveRequest.id);
+
+        // First update non-assignment fields if needed
+        if (Object.keys(baseUpdateParams).length > 1) {
+          console.log('📝 [EDIT MODE] Updating non-assignment fields first');
+          await updateMoveRequest(moveRequest.id, baseUpdateParams);
+        }
+
+        // Now unassign with in_progress_action
+        const unassignParams = {
+          assigned_shift_id: '',
+          assigned_user_id: '',
+          assignment_type: '',
+          client_updated_at: moveRequest.updated_at,
+          in_progress_action: action,
+        };
+
+        console.log('   Unassign params:', JSON.stringify(unassignParams, null, 2));
+        await updateMoveRequest(moveRequest.id, unassignParams);
+        console.log('✅ [UNASSIGNMENT] Successfully unassigned with action');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      } else {
+        // Not an unassignment - use original logic
+        const paramsWithAction = {
+          ...pendingUpdateParams,
+          in_progress_action: action,
+        };
+
+        console.log('✏️ [EDIT MODE] Retrying with in_progress_action:', paramsWithAction);
+        await updateMoveRequest(moveRequest.id, paramsWithAction);
+      }
 
       console.log('✅ [EDIT MODE] Successfully updated move request after in-progress confirmation');
 
@@ -515,6 +547,40 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
         console.log('   Assignment changed:', assignmentChanged);
         console.log('   Is unassigning:', assignmentChanged && !newShiftId && !newUserId);
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+        // PROACTIVE CHECK: If unassigning from an in_progress move, show warning modal immediately
+        const isUnassigning = assignmentChanged && !newShiftId && !newUserId;
+        const isInProgress = moveRequest.status === 'in_progress';
+
+        if (isUnassigning && isInProgress) {
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('⚠️ [PROACTIVE CHECK] Unassigning from in_progress move');
+          console.log('   Status:', moveRequest.status);
+          console.log('   Driver:', moveRequest.assigned_driver_name);
+          console.log('   Showing in-progress warning modal BEFORE submission');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+          // Set up the warning modal data
+          setWarningData({
+            driverName: moveRequest.assigned_driver_name || 'Unknown Driver',
+            waypointInfo: 'Active shift',
+          });
+
+          // Store parameters for when user confirms
+          setPendingUpdateParams({
+            assignmentChanged,
+            newShiftId,
+            newUserId,
+            baseUpdateParams,
+            insertAfterBinId,
+            insertPosition,
+          } as any);
+
+          // Show the in-progress warning modal
+          setShowInProgressWarning(true);
+          setIsSubmitting(false);
+          return; // Stop here - wait for user to select an action
+        }
 
         if (assignmentChanged) {
           // Assignment changed - use specialized assignment APIs
