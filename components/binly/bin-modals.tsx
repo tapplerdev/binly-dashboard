@@ -305,14 +305,47 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
     setShowActiveShiftWarning(false);
 
     try {
-      // Add the confirmation flag to the update params
-      const paramsWithConfirmation = {
-        ...pendingUpdateParams,
-        confirm_active_shift_change: true,
-      };
+      // Check if this is a new-style pending update with assignment metadata
+      const hasMetadata = 'assignmentChanged' in pendingUpdateParams;
 
-      console.log('✏️ [EDIT MODE] Retrying with confirm_active_shift_change:', paramsWithConfirmation);
-      await updateMoveRequest(moveRequest.id, paramsWithConfirmation);
+      if (hasMetadata) {
+        // New-style: Use the stored metadata to retry the correct operation
+        const { assignmentChanged, newShiftId, newUserId, baseUpdateParams, insertAfterBinId, insertPosition } = pendingUpdateParams as any;
+
+        console.log('✏️ [EDIT MODE] Retrying with metadata - Assignment changed:', assignmentChanged);
+
+        // First update non-assignment fields with confirmation flag
+        if (Object.keys(baseUpdateParams).length > 1) {
+          await updateMoveRequest(moveRequest.id, {
+            ...baseUpdateParams,
+            confirm_active_shift_change: true,
+          });
+        }
+
+        // Then handle assignment if it changed
+        if (assignmentChanged && newShiftId) {
+          await assignMoveToShift({
+            move_request_id: moveRequest.id,
+            shift_id: newShiftId,
+            insert_after_bin_id: insertAfterBinId,
+            insert_position: insertPosition,
+          });
+        } else if (assignmentChanged && newUserId) {
+          await assignMoveToUser({
+            move_request_id: moveRequest.id,
+            user_id: newUserId,
+          });
+        }
+      } else {
+        // Old-style: Just retry with confirmation flag (backward compatibility)
+        const paramsWithConfirmation = {
+          ...pendingUpdateParams,
+          confirm_active_shift_change: true,
+        };
+
+        console.log('✏️ [EDIT MODE] Retrying with confirm_active_shift_change (legacy):', paramsWithConfirmation);
+        await updateMoveRequest(moveRequest.id, paramsWithConfirmation);
+      }
 
       console.log('✅ [EDIT MODE] Successfully updated move request after active shift confirmation');
       onSuccess?.();
@@ -452,17 +485,27 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
           return;
         }
 
-        // Check for active shift warning
-        if (errorMessage.includes('is on driver\'s active route') || errorMessage.includes('driver\'s active shift')) {
+        // Check for active shift warning (case-insensitive)
+        const lowerError = errorMessage.toLowerCase();
+        if (lowerError.includes('active route') || lowerError.includes('active shift')) {
           console.log('⚠️ [EDIT MODE] Active shift warning detected');
 
           // Parse driver name from error message
-          const driverMatch = errorMessage.match(/driver\s+(.+?)['']s active/i);
+          // Example: "⚠️ This move is on John Driver's active route..."
+          const driverMatch = errorMessage.match(/on\s+(.+?)['']s active/i);
 
           setWarningData({
             driverName: driverMatch ? driverMatch[1] : moveRequest.assigned_driver_name || 'Unknown Driver',
           });
-          setPendingUpdateParams(updateParams);
+          // Store the original params for retry
+          setPendingUpdateParams({
+            assignmentChanged,
+            newShiftId,
+            newUserId,
+            baseUpdateParams,
+            insertAfterBinId,
+            insertPosition,
+          } as any);
           setShowActiveShiftWarning(true);
           setIsSubmitting(false);
           return;
