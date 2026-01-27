@@ -374,11 +374,19 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
 
       setIsSubmitting(true);
 
+      // Declare variables BEFORE try block so they're accessible in catch block
+      let assignmentChanged = false;
+      let oldShiftId: string | null = null;
+      let oldUserId: string | null = null;
+      let newShiftId: string | null = null;
+      let newUserId: string | null = null;
+      let baseUpdateParams: any = {};
+
       try {
         const scheduledDate = Math.floor(new Date(formData.scheduled_date).getTime() / 1000);
 
         // Prepare base update parameters (non-assignment fields)
-        const baseUpdateParams: any = {
+        baseUpdateParams = {
           scheduled_date: scheduledDate,
           move_type: formData.move_type,
           reason: formData.reason || undefined,
@@ -396,13 +404,13 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
         }
 
         // Determine old and new assignment values
-        const oldShiftId = moveRequest.assigned_shift_id || null;
-        const oldUserId = moveRequest.assigned_user_id || null;
-        const newShiftId = (assignmentMode === 'active_shift' || assignmentMode === 'future_shift') && selectedShiftId ? selectedShiftId : null;
-        const newUserId = assignmentMode === 'user' && selectedUserId ? selectedUserId : null;
+        oldShiftId = moveRequest.assigned_shift_id || null;
+        oldUserId = moveRequest.assigned_user_id || null;
+        newShiftId = (assignmentMode === 'active_shift' || assignmentMode === 'future_shift') && selectedShiftId ? selectedShiftId : null;
+        newUserId = assignmentMode === 'user' && selectedUserId ? selectedUserId : null;
 
         // Detect if assignment changed
-        const assignmentChanged = (newShiftId !== oldShiftId || newUserId !== oldUserId);
+        assignmentChanged = (newShiftId !== oldShiftId || newUserId !== oldUserId);
 
         console.log('✏️ [EDIT MODE] Old assignment - Shift:', oldShiftId, 'User:', oldUserId);
         console.log('✏️ [EDIT MODE] New assignment - Shift:', newShiftId, 'User:', newUserId);
@@ -479,7 +487,15 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
             driverName: driverMatch ? driverMatch[1] : 'Unknown Driver',
             waypointInfo: waypointMatch ? waypointMatch[0].replace(/[()]/g, '') : 'Unknown position',
           });
-          setPendingUpdateParams(updateParams);
+          // Store structured data for retry (same as active shift warning)
+          setPendingUpdateParams({
+            assignmentChanged,
+            newShiftId,
+            newUserId,
+            baseUpdateParams,
+            insertAfterBinId,
+            insertPosition,
+          } as any);
           setShowInProgressWarning(true);
           setIsSubmitting(false);
           return;
