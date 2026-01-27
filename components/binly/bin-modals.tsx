@@ -304,19 +304,36 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
   // Handle active shift warning confirmation
   const handleActiveShiftConfirm = async () => {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🎯 [ACTIVE SHIFT WARNING] handleActiveShiftConfirm() CALLED');
+    console.log('   Timestamp:', new Date().toISOString());
+    console.log('   Function exists:', typeof handleActiveShiftConfirm);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
     console.log('✅ [ACTIVE SHIFT WARNING] User confirmed changes');
     console.log('   Move Request ID:', moveRequest?.id);
+    console.log('   Move Request exists:', !!moveRequest);
+    console.log('   Pending Update Params exists:', !!pendingUpdateParams);
     console.log('   Pending Update Params:', JSON.stringify(pendingUpdateParams, null, 2));
 
     if (!pendingUpdateParams || !moveRequest) {
-      console.log('❌ [ACTIVE SHIFT WARNING] Missing pendingUpdateParams or moveRequest');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('❌ [ACTIVE SHIFT WARNING] ABORT: Missing data');
+      console.log('   pendingUpdateParams:', pendingUpdateParams);
+      console.log('   moveRequest:', moveRequest);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       return;
     }
 
+    console.log('🔄 [ACTIVE SHIFT WARNING] Setting isSubmitting to true...');
     setIsSubmitting(true);
+    console.log('🔄 [ACTIVE SHIFT WARNING] Hiding active shift warning modal...');
     setShowActiveShiftWarning(false);
+    console.log('✅ [ACTIVE SHIFT WARNING] State updated, starting try block...');
 
     try {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🔍 [ACTIVE SHIFT WARNING] INSIDE TRY BLOCK');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       // Check if this is a new-style pending update with assignment metadata
       const hasMetadata = 'assignmentChanged' in pendingUpdateParams;
       console.log('📋 [ACTIVE SHIFT WARNING] Has metadata:', hasMetadata);
@@ -351,9 +368,19 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
             updateParams.assignment_type = moveRequest.assignment_type || '';
           }
 
-          console.log('📝 [ACTIVE SHIFT WARNING] Full update params:', JSON.stringify(updateParams, null, 2));
-          await updateMoveRequest(moveRequest.id, updateParams);
-          console.log('✅ [ACTIVE SHIFT WARNING] Fields updated');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('📝 [ACTIVE SHIFT WARNING] About to call updateMoveRequest()');
+          console.log('   Move Request ID:', moveRequest.id);
+          console.log('   Full update params:', JSON.stringify(updateParams, null, 2));
+          console.log('   confirm_active_shift_change:', updateParams.confirm_active_shift_change);
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+          const updateResult = await updateMoveRequest(moveRequest.id, updateParams);
+
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('✅ [ACTIVE SHIFT WARNING] updateMoveRequest() COMPLETED');
+          console.log('   Result:', JSON.stringify(updateResult, null, 2));
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         }
 
         // Then handle assignment if it changed
@@ -393,16 +420,39 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
       await queryClient.invalidateQueries({ queryKey: ['move-requests'] });
       console.log('✅ [EDIT MODE] Invalidated all move request queries');
 
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🎉 [ACTIVE SHIFT WARNING] ALL OPERATIONS COMPLETED SUCCESSFULLY');
+      console.log('   Calling onSuccess callback...');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
       onSuccess?.();
       handleClose();
     } catch (error) {
-      console.error('❌ [EDIT MODE] Failed to update after active shift confirmation:', error);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('❌❌❌ [ACTIVE SHIFT WARNING] CAUGHT ERROR IN TRY BLOCK');
+      console.error('   Error type:', typeof error);
+      console.error('   Error instanceof Error:', error instanceof Error);
+      console.error('   Error message:', error instanceof Error ? error.message : String(error));
+      console.error('   Error stack:', error instanceof Error ? error.stack : 'N/A');
+      console.error('   Full error object:', error);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
       alert(`Failed to update move. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🧹 [ACTIVE SHIFT WARNING] FINALLY BLOCK - Cleaning up...');
+      console.log('   Setting isSubmitting to false...');
       setIsSubmitting(false);
+      console.log('   Clearing pendingUpdateParams...');
       setPendingUpdateParams(null);
+      console.log('   Clearing warningData...');
       setWarningData({});
+      console.log('✅ [ACTIVE SHIFT WARNING] Cleanup complete');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     }
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🏁 [ACTIVE SHIFT WARNING] handleActiveShiftConfirm() FINISHED');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1682,11 +1732,23 @@ export function ActiveShiftWarningModal({ driverName, onClose, onConfirm }: Acti
   };
 
   const handleConfirm = () => {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🔘 [ACTIVE SHIFT MODAL] Confirm button CLICKED');
+    console.log('   Timestamp:', new Date().toISOString());
+    console.log('   Checkbox confirmed:', confirmed);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
     if (!confirmed) {
+      console.log('⚠️ [ACTIVE SHIFT MODAL] User did not check the confirmation checkbox');
       alert('Please confirm that you understand this will affect the active route.');
       return;
     }
+
+    console.log('✅ [ACTIVE SHIFT MODAL] Calling onConfirm callback...');
+    console.log('   onConfirm function exists:', typeof onConfirm);
     onConfirm();
+    console.log('✅ [ACTIVE SHIFT MODAL] onConfirm callback completed');
+    console.log('🚪 [ACTIVE SHIFT MODAL] Closing modal...');
     handleClose();
   };
 
