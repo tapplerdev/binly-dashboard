@@ -2,9 +2,8 @@
 
 import { BinCheck } from '@/lib/types/bin';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { X, User, Calendar, MapPin, TrendingUp, TrendingDown, Minus, Package } from 'lucide-react';
+import { User, Calendar, MapPin, TrendingUp, TrendingDown, Minus, Package } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import Image from 'next/image';
 
 interface CheckDetailModalProps {
   check: BinCheck | null;
@@ -50,54 +49,53 @@ export function CheckDetailModal({ check, isOpen, onClose }: CheckDetailModalPro
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>Check Details</span>
-            <button
-              onClick={onClose}
-              className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </button>
-          </DialogTitle>
+          <DialogTitle>Check Details</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
           {/* Photo Section */}
           {check.photoUrl && (
-            <div className="relative w-full h-64 md:h-96 rounded-lg overflow-hidden bg-gray-100">
-              <Image
+            <div className="relative w-full h-64 md:h-96 rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
+              <img
                 src={check.photoUrl}
                 alt="Bin check photo"
-                fill
-                className="object-contain"
-                sizes="(max-width: 768px) 100vw, 672px"
-                priority
+                className="w-full h-full object-contain"
               />
             </div>
           )}
 
           {/* Fill Percentage Section */}
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-lg p-4">
+            <p className="text-sm text-gray-600 mb-3">Fill Level</p>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Fill Level</p>
-                <div className="flex items-baseline gap-3">
-                  {check.previousFillPercentage != null && (
-                    <span className="text-2xl font-semibold text-gray-400 line-through">
-                      {check.previousFillPercentage}%
-                    </span>
-                  )}
+                {check.previousFillPercentage != null ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-gray-500">Previous:</span>
+                      <span className="text-2xl font-semibold text-gray-400">
+                        {check.previousFillPercentage}%
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-gray-600 font-medium">Current:</span>
+                      <span className="text-4xl font-bold text-primary">
+                        {check.fillPercentage ?? 'N/A'}
+                        {check.fillPercentage != null && '%'}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
                   <span className="text-4xl font-bold text-primary">
                     {check.fillPercentage ?? 'N/A'}
                     {check.fillPercentage != null && '%'}
                   </span>
-                </div>
+                )}
               </div>
-              {fillChange !== null && (
-                <div className={`flex items-center gap-2 ${fillChangeDisplay.color}`}>
+              {fillChange !== null && fillChange !== 0 && (
+                <div className={`flex items-center gap-2 ${fillChangeDisplay.color} bg-white px-4 py-3 rounded-lg shadow-sm`}>
                   {fillChangeDisplay.icon}
-                  <span className="text-lg font-semibold">{fillChangeDisplay.text}</span>
+                  <span className="text-xl font-bold">{fillChangeDisplay.text}</span>
                 </div>
               )}
             </div>
