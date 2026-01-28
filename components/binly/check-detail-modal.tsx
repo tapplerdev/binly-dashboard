@@ -47,7 +47,7 @@ export function CheckDetailModal({ check, isOpen, onClose }: CheckDetailModalPro
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-90 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-bottom-8 data-[state=open]:slide-in-from-bottom-8">
         <DialogHeader>
           <DialogTitle>Check Details</DialogTitle>
         </DialogHeader>
