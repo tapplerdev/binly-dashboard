@@ -150,7 +150,22 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (!map || bins.length < 1) return; // Changed from < 2 to < 1 to show route even with single bin
+    // Clean up polylines if no bins selected
+    if (!map || bins.length < 1) {
+      if (polylineRef.current) {
+        polylineRef.current.setMap(null);
+        polylineRef.current = null;
+      }
+      if (glowPolylineRef.current) {
+        glowPolylineRef.current.setMap(null);
+        glowPolylineRef.current = null;
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      return;
+    }
 
     async function fetchRoute() {
       try {
