@@ -2,7 +2,7 @@
  * API functions for bin move requests
  */
 
-import { MoveRequest, MoveRequestStatus, MoveRequestType } from '@/lib/types/bin';
+import { MoveRequest, MoveRequestStatus, MoveRequestType, MoveRequestHistoryEvent } from '@/lib/types/bin';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -335,4 +335,25 @@ export async function clearMoveAssignment(moveRequestId: string): Promise<void> 
   // PUT /api/manager/bins/move-requests/:id/clear-assignment
   // For now, we'll show an alert
   throw new Error('Clear assignment endpoint not yet implemented on backend');
+}
+
+/**
+ * Get move request history (audit trail)
+ */
+export async function getMoveRequestHistory(
+  moveRequestId: string
+): Promise<MoveRequestHistoryEvent[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/manager/bins/move-requests/${moveRequestId}/history`,
+    {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch move request history: ${response.statusText}`);
+  }
+
+  return response.json();
 }

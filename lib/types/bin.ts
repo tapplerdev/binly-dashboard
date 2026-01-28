@@ -181,3 +181,86 @@ export function getMoveRequestBadgeColor(scheduledDate: number): string {
       return 'bg-blue-500 text-white';
   }
 }
+
+/**
+ * Move Request History - Audit trail event types
+ */
+export type MoveRequestHistoryActionType =
+  | 'created'
+  | 'assigned'
+  | 'reassigned'
+  | 'unassigned'
+  | 'updated'
+  | 'completed'
+  | 'cancelled';
+
+/**
+ * Move Request History Event
+ */
+export interface MoveRequestHistoryEvent {
+  id: string;
+  move_request_id: string;
+  action_type: MoveRequestHistoryActionType;
+  action_type_label: string; // Human-readable label (e.g., "Created", "Assigned")
+  actor_user_id: string;
+  actor_name: string;
+  description: string | null;
+  notes: string | null;
+
+  // Assignment change tracking
+  previous_assignment_type: string | null;
+  new_assignment_type: string | null;
+  previous_assigned_user_id: string | null;
+  new_assigned_user_id: string | null;
+  previous_assigned_user_name: string | null;
+  new_assigned_user_name: string | null;
+  previous_assigned_shift_id: string | null;
+  new_assigned_shift_id: string | null;
+
+  created_at_iso: string;
+  created_at: number;
+}
+
+/**
+ * Get icon name for history action type
+ */
+export function getHistoryActionIcon(actionType: MoveRequestHistoryActionType): string {
+  switch (actionType) {
+    case 'created':
+      return 'Plus';
+    case 'assigned':
+      return 'UserPlus';
+    case 'reassigned':
+      return 'RefreshCw';
+    case 'unassigned':
+      return 'UserMinus';
+    case 'updated':
+      return 'Edit';
+    case 'completed':
+      return 'CheckCircle';
+    case 'cancelled':
+      return 'XCircle';
+  }
+}
+
+/**
+ * Get color for history action type
+ */
+export function getHistoryActionColor(actionType: MoveRequestHistoryActionType): string {
+  switch (actionType) {
+    case 'created':
+      return 'text-blue-600 bg-blue-50';
+    case 'assigned':
+      return 'text-green-600 bg-green-50';
+    case 'reassigned':
+      return 'text-purple-600 bg-purple-50';
+    case 'unassigned':
+      return 'text-orange-600 bg-orange-50';
+    case 'updated':
+      return 'text-gray-600 bg-gray-50';
+    case 'completed':
+      return 'text-green-700 bg-green-100';
+    case 'cancelled':
+      return 'text-red-600 bg-red-50';
+  }
+}

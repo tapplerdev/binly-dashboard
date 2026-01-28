@@ -1,13 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { MoveRequest } from '@/lib/types/bin';
+import { MoveRequest, MoveRequestHistoryEvent } from '@/lib/types/bin';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { getMoveRequestUrgency, getMoveRequestBadgeColor } from '@/lib/types/bin';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { getMoveRequestHistory } from '@/lib/api/move-requests';
+import { MoveRequestHistoryTimeline } from '@/components/binly/move-request-history-timeline';
 import {
   X as XIcon,
   Package,
@@ -36,8 +38,28 @@ export function MoveRequestDetailDrawer({
   onCancel,
 }: MoveRequestDetailDrawerProps) {
   const [isClosing, setIsClosing] = useState(false);
+  const [historyEvents, setHistoryEvents] = useState<MoveRequestHistoryEvent[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const urgency = getMoveRequestUrgency(moveRequest.scheduled_date);
   const urgencyColors = getMoveRequestBadgeColor(moveRequest.scheduled_date);
+
+  // Fetch history when drawer opens
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        setIsLoadingHistory(true);
+        const history = await getMoveRequestHistory(moveRequest.id);
+        setHistoryEvents(history);
+      } catch (error) {
+        console.error('Failed to fetch move request history:', error);
+        setHistoryEvents([]);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    fetchHistory();
+  }, [moveRequest.id]);
 
   const handleClose = () => {
     setIsClosing(true);
@@ -288,6 +310,12 @@ export function MoveRequestDetailDrawer({
               )}
             </div>
           )}
+
+          {/* Request History Timeline */}
+          <MoveRequestHistoryTimeline
+            events={historyEvents}
+            isLoading={isLoadingHistory}
+          />
 
           {/* Timestamps Card */}
           <div className="bg-gray-50 border border-gray-200 rounded-xl md:rounded-2xl p-4 md:p-6 space-y-2 md:space-y-3">
