@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getBinChecks, getBinMoves, type BinCheck, type BinMove } from '@/lib/api/bins';
+import { getBinChecks, getBinMoves, type BinMove } from '@/lib/api/bins';
 import { getMoveRequest, getMoveRequests, cancelMoveRequest } from '@/lib/api/move-requests';
-import { BinWithPriority, getMoveRequestUrgency, getMoveRequestBadgeColor, type MoveRequest } from '@/lib/types/bin';
+import { BinWithPriority, getMoveRequestUrgency, getMoveRequestBadgeColor, type MoveRequest, type BinCheck } from '@/lib/types/bin';
 import { AssignMovesModal } from '@/components/binly/assign-moves-modal';
+import { CheckDetailModal } from '@/components/binly/check-detail-modal';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -44,12 +45,24 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
   const [activeTab, setActiveTab] = useState<'overview' | 'checks' | 'moves'>('overview');
   const [isClosing, setIsClosing] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedCheck, setSelectedCheck] = useState<BinCheck | null>(null);
+  const [isCheckModalOpen, setIsCheckModalOpen] = useState(false);
 
   const handleClose = () => {
     setIsClosing(true);
     setTimeout(() => {
       onClose();
     }, 300);
+  };
+
+  const handleCheckClick = (check: BinCheck) => {
+    setSelectedCheck(check);
+    setIsCheckModalOpen(true);
+  };
+
+  const handleCheckModalClose = () => {
+    setIsCheckModalOpen(false);
+    setSelectedCheck(null);
   };
 
   // Fetch check history
@@ -648,7 +661,11 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
               ) : checks && checks.length > 0 ? (
                 <div className="space-y-3">
                   {checks.map((check) => (
-                    <Card key={check.id} className="p-4">
+                    <Card
+                      key={check.id}
+                      className="p-4 cursor-pointer hover:bg-blue-50 transition-colors"
+                      onClick={() => handleCheckClick(check)}
+                    >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
@@ -656,9 +673,11 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
                             <span className="font-medium text-gray-900">
                               {check.checkedByName || 'Unknown Driver'}
                             </span>
-                            <Badge className="bg-gray-100 text-gray-700 text-xs">
-                              {check.checkedFrom}
-                            </Badge>
+                            {check.shiftId && (
+                              <Badge className="bg-gray-100 text-gray-700 text-xs">
+                                shift
+                              </Badge>
+                            )}
                           </div>
                           <div className="space-y-1 text-sm">
                             <div className="flex items-center gap-2">
@@ -873,6 +892,13 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
           }}
         />
       )}
+
+      {/* Check Detail Modal */}
+      <CheckDetailModal
+        check={selectedCheck}
+        isOpen={isCheckModalOpen}
+        onClose={handleCheckModalClose}
+      />
     </>
   );
 }
