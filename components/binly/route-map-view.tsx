@@ -10,6 +10,13 @@ import { Bin, isMappableBin } from '@/lib/types/bin';
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 10;
 
+// Warehouse location - all routes start and end here
+const WAREHOUSE_LOCATION = {
+  lat: 37.3009357,
+  lng: -121.9493848,
+  address: '1185 Campbell Ave, San Jose, CA 95126, United States'
+};
+
 interface RouteMapViewProps {
   route: Route;
 }
@@ -28,8 +35,10 @@ function RoutePolyline({ bins }: RoutePolylineProps) {
 
     async function fetchMapboxRoute() {
       try {
-        // Build coordinates string for Mapbox (lng,lat format)
-        const coordinates = bins.map(bin => `${bin.longitude},${bin.latitude}`).join(';');
+        // Build route: warehouse -> bins -> warehouse (round trip)
+        const binCoordinates = bins.map(bin => `${bin.longitude},${bin.latitude}`);
+        const warehouseCoordinate = `${WAREHOUSE_LOCATION.lng},${WAREHOUSE_LOCATION.lat}`;
+        const coordinates = [warehouseCoordinate, ...binCoordinates, warehouseCoordinate].join(';');
 
         // Mapbox Directions API endpoint
         const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?geometries=geojson&overview=full&access_token=pk.eyJ1IjoiYmlubHl5YWkiLCJhIjoiY21pNzN4bzlhMDVheTJpcHdqd2FtYjhpeSJ9.sQM8WHE2C9zWH0xG107xhw`;
@@ -56,9 +65,12 @@ function RoutePolyline({ bins }: RoutePolylineProps) {
 
           setPolyline(line);
 
-          // Fit map bounds to show all bins with more padding to zoom out
+          // Fit map bounds to show all bins and warehouse
           if (map) {
             const bounds = new google.maps.LatLngBounds();
+            // Include warehouse
+            bounds.extend(WAREHOUSE_LOCATION);
+            // Include all bins
             bins.forEach(bin => {
               if (bin.latitude != null && bin.longitude != null) {
                 bounds.extend({ lat: bin.latitude, lng: bin.longitude });
@@ -189,6 +201,21 @@ export function RouteMapView({ route }: RouteMapViewProps) {
       >
         {/* Route Polyline with Animation */}
         <RoutePolyline bins={bins} />
+
+        {/* Warehouse Marker - Start/End point */}
+        <AdvancedMarker
+          key="warehouse"
+          position={WAREHOUSE_LOCATION}
+          zIndex={15}
+        >
+          <div className="relative">
+            <div className="w-12 h-12 bg-orange-600 rounded-full shadow-xl border-2 border-white flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+            </div>
+          </div>
+        </AdvancedMarker>
 
         {/* Bin Markers */}
         {bins.map((bin, index) => {
