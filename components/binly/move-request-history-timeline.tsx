@@ -161,9 +161,24 @@ export function MoveRequestHistoryTimeline({
                 )}
 
                 {/* Metadata changes for "updated" events */}
-                {event.action_type === 'updated' && event.metadata && (() => {
+                {event.action_type === 'updated' && (() => {
+                  // Debug logging
+                  console.log('📋 [HISTORY] Updated event:', {
+                    id: event.id,
+                    hasMetadata: !!event.metadata,
+                    metadata: event.metadata,
+                    description: event.description
+                  });
+
+                  if (!event.metadata) {
+                    console.log('⚠️ [HISTORY] No metadata for updated event');
+                    return null;
+                  }
+
                   try {
                     const metadata: MoveRequestHistoryMetadata = JSON.parse(event.metadata);
+                    console.log('✅ [HISTORY] Parsed metadata:', metadata);
+
                     if (metadata.changes && metadata.changes.length > 0) {
                       return (
                         <div className="mt-2 space-y-1.5">
@@ -188,10 +203,11 @@ export function MoveRequestHistoryTimeline({
                           ))}
                         </div>
                       );
+                    } else {
+                      console.log('⚠️ [HISTORY] No changes in metadata');
                     }
                   } catch (e) {
-                    // Silently fail if metadata is invalid JSON
-                    console.error('Failed to parse metadata:', e);
+                    console.error('❌ [HISTORY] Failed to parse metadata:', e, 'Raw:', event.metadata);
                   }
                   return null;
                 })()}
