@@ -11,6 +11,13 @@ import { Loader2 } from 'lucide-react';
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 11;
 
+// Warehouse location - all routes start and end here
+const WAREHOUSE_LOCATION = {
+  lat: 37.3009357,
+  lng: -121.9493848,
+  address: '1185 Campbell Ave, San Jose, CA 95126, United States'
+};
+
 // Format duration: show minutes if < 1 hour, otherwise show hours
 const formatDuration = (hours: number): string => {
   if (hours < 1) {
@@ -179,8 +186,10 @@ function AllRoutesPolylines({ routes, visibleRouteIds, allBins, onRouteSelect, o
         if (routeBins.length < 2) continue; // Need at least 2 bins to draw a route
 
         try {
-          // Build coordinates string for Mapbox (lng,lat format)
-          const coordinates = routeBins.map(bin => `${bin.longitude},${bin.latitude}`).join(';');
+          // Build route: warehouse -> bins -> warehouse (round trip)
+          const binCoordinates = routeBins.map(bin => `${bin.longitude},${bin.latitude}`);
+          const warehouseCoordinate = `${WAREHOUSE_LOCATION.lng},${WAREHOUSE_LOCATION.lat}`;
+          const coordinates = [warehouseCoordinate, ...binCoordinates, warehouseCoordinate].join(';');
 
           // Mapbox Directions API endpoint
           const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?geometries=geojson&overview=full&access_token=pk.eyJ1IjoiYmlubHl5YWkiLCJhIjoiY21pNzN4bzlhMDVheTJpcHdqd2FtYjhpeSJ9.sQM8WHE2C9zWH0xG107xhw`;
