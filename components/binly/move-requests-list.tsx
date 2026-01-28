@@ -42,7 +42,7 @@ import {
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
-type SortColumn = 'bin_number' | 'scheduled_date' | 'urgency' | 'status' | 'assigned_driver_name';
+type SortColumn = 'bin_number' | 'scheduled_date' | 'created_at' | 'urgency' | 'status' | 'assigned_driver_name';
 type MoveFilterOption = 'overdue' | 'urgent' | 'pending' | 'assigned' | 'in_progress' | 'completed' | 'store' | 'relocation';
 
 // Get auth token helper function
@@ -89,8 +89,8 @@ export function MoveRequestsList() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const menuButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
-  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>('created_at');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Modal state
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -237,6 +237,9 @@ export function MoveRequestsList() {
               break;
             case 'scheduled_date':
               comparison = a.scheduled_date - b.scheduled_date;
+              break;
+            case 'created_at':
+              comparison = a.created_at - b.created_at;
               break;
             case 'urgency': {
               const aUrgency = getMoveRequestUrgency(a.scheduled_date);
