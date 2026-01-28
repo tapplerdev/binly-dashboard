@@ -287,7 +287,7 @@ export function getHistoryActionColor(actionType: MoveRequestHistoryActionType):
 export interface BinCheck {
   id: number;
   binId: string;
-  checkedFrom: string;
+  checkedFrom: string; // Driver's GPS location when checked
   fillPercentage?: number | null;
   previousFillPercentage?: number | null; // Fill % before this check (for showing delta)
   checkedOnIso: string;
@@ -298,4 +298,5 @@ export interface BinCheck {
   shiftId?: string | null;
   shiftStatus?: string | null;
   moveRequestId?: string | null;
+  binLocation?: string | null; // Bin's actual address (from bins table)
 }

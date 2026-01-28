@@ -149,8 +149,10 @@ export function CheckDetailModal({ check, isOpen, onClose }: CheckDetailModalPro
             <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg md:col-span-2">
               <MapPin className="h-5 w-5 text-gray-600 mt-0.5" />
               <div>
-                <p className="text-xs text-gray-500 font-medium">Location</p>
-                <p className="text-sm font-semibold text-gray-900">{check.checkedFrom}</p>
+                <p className="text-xs text-gray-500 font-medium">Bin Location</p>
+                <p className="text-sm font-semibold text-gray-900">
+                  {check.binLocation || check.checkedFrom || 'Unknown location'}
+                </p>
               </div>
             </div>
 
