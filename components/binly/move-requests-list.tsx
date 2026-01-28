@@ -172,13 +172,6 @@ export function MoveRequestsList() {
 
   // Client-side filtering
   const filteredMoves = useMemo(() => {
-    // DEBUG: Log first move request to inspect data structure
-    if (allMoves && allMoves.length > 0) {
-      console.log('🔍 DEBUG - First move request:', allMoves[0]);
-      console.log('🔍 DEBUG - created_at:', allMoves[0].created_at);
-      console.log('🔍 DEBUG - created_at_iso:', allMoves[0].created_at_iso);
-    }
-
     return allMoves
       ?.filter((move) => {
         // Multi-select filters
@@ -246,10 +239,10 @@ export function MoveRequestsList() {
               comparison = a.scheduled_date - b.scheduled_date;
               break;
             case 'created_at': {
-              // Handle null/undefined created_at values - push to end
-              const aCreated = a.created_at || 0;
-              const bCreated = b.created_at || 0;
-              comparison = aCreated - bCreated;
+              // Use created_at_iso for sorting (ISO string format)
+              const aDate = a.created_at_iso ? new Date(a.created_at_iso).getTime() : 0;
+              const bDate = b.created_at_iso ? new Date(b.created_at_iso).getTime() : 0;
+              comparison = aDate - bDate;
               break;
             }
             case 'urgency': {
@@ -853,25 +846,18 @@ export function MoveRequestsList() {
                   {/* Created At */}
                   <td className="py-4 px-4 align-middle">
                     <div className="text-sm">
-                      {(() => {
-                        console.log(`🔍 Rendering Created At for bin #${move.bin_number}:`, {
-                          created_at: move.created_at,
-                          created_at_iso: move.created_at_iso,
-                          has_iso: !!move.created_at_iso
-                        });
-                        return move.created_at_iso ? (
-                          <>
-                            <div className="text-gray-900 font-medium">
-                              {format(new Date(move.created_at_iso), 'MMM dd, yyyy')}
-                            </div>
-                            <div className="text-gray-500 text-xs">
-                              {format(new Date(move.created_at_iso), 'h:mm a')}
-                            </div>
-                          </>
-                        ) : (
-                          <span className="text-gray-400 text-xs">N/A</span>
-                        );
-                      })()}
+                      {move.created_at_iso ? (
+                        <>
+                          <div className="text-gray-900 font-medium">
+                            {format(new Date(move.created_at_iso), 'MMM dd, yyyy')}
+                          </div>
+                          <div className="text-gray-500 text-xs">
+                            {format(new Date(move.created_at_iso), 'h:mm a')}
+                          </div>
+                        </>
+                      ) : (
+                        <span className="text-gray-400 text-xs">N/A</span>
+                      )}
                     </div>
                   </td>
 
