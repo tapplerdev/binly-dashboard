@@ -172,6 +172,13 @@ export function MoveRequestsList() {
 
   // Client-side filtering
   const filteredMoves = useMemo(() => {
+    // DEBUG: Log first move request to inspect data structure
+    if (allMoves && allMoves.length > 0) {
+      console.log('🔍 DEBUG - First move request:', allMoves[0]);
+      console.log('🔍 DEBUG - created_at:', allMoves[0].created_at);
+      console.log('🔍 DEBUG - created_at_iso:', allMoves[0].created_at_iso);
+    }
+
     return allMoves
       ?.filter((move) => {
         // Multi-select filters
@@ -846,18 +853,25 @@ export function MoveRequestsList() {
                   {/* Created At */}
                   <td className="py-4 px-4 align-middle">
                     <div className="text-sm">
-                      {move.created_at_iso ? (
-                        <>
-                          <div className="text-gray-900 font-medium">
-                            {format(new Date(move.created_at_iso), 'MMM dd, yyyy')}
-                          </div>
-                          <div className="text-gray-500 text-xs">
-                            {format(new Date(move.created_at_iso), 'h:mm a')}
-                          </div>
-                        </>
-                      ) : (
-                        <span className="text-gray-400 text-xs">N/A</span>
-                      )}
+                      {(() => {
+                        console.log(`🔍 Rendering Created At for bin #${move.bin_number}:`, {
+                          created_at: move.created_at,
+                          created_at_iso: move.created_at_iso,
+                          has_iso: !!move.created_at_iso
+                        });
+                        return move.created_at_iso ? (
+                          <>
+                            <div className="text-gray-900 font-medium">
+                              {format(new Date(move.created_at_iso), 'MMM dd, yyyy')}
+                            </div>
+                            <div className="text-gray-500 text-xs">
+                              {format(new Date(move.created_at_iso), 'h:mm a')}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-gray-400 text-xs">N/A</span>
+                        );
+                      })()}
                     </div>
                   </td>
 
