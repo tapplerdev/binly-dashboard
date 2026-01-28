@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Bin, getFillLevelCategory } from '@/lib/types/bin';
-import { getBinChecks, BinCheck } from '@/lib/api/bins';
+import { BinCheck } from '@/lib/types/bin';
+import { getBinChecks } from '@/lib/api/bins';
 import { X, MapPin, Calendar, ChevronDown, User, Clock, Camera, Loader2 } from 'lucide-react';
+import { CheckDetailModal } from './check-detail-modal';
 
 interface BinDetailsDrawerProps {
   bin: Bin;
@@ -17,6 +19,8 @@ export function BinDetailsDrawer({ bin, onClose }: BinDetailsDrawerProps) {
   const [checks, setChecks] = useState<BinCheck[]>([]);
   const [loading, setLoading] = useState(true);
   const [isClosing, setIsClosing] = useState(false);
+  const [selectedCheck, setSelectedCheck] = useState<BinCheck | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const fillPercentage = bin.fill_percentage ?? 0;
   const fillCategory = getFillLevelCategory(fillPercentage);
   const isHighPriority = fillPercentage >= 80;
@@ -73,6 +77,16 @@ export function BinDetailsDrawer({ bin, onClose }: BinDetailsDrawerProps) {
 
   const toggleRow = (id: number) => {
     setExpandedRow(expandedRow === id ? null : id);
+  };
+
+  const handleCheckClick = (check: BinCheck) => {
+    setSelectedCheck(check);
+    setIsModalOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setSelectedCheck(null);
   };
 
   // Determine which records to show
@@ -183,6 +197,7 @@ export function BinDetailsDrawer({ bin, onClose }: BinDetailsDrawerProps) {
                     check={check}
                     isExpanded={expandedRow === check.id}
                     onToggle={() => toggleRow(check.id)}
+                    onCardClick={() => handleCheckClick(check)}
                     formatDate={formatDate}
                     formatTimestamp={formatTimestamp}
                   />
@@ -242,6 +257,13 @@ export function BinDetailsDrawer({ bin, onClose }: BinDetailsDrawerProps) {
           Request Move
         </button>
       </div>
+
+      {/* Check Detail Modal */}
+      <CheckDetailModal
+        check={selectedCheck}
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+      />
     </div>
   );
 }
@@ -251,34 +273,43 @@ function CollectionHistoryRow({
   check,
   isExpanded,
   onToggle,
+  onCardClick,
   formatDate,
   formatTimestamp,
 }: {
   check: BinCheck;
   isExpanded: boolean;
   onToggle: () => void;
+  onCardClick: () => void;
   formatDate: (date: string) => string;
   formatTimestamp: (date: string) => string;
 }) {
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden transition-all">
       {/* Clickable Row Header */}
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between py-2 px-3 hover:bg-gray-50 transition-colors cursor-pointer"
-      >
-        <div className="flex items-center gap-2">
+      <div className="flex items-stretch">
+        <button
+          onClick={onCardClick}
+          className="flex-1 flex items-center justify-between py-2 pl-3 pr-1 hover:bg-blue-50 transition-colors cursor-pointer group"
+        >
+          <span className="text-sm text-gray-700 group-hover:text-primary font-medium">
+            {formatDate(check.checkedOnIso)}
+          </span>
+          <span className="text-sm font-semibold text-gray-900 group-hover:text-primary">
+            {check.fillPercentage !== null ? `${check.fillPercentage}%` : 'N/A'}
+          </span>
+        </button>
+        <button
+          onClick={onToggle}
+          className="flex items-center justify-center px-2 hover:bg-gray-50 transition-colors cursor-pointer border-l border-gray-200"
+        >
           <ChevronDown
             className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${
               isExpanded ? 'rotate-180' : ''
             }`}
           />
-          <span className="text-sm text-gray-700">{formatDate(check.checkedOnIso)}</span>
-        </div>
-        <span className="text-sm font-semibold text-gray-900">
-          {check.fillPercentage !== null ? `${check.fillPercentage}%` : 'N/A'}
-        </span>
-      </button>
+        </button>
+      </div>
 
       {/* Expanded Details */}
       {isExpanded && (

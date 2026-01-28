@@ -3,28 +3,13 @@
  * Handles all bin-related API requests to the backend
  */
 
-import { Bin, BinWithPriority, PotentialLocation } from '@/lib/types/bin';
+import { Bin, BinWithPriority, PotentialLocation, BinCheck } from '@/lib/types/bin';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 export type BinSortOption = 'priority' | 'bin_number' | 'fill_percentage' | 'days_since_check' | 'status';
 export type BinFilterOption = 'all' | 'next_move_request' | 'longest_unchecked' | 'high_fill' | 'has_check_recommendation';
 export type BinStatusFilter = 'active' | 'all' | 'retired' | 'pending_move' | 'in_storage';
-
-/**
- * Check/Collection record from the backend
- */
-export interface BinCheck {
-  id: number;
-  binId: string;
-  checkedFrom: string;
-  fillPercentage: number | null;
-  checkedOnIso: string;
-  checkedOn: string;
-  photoUrl: string | null;
-  checkedBy: string | null;
-  checkedByName: string | null;
-}
 
 /**
  * Move record from the backend

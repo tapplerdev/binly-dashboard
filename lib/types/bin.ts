@@ -280,3 +280,22 @@ export function getHistoryActionColor(actionType: MoveRequestHistoryActionType):
       return 'text-red-600 bg-red-50';
   }
 }
+
+/**
+ * Bin Check - History of bin inspections by drivers
+ */
+export interface BinCheck {
+  id: number;
+  binId: string;
+  checkedFrom: string;
+  fillPercentage?: number | null;
+  previousFillPercentage?: number | null; // Fill % before this check (for showing delta)
+  checkedOnIso: string;
+  checkedOn: string; // Formatted date string
+  photoUrl?: string | null;
+  checkedBy?: string | null;
+  checkedByName?: string | null;
+  shiftId?: string | null;
+  shiftStatus?: string | null;
+  moveRequestId?: string | null;
+}
