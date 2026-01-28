@@ -846,13 +846,13 @@ export function MoveRequestsList() {
                   {/* Created At */}
                   <td className="py-4 px-4 align-middle">
                     <div className="text-sm">
-                      {move.created_at && move.created_at > 0 ? (
+                      {move.created_at_iso ? (
                         <>
                           <div className="text-gray-900 font-medium">
-                            {format(new Date(move.created_at * 1000), 'MMM dd, yyyy')}
+                            {format(new Date(move.created_at_iso), 'MMM dd, yyyy')}
                           </div>
                           <div className="text-gray-500 text-xs">
-                            {format(new Date(move.created_at * 1000), 'h:mm a')}
+                            {format(new Date(move.created_at_iso), 'h:mm a')}
                           </div>
                         </>
                       ) : (
@@ -1014,16 +1014,16 @@ export function MoveRequestsList() {
               </div>
 
               {/* Created At */}
-              {move.created_at && move.created_at > 0 && (
+              {move.created_at_iso && (
                 <div className="flex items-center gap-2 mb-3 text-sm">
                   <Calendar className="w-4 h-4 text-gray-400" />
                   <div>
                     <span className="text-gray-500 mr-2">Created:</span>
                     <span className="text-gray-900 font-medium">
-                      {format(new Date(move.created_at * 1000), 'MMM dd, yyyy')}
+                      {format(new Date(move.created_at_iso), 'MMM dd, yyyy')}
                     </span>
                     <span className="text-gray-500 ml-2">
-                      {format(new Date(move.created_at * 1000), 'h:mm a')}
+                      {format(new Date(move.created_at_iso), 'h:mm a')}
                     </span>
                   </div>
                 </div>
