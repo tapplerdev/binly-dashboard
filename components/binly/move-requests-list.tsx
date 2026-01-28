@@ -758,6 +758,15 @@ export function MoveRequestsList() {
                   </div>
                 </th>
                 <th
+                  className="text-left py-4 px-4 text-sm font-semibold text-gray-700 whitespace-nowrap cursor-pointer align-middle"
+                  onClick={() => handleSort('created_at')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Created At</span>
+                    <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                  </div>
+                </th>
+                <th
                   className="text-center py-4 px-4 text-sm font-semibold text-gray-700 w-[8%] cursor-pointer align-middle"
                   onClick={() => handleSort('bin_number')}
                 >
@@ -765,9 +774,6 @@ export function MoveRequestsList() {
                     <span>Bin</span>
                     <ChevronsUpDown className="w-4 h-4 text-gray-400" />
                   </div>
-                </th>
-                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700 w-[18%] align-middle">
-                  Location
                 </th>
                 <th
                   className="text-left py-4 px-4 text-sm font-semibold text-gray-700 whitespace-nowrap cursor-pointer align-middle"
@@ -833,19 +839,23 @@ export function MoveRequestsList() {
                     />
                   </td>
 
-                  {/* Bin Number */}
-                  <td className="py-4 px-4 text-center align-middle">
-                    <span className="font-semibold text-gray-900">{move.bin_number}</span>
-                  </td>
-
-                  {/* Location */}
-                  <td className="py-4 px-4 min-w-[200px] align-middle">
+                  {/* Created At */}
+                  <td className="py-4 px-4 align-middle">
                     <div className="text-sm">
-                      <div className="text-gray-900 font-medium whitespace-nowrap">{move.current_street}</div>
+                      <div className="text-gray-900 font-medium">
+                        {format(new Date(move.created_at * 1000), 'MMM dd, yyyy')}
+                      </div>
                       <div className="text-gray-500 text-xs">
-                        {move.city}, {move.zip}
+                        {format(new Date(move.created_at * 1000), 'h:mm a')}
                       </div>
                     </div>
+                  </td>
+
+                  {/* Bin Number */}
+                  <td className="py-4 px-4 text-center align-middle">
+                    <Badge className="bg-gray-100 text-gray-900 hover:bg-gray-200 font-semibold text-sm">
+                      #{move.bin_number}
+                    </Badge>
                   </td>
 
                   {/* Requested Date */}
@@ -971,7 +981,9 @@ export function MoveRequestsList() {
                     onClick={(e) => e.stopPropagation()}
                     className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
                   />
-                  <span className="text-lg font-bold text-gray-900">Bin #{move.bin_number}</span>
+                  <Badge className="bg-gray-100 text-gray-900 hover:bg-gray-200 font-semibold text-base px-3 py-1">
+                    #{move.bin_number}
+                  </Badge>
                 </div>
 
                 {/* Actions Menu */}
@@ -991,21 +1003,25 @@ export function MoveRequestsList() {
                 </button>
               </div>
 
-              {/* Location */}
-              <div className="flex items-start gap-2 mb-3">
-                <MapPin className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
-                <div className="text-sm">
-                  <div className="text-gray-900 font-medium">{move.current_street}</div>
-                  <div className="text-gray-500">
-                    {move.city}, {move.zip}
-                  </div>
-                </div>
-              </div>
-
-              {/* Date & Time */}
+              {/* Created At */}
               <div className="flex items-center gap-2 mb-3 text-sm">
                 <Calendar className="w-4 h-4 text-gray-400" />
                 <div>
+                  <span className="text-gray-500 mr-2">Created:</span>
+                  <span className="text-gray-900 font-medium">
+                    {format(new Date(move.created_at * 1000), 'MMM dd, yyyy')}
+                  </span>
+                  <span className="text-gray-500 ml-2">
+                    {format(new Date(move.created_at * 1000), 'h:mm a')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Requested Date */}
+              <div className="flex items-center gap-2 mb-3 text-sm">
+                <Calendar className="w-4 h-4 text-gray-400" />
+                <div>
+                  <span className="text-gray-500 mr-2">Requested:</span>
                   <span className="text-gray-900 font-medium">
                     {format(new Date(move.scheduled_date * 1000), 'MMM dd, yyyy')}
                   </span>
