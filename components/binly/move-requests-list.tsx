@@ -238,9 +238,13 @@ export function MoveRequestsList() {
             case 'scheduled_date':
               comparison = a.scheduled_date - b.scheduled_date;
               break;
-            case 'created_at':
-              comparison = a.created_at - b.created_at;
+            case 'created_at': {
+              // Handle null/undefined created_at values - push to end
+              const aCreated = a.created_at || 0;
+              const bCreated = b.created_at || 0;
+              comparison = aCreated - bCreated;
               break;
+            }
             case 'urgency': {
               const aUrgency = getMoveRequestUrgency(a.scheduled_date);
               const bUrgency = getMoveRequestUrgency(b.scheduled_date);
@@ -842,12 +846,18 @@ export function MoveRequestsList() {
                   {/* Created At */}
                   <td className="py-4 px-4 align-middle">
                     <div className="text-sm">
-                      <div className="text-gray-900 font-medium">
-                        {format(new Date(move.created_at * 1000), 'MMM dd, yyyy')}
-                      </div>
-                      <div className="text-gray-500 text-xs">
-                        {format(new Date(move.created_at * 1000), 'h:mm a')}
-                      </div>
+                      {move.created_at && move.created_at > 0 ? (
+                        <>
+                          <div className="text-gray-900 font-medium">
+                            {format(new Date(move.created_at * 1000), 'MMM dd, yyyy')}
+                          </div>
+                          <div className="text-gray-500 text-xs">
+                            {format(new Date(move.created_at * 1000), 'h:mm a')}
+                          </div>
+                        </>
+                      ) : (
+                        <span className="text-gray-400 text-xs">N/A</span>
+                      )}
                     </div>
                   </td>
 
@@ -1004,18 +1014,20 @@ export function MoveRequestsList() {
               </div>
 
               {/* Created At */}
-              <div className="flex items-center gap-2 mb-3 text-sm">
-                <Calendar className="w-4 h-4 text-gray-400" />
-                <div>
-                  <span className="text-gray-500 mr-2">Created:</span>
-                  <span className="text-gray-900 font-medium">
-                    {format(new Date(move.created_at * 1000), 'MMM dd, yyyy')}
-                  </span>
-                  <span className="text-gray-500 ml-2">
-                    {format(new Date(move.created_at * 1000), 'h:mm a')}
-                  </span>
+              {move.created_at && move.created_at > 0 && (
+                <div className="flex items-center gap-2 mb-3 text-sm">
+                  <Calendar className="w-4 h-4 text-gray-400" />
+                  <div>
+                    <span className="text-gray-500 mr-2">Created:</span>
+                    <span className="text-gray-900 font-medium">
+                      {format(new Date(move.created_at * 1000), 'MMM dd, yyyy')}
+                    </span>
+                    <span className="text-gray-500 ml-2">
+                      {format(new Date(move.created_at * 1000), 'h:mm a')}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Requested Date */}
               <div className="flex items-center gap-2 mb-3 text-sm">
