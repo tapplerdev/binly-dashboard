@@ -1,6 +1,11 @@
 'use client';
 
-import { MoveRequestHistoryEvent, getHistoryActionIcon, getHistoryActionColor } from '@/lib/types/bin';
+import {
+  MoveRequestHistoryEvent,
+  MoveRequestHistoryMetadata,
+  getHistoryActionIcon,
+  getHistoryActionColor
+} from '@/lib/types/bin';
 import { format } from 'date-fns';
 import {
   Plus,
@@ -11,6 +16,7 @@ import {
   CheckCircle,
   XCircle,
   History,
+  ArrowRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -153,6 +159,42 @@ export function MoveRequestHistoryTimeline({
                     {event.notes}
                   </div>
                 )}
+
+                {/* Metadata changes for "updated" events */}
+                {event.action_type === 'updated' && event.metadata && (() => {
+                  try {
+                    const metadata: MoveRequestHistoryMetadata = JSON.parse(event.metadata);
+                    if (metadata.changes && metadata.changes.length > 0) {
+                      return (
+                        <div className="mt-2 space-y-1.5">
+                          {metadata.changes.map((change, idx) => (
+                            <div
+                              key={idx}
+                              className="text-xs bg-blue-50 border border-blue-100 rounded-lg p-2"
+                            >
+                              <div className="font-medium text-blue-900 mb-1">
+                                {change.label}
+                              </div>
+                              <div className="flex items-center gap-2 text-gray-700">
+                                <span className="text-gray-500">
+                                  {change.old_formatted || change.old || '(empty)'}
+                                </span>
+                                <ArrowRight className="h-3 w-3 text-blue-500 flex-shrink-0" />
+                                <span className="font-medium text-blue-900">
+                                  {change.new_formatted || change.new || '(empty)'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+                  } catch (e) {
+                    // Silently fail if metadata is invalid JSON
+                    console.error('Failed to parse metadata:', e);
+                  }
+                  return null;
+                })()}
               </div>
             </div>
           );

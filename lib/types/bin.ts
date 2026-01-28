@@ -197,6 +197,21 @@ export type MoveRequestHistoryActionType =
 /**
  * Move Request History Event
  */
+export interface MoveRequestHistoryChangeDetail {
+  field: string;
+  label: string;
+  old?: string | null;
+  new?: string | null;
+  old_formatted?: string | null;
+  new_formatted?: string | null;
+  old_timestamp?: number | null;
+  new_timestamp?: number | null;
+}
+
+export interface MoveRequestHistoryMetadata {
+  changes: MoveRequestHistoryChangeDetail[];
+}
+
 export interface MoveRequestHistoryEvent {
   id: string;
   move_request_id: string;
@@ -206,6 +221,7 @@ export interface MoveRequestHistoryEvent {
   actor_name: string;
   description: string | null;
   notes: string | null;
+  metadata: string | null; // JSON string containing change details
 
   // Assignment change tracking
   previous_assignment_type: string | null;
