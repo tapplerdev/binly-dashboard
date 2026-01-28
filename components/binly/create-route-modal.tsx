@@ -1099,12 +1099,24 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
                     });
                   }}
                   onBinClick={(bin) => {
-                    // Add clicked bin to route (append to end)
-                    setSelectedBins([...selectedBins, bin]);
-                    setFormData({
-                      ...formData,
-                      bin_ids: [...formData.bin_ids, bin.id]
-                    });
+                    // Toggle bin selection: if already selected, remove it; otherwise add it
+                    const isAlreadySelected = selectedBins.find(b => b.id === bin.id);
+                    if (isAlreadySelected) {
+                      // Remove bin from selection
+                      const newBins = selectedBins.filter(b => b.id !== bin.id);
+                      setSelectedBins(newBins);
+                      setFormData({
+                        ...formData,
+                        bin_ids: newBins.map(b => b.id)
+                      });
+                    } else {
+                      // Add clicked bin to route (append to end)
+                      setSelectedBins([...selectedBins, bin]);
+                      setFormData({
+                        ...formData,
+                        bin_ids: [...formData.bin_ids, bin.id]
+                      });
+                    }
                   }}
                   onBinRemove={(bin) => {
                     // Remove bin from route
