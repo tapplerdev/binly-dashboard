@@ -1853,8 +1853,8 @@ function CreateShiftDrawer({
         if (warehouseBeforeZone) {
           // Scan capacity flow between warehouse and negative zone
           for (let k = warehouseBeforeZone.taskIndex + 1; k < zoneStart; k++) {
-            if (capacityFlow[k] && capacityFlow[k].loadAfter >= 0) {
-              // Capacity reached 0 or positive - warehouse completed its job
+            if (capacityFlow[k] && capacityFlow[k].loadAfter === 0) {
+              // Capacity reached exactly 0 - warehouse completed its job
               warehouseCompletedService = true;
               console.log(`   ✅ Warehouse #${warehouseBeforeZone.taskIndex + 1} completed service at task #${k + 1} (capacity=${capacityFlow[k].loadAfter})`);
               break;
