@@ -284,7 +284,7 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
                     onClick={() => setUrgencyFilter('all')}
                     className={`px-2.5 py-1 text-xs font-medium rounded-md transition-fast ${
                       urgencyFilter === 'all'
-                        ? 'bg-gray-900 text-white'
+                        ? 'bg-primary text-white'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
