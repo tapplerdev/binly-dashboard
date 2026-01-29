@@ -1,11 +1,16 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Calendar, List, User, X, Search, ChevronDown, Filter, MapPin, Loader2, Trash2, GripVertical, Package, MapPinned, Warehouse, MoveRight, Plus } from 'lucide-react';
+import { Calendar, List, User, X, Search, ChevronDown, Filter, MapPin, Loader2, Trash2, GripVertical, Package, MapPinned, Warehouse, MoveRight, Plus, Pencil } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel, ShiftStatus } from '@/lib/types/shift';
 import { ShiftDetailsDrawer } from './shift-details-drawer';
 import { BinSelectionMap } from './bin-selection-map';
 import { Route, getRouteLabel } from '@/lib/types/route';
+import { Bin } from '@/lib/types/bin';
+import { getBins } from '@/lib/api/bins';
+import { getShifts, getShiftTasks } from '@/lib/api/shifts';
+import { PotentialLocation, getPotentialLocations } from '@/lib/api/potential-locations';
+import { MoveRequest, getMoveRequests } from '@/lib/api/move-requests';
 import { useShifts, useAssignRoute } from '@/lib/hooks/use-shifts';
 import { useRoutes } from '@/lib/hooks/use-routes';
 import { useActiveDrivers } from '@/lib/hooks/use-active-drivers';
@@ -1269,6 +1274,7 @@ interface ShiftTask {
   // Warehouse stop fields
   warehouse_action?: 'load' | 'unload';
   bins_to_load?: number;
+  auto_inserted?: boolean; // Marks warehouse stops that were automatically inserted
   // Common fields
   latitude: number;
   longitude: number;
@@ -1292,6 +1298,17 @@ function CreateShiftDrawer({
   const [error, setError] = useState<string | null>(null);
   const [isDriverDropdownOpen, setIsDriverDropdownOpen] = useState(false);
   const [isDriverClosing, setIsDriverClosing] = useState(false);
+  const [showBinSelection, setShowBinSelection] = useState(false);
+  const [allBins, setAllBins] = useState<Bin[]>([]);
+  const [showRouteImport, setShowRouteImport] = useState(false);
+  const [availableShifts, setAvailableShifts] = useState<Shift[]>([]);
+  const [selectedShiftForImport, setSelectedShiftForImport] = useState<string>('');
+  const [editingTaskIndex, setEditingTaskIndex] = useState<number | null>(null);
+  const [editingTask, setEditingTask] = useState<ShiftTask | null>(null);
+  const [showPlacementSelection, setShowPlacementSelection] = useState(false);
+  const [potentialLocations, setPotentialLocations] = useState<PotentialLocation[]>([]);
+  const [showMoveRequestSelection, setShowMoveRequestSelection] = useState(false);
+  const [moveRequests, setMoveRequests] = useState<MoveRequest[]>([]);
   const driverDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown with animation
@@ -1357,9 +1374,251 @@ function CreateShiftDrawer({
     setTasks([...tasks, newTask]);
   };
 
+  const openBinSelection = async () => {
+    try {
+      // Fetch bins if not already loaded
+      if (allBins.length === 0) {
+        const bins = await getBins();
+        setAllBins(bins);
+      }
+      setShowBinSelection(true);
+    } catch (error) {
+      console.error('Failed to fetch bins:', error);
+      setError('Failed to load bins. Please try again.');
+    }
+  };
+
+  const handleBinSelectionConfirm = (selectedBinIds: string[]) => {
+    // Convert selected bin IDs to collection tasks
+    const selectedBins = allBins.filter(bin => selectedBinIds.includes(bin.id));
+
+    const collectionTasks: ShiftTask[] = selectedBins.map(bin => ({
+      id: `temp-${Date.now()}-${bin.id}`,
+      type: 'collection',
+      bin_id: bin.id,
+      bin_number: bin.bin_number.toString(),
+      fill_percentage: bin.fill_percentage || 0,
+      latitude: bin.latitude || 0,
+      longitude: bin.longitude || 0,
+      address: bin.current_street || 'Unknown',
+    }));
+
+    // Add collection tasks to the task list
+    setTasks([...tasks, ...collectionTasks]);
+    setShowBinSelection(false);
+  };
+
+  // Route import handlers
+  const openRouteImport = async () => {
+    try {
+      // Fetch available shifts if not already loaded
+      if (availableShifts.length === 0) {
+        const shifts = await getShifts();
+        // Filter for completed or active shifts (not scheduled)
+        const usableShifts = shifts.filter(
+          shift => shift.status === 'completed' || shift.status === 'active'
+        );
+        setAvailableShifts(usableShifts);
+      }
+      setShowRouteImport(true);
+    } catch (error) {
+      console.error('Failed to fetch shifts:', error);
+      setError('Failed to load shifts. Please try again.');
+    }
+  };
+
+  const handleRouteImport = async () => {
+    if (!selectedShiftForImport) return;
+
+    try {
+      // Fetch tasks for the selected shift
+      const shiftTasks = await getShiftTasks(selectedShiftForImport);
+
+      if (shiftTasks.length === 0) {
+        setError('No tasks found in selected shift.');
+        return;
+      }
+
+      // Convert shift tasks to collection tasks
+      const importedTasks: ShiftTask[] = shiftTasks.map((task: any, index: number) => ({
+        id: `imported-${Date.now()}-${index}`,
+        type: 'collection',
+        bin_id: task.bin_id || task.id,
+        bin_number: task.bin_number?.toString() || '',
+        fill_percentage: task.fill_percentage || 0,
+        latitude: task.latitude || 0,
+        longitude: task.longitude || 0,
+        address: task.current_street || task.address || 'Unknown',
+      }));
+
+      // Add imported tasks to the task list
+      setTasks([...tasks, ...importedTasks]);
+      setShowRouteImport(false);
+      setSelectedShiftForImport('');
+    } catch (error) {
+      console.error('Failed to import route:', error);
+      setError('Failed to import route. Please try again.');
+    }
+  };
+
+  const openEditTask = (index: number) => {
+    setEditingTaskIndex(index);
+    setEditingTask({ ...tasks[index] });
+  };
+
+  const handleEditTaskChange = (field: keyof ShiftTask, value: any) => {
+    if (!editingTask) return;
+    setEditingTask({ ...editingTask, [field]: value });
+  };
+
+  const saveEditedTask = () => {
+    if (editingTaskIndex === null || !editingTask) return;
+
+    const updatedTasks = [...tasks];
+    updatedTasks[editingTaskIndex] = editingTask;
+    setTasks(updatedTasks);
+
+    setEditingTaskIndex(null);
+    setEditingTask(null);
+  };
+
+  const cancelEditTask = () => {
+    setEditingTaskIndex(null);
+    setEditingTask(null);
+  };
+
+  const openPlacementSelection = async () => {
+    try {
+      if (potentialLocations.length === 0) {
+        const locations = await getPotentialLocations('active');
+        setPotentialLocations(locations);
+      }
+      setShowPlacementSelection(true);
+    } catch (error) {
+      console.error('Failed to fetch potential locations:', error);
+      setError('Failed to load potential locations. Please try again.');
+    }
+  };
+
+  const handlePlacementSelectionConfirm = (selectedLocationIds: string[]) => {
+    const selectedLocations = potentialLocations.filter(loc =>
+      selectedLocationIds.includes(loc.id)
+    );
+
+    const placementTasks: ShiftTask[] = selectedLocations.map(location => ({
+      id: `temp-${Date.now()}-${location.id}`,
+      type: 'placement',
+      potential_location_id: location.id,
+      new_bin_number: '', // Manager can edit this later
+      latitude: location.latitude || 0,
+      longitude: location.longitude || 0,
+      address: location.address || location.street,
+    }));
+
+    setTasks([...tasks, ...placementTasks]);
+    setShowPlacementSelection(false);
+  };
+
+  const openMoveRequestSelection = async () => {
+    try {
+      if (moveRequests.length === 0) {
+        const requests = await getMoveRequests({ status: 'pending', assigned: 'unassigned' });
+        setMoveRequests(requests);
+      }
+      setShowMoveRequestSelection(true);
+    } catch (error) {
+      console.error('Failed to fetch move requests:', error);
+      setError('Failed to load move requests. Please try again.');
+    }
+  };
+
+  const handleMoveRequestSelectionConfirm = (selectedRequestIds: string[]) => {
+    const selectedRequests = moveRequests.filter(req =>
+      selectedRequestIds.includes(req.id)
+    );
+
+    const moveRequestTasks: ShiftTask[] = selectedRequests.map(request => ({
+      id: `temp-${Date.now()}-${request.id}`,
+      type: 'move_request',
+      move_request_id: request.id,
+      bin_id: request.bin_id,
+      bin_number: request.bin_number.toString(),
+      move_type: request.move_type === 'store' ? 'pickup' : 'pickup', // Pick up bin for both store and relocation
+      destination_latitude: request.new_latitude || 0,
+      destination_longitude: request.new_longitude || 0,
+      destination_address: request.move_type === 'store'
+        ? 'Warehouse Storage'
+        : `${request.new_street || ''}, ${request.new_city || ''} ${request.new_zip || ''}`.trim(),
+      latitude: 0, // Will be populated from bin data on backend
+      longitude: 0, // Will be populated from bin data on backend
+      address: `${request.current_street}, ${request.city} ${request.zip}`,
+    }));
+
+    setTasks([...tasks, ...moveRequestTasks]);
+    setShowMoveRequestSelection(false);
+  };
+
   const removeTask = (index: number) => {
     setTasks(tasks.filter((_, i) => i !== index));
   };
+
+  // Auto-insert warehouse stops when truck capacity is exceeded
+  const autoInsertWarehouseStops = (inputTasks: ShiftTask[], capacity: number): ShiftTask[] => {
+    if (!capacity || capacity <= 0) return inputTasks;
+
+    // First, remove all auto-inserted warehouse stops
+    const manualTasks = inputTasks.filter(task => !(task.type === 'warehouse_stop' && task.auto_inserted));
+
+    const result: ShiftTask[] = [];
+    let currentLoad = 0;
+
+    for (const task of manualTasks) {
+      // Check if this task adds bins to the truck
+      const addsBins = task.type === 'collection' || task.type === 'placement' ||
+                      (task.type === 'move_request' && task.move_type === 'pickup');
+
+      // If adding this task would exceed capacity, insert warehouse stop first
+      if (addsBins && currentLoad >= capacity) {
+        result.push({
+          id: `auto-warehouse-${Date.now()}-${result.length}`,
+          type: 'warehouse_stop',
+          warehouse_action: 'unload',
+          auto_inserted: true,
+          latitude: 0, // Will be set by backend
+          longitude: 0,
+          address: 'Warehouse (Auto-inserted)',
+        });
+        currentLoad = 0; // Reset after unloading
+      }
+
+      // Add the current task
+      result.push(task);
+
+      // Update load count
+      if (addsBins) {
+        currentLoad++;
+      } else if (task.type === 'warehouse_stop') {
+        // Manual warehouse stops also reset the load
+        currentLoad = 0;
+      }
+    }
+
+    return result;
+  };
+
+  // Auto-insert warehouse stops whenever tasks or capacity changes
+  useEffect(() => {
+    const capacity = parseInt(truckCapacity);
+    if (tasks.length > 0 && capacity > 0) {
+      const tasksWithAutoWarehouses = autoInsertWarehouseStops(tasks, capacity);
+
+      // Only update if the result is different (to avoid infinite loop)
+      const hasChanged = JSON.stringify(tasks) !== JSON.stringify(tasksWithAutoWarehouses);
+      if (hasChanged) {
+        setTasks(tasksWithAutoWarehouses);
+      }
+    }
+  }, [truckCapacity]); // Only run when capacity changes, not on every task change
 
   // Calculate shift analysis
   const shiftAnalysis = useMemo(() => {
@@ -1571,27 +1830,35 @@ function CreateShiftDrawer({
                 </button>
                 <button
                   type="button"
-                  disabled
-                  className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-200 rounded-lg text-sm font-medium text-gray-400 cursor-not-allowed"
+                  onClick={openBinSelection}
+                  className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 hover:border-primary hover:bg-primary/5 rounded-lg transition-all text-sm font-medium text-gray-700 hover:text-primary"
                 >
                   <Package className="w-4 h-4" />
-                  Collection (Coming Soon)
+                  Collection
                 </button>
                 <button
                   type="button"
-                  disabled
-                  className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-200 rounded-lg text-sm font-medium text-gray-400 cursor-not-allowed"
+                  onClick={openRouteImport}
+                  className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 hover:border-primary hover:bg-primary/5 rounded-lg transition-all text-sm font-medium text-gray-700 hover:text-primary"
+                >
+                  <List className="w-4 h-4" />
+                  Import from Route
+                </button>
+                <button
+                  type="button"
+                  onClick={openPlacementSelection}
+                  className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 hover:border-primary hover:bg-primary/5 rounded-lg transition-all text-sm font-medium text-gray-700 hover:text-primary"
                 >
                   <MapPinned className="w-4 h-4" />
-                  Placement (Coming Soon)
+                  Placement
                 </button>
                 <button
                   type="button"
-                  disabled
-                  className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-200 rounded-lg text-sm font-medium text-gray-400 cursor-not-allowed"
+                  onClick={openMoveRequestSelection}
+                  className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 hover:border-primary hover:bg-primary/5 rounded-lg transition-all text-sm font-medium text-gray-700 hover:text-primary"
                 >
                   <MoveRight className="w-4 h-4" />
-                  Move Request (Coming Soon)
+                  Move Request
                 </button>
               </div>
             </div>
@@ -1633,9 +1900,9 @@ function CreateShiftDrawer({
                       onDragStart={() => handleDragStart(index)}
                       onDragOver={(e) => handleDragOver(e, index)}
                       onDragEnd={handleDragEnd}
-                      className={`flex items-center gap-3 px-4 py-3 bg-white border rounded-lg cursor-move hover:shadow-md transition-all ${
+                      className={`flex items-center gap-3 px-4 py-3 border rounded-lg cursor-move hover:shadow-md transition-all ${
                         draggedTaskIndex === index ? 'opacity-50' : ''
-                      }`}
+                      } ${task.auto_inserted ? 'bg-blue-50 border-blue-200' : 'bg-white'}`}
                     >
                       <GripVertical className="w-4 h-4 text-gray-400" />
                       <div className="flex-1">
@@ -1646,20 +1913,35 @@ function CreateShiftDrawer({
                           {task.type === 'placement' && <MapPinned className="w-4 h-4 text-purple-600" />}
                           {task.type === 'move_request' && <MoveRight className="w-4 h-4 text-orange-600" />}
                           <span className="text-sm font-medium capitalize">{task.type.replace('_', ' ')}</span>
+                          {task.auto_inserted && (
+                            <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full border border-blue-200">
+                              Auto
+                            </span>
+                          )}
                         </div>
                         {task.warehouse_action && (
                           <p className="text-xs text-gray-500 mt-1">
-                            {task.warehouse_action === 'load' ? 'Load' : 'Unload'} {task.bins_to_load} bin(s)
+                            {task.warehouse_action === 'load' ? 'Load' : 'Unload'} {task.bins_to_load || 'all'} bin(s)
+                            {task.auto_inserted && ' - Automatically inserted based on truck capacity'}
                           </p>
                         )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeTask(index)}
-                        className="text-red-500 hover:text-red-700 transition-fast"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditTask(index)}
+                          className="text-blue-500 hover:text-blue-700 transition-fast"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeTask(index)}
+                          className="text-red-500 hover:text-red-700 transition-fast"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1713,6 +1995,446 @@ function CreateShiftDrawer({
           </div>
         </form>
       </div>
+
+      {/* Bin Selection Map Modal */}
+      {showBinSelection && (
+        <BinSelectionMap
+          onClose={() => setShowBinSelection(false)}
+          onConfirm={handleBinSelectionConfirm}
+          initialSelectedBins={[]}
+        />
+      )}
+
+      {/* Route Import Modal */}
+      {showRouteImport && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Import from Route</h3>
+              <button
+                onClick={() => {
+                  setShowRouteImport(false);
+                  setSelectedShiftForImport('');
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              Select a previous route/shift to import its collection tasks
+            </p>
+
+            <select
+              value={selectedShiftForImport}
+              onChange={(e) => setSelectedShiftForImport(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none mb-4"
+            >
+              <option value="">Select a route...</option>
+              {availableShifts.map(shift => (
+                <option key={shift.id} value={shift.id}>
+                  {shift.driverName} - {shift.route} ({shift.binCount} bins) - {shift.date}
+                </option>
+              ))}
+            </select>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowRouteImport(false);
+                  setSelectedShiftForImport('');
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRouteImport}
+                disabled={!selectedShiftForImport}
+                className="flex-1 px-4 py-2 bg-primary rounded-lg text-sm font-medium text-white hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Import Tasks
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Task Modal */}
+      {editingTask && editingTaskIndex !== null && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Edit Task</h3>
+              <button
+                onClick={cancelEditTask}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Common Fields */}
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-1">Address</label>
+                <input
+                  type="text"
+                  value={editingTask.address || ''}
+                  onChange={(e) => handleEditTaskChange('address', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 block mb-1">Latitude</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={editingTask.latitude || ''}
+                    onChange={(e) => handleEditTaskChange('latitude', parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 block mb-1">Longitude</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={editingTask.longitude || ''}
+                    onChange={(e) => handleEditTaskChange('longitude', parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Collection Fields */}
+              {editingTask.type === 'collection' && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 block mb-1">Bin Number</label>
+                    <input
+                      type="text"
+                      value={editingTask.bin_number || ''}
+                      onChange={(e) => handleEditTaskChange('bin_number', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 block mb-1">Fill Percentage</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={editingTask.fill_percentage || ''}
+                      onChange={(e) => handleEditTaskChange('fill_percentage', parseInt(e.target.value) || 0)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Warehouse Stop Fields */}
+              {editingTask.type === 'warehouse_stop' && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 block mb-1">Action</label>
+                    <select
+                      value={editingTask.warehouse_action || 'load'}
+                      onChange={(e) => handleEditTaskChange('warehouse_action', e.target.value as 'load' | 'unload')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                    >
+                      <option value="load">Load</option>
+                      <option value="unload">Unload</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 block mb-1">Bins to {editingTask.warehouse_action === 'load' ? 'Load' : 'Unload'}</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={editingTask.bins_to_load || ''}
+                      onChange={(e) => handleEditTaskChange('bins_to_load', parseInt(e.target.value) || 1)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Placement Fields */}
+              {editingTask.type === 'placement' && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700 block mb-1">New Bin Number</label>
+                  <input
+                    type="text"
+                    value={editingTask.new_bin_number || ''}
+                    onChange={(e) => handleEditTaskChange('new_bin_number', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                  />
+                </div>
+              )}
+
+              {/* Move Request Fields */}
+              {editingTask.type === 'move_request' && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 block mb-1">Move Type</label>
+                    <select
+                      value={editingTask.move_type || 'pickup'}
+                      onChange={(e) => handleEditTaskChange('move_type', e.target.value as 'pickup' | 'dropoff')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                    >
+                      <option value="pickup">Pickup</option>
+                      <option value="dropoff">Dropoff</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 block mb-1">Destination Address</label>
+                    <input
+                      type="text"
+                      value={editingTask.destination_address || ''}
+                      onChange={(e) => handleEditTaskChange('destination_address', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={cancelEditTask}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveEditedTask}
+                className="flex-1 px-4 py-2 bg-primary rounded-lg text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Placement Selection Modal */}
+      {showPlacementSelection && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Select Placement Locations</h3>
+              <button
+                onClick={() => setShowPlacementSelection(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              {potentialLocations.length === 0 ? (
+                <div className="text-center py-12">
+                  <MapPinned className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500">No potential locations available</p>
+                  <p className="text-xs text-gray-400 mt-1">Landlords can request bin placements from the mobile app</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {potentialLocations.map((location) => {
+                    const isSelected = false; // We'll handle selection with checkboxes
+                    return (
+                      <label
+                        key={location.id}
+                        className="flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-1 w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                          data-location-id={location.id}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900">{location.address}</p>
+                              <p className="text-sm text-gray-600 mt-0.5">
+                                {location.city}, {location.zip}
+                              </p>
+                            </div>
+                          </div>
+                          {location.notes && (
+                            <p className="text-xs text-gray-500 mt-2 italic">{location.notes}</p>
+                          )}
+                          <div className="flex items-center gap-3 mt-2">
+                            <span className="text-xs text-gray-500">
+                              Requested by {location.requested_by_name}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              {new Date(location.created_at_iso).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 p-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowPlacementSelection(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const checkboxes = document.querySelectorAll('[data-location-id]:checked') as NodeListOf<HTMLInputElement>;
+                  const selectedIds = Array.from(checkboxes).map(cb => cb.dataset.locationId!);
+                  if (selectedIds.length > 0) {
+                    handlePlacementSelectionConfirm(selectedIds);
+                  }
+                }}
+                className="flex-1 px-4 py-2 bg-primary rounded-lg text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+              >
+                Add Selected Placements
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Move Request Selection Modal */}
+      {showMoveRequestSelection && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[80vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Select Move Requests</h3>
+              <button
+                onClick={() => setShowMoveRequestSelection(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {moveRequests.length === 0 ? (
+                <div className="text-center py-12">
+                  <MoveRight className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500">No pending move requests</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Move requests can be created from the Move Requests page
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {moveRequests.map((request) => {
+                    // Format urgency badge
+                    const urgencyColors = {
+                      urgent: 'bg-red-100 text-red-700',
+                      overdue: 'bg-red-100 text-red-700',
+                      soon: 'bg-orange-100 text-orange-700',
+                      scheduled: 'bg-blue-100 text-blue-700',
+                      resolved: 'bg-green-100 text-green-700',
+                    };
+
+                    const urgencyColor = urgencyColors[request.urgency] || 'bg-gray-100 text-gray-700';
+
+                    // Format date
+                    const scheduledDate = new Date(request.scheduled_date_iso);
+                    const formattedDate = scheduledDate.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    });
+
+                    return (
+                      <label
+                        key={request.id}
+                        className="flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-1 w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                          data-request-id={request.id}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900">
+                                Bin #{request.bin_number}
+                              </p>
+                              <p className="text-sm text-gray-600 mt-0.5">
+                                {request.current_street}, {request.city} {request.zip}
+                              </p>
+                            </div>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${urgencyColor}`}>
+                              {request.urgency}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-4 text-xs text-gray-500 mt-2">
+                            <span className="flex items-center gap-1">
+                              <span className="font-medium text-gray-700">Type:</span>
+                              {request.move_type === 'store' ? 'Store at Warehouse' : 'Relocate'}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <span className="font-medium text-gray-700">Scheduled:</span>
+                              {formattedDate}
+                            </span>
+                          </div>
+
+                          {request.move_type === 'relocation' && request.new_street && (
+                            <p className="text-xs text-gray-500 mt-2">
+                              <span className="font-medium text-gray-700">New Location:</span>{' '}
+                              {request.new_street}, {request.new_city} {request.new_zip}
+                            </p>
+                          )}
+
+                          {request.reason && (
+                            <p className="text-xs text-gray-500 mt-2 italic">
+                              {request.reason}
+                            </p>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex gap-3 p-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowMoveRequestSelection(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const checkboxes = document.querySelectorAll('[data-request-id]:checked') as NodeListOf<HTMLInputElement>;
+                  const selectedIds = Array.from(checkboxes).map(cb => cb.dataset.requestId!);
+                  if (selectedIds.length > 0) {
+                    handleMoveRequestSelectionConfirm(selectedIds);
+                  }
+                }}
+                className="flex-1 px-4 py-2 bg-primary rounded-lg text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+              >
+                Add Selected Move Requests
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

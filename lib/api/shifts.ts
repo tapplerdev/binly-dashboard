@@ -386,3 +386,29 @@ export function formatTimestamp(timestamp: number | null): string {
   if (!timestamp) return 'N/A';
   return new Date(timestamp * 1000).toLocaleString();
 }
+
+/**
+ * Get detailed tasks for a specific shift
+ * Returns tasks with full bin information
+ */
+export async function getShiftTasks(shiftId: string): Promise<any[]> {
+  try {
+    console.log(`📥 Fetching tasks for shift ${shiftId}...`);
+
+    const response = await fetch(`${API_BASE_URL}/api/shifts/${shiftId}/tasks/detailed`, {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      console.warn(`⚠️  Failed to fetch shift tasks: ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    console.log(`✅ Fetched ${data.data?.length || 0} tasks`);
+    return data.data || [];
+  } catch (error) {
+    console.error('❌ Error fetching shift tasks:', error);
+    return [];
+  }
+}
