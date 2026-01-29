@@ -1848,7 +1848,21 @@ function CreateShiftDrawer({
         const candidatesBeforeZone = existingWarehouseStops.filter(ws => ws.taskIndex < zoneStart && ws.action === 'load');
         const warehouseBeforeZone = candidatesBeforeZone[candidatesBeforeZone.length - 1]; // Get the last (closest) one
 
+        // Check if warehouse already completed its service (capacity reached 0) before this negative zone
+        let warehouseCompletedService = false;
         if (warehouseBeforeZone) {
+          // Scan capacity flow between warehouse and negative zone
+          for (let k = warehouseBeforeZone.taskIndex + 1; k < zoneStart; k++) {
+            if (capacityFlow[k] && capacityFlow[k].loadAfter >= 0) {
+              // Capacity reached 0 or positive - warehouse completed its job
+              warehouseCompletedService = true;
+              console.log(`   ✅ Warehouse #${warehouseBeforeZone.taskIndex + 1} completed service at task #${k + 1} (capacity=${capacityFlow[k].loadAfter})`);
+              break;
+            }
+          }
+        }
+
+        if (warehouseBeforeZone && !warehouseCompletedService) {
           // Count TOTAL downstream placements, dropoffs, AND pickups from warehouse stop
           // - Placements and dropoffs consume bins (need warehouse to provide)
           // - Pickups provide bins (reduce warehouse requirements)
@@ -1938,7 +1952,10 @@ function CreateShiftDrawer({
             }
           }
         } else {
-          // Add new warehouse stop
+          // Add new warehouse stop (either no warehouse before, or warehouse completed its service)
+          if (warehouseBeforeZone && warehouseCompletedService) {
+            console.log(`   🆕 Warehouse #${warehouseBeforeZone.taskIndex + 1} completed its service - need NEW warehouse for this zone`);
+          }
           let insertAfter = zoneStart - 1;
           while (insertAfter >= 0 && tasks[insertAfter]?.type === 'placement') {
             insertAfter--;
