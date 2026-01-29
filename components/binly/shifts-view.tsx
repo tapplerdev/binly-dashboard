@@ -1803,8 +1803,9 @@ function CreateShiftDrawer({
         const binsToLoad = Math.min(binsNeeded, capacity);
         const affectedTasks = Array.from({ length: zoneEnd - zoneStart + 1 }, (_, idx) => zoneStart + idx);
 
-        // Check if there's an existing warehouse stop BEFORE this zone
-        const warehouseBeforeZone = existingWarehouseStops.find(ws => ws.taskIndex < zoneStart && ws.action === 'load');
+        // Check if there's an existing warehouse stop BEFORE this zone (get the CLOSEST one)
+        const candidatesBeforeZone = existingWarehouseStops.filter(ws => ws.taskIndex < zoneStart && ws.action === 'load');
+        const warehouseBeforeZone = candidatesBeforeZone[candidatesBeforeZone.length - 1]; // Get the last (closest) one
 
         if (warehouseBeforeZone) {
           // Count TOTAL downstream placements from warehouse stop (not just shortage)
