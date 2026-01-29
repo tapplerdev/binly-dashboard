@@ -1564,19 +1564,34 @@ function CreateShiftDrawer({
 
   // Accept a smart suggestion
   const acceptSuggestion = (suggestion: typeof smartSuggestions[0]) => {
-    const newWarehouseTask: ShiftTask = {
-      id: `temp-${Date.now()}`,
-      type: 'warehouse_stop',
-      warehouse_action: suggestion.type === 'warehouse_load' ? 'load' : 'unload',
-      bins_to_load: suggestion.type === 'warehouse_load' ? suggestion.binsCount : undefined,
-      latitude: 38.5816, // Binly Central Warehouse
-      longitude: -121.4944,
-      address: 'Binly Central Warehouse - 1500 Industrial Pkwy, Sacramento, CA 95691',
-    };
-
-    // Insert at the suggested position
     const newTasks = [...tasks];
-    newTasks.splice(suggestion.insertAfterIndex + 1, 0, newWarehouseTask);
+
+    if (suggestion.action === 'add') {
+      // Add new warehouse stop
+      const newWarehouseTask: ShiftTask = {
+        id: `temp-${Date.now()}`,
+        type: 'warehouse_stop',
+        warehouse_action: suggestion.targetType === 'warehouse_load' ? 'load' : 'unload',
+        bins_to_load: suggestion.targetType === 'warehouse_load' ? suggestion.binsCount : undefined,
+        latitude: 38.5816, // Binly Central Warehouse
+        longitude: -121.4944,
+        address: 'Binly Central Warehouse - 1500 Industrial Pkwy, Sacramento, CA 95691',
+      };
+      newTasks.splice((suggestion.insertAfterIndex ?? -1) + 1, 0, newWarehouseTask);
+    } else if (suggestion.action === 'update' && suggestion.existingTaskIndex !== undefined) {
+      // Update existing warehouse stop
+      const existingTask = newTasks[suggestion.existingTaskIndex];
+      if (existingTask.type === 'warehouse_stop' && existingTask.warehouse_action === 'load') {
+        newTasks[suggestion.existingTaskIndex] = {
+          ...existingTask,
+          bins_to_load: suggestion.suggestedBinCount,
+        };
+      }
+    } else if (suggestion.action === 'remove' && suggestion.existingTaskIndex !== undefined) {
+      // Remove warehouse stop
+      newTasks.splice(suggestion.existingTaskIndex, 1);
+    }
+
     setTasks(newTasks);
   };
 
@@ -1702,14 +1717,34 @@ function CreateShiftDrawer({
     return flow;
   }, [tasks]);
 
-  // Detect smart suggestions - scans entire shift for ALL capacity issues
+  // Enhanced smart suggestion type with priority and action types
+  type SmartSuggestion = {
+    priority: 'critical' | 'optimization' | 'info';
+    action: 'add' | 'update' | 'move' | 'remove';
+    targetType: 'warehouse_load' | 'warehouse_unload';
+
+    // For add action
+    insertAfterIndex?: number;
+    binsCount?: number;
+
+    // For update/move/remove actions
+    existingTaskIndex?: number;
+    currentBinCount?: number;
+    suggestedBinCount?: number;
+    suggestedPosition?: number;
+
+    reason: string;
+    affectedTasks: number[];
+  };
+
+  // Detect smart suggestions - comprehensive edge case handling
   const smartSuggestions = useMemo(() => {
     console.log('\n💡 [SMART SUGGESTIONS] Analyzing shift for capacity issues...');
     console.log('📊 [SMART SUGGESTIONS] Capacity:', truckCapacity);
     console.log('📋 [SMART SUGGESTIONS] Total tasks:', tasks.length);
     console.log('📈 [SMART SUGGESTIONS] Capacity flow entries:', capacityFlow.length);
 
-    const suggestions: Array<{ type: 'warehouse_load' | 'warehouse_unload'; insertAfterIndex: number; binsCount: number; reason: string }> = [];
+    const suggestions: SmartSuggestion[] = [];
     const capacity = parseInt(truckCapacity) || 0;
 
     if (capacity <= 0 || tasks.length === 0) {
@@ -1717,118 +1752,190 @@ function CreateShiftDrawer({
       return suggestions;
     }
 
-    // Track which problems we've already suggested fixes for
-    const suggestedIndexes = new Set<number>();
+    // PHASE 1: Detect existing warehouse stops
+    console.log('\n📦 [PHASE 1] Detecting existing warehouse stops...');
+    const existingWarehouseStops: Array<{
+      taskIndex: number;
+      action: 'load' | 'unload';
+      binsCount: number;
+    }> = [];
 
-    // SCAN ENTIRE CAPACITY FLOW for problems - GROUP consecutive issues
-    console.log('🔍 [SMART SUGGESTIONS] Scanning capacity flow for problems...');
+    tasks.forEach((task, index) => {
+      if (task.type === 'warehouse_stop') {
+        const action = task.warehouse_action as 'load' | 'unload';
+        const binsCount = action === 'load' ? (task.bins_to_load || 0) : 0;
+        existingWarehouseStops.push({ taskIndex: index, action, binsCount });
+        console.log(`   ⬆️  Found warehouse ${action} at task #${index + 1} (${binsCount} bins)`);
+      }
+    });
+
+    console.log(`✅ Found ${existingWarehouseStops.length} existing warehouse stops`);
+
+    // PHASE 2: Scan capacity flow and generate context-aware suggestions
+    console.log('\n🔍 [PHASE 2] Scanning capacity flow for problems...');
+    const suggestedIndexes = new Set<number>();
 
     let i = 0;
     while (i < capacityFlow.length) {
       const flow = capacityFlow[i];
       const task = tasks[flow.taskIndex];
 
-      // PROBLEM 1: Capacity goes NEGATIVE (ran out of bins)
-      // Group consecutive negative capacity issues into ONE suggestion
+      // CRITICAL: Capacity goes NEGATIVE (ran out of bins)
       if (flow.loadAfter < 0 && !suggestedIndexes.has(i)) {
-        console.log(`🚨 [SMART SUGGESTIONS] NEGATIVE CAPACITY ZONE starting at task #${i + 1}!`);
+        console.log(`🚨 NEGATIVE CAPACITY ZONE starting at task #${i + 1}!`);
 
         const zoneStart = i;
         let zoneEnd = i;
         let lowestCapacity = flow.loadAfter;
 
-        // Scan forward to find the extent of the negative zone
+        // Find extent of negative zone
         let j = i + 1;
         while (j < capacityFlow.length && capacityFlow[j].loadAfter < 0) {
           lowestCapacity = Math.min(lowestCapacity, capacityFlow[j].loadAfter);
           zoneEnd = j;
-          console.log(`   📍 Task #${j + 1}: capacity=${capacityFlow[j].loadAfter} (zone continues)`);
+          console.log(`   📍 Task #${j + 1}: capacity=${capacityFlow[j].loadAfter}`);
           j++;
         }
 
-        console.log(`   📊 Zone: tasks #${zoneStart + 1} to #${zoneEnd + 1}, lowest capacity: ${lowestCapacity}`);
+        console.log(`   📊 Zone: tasks #${zoneStart + 1} to #${zoneEnd + 1}, lowest: ${lowestCapacity}`);
 
-        // Calculate TOTAL bins needed (absolute value of lowest point)
         const binsNeeded = Math.abs(lowestCapacity);
         const binsToLoad = Math.min(binsNeeded, capacity);
+        const affectedTasks = Array.from({ length: zoneEnd - zoneStart + 1 }, (_, idx) => zoneStart + idx);
 
-        // Find best insertion point (before zone starts, after last non-placement)
-        let insertAfter = zoneStart - 1;
-        while (insertAfter >= 0 && tasks[insertAfter]?.type === 'placement') {
-          insertAfter--;
+        // Check if there's an existing warehouse stop BEFORE this zone
+        const warehouseBeforeZone = existingWarehouseStops.find(ws => ws.taskIndex < zoneStart && ws.action === 'load');
+
+        if (warehouseBeforeZone) {
+          // Update existing warehouse stop
+          console.log(`   💡 Found existing warehouse at task #${warehouseBeforeZone.taskIndex + 1} (loads ${warehouseBeforeZone.binsCount} bins)`);
+          if (warehouseBeforeZone.binsCount < binsNeeded) {
+            suggestions.push({
+              priority: 'optimization',
+              action: 'update',
+              targetType: 'warehouse_load',
+              existingTaskIndex: warehouseBeforeZone.taskIndex,
+              currentBinCount: warehouseBeforeZone.binsCount,
+              suggestedBinCount: binsToLoad,
+              reason: binsNeeded > capacity
+                ? `⚠️ Update warehouse stop #${warehouseBeforeZone.taskIndex + 1} to load ${binsToLoad} bins (currently ${warehouseBeforeZone.binsCount}) - need ${binsNeeded} total, will require multiple trips`
+                : `⚠️ Update warehouse stop #${warehouseBeforeZone.taskIndex + 1} from ${warehouseBeforeZone.binsCount} to ${binsToLoad} bins (added ${binsToLoad - warehouseBeforeZone.binsCount} more placement${binsToLoad - warehouseBeforeZone.binsCount > 1 ? 's' : ''})`,
+              affectedTasks
+            });
+          }
+        } else {
+          // Add new warehouse stop
+          let insertAfter = zoneStart - 1;
+          while (insertAfter >= 0 && tasks[insertAfter]?.type === 'placement') {
+            insertAfter--;
+          }
+
+          suggestions.push({
+            priority: 'critical',
+            action: 'add',
+            targetType: 'warehouse_load',
+            insertAfterIndex: Math.max(-1, insertAfter),
+            binsCount: binsToLoad,
+            reason: binsNeeded > capacity
+              ? `🚨 Need ${binsNeeded} bins but capacity is ${capacity}! Add warehouse stop to load ${binsToLoad} bins before task #${zoneStart + 1} (you'll need multiple trips)`
+              : `🚨 Ran out of bins! Add warehouse stop to load ${binsToLoad} bin${binsToLoad > 1 ? 's' : ''} before task #${zoneStart + 1} (covers ${affectedTasks.length} placement${affectedTasks.length > 1 ? 's' : ''})`,
+            affectedTasks
+          });
         }
 
-        const tasksAffected = zoneEnd - zoneStart + 1;
-        suggestions.push({
-          type: 'warehouse_load',
-          insertAfterIndex: Math.max(-1, insertAfter),
-          binsCount: binsToLoad,
-          reason: binsNeeded > capacity
-            ? `🚨 Need ${binsNeeded} bins for ${tasksAffected} placements but capacity is ${capacity}! Load ${binsToLoad} bins before task #${zoneStart + 1} (you'll need multiple warehouse trips)`
-            : `🚨 Ran out of bins! Load ${binsToLoad} bin${binsToLoad > 1 ? 's' : ''} before task #${zoneStart + 1} (covers ${tasksAffected} placement${tasksAffected > 1 ? 's' : ''})`
-        });
-
-        // Mark ALL tasks in this zone as handled
         for (let k = zoneStart; k <= zoneEnd; k++) {
           suggestedIndexes.add(k);
         }
-
-        // Jump to end of zone
         i = zoneEnd + 1;
         continue;
       }
 
-      // PROBLEM 2: Capacity EXCEEDS physical limit
+      // CRITICAL: Capacity EXCEEDS truck limit
       if (flow.loadAfter > capacity && !suggestedIndexes.has(i)) {
-        console.log(`⚠️  [SMART SUGGESTIONS] OVER CAPACITY at task #${i + 1}! loadAfter=${flow.loadAfter}, capacity=${capacity}`);
+        console.log(`⚠️  OVER CAPACITY at task #${i + 1}!`);
         suggestions.push({
-          type: 'warehouse_unload',
+          priority: 'critical',
+          action: 'add',
+          targetType: 'warehouse_unload',
           insertAfterIndex: i - 1,
           binsCount: flow.loadBefore,
-          reason: `⚠️ Over capacity! Truck would have ${flow.loadAfter}/${capacity} bins. Unload before task #${i + 1}`
+          reason: `🚨 Over capacity! Truck would have ${flow.loadAfter}/${capacity} bins. Add warehouse stop to unload before task #${i + 1}`,
+          affectedTasks: [i]
         });
-
         suggestedIndexes.add(i);
       }
 
       i++;
     }
 
-    console.log(`🔍 [SMART SUGGESTIONS] Found ${suggestions.length} critical issues`);
+    // PHASE 3: Check for optimization opportunities
+    console.log('\n✨ [PHASE 3] Checking optimizations...');
 
-    // OPTIMIZATION: If no critical issues, check for initial bins
+    // Check if existing warehouse stops are obsolete or misplaced
+    existingWarehouseStops.forEach(ws => {
+      if (ws.action !== 'load') return;
+
+      const wsFlowIndex = capacityFlow.findIndex(f => f.taskIndex === ws.taskIndex);
+      if (wsFlowIndex === -1) return;
+
+      // Check downstream placements after this warehouse stop
+      let placementsAfter = 0;
+      for (let k = ws.taskIndex + 1; k < tasks.length; k++) {
+        if (tasks[k].type === 'placement') placementsAfter++;
+        if (tasks[k].type === 'warehouse_stop' && (tasks[k] as any).warehouse_action === 'load') break;
+      }
+
+      console.log(`   📦 Warehouse #${ws.taskIndex + 1}: loads ${ws.binsCount}, has ${placementsAfter} placements downstream`);
+
+      // Obsolete: warehouse stop loads bins but no placements use them
+      if (placementsAfter === 0 && ws.binsCount > 0) {
+        suggestions.push({
+          priority: 'optimization',
+          action: 'remove',
+          targetType: 'warehouse_load',
+          existingTaskIndex: ws.taskIndex,
+          currentBinCount: ws.binsCount,
+          reason: `💡 Remove warehouse stop #${ws.taskIndex + 1} - no placements use these ${ws.binsCount} bins`,
+          affectedTasks: []
+        });
+      }
+    });
+
+    // If no issues, suggest initial load for first placements
     if (suggestions.length === 0) {
-      console.log('✨ [SMART SUGGESTIONS] No critical issues. Checking for optimization opportunities...');
       const placements = tasks.filter(t => t.type === 'placement');
       if (placements.length > 0) {
         const firstPlacementIndex = tasks.findIndex(t => t.type === 'placement');
-        const flowAtFirstPlacement = capacityFlow[firstPlacementIndex];
+        const flowAtFirst = capacityFlow[firstPlacementIndex];
 
-        console.log(`📦 [SMART SUGGESTIONS] Found ${placements.length} placements, first at index ${firstPlacementIndex}`);
-        console.log(`📦 [SMART SUGGESTIONS] Load at first placement: ${flowAtFirstPlacement?.loadBefore}`);
-
-        if (flowAtFirstPlacement && flowAtFirstPlacement.loadBefore === 0) {
+        if (flowAtFirst && flowAtFirst.loadBefore === 0) {
           const binsToLoad = Math.min(placements.length, capacity);
-          console.log(`💡 [SMART SUGGESTIONS] Suggesting initial load of ${binsToLoad} bins`);
           suggestions.push({
-            type: 'warehouse_load',
+            priority: 'info',
+            action: 'add',
+            targetType: 'warehouse_load',
             insertAfterIndex: Math.max(-1, firstPlacementIndex - 1),
             binsCount: binsToLoad,
             reason: placements.length > capacity
-              ? `Load ${binsToLoad} bins for first ${binsToLoad} of ${placements.length} placements (will need multiple trips)`
-              : `Load ${binsToLoad} bin${binsToLoad > 1 ? 's' : ''} for ${placements.length} placement${placements.length > 1 ? 's' : ''}`
+              ? `💡 Add warehouse stop to load ${binsToLoad} bins for first ${binsToLoad} of ${placements.length} placements (will need multiple trips)`
+              : `💡 Add warehouse stop to load ${binsToLoad} bin${binsToLoad > 1 ? 's' : ''} for ${placements.length} placement${placements.length > 1 ? 's' : ''}`,
+            affectedTasks: Array.from({ length: Math.min(binsToLoad, placements.length) }, (_, idx) => firstPlacementIndex + idx)
           });
         }
       }
     }
 
-    // Return top 3 most critical suggestions
-    console.log(`\n✅ [SMART SUGGESTIONS] Returning ${suggestions.length} suggestion(s):`);
-    suggestions.forEach((s, i) => {
-      console.log(`   ${i + 1}. [${s.type}] Insert after task #${s.insertAfterIndex + 1}: ${s.reason}`);
+    // Sort by priority and return
+    const priorityOrder = { critical: 0, optimization: 1, info: 2 };
+    const sorted = suggestions.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+
+    console.log(`\n✅ [SMART SUGGESTIONS] Generated ${sorted.length} suggestion(s):`);
+    sorted.forEach((s, idx) => {
+      const actionStr = s.action === 'add' ? 'Add' : s.action === 'update' ? 'Update' : s.action === 'remove' ? 'Remove' : 'Move';
+      console.log(`   ${idx + 1}. [${s.priority}] ${actionStr}: ${s.reason}`);
     });
 
-    return suggestions.slice(0, 3);
+    return sorted.slice(0, 5); // Return top 5
   }, [tasks, capacityFlow, truckCapacity]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -2063,32 +2170,116 @@ function CreateShiftDrawer({
               </div>
             </div>
 
-            {/* Smart Suggestions */}
+            {/* Smart Suggestions - Priority-Based Grouping */}
             {smartSuggestions.length > 0 && (
-              <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">💡</span>
-                  <h3 className="text-sm font-semibold text-yellow-900">Smart Suggestions</h3>
-                </div>
-                {smartSuggestions.map((suggestion, index) => (
-                  <div key={index} className="bg-white rounded-lg p-3 border border-yellow-200">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">
-                          {suggestion.type === 'warehouse_load' ? '🏭 Add Warehouse LOAD' : '⚠️ Add Warehouse UNLOAD'}
-                        </p>
-                        <p className="text-xs text-gray-600 mt-1">{suggestion.reason}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => acceptSuggestion(suggestion)}
-                        className="px-3 py-1.5 bg-primary text-white rounded-md text-xs font-medium hover:bg-primary/90 transition-colors whitespace-nowrap"
-                      >
-                        Add {suggestion.type === 'warehouse_load' ? 'Load' : 'Unload'}
-                      </button>
+              <div className="space-y-3">
+                {/* Critical Issues */}
+                {smartSuggestions.filter(s => s.priority === 'critical').length > 0 && (
+                  <div className="bg-red-50 border border-red-300 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">🚨</span>
+                      <h3 className="text-sm font-semibold text-red-900">
+                        Critical Issues ({smartSuggestions.filter(s => s.priority === 'critical').length})
+                      </h3>
                     </div>
+                    {smartSuggestions.filter(s => s.priority === 'critical').map((suggestion, index) => (
+                      <div key={`crit-${index}`} className="bg-white rounded-lg p-3 border border-red-200">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-900">
+                              {suggestion.action === 'add' && '➕ Add'}
+                              {suggestion.action === 'update' && '✏️ Update'}
+                              {suggestion.action === 'remove' && '🗑️ Remove'}
+                              {' '}{suggestion.targetType === 'warehouse_load' ? 'Warehouse LOAD' : 'Warehouse UNLOAD'}
+                            </p>
+                            <p className="text-xs text-gray-600 mt-1">{suggestion.reason}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => acceptSuggestion(suggestion)}
+                            className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-medium hover:bg-red-700 transition-colors whitespace-nowrap"
+                          >
+                            {suggestion.action === 'add' && 'Add'}
+                            {suggestion.action === 'update' && 'Update'}
+                            {suggestion.action === 'remove' && 'Remove'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
+
+                {/* Optimizations */}
+                {smartSuggestions.filter(s => s.priority === 'optimization').length > 0 && (
+                  <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">⚠️</span>
+                      <h3 className="text-sm font-semibold text-yellow-900">
+                        Optimizations ({smartSuggestions.filter(s => s.priority === 'optimization').length})
+                      </h3>
+                    </div>
+                    {smartSuggestions.filter(s => s.priority === 'optimization').map((suggestion, index) => (
+                      <div key={`opt-${index}`} className="bg-white rounded-lg p-3 border border-yellow-200">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-900">
+                              {suggestion.action === 'add' && '➕ Add'}
+                              {suggestion.action === 'update' && '✏️ Update'}
+                              {suggestion.action === 'remove' && '🗑️ Remove'}
+                              {' '}{suggestion.targetType === 'warehouse_load' ? 'Warehouse LOAD' : 'Warehouse UNLOAD'}
+                            </p>
+                            <p className="text-xs text-gray-600 mt-1">{suggestion.reason}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => acceptSuggestion(suggestion)}
+                            className="px-3 py-1.5 bg-yellow-600 text-white rounded-md text-xs font-medium hover:bg-yellow-700 transition-colors whitespace-nowrap"
+                          >
+                            {suggestion.action === 'add' && 'Add'}
+                            {suggestion.action === 'update' && 'Update'}
+                            {suggestion.action === 'remove' && 'Remove'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Info/Suggestions */}
+                {smartSuggestions.filter(s => s.priority === 'info').length > 0 && (
+                  <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">💡</span>
+                      <h3 className="text-sm font-semibold text-blue-900">
+                        Suggestions ({smartSuggestions.filter(s => s.priority === 'info').length})
+                      </h3>
+                    </div>
+                    {smartSuggestions.filter(s => s.priority === 'info').map((suggestion, index) => (
+                      <div key={`info-${index}`} className="bg-white rounded-lg p-3 border border-blue-200">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-900">
+                              {suggestion.action === 'add' && '➕ Add'}
+                              {suggestion.action === 'update' && '✏️ Update'}
+                              {suggestion.action === 'remove' && '🗑️ Remove'}
+                              {' '}{suggestion.targetType === 'warehouse_load' ? 'Warehouse LOAD' : 'Warehouse UNLOAD'}
+                            </p>
+                            <p className="text-xs text-gray-600 mt-1">{suggestion.reason}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => acceptSuggestion(suggestion)}
+                            className="px-3 py-1.5 bg-primary text-white rounded-md text-xs font-medium hover:bg-primary/90 transition-colors whitespace-nowrap"
+                          >
+                            {suggestion.action === 'add' && 'Add'}
+                            {suggestion.action === 'update' && 'Update'}
+                            {suggestion.action === 'remove' && 'Remove'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
