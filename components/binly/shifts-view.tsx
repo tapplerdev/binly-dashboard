@@ -1701,22 +1701,31 @@ function CreateShiftDrawer({
 
     if (capacity <= 0 || tasks.length === 0) return suggestions;
 
-    // Check if placements need initial warehouse LOAD
+    // Check if placements have SUFFICIENT bins loaded
     const firstPlacementIndex = tasks.findIndex(t => t.type === 'placement');
     if (firstPlacementIndex >= 0) {
-      // Check if there's already a warehouse LOAD before first placement
-      const hasLoadBefore = tasks.slice(0, firstPlacementIndex).some(
-        t => t.type === 'warehouse_stop' && t.warehouse_action === 'load'
-      );
+      // Count total placements needed
+      const placementsCount = tasks.filter(t => t.type === 'placement').length;
 
-      if (!hasLoadBefore) {
-        // Count how many placements we need bins for
-        const placementsCount = tasks.filter(t => t.type === 'placement').length;
+      // Calculate total bins loaded BEFORE placements start
+      let totalBinsLoaded = 0;
+      for (let i = 0; i < firstPlacementIndex; i++) {
+        const task = tasks[i];
+        if (task.type === 'warehouse_stop' && task.warehouse_action === 'load') {
+          totalBinsLoaded += task.bins_to_load || 0;
+        }
+      }
+
+      // Check if we have enough bins for all placements
+      if (totalBinsLoaded < placementsCount) {
+        const shortfall = placementsCount - totalBinsLoaded;
         suggestions.push({
           type: 'warehouse_load',
           insertAfterIndex: Math.max(0, firstPlacementIndex - 1),
-          binsCount: placementsCount,
-          reason: `Load ${placementsCount} new bin${placementsCount > 1 ? 's' : ''} for placement tasks`
+          binsCount: shortfall,
+          reason: totalBinsLoaded === 0
+            ? `Load ${placementsCount} new bin${placementsCount > 1 ? 's' : ''} for placement tasks`
+            : `⚠️ Insufficient bins! You have ${placementsCount} placements but only ${totalBinsLoaded} bin${totalBinsLoaded > 1 ? 's' : ''} loaded. Need ${shortfall} more bin${shortfall > 1 ? 's' : ''}.`
         });
       }
     }
@@ -2028,22 +2037,48 @@ function CreateShiftDrawer({
                 {truckCapacity && parseInt(truckCapacity) > 0 && (
                   <div className="mt-3 pt-3 border-t border-blue-200">
                     <h4 className="text-xs font-semibold text-blue-900 mb-2">Truck Capacity Preview</h4>
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                       {capacityFlow.slice(0, 10).map((flow, index) => {
                         const task = tasks[flow.taskIndex];
                         const capacity = parseInt(truckCapacity);
                         const isOverCapacity = flow.loadAfter > capacity;
                         const barWidth = Math.min(100, (flow.loadAfter / capacity) * 100);
 
+                        // Task type icon and color
+                        const getTaskIcon = () => {
+                          if (task.type === 'collection') return '🧺';
+                          if (task.type === 'placement') return '📍';
+                          if (task.type === 'move_request') return '🔄';
+                          if (task.type === 'warehouse_stop') {
+                            return task.warehouse_action === 'load' ? '⬆️' : '⬇️';
+                          }
+                          return '📦';
+                        };
+
+                        // Bar color based on task type and capacity
+                        const getBarColor = () => {
+                          if (isOverCapacity) return 'bg-red-500';
+                          if (task.type === 'collection') return 'bg-blue-400'; // Lighter for collections
+                          return 'bg-green-500';
+                        };
+
+                        // Delta display
+                        const deltaDisplay = flow.delta !== 0 ? (
+                          <span className={`text-xs font-medium ${
+                            flow.delta > 0 ? 'text-green-600' : 'text-orange-600'
+                          }`}>
+                            {flow.delta > 0 ? `+${flow.delta}` : flow.delta}
+                          </span>
+                        ) : null;
+
                         return (
                           <div key={index} className="text-xs">
                             <div className="flex items-center gap-2">
                               <span className="text-gray-600 w-8">#{index + 1}</span>
+                              <span className="w-5 text-center" title={task.type}>{getTaskIcon()}</span>
                               <div className="flex-1 h-4 bg-gray-200 rounded-full overflow-hidden">
                                 <div
-                                  className={`h-full transition-all ${
-                                    isOverCapacity ? 'bg-red-500' : 'bg-green-500'
-                                  }`}
+                                  className={`h-full transition-all ${getBarColor()}`}
                                   style={{ width: `${barWidth}%` }}
                                 />
                               </div>
@@ -2052,6 +2087,11 @@ function CreateShiftDrawer({
                               }`}>
                                 {flow.loadAfter}/{capacity}
                               </span>
+                              {deltaDisplay && (
+                                <span className="w-8 text-right">
+                                  {deltaDisplay}
+                                </span>
+                              )}
                             </div>
                           </div>
                         );
