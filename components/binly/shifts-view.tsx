@@ -5,6 +5,8 @@ import { Calendar, List, User, X, Search, ChevronDown, Filter, MapPin, Loader2, 
 import { Shift, getShiftStatusColor, getShiftStatusLabel, ShiftStatus } from '@/lib/types/shift';
 import { ShiftDetailsDrawer } from './shift-details-drawer';
 import { BinSelectionMap } from './bin-selection-map';
+import { MoveRequestSelectionMap } from './move-request-selection-map';
+import { PlacementLocationSelectionMap } from './placement-location-selection-map';
 import { Route, getRouteLabel } from '@/lib/types/route';
 import { Bin } from '@/lib/types/bin';
 import { getBins } from '@/lib/api/bins';
@@ -3072,219 +3074,22 @@ function CreateShiftDrawer({
         </div>
       )}
 
-      {/* Placement Selection Modal */}
+      {/* Placement Selection Modal - Map-Based */}
       {showPlacementSelection && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Select Placement Locations</h3>
-              <button
-                onClick={() => setShowPlacementSelection(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6">
-              {potentialLocations.length === 0 ? (
-                <div className="text-center py-12">
-                  <MapPinned className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-sm text-gray-500">No potential locations available</p>
-                  <p className="text-xs text-gray-400 mt-1">Landlords can request bin placements from the mobile app</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {potentialLocations.map((location) => {
-                    const isSelected = false; // We'll handle selection with checkboxes
-                    return (
-                      <label
-                        key={location.id}
-                        className="flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                      >
-                        <input
-                          type="checkbox"
-                          className="mt-1 w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-                          data-location-id={location.id}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1">
-                              <p className="font-medium text-gray-900">{location.address}</p>
-                              <p className="text-sm text-gray-600 mt-0.5">
-                                {location.city}, {location.zip}
-                              </p>
-                            </div>
-                          </div>
-                          {location.notes && (
-                            <p className="text-xs text-gray-500 mt-2 italic">{location.notes}</p>
-                          )}
-                          <div className="flex items-center gap-3 mt-2">
-                            <span className="text-xs text-gray-500">
-                              Requested by {location.requested_by_name}
-                            </span>
-                            <span className="text-xs text-gray-400">
-                              {new Date(location.created_at_iso).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-3 p-6 border-t border-gray-200">
-              <button
-                onClick={() => setShowPlacementSelection(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  const checkboxes = document.querySelectorAll('[data-location-id]:checked') as NodeListOf<HTMLInputElement>;
-                  const selectedIds = Array.from(checkboxes).map(cb => cb.dataset.locationId!);
-                  if (selectedIds.length > 0) {
-                    handlePlacementSelectionConfirm(selectedIds);
-                  }
-                }}
-                className="flex-1 px-4 py-2 bg-primary rounded-lg text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-              >
-                Add Selected Placements
-              </button>
-            </div>
-          </div>
-        </div>
+        <PlacementLocationSelectionMap
+          onClose={() => setShowPlacementSelection(false)}
+          onConfirm={handlePlacementSelectionConfirm}
+          potentialLocations={potentialLocations}
+        />
       )}
 
-      {/* Move Request Selection Modal */}
+      {/* Move Request Selection Modal - Map-Based */}
       {showMoveRequestSelection && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[80vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Select Move Requests</h3>
-              <button
-                onClick={() => setShowMoveRequestSelection(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="flex-1 overflow-y-auto p-6">
-              {moveRequests.length === 0 ? (
-                <div className="text-center py-12">
-                  <MoveRight className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-sm text-gray-500">No pending move requests</p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Move requests can be created from the Move Requests page
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {moveRequests.map((request) => {
-                    // Format urgency badge
-                    const urgencyColors = {
-                      urgent: 'bg-red-100 text-red-700',
-                      overdue: 'bg-red-100 text-red-700',
-                      soon: 'bg-orange-100 text-orange-700',
-                      scheduled: 'bg-blue-100 text-blue-700',
-                      resolved: 'bg-green-100 text-green-700',
-                    };
-
-                    const urgencyColor = urgencyColors[request.urgency] || 'bg-gray-100 text-gray-700';
-
-                    // Format date
-                    const scheduledDate = new Date(request.scheduled_date_iso);
-                    const formattedDate = scheduledDate.toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    });
-
-                    return (
-                      <label
-                        key={request.id}
-                        className="flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                      >
-                        <input
-                          type="checkbox"
-                          className="mt-1 w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-                          data-request-id={request.id}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2 mb-2">
-                            <div className="flex-1">
-                              <p className="font-medium text-gray-900">
-                                Bin #{request.bin_number}
-                              </p>
-                              <p className="text-sm text-gray-600 mt-0.5">
-                                {request.current_street}, {request.city} {request.zip}
-                              </p>
-                            </div>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${urgencyColor}`}>
-                              {request.urgency}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-4 text-xs text-gray-500 mt-2">
-                            <span className="flex items-center gap-1">
-                              <span className="font-medium text-gray-700">Type:</span>
-                              {request.move_type === 'store' ? 'Store at Warehouse' : 'Relocate'}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <span className="font-medium text-gray-700">Scheduled:</span>
-                              {formattedDate}
-                            </span>
-                          </div>
-
-                          {request.move_type === 'relocation' && request.new_street && (
-                            <p className="text-xs text-gray-500 mt-2">
-                              <span className="font-medium text-gray-700">New Location:</span>{' '}
-                              {request.new_street}, {request.new_city} {request.new_zip}
-                            </p>
-                          )}
-
-                          {request.reason && (
-                            <p className="text-xs text-gray-500 mt-2 italic">
-                              {request.reason}
-                            </p>
-                          )}
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex gap-3 p-6 border-t border-gray-200">
-              <button
-                onClick={() => setShowMoveRequestSelection(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  const checkboxes = document.querySelectorAll('[data-request-id]:checked') as NodeListOf<HTMLInputElement>;
-                  const selectedIds = Array.from(checkboxes).map(cb => cb.dataset.requestId!);
-                  if (selectedIds.length > 0) {
-                    handleMoveRequestSelectionConfirm(selectedIds);
-                  }
-                }}
-                className="flex-1 px-4 py-2 bg-primary rounded-lg text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-              >
-                Add Selected Move Requests
-              </button>
-            </div>
-          </div>
-        </div>
+        <MoveRequestSelectionMap
+          onClose={() => setShowMoveRequestSelection(false)}
+          onConfirm={handleMoveRequestSelectionConfirm}
+          moveRequests={moveRequests}
+        />
       )}
     </div>
   );
