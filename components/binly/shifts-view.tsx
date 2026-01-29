@@ -1720,49 +1720,79 @@ function CreateShiftDrawer({
     // Track which problems we've already suggested fixes for
     const suggestedIndexes = new Set<number>();
 
-    // SCAN ENTIRE CAPACITY FLOW for problems
+    // SCAN ENTIRE CAPACITY FLOW for problems - GROUP consecutive issues
     console.log('🔍 [SMART SUGGESTIONS] Scanning capacity flow for problems...');
-    capacityFlow.forEach((flow, index) => {
+
+    let i = 0;
+    while (i < capacityFlow.length) {
+      const flow = capacityFlow[i];
       const task = tasks[flow.taskIndex];
 
       // PROBLEM 1: Capacity goes NEGATIVE (ran out of bins)
-      if (flow.loadAfter < 0 && !suggestedIndexes.has(index)) {
-        console.log(`🚨 [SMART SUGGESTIONS] NEGATIVE CAPACITY at task #${index + 1}! loadAfter=${flow.loadAfter}`);
-        // Calculate how many bins needed
-        const binsNeeded = Math.abs(flow.loadAfter);
-        const binsToLoad = Math.min(binsNeeded, capacity); // Can't load more than capacity
+      // Group consecutive negative capacity issues into ONE suggestion
+      if (flow.loadAfter < 0 && !suggestedIndexes.has(i)) {
+        console.log(`🚨 [SMART SUGGESTIONS] NEGATIVE CAPACITY ZONE starting at task #${i + 1}!`);
 
-        // Find best insertion point (before this task, after last non-placement)
-        let insertAfter = index - 1;
+        const zoneStart = i;
+        let zoneEnd = i;
+        let lowestCapacity = flow.loadAfter;
+
+        // Scan forward to find the extent of the negative zone
+        let j = i + 1;
+        while (j < capacityFlow.length && capacityFlow[j].loadAfter < 0) {
+          lowestCapacity = Math.min(lowestCapacity, capacityFlow[j].loadAfter);
+          zoneEnd = j;
+          console.log(`   📍 Task #${j + 1}: capacity=${capacityFlow[j].loadAfter} (zone continues)`);
+          j++;
+        }
+
+        console.log(`   📊 Zone: tasks #${zoneStart + 1} to #${zoneEnd + 1}, lowest capacity: ${lowestCapacity}`);
+
+        // Calculate TOTAL bins needed (absolute value of lowest point)
+        const binsNeeded = Math.abs(lowestCapacity);
+        const binsToLoad = Math.min(binsNeeded, capacity);
+
+        // Find best insertion point (before zone starts, after last non-placement)
+        let insertAfter = zoneStart - 1;
         while (insertAfter >= 0 && tasks[insertAfter]?.type === 'placement') {
           insertAfter--;
         }
 
+        const tasksAffected = zoneEnd - zoneStart + 1;
         suggestions.push({
           type: 'warehouse_load',
           insertAfterIndex: Math.max(-1, insertAfter),
           binsCount: binsToLoad,
           reason: binsNeeded > capacity
-            ? `🚨 Need ${binsNeeded} bins but capacity is ${capacity}! Load ${binsToLoad} bins before task #${index + 1} (you'll need multiple warehouse trips)`
-            : `🚨 Ran out of bins! Load ${binsToLoad} bin${binsToLoad > 1 ? 's' : ''} before task #${index + 1}`
+            ? `🚨 Need ${binsNeeded} bins for ${tasksAffected} placements but capacity is ${capacity}! Load ${binsToLoad} bins before task #${zoneStart + 1} (you'll need multiple warehouse trips)`
+            : `🚨 Ran out of bins! Load ${binsToLoad} bin${binsToLoad > 1 ? 's' : ''} before task #${zoneStart + 1} (covers ${tasksAffected} placement${tasksAffected > 1 ? 's' : ''})`
         });
 
-        suggestedIndexes.add(index);
+        // Mark ALL tasks in this zone as handled
+        for (let k = zoneStart; k <= zoneEnd; k++) {
+          suggestedIndexes.add(k);
+        }
+
+        // Jump to end of zone
+        i = zoneEnd + 1;
+        continue;
       }
 
       // PROBLEM 2: Capacity EXCEEDS physical limit
-      if (flow.loadAfter > capacity && !suggestedIndexes.has(index)) {
-        console.log(`⚠️  [SMART SUGGESTIONS] OVER CAPACITY at task #${index + 1}! loadAfter=${flow.loadAfter}, capacity=${capacity}`);
+      if (flow.loadAfter > capacity && !suggestedIndexes.has(i)) {
+        console.log(`⚠️  [SMART SUGGESTIONS] OVER CAPACITY at task #${i + 1}! loadAfter=${flow.loadAfter}, capacity=${capacity}`);
         suggestions.push({
           type: 'warehouse_unload',
-          insertAfterIndex: index - 1,
+          insertAfterIndex: i - 1,
           binsCount: flow.loadBefore,
-          reason: `⚠️ Over capacity! Truck would have ${flow.loadAfter}/${capacity} bins. Unload before task #${index + 1}`
+          reason: `⚠️ Over capacity! Truck would have ${flow.loadAfter}/${capacity} bins. Unload before task #${i + 1}`
         });
 
-        suggestedIndexes.add(index);
+        suggestedIndexes.add(i);
       }
-    });
+
+      i++;
+    }
 
     console.log(`🔍 [SMART SUGGESTIONS] Found ${suggestions.length} critical issues`);
 
