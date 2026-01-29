@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { getBins } from '@/lib/api/bins';
 import { Bin, isMappableBin, MoveRequest } from '@/lib/types/bin';
 import { X, Search, Filter, MapPin } from 'lucide-react';
@@ -13,6 +13,32 @@ const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 12;
 
 type UrgencyFilter = 'all' | 'overdue' | 'urgent' | 'soon' | 'scheduled';
+
+// Map controller for programmatic zoom/pan
+function MapController({
+  targetLocation,
+  onComplete,
+}: {
+  targetLocation: { lat: number; lng: number } | null;
+  onComplete: () => void;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || !targetLocation) return;
+
+    map.panTo(targetLocation);
+    map.setZoom(16);
+
+    const timeout = setTimeout(() => {
+      onComplete();
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [map, targetLocation, onComplete]);
+
+  return null;
+}
 
 interface MoveRequestSelectionMapProps {
   onClose: () => void;
@@ -91,6 +117,7 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
   const [searchQuery, setSearchQuery] = useState('');
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>('all');
   const [loading, setLoading] = useState(true);
+  const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   // Load bins from API to get coordinates
   useEffect(() => {
@@ -118,13 +145,17 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
     };
   }).filter(req => req.latitude !== undefined && req.longitude !== undefined);
 
-  // Toggle request selection
-  const toggleRequestSelection = (requestId: string) => {
+  // Toggle request selection and pan to location
+  const toggleRequestSelection = (requestId: string, request: MappableMoveRequest) => {
     const newSelection = new Set(selectedRequestIds);
     if (newSelection.has(requestId)) {
       newSelection.delete(requestId);
     } else {
       newSelection.add(requestId);
+      // Pan to the selected request's bin location
+      if (request.latitude && request.longitude) {
+        setTargetLocation({ lat: request.latitude, lng: request.longitude });
+      }
     }
     setSelectedRequestIds(newSelection);
   };
@@ -221,8 +252,15 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
                   mapId="binly-move-request-selection"
                   gestureHandling="greedy"
                   disableDefaultUI={false}
+                  streetViewControl={false}
                   className="w-full h-full"
                 >
+                  {/* Map controller for selected request navigation */}
+                  <MapController
+                    targetLocation={targetLocation}
+                    onComplete={() => setTargetLocation(null)}
+                  />
+
                   {/* Move Request Markers - Using Bin Number Display */}
                   {mappableFilteredRequests.map((request) => {
                     const isSelected = selectedRequestIds.has(request.id);
@@ -232,7 +270,7 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
                       <AdvancedMarker
                         key={request.id}
                         position={{ lat: request.latitude!, lng: request.longitude! }}
-                        onClick={() => toggleRequestSelection(request.id)}
+                        onClick={() => toggleRequestSelection(request.id, request)}
                       >
                         <div
                           className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold cursor-pointer transition-all hover:scale-110 ${
@@ -362,6 +400,14 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
                   filteredRequests.map((request) => {
                     const isSelected = selectedRequestIds.has(request.id);
 
+                    // Get bin coordinates for this request
+                    const bin = bins.find(b => b.id === request.bin_id);
+                    const mappableRequest: MappableMoveRequest = {
+                      ...request,
+                      latitude: bin?.latitude,
+                      longitude: bin?.longitude,
+                    };
+
                     // Format date
                     const scheduledDate = new Date(request.scheduled_date_iso);
                     const formattedDate = scheduledDate.toLocaleDateString('en-US', {
@@ -373,7 +419,7 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
                     return (
                       <div
                         key={request.id}
-                        onClick={() => toggleRequestSelection(request.id)}
+                        onClick={() => toggleRequestSelection(request.id, mappableRequest)}
                         className={`p-3 rounded-lg cursor-pointer transition-all ${
                           isSelected
                             ? 'bg-green-50 border-2 border-green-500'

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
+import { useState, useEffect } from 'react';
+import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { PotentialLocation } from '@/lib/api/potential-locations';
 import { X, Search, MapPin, Filter } from 'lucide-react';
 import { PotentialLocationPin } from '@/components/ui/potential-location-pin';
@@ -11,6 +11,32 @@ const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 12;
 
 type DateFilter = 'all' | 'newest' | 'oldest';
+
+// Map controller for programmatic zoom/pan
+function MapController({
+  targetLocation,
+  onComplete,
+}: {
+  targetLocation: { lat: number; lng: number } | null;
+  onComplete: () => void;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || !targetLocation) return;
+
+    map.panTo(targetLocation);
+    map.setZoom(16);
+
+    const timeout = setTimeout(() => {
+      onComplete();
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [map, targetLocation, onComplete]);
+
+  return null;
+}
 
 interface PlacementLocationSelectionMapProps {
   onClose: () => void;
@@ -34,14 +60,19 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
   const [selectedLocationIds, setSelectedLocationIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Toggle location selection
-  const toggleLocationSelection = (locationId: string) => {
+  // Toggle location selection and pan to location
+  const toggleLocationSelection = (locationId: string, location: PotentialLocation) => {
     const newSelection = new Set(selectedLocationIds);
     if (newSelection.has(locationId)) {
       newSelection.delete(locationId);
     } else {
       newSelection.add(locationId);
+      // Pan to the selected location
+      if (location.latitude && location.longitude) {
+        setTargetLocation({ lat: location.latitude, lng: location.longitude });
+      }
     }
     setSelectedLocationIds(newSelection);
   };
@@ -125,8 +156,15 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                 mapId="binly-placement-location-selection"
                 gestureHandling="greedy"
                 disableDefaultUI={false}
+                streetViewControl={false}
                 className="w-full h-full"
               >
+                {/* Map controller for selected location navigation */}
+                <MapController
+                  targetLocation={targetLocation}
+                  onComplete={() => setTargetLocation(null)}
+                />
+
                 {/* Placement Location Markers - Using PotentialLocationPin */}
                 {mappableLocations.map((location) => {
                   const isSelected = selectedLocationIds.has(location.id);
@@ -135,7 +173,7 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                     <AdvancedMarker
                       key={location.id}
                       position={{ lat: location.latitude, lng: location.longitude }}
-                      onClick={() => toggleLocationSelection(location.id)}
+                      onClick={() => toggleLocationSelection(location.id, location)}
                     >
                       <div
                         className={`cursor-pointer transition-all hover:scale-110 ${
@@ -257,7 +295,7 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                     return (
                       <div
                         key={location.id}
-                        onClick={() => toggleLocationSelection(location.id)}
+                        onClick={() => toggleLocationSelection(location.id, location)}
                         className={`p-3 rounded-lg cursor-pointer transition-all ${
                           isSelected
                             ? 'bg-green-50 border-2 border-green-500'
