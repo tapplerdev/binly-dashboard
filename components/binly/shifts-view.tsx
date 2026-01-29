@@ -1841,7 +1841,7 @@ function CreateShiftDrawer({
                 targetType: 'warehouse_load',
                 insertAfterIndex: insertAfterTask,
                 binsCount: secondLoadBins,
-                reason: `🚛 Truck at max capacity (${capacity} bins). Add second warehouse stop after task #${insertAfterTask + 1} to load ${secondLoadBins} more bins (${totalPlacementsDownstream} total placements require multiple trips)`,
+                reason: `🚛 Truck at max capacity (${capacity} bins). Add another warehouse stop after task #${insertAfterTask + 1} to load ${secondLoadBins} more bins (${totalPlacementsDownstream} total placements require multiple trips)`,
                 affectedTasks
               });
             } else if (warehouseBeforeZone.binsCount < capacity) {
