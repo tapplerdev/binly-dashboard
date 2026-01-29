@@ -2303,6 +2303,26 @@ function CreateShiftDrawer({
         tasks: tasksPayload,
       };
 
+      // Log the complete shift object before creating
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🚀 [SHIFT CREATION] Final Shift Object:');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log(JSON.stringify(payload, null, 2));
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📊 Shift Summary:');
+      console.log(`   Driver ID: ${payload.driver_id}`);
+      console.log(`   Truck Capacity: ${payload.truck_bin_capacity} bins`);
+      console.log(`   Total Tasks: ${payload.tasks.length}`);
+      console.log(`   Task Breakdown:`);
+      const taskCounts = payload.tasks.reduce((acc, task) => {
+        acc[task.task_type] = (acc[task.task_type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      Object.entries(taskCounts).forEach(([type, count]) => {
+        console.log(`      - ${type}: ${count}`);
+      });
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
       const response = await fetch('/api/manager/shifts/create-with-tasks', {
         method: 'POST',
         headers: {
