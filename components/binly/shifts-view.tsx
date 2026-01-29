@@ -1562,6 +1562,24 @@ function CreateShiftDrawer({
     setTasks(tasks.filter((_, i) => i !== index));
   };
 
+  // Accept a smart suggestion
+  const acceptSuggestion = (suggestion: typeof smartSuggestions[0]) => {
+    const newWarehouseTask: ShiftTask = {
+      id: `temp-${Date.now()}`,
+      type: 'warehouse_stop',
+      warehouse_action: suggestion.type === 'warehouse_load' ? 'load' : 'unload',
+      bins_to_load: suggestion.type === 'warehouse_load' ? suggestion.binsCount : undefined,
+      latitude: 38.5816, // Binly Central Warehouse
+      longitude: -121.4944,
+      address: 'Binly Central Warehouse - 1500 Industrial Pkwy, Sacramento, CA 95691',
+    };
+
+    // Insert at the suggested position
+    const newTasks = [...tasks];
+    newTasks.splice(suggestion.insertAfterIndex + 1, 0, newWarehouseTask);
+    setTasks(newTasks);
+  };
+
   // Auto-insert warehouse stops when truck capacity is exceeded
   const autoInsertWarehouseStops = (inputTasks: ShiftTask[], capacity: number): ShiftTask[] => {
     if (!capacity || capacity <= 0) return inputTasks;
@@ -1636,6 +1654,89 @@ function CreateShiftDrawer({
 
     return { collections, placements, moveRequests, warehouseStops, total: tasks.length };
   }, [tasks]);
+
+  // Calculate capacity flow for each task (hybrid approach)
+  const capacityFlow = useMemo(() => {
+    const flow: Array<{ taskIndex: number; loadBefore: number; loadAfter: number; delta: number }> = [];
+    let currentLoad = 0;
+
+    tasks.forEach((task, index) => {
+      const loadBefore = currentLoad;
+      let delta = 0;
+
+      if (task.type === 'collection') {
+        // Collection: pickup bin (+1)
+        delta = +1;
+      } else if (task.type === 'placement') {
+        // Placement: deliver new bin (-1)
+        delta = -1;
+      } else if (task.type === 'move_request') {
+        // Move request: pickup (+1) then deliver (-1) = net 0
+        // Internally this is two operations but we show collapsed view
+        delta = 0; // Self-contained operation
+      } else if (task.type === 'warehouse_stop') {
+        if (task.warehouse_action === 'load') {
+          delta = +(task.bins_to_load || 0);
+        } else {
+          // Unload all bins
+          delta = -currentLoad;
+        }
+      }
+
+      currentLoad = Math.max(0, currentLoad + delta);
+      const loadAfter = currentLoad;
+
+      flow.push({ taskIndex: index, loadBefore, loadAfter, delta });
+    });
+
+    return flow;
+  }, [tasks]);
+
+  // Detect smart suggestions
+  const smartSuggestions = useMemo(() => {
+    const suggestions: Array<{ type: 'warehouse_load' | 'warehouse_unload'; insertAfterIndex: number; binsCount: number; reason: string }> = [];
+    const capacity = parseInt(truckCapacity) || 0;
+
+    if (capacity <= 0 || tasks.length === 0) return suggestions;
+
+    // Check if placements need initial warehouse LOAD
+    const firstPlacementIndex = tasks.findIndex(t => t.type === 'placement');
+    if (firstPlacementIndex >= 0) {
+      // Check if there's already a warehouse LOAD before first placement
+      const hasLoadBefore = tasks.slice(0, firstPlacementIndex).some(
+        t => t.type === 'warehouse_stop' && t.warehouse_action === 'load'
+      );
+
+      if (!hasLoadBefore) {
+        // Count how many placements we need bins for
+        const placementsCount = tasks.filter(t => t.type === 'placement').length;
+        suggestions.push({
+          type: 'warehouse_load',
+          insertAfterIndex: Math.max(0, firstPlacementIndex - 1),
+          binsCount: placementsCount,
+          reason: `Load ${placementsCount} new bin${placementsCount > 1 ? 's' : ''} for placement tasks`
+        });
+      }
+    }
+
+    // Check for capacity violations
+    capacityFlow.forEach((flow, index) => {
+      if (flow.loadAfter > capacity) {
+        // Find if there's already an auto-inserted warehouse stop
+        const hasAutoWarehouse = tasks.slice(0, index + 1).some(t => t.auto_inserted);
+        if (!hasAutoWarehouse) {
+          suggestions.push({
+            type: 'warehouse_unload',
+            insertAfterIndex: index - 1,
+            binsCount: flow.loadBefore,
+            reason: `Truck would exceed capacity (${flow.loadAfter}/${capacity} bins)`
+          });
+        }
+      }
+    });
+
+    return suggestions;
+  }, [tasks, capacityFlow, truckCapacity]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1869,6 +1970,35 @@ function CreateShiftDrawer({
               </div>
             </div>
 
+            {/* Smart Suggestions */}
+            {smartSuggestions.length > 0 && (
+              <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">💡</span>
+                  <h3 className="text-sm font-semibold text-yellow-900">Smart Suggestions</h3>
+                </div>
+                {smartSuggestions.map((suggestion, index) => (
+                  <div key={index} className="bg-white rounded-lg p-3 border border-yellow-200">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">
+                          {suggestion.type === 'warehouse_load' ? '🏭 Add Warehouse LOAD' : '⚠️ Add Warehouse UNLOAD'}
+                        </p>
+                        <p className="text-xs text-gray-600 mt-1">{suggestion.reason}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => acceptSuggestion(suggestion)}
+                        className="px-3 py-1.5 bg-primary text-white rounded-md text-xs font-medium hover:bg-primary/90 transition-colors whitespace-nowrap"
+                      >
+                        Add {suggestion.type === 'warehouse_load' ? 'Load' : 'Unload'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Shift Analysis */}
             {tasks.length > 0 && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -1891,6 +2021,47 @@ function CreateShiftDrawer({
                     <span className="font-semibold text-blue-900">{shiftAnalysis.warehouseStops}</span>
                   </div>
                 </div>
+
+                {/* Capacity Preview */}
+                {truckCapacity && parseInt(truckCapacity) > 0 && (
+                  <div className="mt-3 pt-3 border-t border-blue-200">
+                    <h4 className="text-xs font-semibold text-blue-900 mb-2">Truck Capacity Preview</h4>
+                    <div className="space-y-1">
+                      {capacityFlow.slice(0, 10).map((flow, index) => {
+                        const task = tasks[flow.taskIndex];
+                        const capacity = parseInt(truckCapacity);
+                        const isOverCapacity = flow.loadAfter > capacity;
+                        const barWidth = Math.min(100, (flow.loadAfter / capacity) * 100);
+
+                        return (
+                          <div key={index} className="text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600 w-8">#{index + 1}</span>
+                              <div className="flex-1 h-4 bg-gray-200 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full transition-all ${
+                                    isOverCapacity ? 'bg-red-500' : 'bg-green-500'
+                                  }`}
+                                  style={{ width: `${barWidth}%` }}
+                                />
+                              </div>
+                              <span className={`w-12 text-right font-medium ${
+                                isOverCapacity ? 'text-red-600' : 'text-gray-700'
+                              }`}>
+                                {flow.loadAfter}/{capacity}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {capacityFlow.length > 10 && (
+                        <p className="text-xs text-gray-500 text-center mt-2">
+                          +{capacityFlow.length - 10} more tasks...
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
