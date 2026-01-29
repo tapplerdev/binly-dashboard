@@ -1821,20 +1821,45 @@ function CreateShiftDrawer({
           // Compare warehouse bin count against TOTAL downstream placements
           if (warehouseBeforeZone.binsCount < totalPlacementsDownstream) {
             const optimalBinCount = Math.min(totalPlacementsDownstream, capacity);
-            const additionalNeeded = optimalBinCount - warehouseBeforeZone.binsCount;
 
-            suggestions.push({
-              priority: 'optimization',
-              action: 'update',
-              targetType: 'warehouse_load',
-              existingTaskIndex: warehouseBeforeZone.taskIndex,
-              currentBinCount: warehouseBeforeZone.binsCount,
-              suggestedBinCount: optimalBinCount,
-              reason: totalPlacementsDownstream > capacity
-                ? `⚠️ Update warehouse stop #${warehouseBeforeZone.taskIndex + 1} to load ${optimalBinCount} bins (currently ${warehouseBeforeZone.binsCount}) - need ${totalPlacementsDownstream} total, will require multiple trips`
-                : `⚠️ Update warehouse stop #${warehouseBeforeZone.taskIndex + 1} from ${warehouseBeforeZone.binsCount} to ${optimalBinCount} bins (added ${additionalNeeded} more placement${additionalNeeded > 1 ? 's' : ''})`,
-              affectedTasks
-            });
+            // Check if warehouse is already at truck capacity
+            if (warehouseBeforeZone.binsCount >= capacity && totalPlacementsDownstream > capacity) {
+              // Warehouse already loading max truck capacity, need SECOND warehouse stop
+              const remainingPlacements = totalPlacementsDownstream - warehouseBeforeZone.binsCount;
+              const secondLoadBins = Math.min(remainingPlacements, capacity);
+
+              // Find where to insert second warehouse stop (after first batch of placements)
+              let insertAfterTask = warehouseBeforeZone.taskIndex + capacity; // After first 6 placements
+              while (insertAfterTask < tasks.length && tasks[insertAfterTask]?.type !== 'placement') {
+                insertAfterTask++;
+              }
+
+              suggestions.push({
+                priority: 'critical',
+                action: 'add',
+                targetType: 'warehouse_load',
+                insertAfterIndex: insertAfterTask,
+                binsCount: secondLoadBins,
+                reason: `🚛 Truck at max capacity (${capacity} bins). Add second warehouse stop after task #${insertAfterTask + 1} to load ${secondLoadBins} more bins (${totalPlacementsDownstream} total placements require multiple trips)`,
+                affectedTasks
+              });
+            } else if (warehouseBeforeZone.binsCount < capacity) {
+              // Warehouse can load more, suggest updating it
+              const additionalNeeded = optimalBinCount - warehouseBeforeZone.binsCount;
+
+              suggestions.push({
+                priority: 'optimization',
+                action: 'update',
+                targetType: 'warehouse_load',
+                existingTaskIndex: warehouseBeforeZone.taskIndex,
+                currentBinCount: warehouseBeforeZone.binsCount,
+                suggestedBinCount: optimalBinCount,
+                reason: totalPlacementsDownstream > capacity
+                  ? `⚠️ Update warehouse stop #${warehouseBeforeZone.taskIndex + 1} to load ${optimalBinCount} bins (currently ${warehouseBeforeZone.binsCount}) - need ${totalPlacementsDownstream} total, will require multiple trips`
+                  : `⚠️ Update warehouse stop #${warehouseBeforeZone.taskIndex + 1} from ${warehouseBeforeZone.binsCount} to ${optimalBinCount} bins (added ${additionalNeeded} more placement${additionalNeeded > 1 ? 's' : ''})`,
+                affectedTasks
+              });
+            }
           }
         } else {
           // Add new warehouse stop
