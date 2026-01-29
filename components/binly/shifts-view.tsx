@@ -1854,10 +1854,16 @@ function CreateShiftDrawer({
           // Scan capacity flow between warehouse and negative zone
           for (let k = warehouseBeforeZone.taskIndex + 1; k < zoneStart; k++) {
             if (capacityFlow[k] && capacityFlow[k].loadAfter === 0) {
-              // Capacity reached exactly 0 - warehouse completed its job
-              warehouseCompletedService = true;
-              console.log(`   ✅ Warehouse #${warehouseBeforeZone.taskIndex + 1} completed service at task #${k + 1} (capacity=${capacityFlow[k].loadAfter})`);
-              break;
+              // Capacity reached exactly 0 - but check if there's a gap before the negative zone
+              // If negative zone starts immediately after (k+1 === zoneStart), it's continuous
+              if (k + 1 < zoneStart) {
+                // There's a gap between zero-point and negative zone - warehouse completed
+                warehouseCompletedService = true;
+                console.log(`   ✅ Warehouse #${warehouseBeforeZone.taskIndex + 1} completed service at task #${k + 1} (capacity=${capacityFlow[k].loadAfter})`);
+                break;
+              } else {
+                console.log(`   📌 Warehouse #${warehouseBeforeZone.taskIndex + 1} reached capacity=0 at task #${k + 1}, but negative zone starts immediately - continuous sequence`);
+              }
             }
           }
         }
