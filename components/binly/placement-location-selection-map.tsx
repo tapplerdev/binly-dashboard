@@ -3,11 +3,14 @@
 import { useState } from 'react';
 import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { PotentialLocation } from '@/lib/api/potential-locations';
-import { X, Search, MapPin } from 'lucide-react';
+import { X, Search, MapPin, Filter } from 'lucide-react';
+import { PotentialLocationPin } from '@/components/ui/potential-location-pin';
 
 // Default map center (San Jose, CA area)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 12;
+
+type DateFilter = 'all' | 'newest' | 'oldest';
 
 interface PlacementLocationSelectionMapProps {
   onClose: () => void;
@@ -30,6 +33,7 @@ function isMappableLocation(location: PotentialLocation): location is PotentialL
 export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLocations }: PlacementLocationSelectionMapProps) {
   const [selectedLocationIds, setSelectedLocationIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
 
   // Toggle location selection
   const toggleLocationSelection = (locationId: string) => {
@@ -53,17 +57,28 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
     setSelectedLocationIds(new Set());
   };
 
-  // Filter locations based on search
-  const filteredLocations = potentialLocations.filter(location => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      location.address?.toLowerCase().includes(query) ||
-      location.street?.toLowerCase().includes(query) ||
-      location.city?.toLowerCase().includes(query) ||
-      location.requested_by_name?.toLowerCase().includes(query)
-    );
-  });
+  // Filter and sort locations based on search and date
+  const filteredLocations = potentialLocations
+    .filter(location => {
+      // Search filter
+      if (!searchQuery) return true;
+      const query = searchQuery.toLowerCase();
+      return (
+        location.address?.toLowerCase().includes(query) ||
+        location.street?.toLowerCase().includes(query) ||
+        location.city?.toLowerCase().includes(query) ||
+        location.requested_by_name?.toLowerCase().includes(query)
+      );
+    })
+    .sort((a, b) => {
+      // Date sorting
+      if (dateFilter === 'newest') {
+        return new Date(b.created_at_iso).getTime() - new Date(a.created_at_iso).getTime();
+      } else if (dateFilter === 'oldest') {
+        return new Date(a.created_at_iso).getTime() - new Date(b.created_at_iso).getTime();
+      }
+      return 0; // 'all' - no sorting
+    });
 
   // Get mappable locations
   const mappableLocations = filteredLocations.filter(isMappableLocation);
@@ -112,10 +127,9 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                 disableDefaultUI={false}
                 className="w-full h-full"
               >
-                {/* Placement Location Markers */}
+                {/* Placement Location Markers - Using PotentialLocationPin */}
                 {mappableLocations.map((location) => {
                   const isSelected = selectedLocationIds.has(location.id);
-                  const markerColor = isSelected ? '#16a34a' : '#8B5CF6'; // green-600 or purple-500
 
                   return (
                     <AdvancedMarker
@@ -124,13 +138,15 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                       onClick={() => toggleLocationSelection(location.id)}
                     >
                       <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center text-white cursor-pointer transition-all hover:scale-110 shadow-lg ${
-                          isSelected ? 'ring-4 ring-green-300 animate-pulse-glow' : ''
+                        className={`cursor-pointer transition-all hover:scale-110 ${
+                          isSelected ? 'ring-4 ring-green-300 rounded-full animate-pulse-glow' : ''
                         }`}
-                        style={{ backgroundColor: markerColor }}
                         title={`${location.address || location.street} - Requested by ${location.requested_by_name}`}
                       >
-                        <MapPin className="w-5 h-5" fill="white" />
+                        <PotentialLocationPin
+                          size={40}
+                          color={isSelected ? '#16a34a' : '#FF9500'}
+                        />
                       </div>
                     </AdvancedMarker>
                   );
@@ -159,6 +175,46 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                   placeholder="Search by address or requester..."
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
+              </div>
+
+              {/* Date Filter Buttons */}
+              <div className="mt-3 mb-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Filter className="w-3.5 h-3.5 text-gray-500" />
+                  <span className="text-xs font-medium text-gray-700">Sort by Date</span>
+                </div>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => setDateFilter('all')}
+                    className={`flex-1 px-2.5 py-1 text-xs font-medium rounded-md transition-fast ${
+                      dateFilter === 'all'
+                        ? 'bg-gray-900 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setDateFilter('newest')}
+                    className={`flex-1 px-2.5 py-1 text-xs font-medium rounded-md transition-fast ${
+                      dateFilter === 'newest'
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                    }`}
+                  >
+                    Newest First
+                  </button>
+                  <button
+                    onClick={() => setDateFilter('oldest')}
+                    className={`flex-1 px-2.5 py-1 text-xs font-medium rounded-md transition-fast ${
+                      dateFilter === 'oldest'
+                        ? 'bg-purple-500 text-white'
+                        : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                    }`}
+                  >
+                    Oldest First
+                  </button>
+                </div>
               </div>
 
               {/* Quick Actions */}
