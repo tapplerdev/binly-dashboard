@@ -1689,7 +1689,8 @@ function CreateShiftDrawer({
         }
       }
 
-      currentLoad = Math.max(0, currentLoad + delta);
+      // Allow negative capacity so smart suggestions can detect when bins run out
+      currentLoad = currentLoad + delta;
       const loadAfter = currentLoad;
 
       flow.push({ taskIndex: index, loadBefore, loadAfter, delta });
