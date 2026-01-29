@@ -1537,22 +1537,51 @@ function CreateShiftDrawer({
       selectedRequestIds.includes(req.id)
     );
 
-    const moveRequestTasks: ShiftTask[] = selectedRequests.map(request => ({
-      id: `temp-${Date.now()}-${request.id}`,
-      type: 'move_request',
-      move_request_id: request.id,
-      bin_id: request.bin_id,
-      bin_number: request.bin_number.toString(),
-      move_type: request.move_type === 'store' ? 'pickup' : 'pickup', // Pick up bin for both store and relocation
-      destination_latitude: request.new_latitude || 0,
-      destination_longitude: request.new_longitude || 0,
-      destination_address: request.move_type === 'store'
-        ? 'Warehouse Storage'
-        : `${request.new_street || ''}, ${request.new_city || ''} ${request.new_zip || ''}`.trim(),
-      latitude: 0, // Will be populated from bin data on backend
-      longitude: 0, // Will be populated from bin data on backend
-      address: `${request.current_street}, ${request.city} ${request.zip}`,
-    }));
+    // For each move request, create BOTH pickup and dropoff tasks
+    const moveRequestTasks: ShiftTask[] = [];
+
+    selectedRequests.forEach(request => {
+      // 1. Pickup task at current location
+      const pickupTask: ShiftTask = {
+        id: `temp-${Date.now()}-${request.id}-pickup`,
+        type: 'move_request',
+        move_request_id: request.id,
+        bin_id: request.bin_id,
+        bin_number: request.bin_number.toString(),
+        move_type: 'pickup',
+        destination_latitude: request.new_latitude || 0,
+        destination_longitude: request.new_longitude || 0,
+        destination_address: request.move_type === 'store'
+          ? 'Warehouse Storage'
+          : `${request.new_street || ''}, ${request.new_city || ''} ${request.new_zip || ''}`.trim(),
+        latitude: 0, // Will be populated from bin data on backend
+        longitude: 0, // Will be populated from bin data on backend
+        address: `${request.current_street}, ${request.city} ${request.zip}`,
+      };
+
+      // 2. Dropoff task at destination
+      const dropoffTask: ShiftTask = {
+        id: `temp-${Date.now()}-${request.id}-dropoff`,
+        type: 'move_request',
+        move_request_id: request.id,
+        bin_id: request.bin_id,
+        bin_number: request.bin_number.toString(),
+        move_type: 'dropoff',
+        destination_latitude: request.new_latitude || 0,
+        destination_longitude: request.new_longitude || 0,
+        destination_address: request.move_type === 'store'
+          ? 'Warehouse Storage'
+          : `${request.new_street || ''}, ${request.new_city || ''} ${request.new_zip || ''}`.trim(),
+        latitude: request.new_latitude || 0,
+        longitude: request.new_longitude || 0,
+        address: request.move_type === 'store'
+          ? 'Warehouse Storage'
+          : `${request.new_street || ''}, ${request.new_city || ''} ${request.new_zip || ''}`.trim(),
+      };
+
+      // Add pickup first, then dropoff (in sequence)
+      moveRequestTasks.push(pickupTask, dropoffTask);
+    });
 
     setTasks([...tasks, ...moveRequestTasks]);
     setShowMoveRequestSelection(false);
