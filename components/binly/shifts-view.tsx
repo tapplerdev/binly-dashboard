@@ -2130,41 +2130,6 @@ function CreateShiftDrawer({
           affectedTasks: []
         });
       }
-      // Check for pickups BEFORE first consumption (would cause over-capacity)
-      else {
-        // Count pickups that occur BEFORE the first consumption after this warehouse
-        let pickupsBeforeConsumption = 0;
-        for (let k = ws.taskIndex + 1; k < tasks.length; k++) {
-          // Stop at first consumption (placement or dropoff)
-          if (tasks[k].type === 'placement' || (tasks[k].type === 'move_request' && tasks[k].move_type === 'dropoff')) {
-            break;
-          }
-          // Count pickups before first consumption
-          if (tasks[k].type === 'move_request' && tasks[k].move_type === 'pickup') {
-            pickupsBeforeConsumption++;
-          }
-          // Stop at next warehouse LOAD
-          if (k > ws.taskIndex && tasks[k].type === 'warehouse_stop' && (tasks[k] as any).warehouse_action === 'load') break;
-        }
-
-        // If warehouse + pickups > capacity, suggest reducing warehouse load
-        if (pickupsBeforeConsumption > 0 && ws.binsCount + pickupsBeforeConsumption > capacity) {
-          const optimalLoad = capacity - pickupsBeforeConsumption;
-          if (optimalLoad > 0 && optimalLoad < ws.binsCount) {
-            console.log(`   ⚠️  Warehouse #${ws.taskIndex + 1} (${ws.binsCount} bins) + ${pickupsBeforeConsumption} pickup(s) before consumption = ${ws.binsCount + pickupsBeforeConsumption} (over capacity ${capacity}!)`);
-            suggestions.push({
-              priority: 'optimization',
-              action: 'update',
-              targetType: 'warehouse_load',
-              existingTaskIndex: ws.taskIndex,
-              currentBinCount: ws.binsCount,
-              suggestedBinCount: optimalLoad,
-              reason: `💡 Update warehouse stop #${ws.taskIndex + 1} from ${ws.binsCount} to ${optimalLoad} bins to leave room for ${pickupsBeforeConsumption} pickup${pickupsBeforeConsumption > 1 ? 's' : ''} before placements`,
-              affectedTasks: []
-            });
-          }
-        }
-      }
     });
 
     // Check for warehouse consolidation opportunities
