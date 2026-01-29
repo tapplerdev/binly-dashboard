@@ -1869,11 +1869,46 @@ function CreateShiftDrawer({
         }
 
         if (warehouseBeforeZone && !warehouseCompletedService) {
+          // Check for downstream warehouses that could be consolidated (no service boundaries between them)
+          const warehousesToConsolidate: typeof warehouseBeforeZone[] = [];
+          let lastCheckedWarehouse = warehouseBeforeZone;
+
+          // Look ahead for more warehouses in the continuous flow
+          for (let wIdx = existingWarehouseStops.indexOf(warehouseBeforeZone) + 1; wIdx < existingWarehouseStops.length; wIdx++) {
+            const nextWarehouse = existingWarehouseStops[wIdx];
+            if (nextWarehouse.action !== 'load') continue;
+
+            // Check if there's a service boundary between lastCheckedWarehouse and nextWarehouse
+            let hasServiceBoundary = false;
+            for (let k = lastCheckedWarehouse.taskIndex + 1; k < nextWarehouse.taskIndex; k++) {
+              if (capacityFlow[k] && capacityFlow[k].loadAfter === 0) {
+                // Found capacity=0, check if there's a gap before next negative zone
+                if (k + 1 < nextWarehouse.taskIndex) {
+                  // There's a gap between capacity=0 and next warehouse - boundary exists
+                  hasServiceBoundary = true;
+                  break;
+                }
+              }
+            }
+
+            if (!hasServiceBoundary) {
+              // No boundary - this warehouse is in the same continuous flow, can be consolidated
+              warehousesToConsolidate.push(nextWarehouse);
+              lastCheckedWarehouse = nextWarehouse;
+            } else {
+              // Service boundary found - stop looking
+              break;
+            }
+          }
+
           // Count TOTAL downstream placements, dropoffs, AND pickups from warehouse stop
-          // - Placements and dropoffs consume bins (need warehouse to provide)
-          // - Pickups provide bins (reduce warehouse requirements)
+          // If we found warehouses to consolidate, count ALL consumers across all of them
           let totalBinConsumers = 0; // placements + dropoffs
           let totalBinProviders = 0; // pickups
+          const stopAtIndex = warehousesToConsolidate.length > 0
+            ? warehousesToConsolidate[warehousesToConsolidate.length - 1].taskIndex
+            : warehouseBeforeZone.taskIndex;
+
           for (let k = warehouseBeforeZone.taskIndex + 1; k < tasks.length; k++) {
             if (tasks[k].type === 'placement' || (tasks[k].type === 'move_request' && tasks[k].move_type === 'dropoff')) {
               totalBinConsumers++;
@@ -1881,8 +1916,8 @@ function CreateShiftDrawer({
             if (tasks[k].type === 'move_request' && tasks[k].move_type === 'pickup') {
               totalBinProviders++;
             }
-            // Stop at next warehouse LOAD
-            if (k > warehouseBeforeZone.taskIndex && tasks[k].type === 'warehouse_stop' && (tasks[k] as any).warehouse_action === 'load') break;
+            // Stop at next warehouse LOAD (only if not in consolidation list)
+            if (k > stopAtIndex && tasks[k].type === 'warehouse_stop' && (tasks[k] as any).warehouse_action === 'load') break;
           }
 
           // Net bins needed = consumers minus providers (pickups reduce warehouse load)
@@ -1902,6 +1937,13 @@ function CreateShiftDrawer({
           }
 
           console.log(`   💡 Found existing warehouse at task #${warehouseBeforeZone.taskIndex + 1} (loads ${warehouseBeforeZone.binsCount} bins)`);
+          if (warehousesToConsolidate.length > 0) {
+            const consolidatedBins = warehousesToConsolidate.reduce((sum, w) => sum + w.binsCount, 0);
+            console.log(`   🔄 Found ${warehousesToConsolidate.length} downstream warehouse(s) that can be consolidated (${consolidatedBins} bins total):`);
+            warehousesToConsolidate.forEach(w => {
+              console.log(`      - Warehouse #${w.taskIndex + 1}: ${w.binsCount} bins`);
+            });
+          }
           console.log(`   📊 Downstream: ${totalBinConsumers} consumers (placements+dropoffs) - ${totalBinProviders} providers (pickups) = ${netBinsNeeded} net bins needed, warehouse loads: ${warehouseBeforeZone.binsCount}`);
           if (pickupsBeforeConsumption > 0) {
             console.log(`   🔄 Found ${pickupsBeforeConsumption} pickup(s) before first consumption - will reduce warehouse load to prevent over-capacity`);
@@ -1943,6 +1985,10 @@ function CreateShiftDrawer({
                 ? `, reduced from ${netBinsNeeded} to leave room for ${pickupsBeforeConsumption} pickup${pickupsBeforeConsumption > 1 ? 's' : ''}`
                 : '';
 
+              const consolidationNote = warehousesToConsolidate.length > 0
+                ? ` (consolidating ${warehousesToConsolidate.length} downstream warehouse${warehousesToConsolidate.length > 1 ? 's' : ''})`
+                : '';
+
               suggestions.push({
                 priority: 'optimization',
                 action: 'update',
@@ -1951,10 +1997,25 @@ function CreateShiftDrawer({
                 currentBinCount: warehouseBeforeZone.binsCount,
                 suggestedBinCount: optimalBinCount,
                 reason: netBinsNeeded > capacity
-                  ? `⚠️ Update warehouse stop #${warehouseBeforeZone.taskIndex + 1} to load ${optimalBinCount} bins (currently ${warehouseBeforeZone.binsCount}) - need ${netBinsNeeded} net bins (${totalBinConsumers} consumers - ${totalBinProviders} pickups), will require multiple trips${pickupNote}`
-                  : `⚠️ Update warehouse stop #${warehouseBeforeZone.taskIndex + 1} from ${warehouseBeforeZone.binsCount} to ${optimalBinCount} bins (need ${netBinsNeeded} net bins: ${totalBinConsumers} consumers - ${totalBinProviders} pickup${totalBinProviders > 1 ? 's' : ''}${pickupNote})`,
+                  ? `⚠️ Update warehouse stop #${warehouseBeforeZone.taskIndex + 1} to load ${optimalBinCount} bins (currently ${warehouseBeforeZone.binsCount}) - need ${netBinsNeeded} net bins (${totalBinConsumers} consumers - ${totalBinProviders} pickups), will require multiple trips${pickupNote}${consolidationNote}`
+                  : `⚠️ Update warehouse stop #${warehouseBeforeZone.taskIndex + 1} from ${warehouseBeforeZone.binsCount} to ${optimalBinCount} bins (need ${netBinsNeeded} net bins: ${totalBinConsumers} consumers - ${totalBinProviders} pickup${totalBinProviders > 1 ? 's' : ''}${pickupNote})${consolidationNote}`,
                 affectedTasks
               });
+
+              // Suggest removing the consolidated warehouses
+              if (warehousesToConsolidate.length > 0) {
+                warehousesToConsolidate.forEach(w => {
+                  suggestions.push({
+                    priority: 'optimization',
+                    action: 'remove',
+                    targetType: 'warehouse_load',
+                    existingTaskIndex: w.taskIndex,
+                    currentBinCount: w.binsCount,
+                    reason: `💡 Remove warehouse stop #${w.taskIndex + 1} - consolidated into warehouse #${warehouseBeforeZone.taskIndex + 1}`,
+                    affectedTasks: []
+                  });
+                });
+              }
             }
           }
         } else {
