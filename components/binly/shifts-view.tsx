@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Calendar, List, User, X, Search, ChevronDown, Filter, MapPin, Loader2, Trash2, GripVertical, Package, MapPinned, Warehouse, MoveRight, Plus, Pencil } from 'lucide-react';
+import { Calendar, List, User, X, Search, ChevronDown, Filter, MapPin, Loader2, Trash2, GripVertical, Package, MapPinned, Warehouse, MoveRight, Plus, Pencil, ArrowUp, ArrowDown } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel, ShiftStatus } from '@/lib/types/shift';
 import { ShiftDetailsDrawer } from './shift-details-drawer';
 import { BinSelectionMap } from './bin-selection-map';
@@ -1659,17 +1659,21 @@ function CreateShiftDrawer({
   const shiftAnalysis = useMemo(() => {
     let collections = 0;
     let placements = 0;
-    let moveRequests = 0;
+    let pickups = 0;
+    let dropoffs = 0;
     let warehouseStops = 0;
 
     tasks.forEach(task => {
       if (task.type === 'collection') collections++;
       else if (task.type === 'placement') placements++;
-      else if (task.type === 'move_request') moveRequests++;
+      else if (task.type === 'move_request') {
+        if (task.move_type === 'pickup') pickups++;
+        else if (task.move_type === 'dropoff') dropoffs++;
+      }
       else if (task.type === 'warehouse_stop') warehouseStops++;
     });
 
-    return { collections, placements, moveRequests, warehouseStops, total: tasks.length };
+    return { collections, placements, pickups, dropoffs, warehouseStops, total: tasks.length };
   }, [tasks]);
 
   // Calculate capacity flow for each task (hybrid approach)
@@ -1692,9 +1696,14 @@ function CreateShiftDrawer({
         // Placement: deliver new bin (-1)
         delta = -1;
       } else if (task.type === 'move_request') {
-        // Move request: pickup (+1) then deliver (-1) = net 0
-        // Internally this is two operations but we show collapsed view
-        delta = 0; // Self-contained operation
+        // Move request: split into pickup (+1) and dropoff (-1) based on move_type
+        if (task.move_type === 'pickup') {
+          delta = +1; // Picking up existing bin from field (adds to truck)
+        } else if (task.move_type === 'dropoff') {
+          delta = -1; // Dropping off bin at new location (removes from truck)
+        } else {
+          delta = 0; // Fallback for legacy data without move_type
+        }
       } else if (task.type === 'warehouse_stop') {
         if (task.warehouse_action === 'load') {
           delta = +(task.bins_to_load || 0);
@@ -1710,7 +1719,10 @@ function CreateShiftDrawer({
 
       flow.push({ taskIndex: index, loadBefore, loadAfter, delta });
 
-      console.log(`  Task #${index + 1} [${task.type}]: ${loadBefore} ${delta >= 0 ? '+' : ''}${delta} → ${loadAfter}`);
+      const taskLabel = task.type === 'move_request' && task.move_type
+        ? `${task.type}_${task.move_type}`
+        : task.type;
+      console.log(`  Task #${index + 1} [${taskLabel}]: ${loadBefore} ${delta >= 0 ? '+' : ''}${delta} → ${loadAfter}`);
     });
 
     console.log('✅ [CAPACITY FLOW] Calculation complete. Total flow entries:', flow.length);
@@ -1808,16 +1820,19 @@ function CreateShiftDrawer({
         const warehouseBeforeZone = candidatesBeforeZone[candidatesBeforeZone.length - 1]; // Get the last (closest) one
 
         if (warehouseBeforeZone) {
-          // Count TOTAL downstream placements from warehouse stop (not just shortage)
+          // Count TOTAL downstream placements AND dropoffs from warehouse stop (not just shortage)
+          // Dropoffs consume bin space just like placements do
           let totalPlacementsDownstream = 0;
           for (let k = warehouseBeforeZone.taskIndex + 1; k < tasks.length; k++) {
-            if (tasks[k].type === 'placement') totalPlacementsDownstream++;
+            if (tasks[k].type === 'placement' || (tasks[k].type === 'move_request' && tasks[k].move_type === 'dropoff')) {
+              totalPlacementsDownstream++;
+            }
             // Stop at next warehouse LOAD
             if (k > warehouseBeforeZone.taskIndex && tasks[k].type === 'warehouse_stop' && (tasks[k] as any).warehouse_action === 'load') break;
           }
 
           console.log(`   💡 Found existing warehouse at task #${warehouseBeforeZone.taskIndex + 1} (loads ${warehouseBeforeZone.binsCount} bins)`);
-          console.log(`   📊 Total downstream placements: ${totalPlacementsDownstream}, warehouse loads: ${warehouseBeforeZone.binsCount}`);
+          console.log(`   📊 Total downstream placements + dropoffs: ${totalPlacementsDownstream}, warehouse loads: ${warehouseBeforeZone.binsCount}`);
 
           // Compare warehouse bin count against TOTAL downstream placements
           if (warehouseBeforeZone.binsCount < totalPlacementsDownstream) {
@@ -2360,7 +2375,12 @@ function CreateShiftDrawer({
                         const getTaskIcon = () => {
                           if (task.type === 'collection') return '🧺';
                           if (task.type === 'placement') return '📍';
-                          if (task.type === 'move_request') return '🔄';
+                          if (task.type === 'move_request') {
+                            // Differentiate pickup vs dropoff
+                            if (task.move_type === 'pickup') return '📤'; // Picking up bin from field
+                            if (task.move_type === 'dropoff') return '📥'; // Dropping off bin at new location
+                            return '🔄'; // Fallback for legacy data
+                          }
                           if (task.type === 'warehouse_stop') {
                             return task.warehouse_action === 'load' ? '⬆️' : '⬇️';
                           }
@@ -2442,8 +2462,14 @@ function CreateShiftDrawer({
                           {task.type === 'warehouse_stop' && <Warehouse className="w-4 h-4 text-blue-600" />}
                           {task.type === 'collection' && <Package className="w-4 h-4 text-green-600" />}
                           {task.type === 'placement' && <MapPinned className="w-4 h-4 text-purple-600" />}
-                          {task.type === 'move_request' && <MoveRight className="w-4 h-4 text-orange-600" />}
-                          <span className="text-sm font-medium capitalize">{task.type.replace('_', ' ')}</span>
+                          {task.type === 'move_request' && task.move_type === 'pickup' && <ArrowUp className="w-4 h-4 text-orange-600" />}
+                          {task.type === 'move_request' && task.move_type === 'dropoff' && <ArrowDown className="w-4 h-4 text-orange-600" />}
+                          {task.type === 'move_request' && !task.move_type && <MoveRight className="w-4 h-4 text-orange-600" />}
+                          <span className="text-sm font-medium capitalize">
+                            {task.type === 'move_request' && task.move_type
+                              ? `${task.move_type} (Move Request)`
+                              : task.type.replace('_', ' ')}
+                          </span>
                           {task.auto_inserted && (
                             <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full border border-blue-200">
                               Auto
@@ -2469,9 +2495,21 @@ function CreateShiftDrawer({
                         {/* Move Request metadata */}
                         {task.type === 'move_request' && (
                           <p className="text-xs text-gray-500 mt-1">
-                            <span className="font-medium">Bin #{task.bin_number}</span> from {task.address}
-                            <br />
-                            → To: {task.destination_address}
+                            {task.move_type === 'pickup' ? (
+                              <>
+                                <span className="font-medium">Pick up Bin #{task.bin_number}</span> from {task.address}
+                              </>
+                            ) : task.move_type === 'dropoff' ? (
+                              <>
+                                <span className="font-medium">Drop off Bin #{task.bin_number}</span> at {task.destination_address}
+                              </>
+                            ) : (
+                              <>
+                                <span className="font-medium">Bin #{task.bin_number}</span> from {task.address}
+                                <br />
+                                → To: {task.destination_address}
+                              </>
+                            )}
                           </p>
                         )}
 
