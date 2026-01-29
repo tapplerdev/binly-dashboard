@@ -2069,24 +2069,33 @@ function CreateShiftDrawer({
     // PHASE 3: Check for optimization opportunities
     console.log('\n✨ [PHASE 3] Checking optimizations...');
 
-    // Check if existing warehouse stops are obsolete or misplaced
+    // Check if existing warehouse stops are obsolete, over-provisioned, or misplaced
     existingWarehouseStops.forEach(ws => {
       if (ws.action !== 'load') return;
 
       const wsFlowIndex = capacityFlow.findIndex(f => f.taskIndex === ws.taskIndex);
       if (wsFlowIndex === -1) return;
 
-      // Check downstream placements after this warehouse stop
-      let placementsAfter = 0;
+      // Count ALL downstream consumers and providers
+      let totalConsumers = 0; // placements + dropoffs
+      let totalProviders = 0; // pickups
       for (let k = ws.taskIndex + 1; k < tasks.length; k++) {
-        if (tasks[k].type === 'placement') placementsAfter++;
-        if (tasks[k].type === 'warehouse_stop' && (tasks[k] as any).warehouse_action === 'load') break;
+        if (tasks[k].type === 'placement' || (tasks[k].type === 'move_request' && tasks[k].move_type === 'dropoff')) {
+          totalConsumers++;
+        }
+        if (tasks[k].type === 'move_request' && tasks[k].move_type === 'pickup') {
+          totalProviders++;
+        }
+        // Stop at next warehouse LOAD
+        if (k > ws.taskIndex && tasks[k].type === 'warehouse_stop' && (tasks[k] as any).warehouse_action === 'load') break;
       }
 
-      console.log(`   📦 Warehouse #${ws.taskIndex + 1}: loads ${ws.binsCount}, has ${placementsAfter} placements downstream`);
+      const netConsumers = totalConsumers - totalProviders;
 
-      // Obsolete: warehouse stop loads bins but no placements use them
-      if (placementsAfter === 0 && ws.binsCount > 0) {
+      console.log(`   📦 Warehouse #${ws.taskIndex + 1}: loads ${ws.binsCount}, has ${totalConsumers} consumers - ${totalProviders} pickups = ${netConsumers} net downstream`);
+
+      // Obsolete: warehouse stop loads bins but no consumers use them
+      if (netConsumers === 0 && ws.binsCount > 0) {
         suggestions.push({
           priority: 'optimization',
           action: 'remove',
@@ -2094,6 +2103,21 @@ function CreateShiftDrawer({
           existingTaskIndex: ws.taskIndex,
           currentBinCount: ws.binsCount,
           reason: `💡 Remove warehouse stop #${ws.taskIndex + 1} - no placements use these ${ws.binsCount} bins`,
+          affectedTasks: []
+        });
+      }
+      // Over-provisioned: warehouse loads more bins than needed
+      else if (ws.binsCount > netConsumers && netConsumers > 0) {
+        suggestions.push({
+          priority: 'optimization',
+          action: 'update',
+          targetType: 'warehouse_load',
+          existingTaskIndex: ws.taskIndex,
+          currentBinCount: ws.binsCount,
+          suggestedBinCount: netConsumers,
+          reason: totalProviders > 0
+            ? `💡 Update warehouse stop #${ws.taskIndex + 1} from ${ws.binsCount} to ${netConsumers} bins (only need ${netConsumers}: ${totalConsumers} consumers - ${totalProviders} pickup${totalProviders > 1 ? 's' : ''})`
+            : `💡 Update warehouse stop #${ws.taskIndex + 1} from ${ws.binsCount} to ${netConsumers} bins (only need ${netConsumers} for ${totalConsumers} placement${totalConsumers > 1 ? 's' : ''})`,
           affectedTasks: []
         });
       }
