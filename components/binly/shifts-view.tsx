@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Calendar, List, User, X, Search, ChevronDown, Filter, MapPin, Loader2 } from 'lucide-react';
+import { Calendar, List, User, X, Search, ChevronDown, Filter, MapPin, Loader2, Trash2, GripVertical, Package, MapPinned, Warehouse, MoveRight, Plus } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel, ShiftStatus } from '@/lib/types/shift';
 import { ShiftDetailsDrawer } from './shift-details-drawer';
 import { BinSelectionMap } from './bin-selection-map';
@@ -289,7 +289,6 @@ export function ShiftsView() {
       {isCreateDrawerOpen && (
         <CreateShiftDrawer
           onClose={() => setIsCreateDrawerOpen(false)}
-          assignRouteMutation={assignRouteMutation}
         />
       )}
 
@@ -1250,24 +1249,45 @@ function DailyGantt({
   );
 }
 
+// Task type for shift builder
+interface ShiftTask {
+  id: string;
+  type: 'collection' | 'placement' | 'move_request' | 'warehouse_stop';
+  // Collection fields
+  bin_id?: string;
+  bin_number?: string;
+  fill_percentage?: number;
+  // Placement fields
+  potential_location_id?: string;
+  new_bin_number?: string;
+  // Move request fields
+  move_request_id?: string;
+  destination_latitude?: number;
+  destination_longitude?: number;
+  destination_address?: string;
+  move_type?: 'pickup' | 'dropoff';
+  // Warehouse stop fields
+  warehouse_action?: 'load' | 'unload';
+  bins_to_load?: number;
+  // Common fields
+  latitude: number;
+  longitude: number;
+  address: string;
+}
+
 // Create Shift Drawer Component
 function CreateShiftDrawer({
   onClose,
-  assignRouteMutation,
 }: {
   onClose: () => void;
-  assignRouteMutation: ReturnType<typeof useAssignRoute>;
 }) {
-  const { data: routes = [], isLoading: loadingRoutes } = useRoutes();
   const { data: drivers = [], isLoading: loadingDrivers } = useDrivers();
-  const [formData, setFormData] = useState({
-    date: '2025-12-28',
-    driverId: '',
-    selectionType: 'route' as 'route' | 'custom',
-    routeId: '',
-    selectedBins: [] as string[],
-  });
-  const [showBinSelection, setShowBinSelection] = useState(false);
+  const { token } = useAuthStore();
+
+  const [driverId, setDriverId] = useState('');
+  const [truckCapacity, setTruckCapacity] = useState('');
+  const [tasks, setTasks] = useState<ShiftTask[]>([]);
+  const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDriverDropdownOpen, setIsDriverDropdownOpen] = useState(false);
@@ -1299,91 +1319,152 @@ function CreateShiftDrawer({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isDriverDropdownOpen]);
 
-  // Get selected driver info
-  const selectedDriver = drivers.find(d => d.id === formData.driverId);
+  const selectedDriver = drivers.find(d => d.id === driverId);
+
+  // Drag and drop handlers
+  const handleDragStart = (index: number) => {
+    setDraggedTaskIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedTaskIndex === null || draggedTaskIndex === index) return;
+
+    const newTasks = [...tasks];
+    const draggedTask = newTasks[draggedTaskIndex];
+    newTasks.splice(draggedTaskIndex, 1);
+    newTasks.splice(index, 0, draggedTask);
+
+    setTasks(newTasks);
+    setDraggedTaskIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedTaskIndex(null);
+  };
+
+  // Task management
+  const addWarehouseStop = () => {
+    const newTask: ShiftTask = {
+      id: `temp-${Date.now()}`,
+      type: 'warehouse_stop',
+      warehouse_action: 'load',
+      bins_to_load: 1,
+      latitude: 0, // TODO: Use actual warehouse coordinates
+      longitude: 0,
+      address: 'Warehouse',
+    };
+    setTasks([...tasks, newTask]);
+  };
+
+  const removeTask = (index: number) => {
+    setTasks(tasks.filter((_, i) => i !== index));
+  };
+
+  // Calculate shift analysis
+  const shiftAnalysis = useMemo(() => {
+    let collections = 0;
+    let placements = 0;
+    let moveRequests = 0;
+    let warehouseStops = 0;
+
+    tasks.forEach(task => {
+      if (task.type === 'collection') collections++;
+      else if (task.type === 'placement') placements++;
+      else if (task.type === 'move_request') moveRequests++;
+      else if (task.type === 'warehouse_stop') warehouseStops++;
+    });
+
+    return { collections, placements, moveRequests, warehouseStops, total: tasks.length };
+  }, [tasks]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('🎬 handleSubmit called');
-    console.log('📋 Current formData:', JSON.stringify(formData, null, 2));
-
     setError(null);
     setIsSubmitting(true);
 
     try {
-      // Get bin IDs based on selection type
-      let binIds: string[] = [];
+      if (!driverId) {
+        throw new Error('Please select a driver');
+      }
+      if (!truckCapacity || parseInt(truckCapacity) <= 0) {
+        throw new Error('Please enter a valid truck capacity');
+      }
+      if (tasks.length === 0) {
+        throw new Error('Please add at least one task to the shift');
+      }
 
-      if (formData.selectionType === 'route') {
-        console.log('📍 Getting bins from route:', formData.routeId);
-        // Use bins from selected route
-        const selectedRoute = routes.find(r => r.id === formData.routeId);
-        console.log('🔍 Found route:', selectedRoute);
+      // Convert tasks to API format
+      const tasksPayload = tasks.map(task => {
+        const baseTask: Record<string, unknown> = {
+          task_type: task.type,
+          latitude: task.latitude,
+          longitude: task.longitude,
+          address: task.address,
+        };
 
-        if (!selectedRoute || !selectedRoute.bin_ids) {
-          console.error('❌ Selected route has no bins');
-          throw new Error('Selected route has no bins');
+        if (task.type === 'collection') {
+          baseTask.bin_id = task.bin_id;
+          baseTask.bin_number = task.bin_number;
+          baseTask.fill_percentage = task.fill_percentage;
+        } else if (task.type === 'placement') {
+          baseTask.potential_location_id = task.potential_location_id;
+          baseTask.new_bin_number = task.new_bin_number;
+        } else if (task.type === 'move_request') {
+          baseTask.move_request_id = task.move_request_id;
+          baseTask.destination_latitude = task.destination_latitude;
+          baseTask.destination_longitude = task.destination_longitude;
+          baseTask.destination_address = task.destination_address;
+          baseTask.move_type = task.move_type;
+        } else if (task.type === 'warehouse_stop') {
+          baseTask.warehouse_action = task.warehouse_action;
+          baseTask.bins_to_load = task.bins_to_load;
         }
-        binIds = selectedRoute.bin_ids;
-        console.log('✅ Got', binIds.length, 'bins from route');
-      } else {
-        console.log('📍 Using custom selected bins');
-        // Use custom selected bins
-        binIds = formData.selectedBins;
-        console.log('✅ Got', binIds.length, 'custom bins');
-      }
 
-      if (binIds.length === 0) {
-        console.error('❌ No bins selected (after processing)');
-        throw new Error('No bins selected');
-      }
+        return baseTask;
+      });
 
-      console.log('📦 Bin IDs to assign:', binIds);
-
-      const mutationData = {
-        driver_id: formData.driverId,
-        route_id: formData.routeId || 'custom',
-        bin_ids: binIds,
+      const payload = {
+        driver_id: driverId,
+        truck_bin_capacity: parseInt(truckCapacity),
+        warehouse_latitude: 0, // TODO: Use actual warehouse coordinates
+        warehouse_longitude: 0,
+        warehouse_address: 'Warehouse',
+        tasks: tasksPayload,
       };
 
-      console.log('🚀 Calling assignRouteMutation.mutateAsync with:', JSON.stringify(mutationData, null, 2));
+      const response = await fetch('/api/manager/shifts/create-with-tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
-      // Call backend API to assign route (create shift) with React Query mutation
-      const result = await assignRouteMutation.mutateAsync(mutationData);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create shift');
+      }
 
-      console.log('✅ Mutation successful! Result:', result);
-
-      // Success! Close drawer
-      console.log('✅ Closing drawer');
       onClose();
     } catch (err) {
-      console.error('💥 Failed to create shift:', err);
-      console.error('💥 Error type:', err instanceof Error ? err.constructor.name : typeof err);
-      console.error('💥 Error message:', err instanceof Error ? err.message : String(err));
-      console.error('💥 Error stack:', err instanceof Error ? err.stack : 'No stack trace');
+      console.error('Failed to create shift:', err);
       setError(err instanceof Error ? err.message : 'Failed to create shift. Please try again.');
     } finally {
-      console.log('🏁 Setting isSubmitting to false');
       setIsSubmitting(false);
     }
   };
 
-  const handleBinSelectionConfirm = (selectedBinIds: string[]) => {
-    setFormData({ ...formData, selectedBins: selectedBinIds });
-  };
-
-  // Get selected route for display
-  const selectedRoute = routes.find(r => r.id === formData.routeId);
-
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center sm:items-center">
       <div
-        className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-fade-in"
+        className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-fade-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Schedule New Shift</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Build Custom Shift</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-fast"
@@ -1395,32 +1476,9 @@ function CreateShiftDrawer({
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-6">
-            {/* Step 1: Date */}
+            {/* Driver Selection */}
             <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-medium">
-                  1
-                </div>
-                <label className="text-sm font-semibold text-gray-900">Date</label>
-              </div>
-              <input
-                type="date"
-                value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                required
-              />
-            </div>
-
-            {/* Step 2: Driver */}
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-medium">
-                  2
-                </div>
-                <label className="text-sm font-semibold text-gray-900">Driver</label>
-              </div>
-
+              <label className="text-sm font-semibold text-gray-900 mb-3 block">Driver</label>
               <div className="relative" ref={driverDropdownRef}>
                 <button
                   type="button"
@@ -1434,16 +1492,6 @@ function CreateShiftDrawer({
                           {selectedDriver.name.split(' ').map(n => n[0]).join('')}
                         </div>
                         <span className="font-medium">{selectedDriver.name}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          selectedDriver.status === 'available'
-                            ? 'bg-green-100 text-green-700'
-                            : selectedDriver.status === 'on-shift'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}>
-                          {selectedDriver.status === 'available' ? 'Available' :
-                           selectedDriver.status === 'on-shift' ? 'On Shift' : 'Unavailable'}
-                        </span>
                       </div>
                     ) : (
                       'Select driver...'
@@ -1462,7 +1510,6 @@ function CreateShiftDrawer({
                       <div className="text-center py-8 px-4">
                         <User className="w-12 h-12 text-gray-300 mx-auto mb-2" />
                         <p className="text-sm text-gray-500">No drivers available</p>
-                        <p className="text-xs text-gray-400 mt-1">Please add drivers to continue</p>
                       </div>
                     ) : (
                       <div className="p-2">
@@ -1471,11 +1518,11 @@ function CreateShiftDrawer({
                             key={driver.id}
                             type="button"
                             onClick={() => {
-                              setFormData({ ...formData, driverId: driver.id });
+                              setDriverId(driver.id);
                               closeDriverDropdown();
                             }}
                             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-fast ${
-                              formData.driverId === driver.id ? 'bg-primary/5 border border-primary/20' : ''
+                              driverId === driver.id ? 'bg-primary/5 border border-primary/20' : ''
                             }`}
                           >
                             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
@@ -1485,16 +1532,6 @@ function CreateShiftDrawer({
                               <p className="font-medium text-gray-900 text-sm">{driver.name}</p>
                               <p className="text-xs text-gray-500 truncate">{driver.email}</p>
                             </div>
-                            <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ${
-                              driver.status === 'available'
-                                ? 'bg-green-100 text-green-700'
-                                : driver.status === 'on-shift'
-                                ? 'bg-blue-100 text-blue-700'
-                                : 'bg-gray-100 text-gray-700'
-                            }`}>
-                              {driver.status === 'available' ? 'Available' :
-                               driver.status === 'on-shift' ? 'On Shift' : 'Unavailable'}
-                            </span>
                           </button>
                         ))}
                       </div>
@@ -1504,141 +1541,142 @@ function CreateShiftDrawer({
               </div>
             </div>
 
-            {/* Step 3: Bin Assignment */}
+            {/* Truck Capacity */}
             <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-medium">
-                  3
-                </div>
-                <label className="text-sm font-semibold text-gray-900">Bin Assignment</label>
-              </div>
+              <label className="text-sm font-semibold text-gray-900 mb-3 block">
+                Truck Bin Capacity <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={truckCapacity}
+                onChange={(e) => setTruckCapacity(e.target.value)}
+                placeholder="Enter number of bins truck can hold"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                required
+              />
+            </div>
 
-              {/* Selection Type Radio Buttons */}
-              <div className="space-y-3">
-                {/* Option A: Use Existing Route */}
-                <div
-                  onClick={() => setFormData({ ...formData, selectionType: 'route', selectedBins: [] })}
-                  className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                    formData.selectionType === 'route'
-                      ? 'border-primary bg-primary/5'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
+            {/* Quick Add Buttons */}
+            <div>
+              <label className="text-sm font-semibold text-gray-900 mb-3 block">Add Tasks</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={addWarehouseStop}
+                  className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 hover:border-primary hover:bg-primary/5 rounded-lg transition-all text-sm font-medium text-gray-700 hover:text-primary"
                 >
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="radio"
-                      checked={formData.selectionType === 'route'}
-                      onChange={() => {}}
-                      className="mt-0.5 text-primary focus:ring-primary"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium text-gray-900">Use existing route</p>
-                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
-                          Recommended
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-600 mb-3">
-                        Select a pre-defined route template with optimized bin assignments
-                      </p>
-
-                      {formData.selectionType === 'route' && (
-                        <div className="animate-slide-in-down">
-                          {loadingRoutes ? (
-                            <div className="flex items-center justify-center py-2">
-                              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                            </div>
-                          ) : (
-                            <select
-                              value={formData.routeId}
-                              onChange={(e) => setFormData({ ...formData, routeId: e.target.value })}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                              required={formData.selectionType === 'route'}
-                            >
-                              <option value="">Select route...</option>
-                              {routes.map((route) => (
-                                <option key={route.id} value={route.id}>
-                                  {getRouteLabel(route)} • {route.geographic_area} • {route.schedule_pattern}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-
-                          {selectedRoute && (
-                            <div className="mt-2 flex items-center gap-2 text-xs text-gray-600">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              <span>~{selectedRoute.estimated_duration_hours}h • {selectedRoute.description}</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Option B: Custom Bin Selection */}
-                <div
-                  onClick={() => setFormData({ ...formData, selectionType: 'custom', routeId: '' })}
-                  className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                    formData.selectionType === 'custom'
-                      ? 'border-primary bg-primary/5'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
+                  <Warehouse className="w-4 h-4" />
+                  Warehouse Stop
+                </button>
+                <button
+                  type="button"
+                  disabled
+                  className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-200 rounded-lg text-sm font-medium text-gray-400 cursor-not-allowed"
                 >
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="radio"
-                      checked={formData.selectionType === 'custom'}
-                      onChange={() => {}}
-                      className="mt-0.5 text-primary focus:ring-primary"
-                    />
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900 mb-1">Custom bin selection</p>
-                      <p className="text-xs text-gray-600 mb-3">
-                        One-time job: manually select specific bins using the map
-                      </p>
-
-                      {formData.selectionType === 'custom' && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowBinSelection(true);
-                          }}
-                          className="w-full border-2 border-dashed border-gray-300 hover:border-primary rounded-lg p-6 text-center transition-all hover:bg-gray-50 animate-slide-in-down"
-                        >
-                          <div className="flex flex-col items-center gap-2">
-                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                              <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                              </svg>
-                            </div>
-                            {formData.selectedBins.length === 0 ? (
-                              <>
-                                <p className="text-sm font-medium text-gray-900">Select Bins on Map</p>
-                                <p className="text-xs text-gray-500">Click to open map with lasso select</p>
-                              </>
-                            ) : (
-                              <>
-                                <p className="text-sm font-medium text-primary">{formData.selectedBins.length} bins selected</p>
-                                <p className="text-xs text-gray-500">Click to modify selection</p>
-                              </>
-                            )}
-                          </div>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                  <Package className="w-4 h-4" />
+                  Collection (Coming Soon)
+                </button>
+                <button
+                  type="button"
+                  disabled
+                  className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-200 rounded-lg text-sm font-medium text-gray-400 cursor-not-allowed"
+                >
+                  <MapPinned className="w-4 h-4" />
+                  Placement (Coming Soon)
+                </button>
+                <button
+                  type="button"
+                  disabled
+                  className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-200 rounded-lg text-sm font-medium text-gray-400 cursor-not-allowed"
+                >
+                  <MoveRight className="w-4 h-4" />
+                  Move Request (Coming Soon)
+                </button>
               </div>
             </div>
+
+            {/* Shift Analysis */}
+            {tasks.length > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-blue-900 mb-2">Shift Summary</h3>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700">Total Tasks:</span>
+                    <span className="font-semibold text-blue-900">{shiftAnalysis.total}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700">Collections:</span>
+                    <span className="font-semibold text-blue-900">{shiftAnalysis.collections}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700">Placements:</span>
+                    <span className="font-semibold text-blue-900">{shiftAnalysis.placements}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700">Warehouse Stops:</span>
+                    <span className="font-semibold text-blue-900">{shiftAnalysis.warehouseStops}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Task List */}
+            {tasks.length > 0 && (
+              <div>
+                <label className="text-sm font-semibold text-gray-900 mb-3 block">Task Sequence</label>
+                <div className="space-y-2">
+                  {tasks.map((task, index) => (
+                    <div
+                      key={task.id}
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDragEnd={handleDragEnd}
+                      className={`flex items-center gap-3 px-4 py-3 bg-white border rounded-lg cursor-move hover:shadow-md transition-all ${
+                        draggedTaskIndex === index ? 'opacity-50' : ''
+                      }`}
+                    >
+                      <GripVertical className="w-4 h-4 text-gray-400" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-gray-500">#{index + 1}</span>
+                          {task.type === 'warehouse_stop' && <Warehouse className="w-4 h-4 text-blue-600" />}
+                          {task.type === 'collection' && <Package className="w-4 h-4 text-green-600" />}
+                          {task.type === 'placement' && <MapPinned className="w-4 h-4 text-purple-600" />}
+                          {task.type === 'move_request' && <MoveRight className="w-4 h-4 text-orange-600" />}
+                          <span className="text-sm font-medium capitalize">{task.type.replace('_', ' ')}</span>
+                        </div>
+                        {task.warehouse_action && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {task.warehouse_action === 'load' ? 'Load' : 'Unload'} {task.bins_to_load} bin(s)
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeTask(index)}
+                        className="text-red-500 hover:text-red-700 transition-fast"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {tasks.length === 0 && (
+              <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg">
+                <Plus className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-sm text-gray-500">No tasks added yet</p>
+                <p className="text-xs text-gray-400 mt-1">Use the buttons above to add tasks to your shift</p>
+              </div>
+            )}
           </div>
 
           {/* Footer */}
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-            {/* Error message */}
             {error && (
               <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
                 <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -1659,12 +1697,7 @@ function CreateShiftDrawer({
               </button>
               <button
                 type="submit"
-                disabled={
-                  isSubmitting ||
-                  !formData.driverId ||
-                  (formData.selectionType === 'route' && !formData.routeId) ||
-                  (formData.selectionType === 'custom' && formData.selectedBins.length === 0)
-                }
+                disabled={isSubmitting || !driverId || !truckCapacity || tasks.length === 0}
                 className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-all flex items-center gap-2"
               >
                 {isSubmitting ? (
@@ -1680,15 +1713,6 @@ function CreateShiftDrawer({
           </div>
         </form>
       </div>
-
-      {/* Bin Selection Map Modal */}
-      {showBinSelection && (
-        <BinSelectionMap
-          onClose={() => setShowBinSelection(false)}
-          onConfirm={handleBinSelectionConfirm}
-          initialSelectedBins={formData.selectedBins}
-        />
-      )}
     </div>
   );
 }
