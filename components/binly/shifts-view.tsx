@@ -1694,59 +1694,80 @@ function CreateShiftDrawer({
     return flow;
   }, [tasks]);
 
-  // Detect smart suggestions
+  // Detect smart suggestions - scans entire shift for ALL capacity issues
   const smartSuggestions = useMemo(() => {
     const suggestions: Array<{ type: 'warehouse_load' | 'warehouse_unload'; insertAfterIndex: number; binsCount: number; reason: string }> = [];
     const capacity = parseInt(truckCapacity) || 0;
 
     if (capacity <= 0 || tasks.length === 0) return suggestions;
 
-    // Check if placements have SUFFICIENT bins loaded
-    const firstPlacementIndex = tasks.findIndex(t => t.type === 'placement');
-    if (firstPlacementIndex >= 0) {
-      // Count total placements needed
-      const placementsCount = tasks.filter(t => t.type === 'placement').length;
+    // Track which problems we've already suggested fixes for
+    const suggestedIndexes = new Set<number>();
 
-      // Calculate total bins loaded BEFORE placements start
-      let totalBinsLoaded = 0;
-      for (let i = 0; i < firstPlacementIndex; i++) {
-        const task = tasks[i];
-        if (task.type === 'warehouse_stop' && task.warehouse_action === 'load') {
-          totalBinsLoaded += task.bins_to_load || 0;
+    // SCAN ENTIRE CAPACITY FLOW for problems
+    capacityFlow.forEach((flow, index) => {
+      const task = tasks[flow.taskIndex];
+
+      // PROBLEM 1: Capacity goes NEGATIVE (ran out of bins)
+      if (flow.loadAfter < 0 && !suggestedIndexes.has(index)) {
+        // Calculate how many bins needed
+        const binsNeeded = Math.abs(flow.loadAfter);
+        const binsToLoad = Math.min(binsNeeded, capacity); // Can't load more than capacity
+
+        // Find best insertion point (before this task, after last non-placement)
+        let insertAfter = index - 1;
+        while (insertAfter >= 0 && tasks[insertAfter]?.type === 'placement') {
+          insertAfter--;
         }
-      }
 
-      // Check if we have enough bins for all placements
-      if (totalBinsLoaded < placementsCount) {
-        const shortfall = placementsCount - totalBinsLoaded;
         suggestions.push({
           type: 'warehouse_load',
-          insertAfterIndex: Math.max(0, firstPlacementIndex - 1),
-          binsCount: shortfall,
-          reason: totalBinsLoaded === 0
-            ? `Load ${placementsCount} new bin${placementsCount > 1 ? 's' : ''} for placement tasks`
-            : `⚠️ Insufficient bins! You have ${placementsCount} placements but only ${totalBinsLoaded} bin${totalBinsLoaded > 1 ? 's' : ''} loaded. Need ${shortfall} more bin${shortfall > 1 ? 's' : ''}.`
+          insertAfterIndex: Math.max(-1, insertAfter),
+          binsCount: binsToLoad,
+          reason: binsNeeded > capacity
+            ? `🚨 Need ${binsNeeded} bins but capacity is ${capacity}! Load ${binsToLoad} bins before task #${index + 1} (you'll need multiple warehouse trips)`
+            : `🚨 Ran out of bins! Load ${binsToLoad} bin${binsToLoad > 1 ? 's' : ''} before task #${index + 1}`
         });
-      }
-    }
 
-    // Check for capacity violations
-    capacityFlow.forEach((flow, index) => {
-      if (flow.loadAfter > capacity) {
-        // Find if there's already an auto-inserted warehouse stop
-        const hasAutoWarehouse = tasks.slice(0, index + 1).some(t => t.auto_inserted);
-        if (!hasAutoWarehouse) {
-          suggestions.push({
-            type: 'warehouse_unload',
-            insertAfterIndex: index - 1,
-            binsCount: flow.loadBefore,
-            reason: `Truck would exceed capacity (${flow.loadAfter}/${capacity} bins)`
-          });
-        }
+        suggestedIndexes.add(index);
+      }
+
+      // PROBLEM 2: Capacity EXCEEDS physical limit
+      if (flow.loadAfter > capacity && !suggestedIndexes.has(index)) {
+        suggestions.push({
+          type: 'warehouse_unload',
+          insertAfterIndex: index - 1,
+          binsCount: flow.loadBefore,
+          reason: `⚠️ Over capacity! Truck would have ${flow.loadAfter}/${capacity} bins. Unload before task #${index + 1}`
+        });
+
+        suggestedIndexes.add(index);
       }
     });
 
-    return suggestions;
+    // OPTIMIZATION: If no critical issues, check for initial bins
+    if (suggestions.length === 0) {
+      const placements = tasks.filter(t => t.type === 'placement');
+      if (placements.length > 0) {
+        const firstPlacementIndex = tasks.findIndex(t => t.type === 'placement');
+        const flowAtFirstPlacement = capacityFlow[firstPlacementIndex];
+
+        if (flowAtFirstPlacement && flowAtFirstPlacement.loadBefore === 0) {
+          const binsToLoad = Math.min(placements.length, capacity);
+          suggestions.push({
+            type: 'warehouse_load',
+            insertAfterIndex: Math.max(-1, firstPlacementIndex - 1),
+            binsCount: binsToLoad,
+            reason: placements.length > capacity
+              ? `Load ${binsToLoad} bins for first ${binsToLoad} of ${placements.length} placements (will need multiple trips)`
+              : `Load ${binsToLoad} bin${binsToLoad > 1 ? 's' : ''} for ${placements.length} placement${placements.length > 1 ? 's' : ''}`
+          });
+        }
+      }
+    }
+
+    // Return top 3 most critical suggestions
+    return suggestions.slice(0, 3);
   }, [tasks, capacityFlow, truckCapacity]);
 
   const handleSubmit = async (e: React.FormEvent) => {
