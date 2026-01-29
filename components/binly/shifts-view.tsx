@@ -1659,6 +1659,10 @@ function CreateShiftDrawer({
 
   // Calculate capacity flow for each task (hybrid approach)
   const capacityFlow = useMemo(() => {
+    console.log('🔄 [CAPACITY FLOW] Recalculating...');
+    console.log('📋 [CAPACITY FLOW] Total tasks:', tasks.length);
+    console.log('🚛 [CAPACITY FLOW] Truck capacity:', truckCapacity);
+
     const flow: Array<{ taskIndex: number; loadBefore: number; loadAfter: number; delta: number }> = [];
     let currentLoad = 0;
 
@@ -1689,27 +1693,40 @@ function CreateShiftDrawer({
       const loadAfter = currentLoad;
 
       flow.push({ taskIndex: index, loadBefore, loadAfter, delta });
+
+      console.log(`  Task #${index + 1} [${task.type}]: ${loadBefore} ${delta >= 0 ? '+' : ''}${delta} → ${loadAfter}`);
     });
 
+    console.log('✅ [CAPACITY FLOW] Calculation complete. Total flow entries:', flow.length);
     return flow;
   }, [tasks]);
 
   // Detect smart suggestions - scans entire shift for ALL capacity issues
   const smartSuggestions = useMemo(() => {
+    console.log('\n💡 [SMART SUGGESTIONS] Analyzing shift for capacity issues...');
+    console.log('📊 [SMART SUGGESTIONS] Capacity:', truckCapacity);
+    console.log('📋 [SMART SUGGESTIONS] Total tasks:', tasks.length);
+    console.log('📈 [SMART SUGGESTIONS] Capacity flow entries:', capacityFlow.length);
+
     const suggestions: Array<{ type: 'warehouse_load' | 'warehouse_unload'; insertAfterIndex: number; binsCount: number; reason: string }> = [];
     const capacity = parseInt(truckCapacity) || 0;
 
-    if (capacity <= 0 || tasks.length === 0) return suggestions;
+    if (capacity <= 0 || tasks.length === 0) {
+      console.log('⚠️  [SMART SUGGESTIONS] Skipping: capacity or tasks invalid');
+      return suggestions;
+    }
 
     // Track which problems we've already suggested fixes for
     const suggestedIndexes = new Set<number>();
 
     // SCAN ENTIRE CAPACITY FLOW for problems
+    console.log('🔍 [SMART SUGGESTIONS] Scanning capacity flow for problems...');
     capacityFlow.forEach((flow, index) => {
       const task = tasks[flow.taskIndex];
 
       // PROBLEM 1: Capacity goes NEGATIVE (ran out of bins)
       if (flow.loadAfter < 0 && !suggestedIndexes.has(index)) {
+        console.log(`🚨 [SMART SUGGESTIONS] NEGATIVE CAPACITY at task #${index + 1}! loadAfter=${flow.loadAfter}`);
         // Calculate how many bins needed
         const binsNeeded = Math.abs(flow.loadAfter);
         const binsToLoad = Math.min(binsNeeded, capacity); // Can't load more than capacity
@@ -1734,6 +1751,7 @@ function CreateShiftDrawer({
 
       // PROBLEM 2: Capacity EXCEEDS physical limit
       if (flow.loadAfter > capacity && !suggestedIndexes.has(index)) {
+        console.log(`⚠️  [SMART SUGGESTIONS] OVER CAPACITY at task #${index + 1}! loadAfter=${flow.loadAfter}, capacity=${capacity}`);
         suggestions.push({
           type: 'warehouse_unload',
           insertAfterIndex: index - 1,
@@ -1745,15 +1763,22 @@ function CreateShiftDrawer({
       }
     });
 
+    console.log(`🔍 [SMART SUGGESTIONS] Found ${suggestions.length} critical issues`);
+
     // OPTIMIZATION: If no critical issues, check for initial bins
     if (suggestions.length === 0) {
+      console.log('✨ [SMART SUGGESTIONS] No critical issues. Checking for optimization opportunities...');
       const placements = tasks.filter(t => t.type === 'placement');
       if (placements.length > 0) {
         const firstPlacementIndex = tasks.findIndex(t => t.type === 'placement');
         const flowAtFirstPlacement = capacityFlow[firstPlacementIndex];
 
+        console.log(`📦 [SMART SUGGESTIONS] Found ${placements.length} placements, first at index ${firstPlacementIndex}`);
+        console.log(`📦 [SMART SUGGESTIONS] Load at first placement: ${flowAtFirstPlacement?.loadBefore}`);
+
         if (flowAtFirstPlacement && flowAtFirstPlacement.loadBefore === 0) {
           const binsToLoad = Math.min(placements.length, capacity);
+          console.log(`💡 [SMART SUGGESTIONS] Suggesting initial load of ${binsToLoad} bins`);
           suggestions.push({
             type: 'warehouse_load',
             insertAfterIndex: Math.max(-1, firstPlacementIndex - 1),
@@ -1767,6 +1792,11 @@ function CreateShiftDrawer({
     }
 
     // Return top 3 most critical suggestions
+    console.log(`\n✅ [SMART SUGGESTIONS] Returning ${suggestions.length} suggestion(s):`);
+    suggestions.forEach((s, i) => {
+      console.log(`   ${i + 1}. [${s.type}] Insert after task #${s.insertAfterIndex + 1}: ${s.reason}`);
+    });
+
     return suggestions.slice(0, 3);
   }, [tasks, capacityFlow, truckCapacity]);
 
