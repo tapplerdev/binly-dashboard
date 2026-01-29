@@ -1868,12 +1868,31 @@ function CreateShiftDrawer({
           // Net bins needed = consumers minus providers (pickups reduce warehouse load)
           const netBinsNeeded = totalBinConsumers - totalBinProviders;
 
+          // Count pickups that happen BEFORE first consumption (these temporarily increase capacity)
+          let pickupsBeforeConsumption = 0;
+          for (let k = warehouseBeforeZone.taskIndex + 1; k < tasks.length; k++) {
+            // Stop at first consumption (placement or dropoff)
+            if (tasks[k].type === 'placement' || (tasks[k].type === 'move_request' && tasks[k].move_type === 'dropoff')) {
+              break;
+            }
+            // Count pickups before first consumption
+            if (tasks[k].type === 'move_request' && tasks[k].move_type === 'pickup') {
+              pickupsBeforeConsumption++;
+            }
+          }
+
           console.log(`   💡 Found existing warehouse at task #${warehouseBeforeZone.taskIndex + 1} (loads ${warehouseBeforeZone.binsCount} bins)`);
           console.log(`   📊 Downstream: ${totalBinConsumers} consumers (placements+dropoffs) - ${totalBinProviders} providers (pickups) = ${netBinsNeeded} net bins needed, warehouse loads: ${warehouseBeforeZone.binsCount}`);
+          if (pickupsBeforeConsumption > 0) {
+            console.log(`   🔄 Found ${pickupsBeforeConsumption} pickup(s) before first consumption - will reduce warehouse load to prevent over-capacity`);
+          }
 
           // Compare warehouse bin count against NET bins needed (consumers - providers)
           if (warehouseBeforeZone.binsCount < netBinsNeeded) {
-            const optimalBinCount = Math.min(netBinsNeeded, capacity);
+            // Calculate optimal bin count, accounting for pickups that happen before consumption
+            // Example: Need 6 net bins, but 1 pickup happens first → load only 5 bins
+            // Result: 5 (warehouse) + 1 (pickup) = 6, then consume 6
+            let optimalBinCount = Math.min(netBinsNeeded, capacity - pickupsBeforeConsumption);
 
             // Check if warehouse is already at truck capacity
             if (warehouseBeforeZone.binsCount >= capacity && netBinsNeeded > capacity) {
@@ -1900,6 +1919,10 @@ function CreateShiftDrawer({
               // Warehouse can load more, suggest updating it
               const additionalNeeded = optimalBinCount - warehouseBeforeZone.binsCount;
 
+              const pickupNote = pickupsBeforeConsumption > 0
+                ? `, reduced from ${netBinsNeeded} to leave room for ${pickupsBeforeConsumption} pickup${pickupsBeforeConsumption > 1 ? 's' : ''}`
+                : '';
+
               suggestions.push({
                 priority: 'optimization',
                 action: 'update',
@@ -1908,8 +1931,8 @@ function CreateShiftDrawer({
                 currentBinCount: warehouseBeforeZone.binsCount,
                 suggestedBinCount: optimalBinCount,
                 reason: netBinsNeeded > capacity
-                  ? `⚠️ Update warehouse stop #${warehouseBeforeZone.taskIndex + 1} to load ${optimalBinCount} bins (currently ${warehouseBeforeZone.binsCount}) - need ${netBinsNeeded} net bins (${totalBinConsumers} consumers - ${totalBinProviders} pickups), will require multiple trips`
-                  : `⚠️ Update warehouse stop #${warehouseBeforeZone.taskIndex + 1} from ${warehouseBeforeZone.binsCount} to ${optimalBinCount} bins (need ${netBinsNeeded} net bins: ${totalBinConsumers} consumers - ${totalBinProviders} pickup${totalBinProviders > 1 ? 's' : ''})`,
+                  ? `⚠️ Update warehouse stop #${warehouseBeforeZone.taskIndex + 1} to load ${optimalBinCount} bins (currently ${warehouseBeforeZone.binsCount}) - need ${netBinsNeeded} net bins (${totalBinConsumers} consumers - ${totalBinProviders} pickups), will require multiple trips${pickupNote}`
+                  : `⚠️ Update warehouse stop #${warehouseBeforeZone.taskIndex + 1} from ${warehouseBeforeZone.binsCount} to ${optimalBinCount} bins (need ${netBinsNeeded} net bins: ${totalBinConsumers} consumers - ${totalBinProviders} pickup${totalBinProviders > 1 ? 's' : ''}${pickupNote})`,
                 affectedTasks
               });
             }
@@ -1929,7 +1952,7 @@ function CreateShiftDrawer({
             binsCount: binsToLoad,
             reason: binsNeeded > capacity
               ? `🚨 Need ${binsNeeded} bins but capacity is ${capacity}! Add warehouse stop to load ${binsToLoad} bins before task #${zoneStart + 1} (you'll need multiple trips)`
-              : `🚨 Ran out of bins! Add warehouse stop to load ${binsToLoad} bin${binsToLoad > 1 ? 's' : ''} before task #${zoneStart + 1} (covers ${affectedTasks.length} placement${affectedTasks.length > 1 ? 's' : ''})`,
+              : `🚨 Add warehouse stop to load ${binsToLoad} bin${binsToLoad > 1 ? 's' : ''} before task #${zoneStart + 1} (covers ${affectedTasks.length} task${affectedTasks.length > 1 ? 's' : ''})`,
             affectedTasks
           });
         }
