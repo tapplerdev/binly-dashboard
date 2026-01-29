@@ -1592,7 +1592,9 @@ function CreateShiftDrawer({
 
     for (const task of manualTasks) {
       // Check if this task adds bins to the truck
-      const addsBins = task.type === 'collection' || task.type === 'placement' ||
+      // Note: Collections don't affect bin capacity (collecting clothes, not bins)
+      // Placements actually reduce capacity (delivering bins)
+      const addsBins = task.type === 'placement' ||
                       (task.type === 'move_request' && task.move_type === 'pickup');
 
       // If adding this task would exceed capacity, insert warehouse stop first
@@ -1665,8 +1667,8 @@ function CreateShiftDrawer({
       let delta = 0;
 
       if (task.type === 'collection') {
-        // Collection: pickup bin (+1)
-        delta = +1;
+        // Collection: collecting CLOTHES from bins (doesn't affect bin capacity)
+        delta = 0;
       } else if (task.type === 'placement') {
         // Placement: deliver new bin (-1)
         delta = -1;
