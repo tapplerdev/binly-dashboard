@@ -1807,19 +1807,32 @@ function CreateShiftDrawer({
         const warehouseBeforeZone = existingWarehouseStops.find(ws => ws.taskIndex < zoneStart && ws.action === 'load');
 
         if (warehouseBeforeZone) {
-          // Update existing warehouse stop
+          // Count TOTAL downstream placements from warehouse stop (not just shortage)
+          let totalPlacementsDownstream = 0;
+          for (let k = warehouseBeforeZone.taskIndex + 1; k < tasks.length; k++) {
+            if (tasks[k].type === 'placement') totalPlacementsDownstream++;
+            // Stop at next warehouse LOAD
+            if (k > warehouseBeforeZone.taskIndex && tasks[k].type === 'warehouse_stop' && (tasks[k] as any).warehouse_action === 'load') break;
+          }
+
           console.log(`   💡 Found existing warehouse at task #${warehouseBeforeZone.taskIndex + 1} (loads ${warehouseBeforeZone.binsCount} bins)`);
-          if (warehouseBeforeZone.binsCount < binsNeeded) {
+          console.log(`   📊 Total downstream placements: ${totalPlacementsDownstream}, warehouse loads: ${warehouseBeforeZone.binsCount}`);
+
+          // Compare warehouse bin count against TOTAL downstream placements
+          if (warehouseBeforeZone.binsCount < totalPlacementsDownstream) {
+            const optimalBinCount = Math.min(totalPlacementsDownstream, capacity);
+            const additionalNeeded = optimalBinCount - warehouseBeforeZone.binsCount;
+
             suggestions.push({
               priority: 'optimization',
               action: 'update',
               targetType: 'warehouse_load',
               existingTaskIndex: warehouseBeforeZone.taskIndex,
               currentBinCount: warehouseBeforeZone.binsCount,
-              suggestedBinCount: binsToLoad,
-              reason: binsNeeded > capacity
-                ? `⚠️ Update warehouse stop #${warehouseBeforeZone.taskIndex + 1} to load ${binsToLoad} bins (currently ${warehouseBeforeZone.binsCount}) - need ${binsNeeded} total, will require multiple trips`
-                : `⚠️ Update warehouse stop #${warehouseBeforeZone.taskIndex + 1} from ${warehouseBeforeZone.binsCount} to ${binsToLoad} bins (added ${binsToLoad - warehouseBeforeZone.binsCount} more placement${binsToLoad - warehouseBeforeZone.binsCount > 1 ? 's' : ''})`,
+              suggestedBinCount: optimalBinCount,
+              reason: totalPlacementsDownstream > capacity
+                ? `⚠️ Update warehouse stop #${warehouseBeforeZone.taskIndex + 1} to load ${optimalBinCount} bins (currently ${warehouseBeforeZone.binsCount}) - need ${totalPlacementsDownstream} total, will require multiple trips`
+                : `⚠️ Update warehouse stop #${warehouseBeforeZone.taskIndex + 1} from ${warehouseBeforeZone.binsCount} to ${optimalBinCount} bins (added ${additionalNeeded} more placement${additionalNeeded > 1 ? 's' : ''})`,
               affectedTasks
             });
           }
