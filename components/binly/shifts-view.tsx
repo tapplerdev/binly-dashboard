@@ -1367,9 +1367,9 @@ function CreateShiftDrawer({
       type: 'warehouse_stop',
       warehouse_action: 'load',
       bins_to_load: 1,
-      latitude: 0, // TODO: Use actual warehouse coordinates
-      longitude: 0,
-      address: 'Warehouse',
+      latitude: 38.5816, // Binly Central Warehouse coordinates
+      longitude: -121.4944,
+      address: 'Binly Central Warehouse - 1500 Industrial Pkwy, Sacramento, CA 95691',
     };
     setTasks([...tasks, newTask]);
   };
@@ -1584,9 +1584,9 @@ function CreateShiftDrawer({
           type: 'warehouse_stop',
           warehouse_action: 'unload',
           auto_inserted: true,
-          latitude: 0, // Will be set by backend
-          longitude: 0,
-          address: 'Warehouse (Auto-inserted)',
+          latitude: 38.5816, // Binly Central Warehouse coordinates
+          longitude: -121.4944,
+          address: 'Binly Central Warehouse - 1500 Industrial Pkwy, Sacramento, CA 95691',
         });
         currentLoad = 0; // Reset after unloading
       }
@@ -1686,9 +1686,9 @@ function CreateShiftDrawer({
       const payload = {
         driver_id: driverId,
         truck_bin_capacity: parseInt(truckCapacity),
-        warehouse_latitude: 0, // TODO: Use actual warehouse coordinates
-        warehouse_longitude: 0,
-        warehouse_address: 'Warehouse',
+        warehouse_latitude: 38.5816, // Binly Central Warehouse coordinates
+        warehouse_longitude: -121.4944,
+        warehouse_address: 'Binly Central Warehouse - 1500 Industrial Pkwy, Sacramento, CA 95691',
         tasks: tasksPayload,
       };
 
@@ -1702,8 +1702,14 @@ function CreateShiftDrawer({
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create shift');
+        let errorMessage = `Failed to create shift (${response.status} ${response.statusText})`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // Response is not JSON, use status text
+        }
+        throw new Error(errorMessage);
       }
 
       onClose();
@@ -1919,10 +1925,36 @@ function CreateShiftDrawer({
                             </span>
                           )}
                         </div>
-                        {task.warehouse_action && (
+
+                        {/* Collection metadata */}
+                        {task.type === 'collection' && (
                           <p className="text-xs text-gray-500 mt-1">
-                            {task.warehouse_action === 'load' ? 'Load' : 'Unload'} {task.bins_to_load || 'all'} bin(s)
-                            {task.auto_inserted && ' - Automatically inserted based on truck capacity'}
+                            <span className="font-medium">Bin #{task.bin_number}</span> - {task.address}
+                          </p>
+                        )}
+
+                        {/* Placement metadata */}
+                        {task.type === 'placement' && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {task.address}
+                            {task.new_bin_number && <span className="ml-2 font-medium">(New Bin #{task.new_bin_number})</span>}
+                          </p>
+                        )}
+
+                        {/* Move Request metadata */}
+                        {task.type === 'move_request' && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            <span className="font-medium">Bin #{task.bin_number}</span> from {task.address}
+                            <br />
+                            → To: {task.destination_address}
+                          </p>
+                        )}
+
+                        {/* Warehouse metadata */}
+                        {task.type === 'warehouse_stop' && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {task.warehouse_action === 'load' ? 'Load' : 'Unload'} {task.bins_to_load || 'all'} bin(s) - {task.address}
+                            {task.auto_inserted && <span className="ml-2 text-blue-600">(Auto-inserted)</span>}
                           </p>
                         )}
                       </div>
