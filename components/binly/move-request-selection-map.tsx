@@ -4,11 +4,15 @@ import { useState, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { getBins } from '@/lib/api/bins';
 import { Bin, isMappableBin, MoveRequest } from '@/lib/types/bin';
-import { X, Search, MapPin } from 'lucide-react';
+import { X, Search, Filter, MapPin } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 // Default map center (San Jose, CA area)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 12;
+
+type UrgencyFilter = 'all' | 'overdue' | 'urgent' | 'soon' | 'scheduled';
 
 interface MoveRequestSelectionMapProps {
   onClose: () => void;
@@ -25,7 +29,7 @@ interface MappableMoveRequest extends MoveRequest {
 }
 
 /**
- * Get marker color based on urgency
+ * Get marker color based on urgency (matching move requests table)
  */
 function getUrgencyMarkerColor(urgency: MoveRequest['urgency']): string {
   switch (urgency) {
@@ -37,35 +41,55 @@ function getUrgencyMarkerColor(urgency: MoveRequest['urgency']): string {
     case 'scheduled':
       return '#3B82F6'; // blue-500
     case 'resolved':
-      return '#10B981'; // green-500
+      return '#16A34A'; // green-600
     default:
       return '#9CA3AF'; // gray-400
   }
 }
 
 /**
- * Get badge color classes based on urgency
+ * Get urgency badge (matching move requests table exactly)
  */
-function getUrgencyBadgeColor(urgency: MoveRequest['urgency']): string {
-  switch (urgency) {
-    case 'overdue':
-    case 'urgent':
-      return 'bg-red-100 text-red-700';
-    case 'soon':
-      return 'bg-orange-100 text-orange-700';
-    case 'scheduled':
-      return 'bg-blue-100 text-blue-700';
-    case 'resolved':
-      return 'bg-green-100 text-green-700';
-    default:
-      return 'bg-gray-100 text-gray-700';
-  }
+function getUrgencyBadge(move: MoveRequest) {
+  const urgency = move.urgency;
+
+  const config = {
+    overdue: {
+      label: '⚠️ Overdue',
+      colors: 'bg-red-500 text-white',
+    },
+    urgent: {
+      label: '🔴 Urgent',
+      colors: 'bg-red-500 text-white',
+    },
+    soon: {
+      label: 'Move Soon',
+      colors: 'bg-orange-500 text-white',
+    },
+    scheduled: {
+      label: 'Scheduled',
+      colors: 'bg-blue-500 text-white',
+    },
+    resolved: {
+      label: '✓ Resolved',
+      colors: 'bg-green-600 text-white',
+    },
+  };
+
+  const { label, colors } = config[urgency] || config.scheduled;
+
+  return (
+    <Badge className={cn('font-semibold whitespace-nowrap', colors)}>
+      {label}
+    </Badge>
+  );
 }
 
 export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: MoveRequestSelectionMapProps) {
   const [bins, setBins] = useState<Bin[]>([]);
   const [selectedRequestIds, setSelectedRequestIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>('all');
   const [loading, setLoading] = useState(true);
 
   // Load bins from API to get coordinates
@@ -116,8 +140,14 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
     setSelectedRequestIds(new Set());
   };
 
-  // Filter requests based on search
+  // Filter requests based on search and urgency
   const filteredRequests = moveRequests.filter(request => {
+    // Urgency filter
+    if (urgencyFilter !== 'all' && request.urgency !== urgencyFilter) {
+      return false;
+    }
+
+    // Search filter
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -193,7 +223,7 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
                   disableDefaultUI={false}
                   className="w-full h-full"
                 >
-                  {/* Move Request Markers */}
+                  {/* Move Request Markers - Using Bin Number Display */}
                   {mappableFilteredRequests.map((request) => {
                     const isSelected = selectedRequestIds.has(request.id);
                     const markerColor = isSelected ? '#16a34a' : getUrgencyMarkerColor(request.urgency);
@@ -205,13 +235,13 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
                         onClick={() => toggleRequestSelection(request.id)}
                       >
                         <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold cursor-pointer transition-all hover:scale-110 shadow-lg ${
+                          className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold cursor-pointer transition-all hover:scale-110 ${
                             isSelected ? 'ring-4 ring-green-300 animate-pulse-glow' : ''
                           }`}
                           style={{ backgroundColor: markerColor }}
                           title={`Bin #${request.bin_number} - ${request.current_street}`}
                         >
-                          <MapPin className="w-5 h-5" fill="white" />
+                          {request.bin_number % 100}
                         </div>
                       </AdvancedMarker>
                     );
@@ -243,6 +273,66 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
                 />
               </div>
 
+              {/* Urgency Filter Buttons */}
+              <div className="mt-3 mb-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Filter className="w-3.5 h-3.5 text-gray-500" />
+                  <span className="text-xs font-medium text-gray-700">Filter by Urgency</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => setUrgencyFilter('all')}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-fast ${
+                      urgencyFilter === 'all'
+                        ? 'bg-gray-900 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setUrgencyFilter('overdue')}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-fast ${
+                      urgencyFilter === 'overdue'
+                        ? 'bg-red-500 text-white'
+                        : 'bg-red-100 text-red-700 hover:bg-red-200'
+                    }`}
+                  >
+                    ⚠️ Overdue
+                  </button>
+                  <button
+                    onClick={() => setUrgencyFilter('urgent')}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-fast ${
+                      urgencyFilter === 'urgent'
+                        ? 'bg-red-500 text-white'
+                        : 'bg-red-100 text-red-700 hover:bg-red-200'
+                    }`}
+                  >
+                    🔴 Urgent
+                  </button>
+                  <button
+                    onClick={() => setUrgencyFilter('soon')}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-fast ${
+                      urgencyFilter === 'soon'
+                        ? 'bg-orange-500 text-white'
+                        : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                    }`}
+                  >
+                    Move Soon
+                  </button>
+                  <button
+                    onClick={() => setUrgencyFilter('scheduled')}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-fast ${
+                      urgencyFilter === 'scheduled'
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                    }`}
+                  >
+                    Scheduled
+                  </button>
+                </div>
+              </div>
+
               {/* Quick Actions */}
               <div className="flex gap-2 mt-3">
                 <button
@@ -271,7 +361,6 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
                 ) : (
                   filteredRequests.map((request) => {
                     const isSelected = selectedRequestIds.has(request.id);
-                    const urgencyColor = getUrgencyBadgeColor(request.urgency);
 
                     // Format date
                     const scheduledDate = new Date(request.scheduled_date_iso);
@@ -311,9 +400,7 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
                                   {request.current_street}, {request.city} {request.zip}
                                 </p>
                               </div>
-                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${urgencyColor}`}>
-                                {request.urgency}
-                              </span>
+                              {getUrgencyBadge(request)}
                             </div>
 
                             {/* Request Details */}
