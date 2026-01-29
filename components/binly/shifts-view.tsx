@@ -2038,6 +2038,83 @@ function CreateShiftDrawer({
       }
     });
 
+    // Check for warehouse consolidation opportunities
+    // If there are multiple warehouse stops that could be merged into one
+    const warehouseLoads = existingWarehouseStops.filter(ws => ws.action === 'load');
+    if (warehouseLoads.length >= 2) {
+      for (let i = 0; i < warehouseLoads.length - 1; i++) {
+        const warehouseA = warehouseLoads[i];
+        const warehouseB = warehouseLoads[i + 1];
+
+        // Check if there's a "service completion boundary" between A and B
+        // (capacity reaches 0 with a gap before going negative again)
+        let hasServiceBoundary = false;
+        for (let k = warehouseA.taskIndex + 1; k < warehouseB.taskIndex; k++) {
+          if (capacityFlow[k] && capacityFlow[k].loadAfter === 0) {
+            // Found capacity=0, check if there's a gap before next negative zone
+            const nextNegativeIndex = capacityFlow.findIndex((f, idx) => idx > k && f.loadAfter < 0);
+            if (nextNegativeIndex === -1 || nextNegativeIndex > k + 1) {
+              // There's a gap - service boundary exists
+              hasServiceBoundary = true;
+              break;
+            }
+          }
+        }
+
+        // If no service boundary, check if they can be consolidated
+        if (!hasServiceBoundary) {
+          const combinedBins = warehouseA.binsCount + warehouseB.binsCount;
+
+          // Only suggest consolidation if combined load doesn't exceed truck capacity
+          if (combinedBins <= capacity) {
+            // Count total consumers between warehouse A and the end of warehouse B's service
+            let totalConsumers = 0;
+            let totalProviders = 0;
+            for (let k = warehouseA.taskIndex + 1; k < tasks.length; k++) {
+              if (tasks[k].type === 'placement' || (tasks[k].type === 'move_request' && tasks[k].move_type === 'dropoff')) {
+                totalConsumers++;
+              }
+              if (tasks[k].type === 'move_request' && tasks[k].move_type === 'pickup') {
+                totalProviders++;
+              }
+              // Stop at next warehouse load (after B)
+              if (k > warehouseB.taskIndex && tasks[k].type === 'warehouse_stop' && (tasks[k] as any).warehouse_action === 'load') {
+                break;
+              }
+            }
+
+            const netConsumers = totalConsumers - totalProviders;
+
+            // Only suggest if the consolidation makes sense (combined bins = net consumers)
+            if (combinedBins === netConsumers) {
+              console.log(`   🔄 Consolidation opportunity: Warehouse #${warehouseA.taskIndex + 1} (${warehouseA.binsCount} bins) + Warehouse #${warehouseB.taskIndex + 1} (${warehouseB.binsCount} bins) = ${combinedBins} bins`);
+
+              suggestions.push({
+                priority: 'optimization',
+                action: 'update',
+                targetType: 'warehouse_load',
+                existingTaskIndex: warehouseA.taskIndex,
+                currentBinCount: warehouseA.binsCount,
+                suggestedBinCount: combinedBins,
+                reason: `💡 Update warehouse stop #${warehouseA.taskIndex + 1} from ${warehouseA.binsCount} to ${combinedBins} bins (consolidate with warehouse #${warehouseB.taskIndex + 1})`,
+                affectedTasks: []
+              });
+
+              suggestions.push({
+                priority: 'optimization',
+                action: 'remove',
+                targetType: 'warehouse_load',
+                existingTaskIndex: warehouseB.taskIndex,
+                currentBinCount: warehouseB.binsCount,
+                reason: `💡 Remove warehouse stop #${warehouseB.taskIndex + 1} - consolidated into warehouse #${warehouseA.taskIndex + 1}`,
+                affectedTasks: []
+              });
+            }
+          }
+        }
+      }
+    }
+
     // If no issues, suggest initial load for first placements
     if (suggestions.length === 0) {
       const placements = tasks.filter(t => t.type === 'placement');
