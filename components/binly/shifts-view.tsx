@@ -1294,6 +1294,7 @@ function CreateShiftDrawer({
   const [truckCapacity, setTruckCapacity] = useState('');
   const [tasks, setTasks] = useState<ShiftTask[]>([]);
   const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDriverDropdownOpen, setIsDriverDropdownOpen] = useState(false);
@@ -1338,26 +1339,34 @@ function CreateShiftDrawer({
 
   const selectedDriver = drivers.find(d => d.id === driverId);
 
-  // Drag and drop handlers
+  // Drag and drop handlers - optimized to only recalculate on drop
   const handleDragStart = (index: number) => {
     setDraggedTaskIndex(index);
+    setDragOverIndex(null);
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     if (draggedTaskIndex === null || draggedTaskIndex === index) return;
 
-    const newTasks = [...tasks];
-    const draggedTask = newTasks[draggedTaskIndex];
-    newTasks.splice(draggedTaskIndex, 1);
-    newTasks.splice(index, 0, draggedTask);
-
-    setTasks(newTasks);
-    setDraggedTaskIndex(index);
+    // Only track visual position, don't update tasks array yet
+    // This prevents recalculating capacity flow on every pixel during drag
+    setDragOverIndex(index);
   };
 
   const handleDragEnd = () => {
+    // Only update tasks array on drop (not during drag)
+    // This triggers capacity flow recalculation ONCE instead of ~100 times
+    if (draggedTaskIndex !== null && dragOverIndex !== null && draggedTaskIndex !== dragOverIndex) {
+      const newTasks = [...tasks];
+      const draggedTask = newTasks[draggedTaskIndex];
+      newTasks.splice(draggedTaskIndex, 1);
+      newTasks.splice(dragOverIndex, 0, draggedTask);
+      setTasks(newTasks);
+    }
+
     setDraggedTaskIndex(null);
+    setDragOverIndex(null);
   };
 
   // Task management
@@ -2698,7 +2707,9 @@ function CreateShiftDrawer({
                       onDragEnd={handleDragEnd}
                       className={`flex items-center gap-3 px-4 py-3 border rounded-lg cursor-move hover:shadow-md transition-all ${
                         draggedTaskIndex === index ? 'opacity-50' : ''
-                      } ${task.auto_inserted ? 'bg-blue-50 border-blue-200' : 'bg-white'}`}
+                      } ${dragOverIndex === index && draggedTaskIndex !== index ? 'border-blue-500 border-2 shadow-lg' : ''} ${
+                        task.auto_inserted ? 'bg-blue-50 border-blue-200' : 'bg-white'
+                      }`}
                     >
                       <GripVertical className="w-4 h-4 text-gray-400" />
                       <div className="flex-1">
