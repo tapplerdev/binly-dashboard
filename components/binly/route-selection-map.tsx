@@ -236,10 +236,12 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
     return routes.find(r => r.id === selectedRouteId) || null;
   }, [routes, selectedRouteId]);
 
-  // Get bins for the selected route
+  // Get bins for the selected route - preserve optimized order
   const routeBins = useMemo(() => {
     if (!selectedRoute) return [];
-    return allBins.filter(bin => selectedRoute.bin_ids.includes(bin.id) && bin.latitude && bin.longitude);
+    return selectedRoute.bin_ids
+      .map(binId => allBins.find(bin => bin.id === binId))
+      .filter((bin): bin is Bin => bin !== undefined && bin.latitude != null && bin.longitude != null);
   }, [selectedRoute, allBins]);
 
   // Calculate map center based on selected route bins
