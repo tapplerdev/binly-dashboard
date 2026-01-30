@@ -2290,8 +2290,10 @@ function CreateShiftDrawer({
         } else if (task.type === 'placement') {
           baseTask.potential_location_id = task.potential_location_id;
           baseTask.new_bin_number = task.new_bin_number;
-        } else if (task.type === 'move_request') {
+        } else if (task.type === 'pickup' || task.type === 'dropoff') {
+          // Pickup/dropoff tasks from move requests
           baseTask.move_request_id = task.move_request_id;
+          baseTask.bin_id = task.bin_id; // Needed for pickup coordinate lookup
           baseTask.destination_latitude = task.destination_latitude;
           baseTask.destination_longitude = task.destination_longitude;
           baseTask.destination_address = task.destination_address;
