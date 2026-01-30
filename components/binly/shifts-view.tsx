@@ -1552,7 +1552,7 @@ function CreateShiftDrawer({
     const moveRequestTasks: ShiftTask[] = [];
 
     selectedRequests.forEach(request => {
-      // 1. Pickup task at current location
+      // 1. Pickup task at current location (type must match backend constraint)
       const pickupTask: ShiftTask = {
         id: `temp-${Date.now()}-${request.id}-pickup`,
         type: 'pickup',
