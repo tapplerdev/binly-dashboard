@@ -175,6 +175,22 @@ export async function getShiftDetails(driverId: string): Promise<BackendShiftDet
 }
 
 /**
+ * Gets a specific shift by its ID (includes all tasks)
+ */
+export async function getShiftById(shiftId: string): Promise<BackendShiftDetails> {
+  const response = await fetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch shift: ${response.statusText}`);
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
+/**
  * Assigns a route to a driver, creating a new shift
  */
 export async function assignRoute(data: {

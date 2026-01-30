@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shift';
-import { getShiftDetails, cancelShift } from '@/lib/api/shifts';
+import { getShiftById, cancelShift } from '@/lib/api/shifts';
 
 interface ShiftBin {
   id: number;
@@ -38,7 +38,7 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
     async function loadShiftDetails() {
       try {
         setLoading(true);
-        const details = await getShiftDetails(shift.driverId); // Use driverId, not shift ID
+        const details = await getShiftById(shift.id); // Fetch specific shift by ID
         setBins(details.bins || []);
       } catch (error) {
         console.error('Failed to load shift details:', error);
@@ -47,7 +47,7 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
       }
     }
     loadShiftDetails();
-  }, [shift.driverId]);
+  }, [shift.id]);
 
   const handleClose = () => {
     setIsClosing(true);
