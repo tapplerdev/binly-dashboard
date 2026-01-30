@@ -654,6 +654,12 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
         return;
       }
 
+      // Check Mapbox API 12-bin limit
+      if (selectedBins.length > 12) {
+        alert('Cannot optimize more than 12 bins.\n\nMapbox Optimization API has a 12 waypoint limit on the free tier. Please select 12 or fewer bins to use route optimization.');
+        return;
+      }
+
       console.log('🎯 OPTIMIZE ROUTE - START');
       console.log('📦 Current bin order (BEFORE optimization):', selectedBins.map((b, i) => `${i+1}. Bin #${b.bin_number} (ID: ${b.id})`));
       console.log('📍 Current formData.bin_ids:', formData.bin_ids);
@@ -676,6 +682,13 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
         if (!response.ok) {
           const errorText = await response.text();
           console.error('❌ API Error Response:', errorText);
+
+          // Show user-friendly error for 12-bin limit
+          if (errorText.includes('12 bins')) {
+            alert('Cannot optimize more than 12 bins.\n\nMapbox Optimization API has a 12 waypoint limit. Please select 12 or fewer bins.');
+            throw new Error('Too many bins for optimization');
+          }
+
           throw new Error('Failed to optimize route');
         }
 
