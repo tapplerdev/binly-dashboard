@@ -35,13 +35,16 @@ export function RouteDetailsDrawer({ route, onClose, onEdit, onDelete, onDuplica
     }, 300);
   };
 
-  // Load bin details
+  // Load bin details - preserve route order
   useEffect(() => {
     async function loadBinDetails() {
       try {
         setLoadingBins(true);
         const allBins = await getBins();
-        const bins = allBins.filter(bin => route.bin_ids.includes(bin.id));
+        // Map over route.bin_ids to preserve optimized order
+        const bins = route.bin_ids
+          .map(binId => allBins.find(bin => bin.id === binId))
+          .filter((bin): bin is Bin => bin !== undefined);
         setRouteBins(bins);
       } catch (error) {
         console.error('Failed to load bin details:', error);
