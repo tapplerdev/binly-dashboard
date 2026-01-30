@@ -1035,7 +1035,7 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
                     </div>
                   ) : (
                     <div className="divide-y divide-gray-100">
-                      {filteredBins.slice(0, 50).map(bin => {
+                      {filteredBins.map(bin => {
                         const isSelected = selectedBins.find(b => b.id === bin.id);
                         return (
                           <div
