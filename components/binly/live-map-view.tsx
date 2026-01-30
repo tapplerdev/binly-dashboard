@@ -274,6 +274,27 @@ export function LiveMapView() {
     }
   }, [bins]);
 
+  // Check URL params for lat/lng/zoom (from potential location "View on Live Map")
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const lat = urlParams.get('lat');
+    const lng = urlParams.get('lng');
+    const zoom = urlParams.get('zoom');
+
+    if (lat && lng) {
+      const latitude = parseFloat(lat);
+      const longitude = parseFloat(lng);
+      const zoomLevel = zoom ? parseInt(zoom) : 16;
+
+      if (!isNaN(latitude) && !isNaN(longitude)) {
+        console.log('🗺️ [LIVE MAP] Zooming to location from URL:', { lat: latitude, lng: longitude, zoom: zoomLevel });
+        setTargetLocation({ lat: latitude, lng: longitude, zoom: zoomLevel });
+        // Clean up URL
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
+  }, []); // Run once on mount
+
   // Combined loading and error states
   const loading = loadingBins || loadingZones || loadingLocations;
   const error = binsError?.message || zonesError?.message || locationsError?.message || null;
