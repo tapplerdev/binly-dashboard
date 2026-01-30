@@ -41,7 +41,7 @@ function RoutePolyline({ route, routeBins }: { route: Route; routeBins: Bin[] })
 
     async function drawRoute() {
       try {
-        // Build route: bins -> warehouse (one-way)
+        // Build route: warehouse -> bins -> warehouse (round trip)
         const binCoordinates = routeBins
           .filter(bin => bin.latitude && bin.longitude)
           .map(bin => `${bin.longitude},${bin.latitude}`);
@@ -49,7 +49,7 @@ function RoutePolyline({ route, routeBins }: { route: Route; routeBins: Bin[] })
         if (binCoordinates.length < 2) return;
 
         const warehouseCoordinate = `${WAREHOUSE_LOCATION.lng},${WAREHOUSE_LOCATION.lat}`;
-        const coordinates = [...binCoordinates, warehouseCoordinate].join(';');
+        const coordinates = [warehouseCoordinate, ...binCoordinates, warehouseCoordinate].join(';');
 
         // Mapbox Directions API endpoint
         const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?geometries=geojson&overview=full&access_token=pk.eyJ1IjoiYmlubHl5YWkiLCJhIjoiY21pNzN4bzlhMDVheTJpcHdqd2FtYjhpeSJ9.sQM8WHE2C9zWH0xG107xhw`;

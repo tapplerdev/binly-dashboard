@@ -190,10 +190,10 @@ function AllRoutesPolylines({ routes, visibleRouteIds, allBins, onRouteSelect, o
         if (routeBins.length < 2) continue; // Need at least 2 bins to draw a route
 
         try {
-          // Build route: bins -> warehouse (one-way)
+          // Build route: warehouse -> bins -> warehouse (round trip)
           const binCoordinates = routeBins.map(bin => `${bin.longitude},${bin.latitude}`);
           const warehouseCoordinate = `${WAREHOUSE_LOCATION.lng},${WAREHOUSE_LOCATION.lat}`;
-          const coordinates = [...binCoordinates, warehouseCoordinate].join(';');
+          const coordinates = [warehouseCoordinate, ...binCoordinates, warehouseCoordinate].join(';');
 
           // Mapbox Directions API endpoint
           const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?geometries=geojson&overview=full&access_token=pk.eyJ1IjoiYmlubHl5YWkiLCJhIjoiY21pNzN4bzlhMDVheTJpcHdqd2FtYjhpeSJ9.sQM8WHE2C9zWH0xG107xhw`;
