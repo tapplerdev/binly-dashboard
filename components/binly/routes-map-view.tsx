@@ -13,9 +13,9 @@ const DEFAULT_ZOOM = 11;
 
 // Warehouse location - all routes start and end here
 const WAREHOUSE_LOCATION = {
-  lat: 37.3009357,
-  lng: -121.9493848,
-  address: '1185 Campbell Ave, San Jose, CA 95126, United States'
+  lat: 11.1867045,
+  lng: -74.2362302,
+  address: 'Cl. 29 #1-65, Gaira, Santa Marta, Magdalena'
 };
 
 // Format duration: show minutes if < 1 hour, otherwise show hours

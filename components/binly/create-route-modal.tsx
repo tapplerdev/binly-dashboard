@@ -29,9 +29,9 @@ const DAYS_OF_WEEK = [
 
 // Warehouse location - all routes end here
 const WAREHOUSE_LOCATION = {
-  lat: 37.3009357,
-  lng: -121.9493848,
-  address: '1185 Campbell Ave, San Jose, CA 95126, United States'
+  lat: 11.1867045,
+  lng: -74.2362302,
+  address: 'Cl. 29 #1-65, Gaira, Santa Marta, Magdalena'
 };
 
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
