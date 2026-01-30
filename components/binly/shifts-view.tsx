@@ -1259,7 +1259,7 @@ function DailyGantt({
 // Task type for shift builder
 interface ShiftTask {
   id: string;
-  type: 'collection' | 'placement' | 'move_request' | 'warehouse_stop';
+  type: 'collection' | 'placement' | 'pickup' | 'dropoff' | 'warehouse_stop';
   // Collection fields
   bin_id?: string;
   bin_number?: string;
@@ -1555,7 +1555,7 @@ function CreateShiftDrawer({
       // 1. Pickup task at current location
       const pickupTask: ShiftTask = {
         id: `temp-${Date.now()}-${request.id}-pickup`,
-        type: 'move_request',
+        type: 'pickup',
         move_request_id: request.id,
         bin_id: request.bin_id,
         bin_number: request.bin_number.toString(),
@@ -1573,7 +1573,7 @@ function CreateShiftDrawer({
       // 2. Dropoff task at destination
       const dropoffTask: ShiftTask = {
         id: `temp-${Date.now()}-${request.id}-dropoff`,
-        type: 'move_request',
+        type: 'dropoff',
         move_request_id: request.id,
         bin_id: request.bin_id,
         bin_number: request.bin_number.toString(),
