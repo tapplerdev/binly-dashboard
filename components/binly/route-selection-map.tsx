@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { Route } from '@/lib/types/route';
 import { Bin } from '@/lib/types/bin';
 import { getRoutes } from '@/lib/api/routes';
@@ -13,9 +13,192 @@ import { Button } from '@/components/ui/button';
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 11;
 
+// Warehouse location - routes start and end here
+const WAREHOUSE_LOCATION = {
+  lat: 11.1867045,
+  lng: -74.2362302,
+  address: 'Cl. 29 #1-65, Gaira, Santa Marta, Magdalena'
+};
+
+// Route color
+const ROUTE_COLOR = '#4880FF';
+
 interface RouteSelectionMapProps {
   onClose: () => void;
   onConfirm: (selectedRoute: Route, routeBins: Bin[]) => void;
+}
+
+// Route Polyline Component - Renders animated polyline for selected route
+function RoutePolyline({ route, routeBins }: { route: Route; routeBins: Bin[] }) {
+  const map = useMap();
+  const polylineRef = useRef<google.maps.Polyline | null>(null);
+  const glowPolylineRef = useRef<google.maps.Polyline | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
+  // Fetch and draw polyline
+  useEffect(() => {
+    if (!map || routeBins.length < 2) return;
+
+    async function drawRoute() {
+      try {
+        // Build route: warehouse -> bins -> warehouse (round trip)
+        const binCoordinates = routeBins
+          .filter(bin => bin.latitude && bin.longitude)
+          .map(bin => `${bin.longitude},${bin.latitude}`);
+
+        if (binCoordinates.length < 2) return;
+
+        const warehouseCoordinate = `${WAREHOUSE_LOCATION.lng},${WAREHOUSE_LOCATION.lat}`;
+        const coordinates = [warehouseCoordinate, ...binCoordinates, warehouseCoordinate].join(';');
+
+        // Mapbox Directions API endpoint
+        const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?geometries=geojson&overview=full&access_token=pk.eyJ1IjoiYmlubHl5YWkiLCJhIjoiY21pNzN4bzlhMDVheTJpcHdqd2FtYjhpeSJ9.sQM8WHE2C9zWH0xG107xhw`;
+
+        const response = await fetch(mapboxUrl);
+        const data = await response.json();
+
+        if (data.routes && data.routes[0]) {
+          // Convert Mapbox GeoJSON coordinates to Google Maps LatLng
+          const path = data.routes[0].geometry.coordinates.map((coord: number[]) => ({
+            lat: coord[1],
+            lng: coord[0],
+          }));
+
+          // Create glow polyline (thicker, semi-transparent layer underneath)
+          const glowLine = new google.maps.Polyline({
+            path: path,
+            geodesic: false,
+            strokeColor: ROUTE_COLOR,
+            strokeOpacity: 0.3,
+            strokeWeight: 12,
+            map: map,
+            clickable: false,
+            zIndex: 999,
+          });
+
+          // Create main polyline
+          const line = new google.maps.Polyline({
+            path: path,
+            geodesic: false,
+            strokeColor: ROUTE_COLOR,
+            strokeOpacity: 1,
+            strokeWeight: 6,
+            map: map,
+            clickable: false,
+            zIndex: 1000,
+          });
+
+          polylineRef.current = line;
+          glowPolylineRef.current = glowLine;
+
+          // Fit map bounds to show entire route
+          const bounds = new google.maps.LatLngBounds();
+          path.forEach((point) => bounds.extend(point));
+          map.fitBounds(bounds, { top: 100, right: 100, bottom: 100, left: 100 });
+        }
+      } catch (error) {
+        console.error('Error fetching route polyline:', error);
+      }
+    }
+
+    drawRoute();
+
+    return () => {
+      if (polylineRef.current) polylineRef.current.setMap(null);
+      if (glowPolylineRef.current) glowPolylineRef.current.setMap(null);
+    };
+  }, [map, route, routeBins]);
+
+  // Pulsing animation
+  useEffect(() => {
+    let opacity = 1;
+    let opacityDirection = -0.008;
+    let strokeWeight = 6;
+    let weightDirection = -0.05;
+    let glowOpacity = 0.3;
+    let glowOpacityDirection = -0.006;
+
+    const animate = () => {
+      // Pulsing values
+      opacity += opacityDirection;
+      if (opacity <= 0.85 || opacity >= 1) opacityDirection *= -1;
+
+      strokeWeight += weightDirection;
+      if (strokeWeight <= 5 || strokeWeight >= 7) weightDirection *= -1;
+
+      glowOpacity += glowOpacityDirection;
+      if (glowOpacity <= 0.15 || glowOpacity >= 0.4) glowOpacityDirection *= -1;
+
+      // Apply to polylines
+      if (polylineRef.current) {
+        polylineRef.current.setOptions({
+          strokeOpacity: opacity,
+          strokeWeight: strokeWeight,
+        });
+      }
+
+      if (glowPolylineRef.current) {
+        glowPolylineRef.current.setOptions({
+          strokeOpacity: glowOpacity,
+          strokeWeight: 14 + (strokeWeight - 5) * 2,
+        });
+      }
+
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
+
+  return null;
+}
+
+// Pulsing Marker Component
+function PulsingMarker({ bin, index, total }: { bin: Bin; index: number; total: number }) {
+  const isFirst = index === 0;
+  const isLast = index === total - 1;
+
+  return (
+    <AdvancedMarker
+      key={bin.id}
+      position={{ lat: bin.latitude, lng: bin.longitude }}
+      zIndex={10}
+    >
+      <div className="relative">
+        {/* Pulsing ring animation */}
+        <div className="absolute inset-0 -m-2">
+          <div className="w-12 h-12 rounded-full bg-primary opacity-30 animate-ping" />
+        </div>
+
+        {/* Bin number marker */}
+        <div
+          className={`relative w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg ${
+            isFirst ? 'bg-green-600 ring-4 ring-green-200' :
+            isLast ? 'bg-red-600 ring-4 ring-red-200' :
+            'bg-primary ring-2 ring-white'
+          }`}
+          title={`Bin #${bin.bin_number}`}
+        >
+          {bin.bin_number}
+        </div>
+
+        {/* Label for first/last */}
+        {(isFirst || isLast) && (
+          <div className={`absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs font-semibold px-2 py-0.5 rounded ${
+            isFirst ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'
+          }`}>
+            {isFirst ? 'START' : 'END'}
+          </div>
+        )}
+      </div>
+    </AdvancedMarker>
+  );
 }
 
 export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps) {
@@ -56,7 +239,7 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
   // Get bins for the selected route
   const routeBins = useMemo(() => {
     if (!selectedRoute) return [];
-    return allBins.filter(bin => selectedRoute.bin_ids.includes(bin.id));
+    return allBins.filter(bin => selectedRoute.bin_ids.includes(bin.id) && bin.latitude && bin.longitude);
   }, [selectedRoute, allBins]);
 
   // Calculate map center based on selected route bins
@@ -140,21 +323,39 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
                 gestureHandling="greedy"
                 className="w-full h-full"
               >
-                {/* Bin Markers */}
-                {routeBins.map((bin) => {
-                  if (!bin.latitude || !bin.longitude) return null;
+                {/* Route Polyline with pulsing animation */}
+                {selectedRoute && routeBins.length >= 2 && (
+                  <RoutePolyline route={selectedRoute} routeBins={routeBins} />
+                )}
 
-                  return (
-                    <AdvancedMarker
-                      key={bin.id}
-                      position={{ lat: bin.latitude, lng: bin.longitude }}
-                    >
-                      <div className="bg-primary text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold shadow-lg border-2 border-white">
-                        {bin.bin_number}
+                {/* Pulsing Bin Markers */}
+                {routeBins.map((bin, index) => (
+                  <PulsingMarker
+                    key={bin.id}
+                    bin={bin}
+                    index={index}
+                    total={routeBins.length}
+                  />
+                ))}
+
+                {/* Warehouse Marker */}
+                {selectedRoute && (
+                  <AdvancedMarker
+                    position={{ lat: WAREHOUSE_LOCATION.lat, lng: WAREHOUSE_LOCATION.lng }}
+                    zIndex={5}
+                  >
+                    <div className="relative">
+                      <div className="w-10 h-10 rounded-lg bg-amber-500 flex items-center justify-center shadow-lg ring-4 ring-amber-200">
+                        <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                        </svg>
                       </div>
-                    </AdvancedMarker>
-                  );
-                })}
+                      <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
+                        WAREHOUSE
+                      </div>
+                    </div>
+                  </AdvancedMarker>
+                )}
               </Map>
             </APIProvider>
 
