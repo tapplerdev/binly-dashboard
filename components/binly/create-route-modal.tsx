@@ -169,10 +169,10 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
 
     async function fetchRoute() {
       try {
-        // Build route: warehouse -> bins -> warehouse (round trip)
+        // Build route: bins -> warehouse (one-way)
         const binCoordinates = bins.map(bin => `${bin.longitude},${bin.latitude}`);
         const warehouseCoordinate = `${WAREHOUSE_LOCATION.lng},${WAREHOUSE_LOCATION.lat}`;
-        const coordinates = [warehouseCoordinate, ...binCoordinates, warehouseCoordinate].join(';');
+        const coordinates = [...binCoordinates, warehouseCoordinate].join(';');
         const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?geometries=geojson&overview=full&access_token=pk.eyJ1IjoiYmlubHl5YWkiLCJhIjoiY21pNzN4bzlhMDVheTJpcHdqd2FtYjhpeSJ9.sQM8WHE2C9zWH0xG107xhw`;
 
         const response = await fetch(mapboxUrl);
