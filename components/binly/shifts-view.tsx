@@ -1378,9 +1378,9 @@ function CreateShiftDrawer({
       type: 'warehouse_stop',
       warehouse_action: 'load',
       bins_to_load: 1,
-      latitude: 38.5816, // Binly Central Warehouse coordinates
-      longitude: -121.4944,
-      address: 'Binly Central Warehouse - 1500 Industrial Pkwy, Sacramento, CA 95691',
+      latitude: 11.1867045, // Ropacal Warehouse - Santa Marta, Colombia
+      longitude: -74.2362302,
+      address: 'Cl. 29 #1-65, Gaira, Santa Marta, Magdalena',
     };
     setTasks([...tasks, newTask]);
   };
@@ -1623,9 +1623,9 @@ function CreateShiftDrawer({
         type: 'warehouse_stop',
         warehouse_action: suggestion.targetType === 'warehouse_load' ? 'load' : 'unload',
         bins_to_load: suggestion.targetType === 'warehouse_load' ? suggestion.binsCount : undefined,
-        latitude: 38.5816, // Binly Central Warehouse
-        longitude: -121.4944,
-        address: 'Binly Central Warehouse - 1500 Industrial Pkwy, Sacramento, CA 95691',
+        latitude: 11.1867045, // Ropacal Warehouse - Santa Marta, Colombia
+        longitude: -74.2362302,
+        address: 'Cl. 29 #1-65, Gaira, Santa Marta, Magdalena',
       };
       newTasks.splice((suggestion.insertAfterIndex ?? -1) + 1, 0, newWarehouseTask);
     } else if (suggestion.action === 'update' && suggestion.existingTaskIndex !== undefined) {
@@ -1669,9 +1669,9 @@ function CreateShiftDrawer({
           type: 'warehouse_stop',
           warehouse_action: 'unload',
           auto_inserted: true,
-          latitude: 38.5816, // Binly Central Warehouse coordinates
-          longitude: -121.4944,
-          address: 'Binly Central Warehouse - 1500 Industrial Pkwy, Sacramento, CA 95691',
+          latitude: 11.1867045, // Ropacal Warehouse - Santa Marta, Colombia
+          longitude: -74.2362302,
+          address: 'Cl. 29 #1-65, Gaira, Santa Marta, Magdalena',
         });
         currentLoad = 0; // Reset after unloading
       }
@@ -2309,9 +2309,9 @@ function CreateShiftDrawer({
       const payload = {
         driver_id: driverId,
         truck_bin_capacity: parseInt(truckCapacity),
-        warehouse_latitude: 38.5816, // Binly Central Warehouse coordinates
-        warehouse_longitude: -121.4944,
-        warehouse_address: 'Binly Central Warehouse - 1500 Industrial Pkwy, Sacramento, CA 95691',
+        warehouse_latitude: 11.1867045, // Ropacal Warehouse - Santa Marta, Colombia
+        warehouse_longitude: -74.2362302,
+        warehouse_address: 'Cl. 29 #1-65, Gaira, Santa Marta, Magdalena',
         tasks: tasksPayload,
       };
 
