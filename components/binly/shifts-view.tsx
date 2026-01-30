@@ -2323,7 +2323,9 @@ function CreateShiftDrawer({
       });
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-      const response = await fetch('/api/manager/shifts/create-with-tasks', {
+      // Call backend directly (not through Next.js API route)
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      const response = await fetch(`${API_URL}/api/manager/shifts/create-with-tasks`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
