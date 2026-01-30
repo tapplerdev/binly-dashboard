@@ -1,8 +1,10 @@
 'use client';
 
-import { X, MapPin, User, Calendar, FileText, Check, Trash2, Map } from 'lucide-react';
+import { X, MapPin, User, Calendar, FileText, Check, Trash2, Map, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { APIProvider, Map as GoogleMap, AdvancedMarker } from '@vis.gl/react-google-maps';
+import { useRouter } from 'next/navigation';
 
 interface PotentialLocation {
   id: string;
@@ -35,6 +37,8 @@ export function PotentialLocationDetailsDrawer({
   onConvert,
   onDelete,
 }: PotentialLocationDetailsDrawerProps) {
+  const router = useRouter();
+
   const formatDate = (isoDate: string) => {
     return new Date(isoDate).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -43,6 +47,11 @@ export function PotentialLocationDetailsDrawer({
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const handleViewOnMap = () => {
+    // Navigate to live map and center on this location
+    router.push(`/operations/live-map?lat=${location.latitude}&lng=${location.longitude}&zoom=16`);
   };
 
   const isConverted = !!location.converted_at_iso;
@@ -113,6 +122,37 @@ export function PotentialLocationDetailsDrawer({
               </div>
             )}
           </div>
+
+          {/* Map Section */}
+          {location.latitude && location.longitude && (
+            <div className="border-b border-gray-200">
+              <div className="relative h-[240px] w-full">
+                <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
+                  <GoogleMap
+                    defaultCenter={{ lat: location.latitude, lng: location.longitude }}
+                    defaultZoom={15}
+                    mapId="potential-location-map"
+                    disableDefaultUI={true}
+                    gestureHandling="greedy"
+                    className="w-full h-full"
+                  >
+                    <AdvancedMarker
+                      position={{ lat: location.latitude, lng: location.longitude }}
+                    />
+                  </GoogleMap>
+                </APIProvider>
+
+                {/* View on Live Map Button */}
+                <button
+                  onClick={handleViewOnMap}
+                  className="absolute bottom-4 right-4 bg-white hover:bg-gray-50 px-3 py-2 rounded-lg shadow-md flex items-center gap-2 text-sm font-medium text-gray-700 transition-colors border border-gray-200"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  View on Live Map
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Requested By Section */}
           <div className="p-4 md:p-6 border-b border-gray-200">
@@ -194,22 +234,24 @@ export function PotentialLocationDetailsDrawer({
 
         {/* Footer Actions */}
         {!isConverted && (
-          <div className="p-4 md:p-6 border-t border-gray-200 bg-gray-50 space-y-3 shrink-0">
-            <Button
-              onClick={onConvert}
-              className="w-full gap-2 h-11"
-            >
-              <Check className="w-4 h-4" />
-              Convert to Bin
-            </Button>
-            <Button
-              onClick={onDelete}
-              variant="destructive"
-              className="w-full gap-2 h-11"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete Location
-            </Button>
+          <div className="p-4 md:p-6 border-t border-gray-200 bg-gray-50 shrink-0">
+            <div className="flex gap-3">
+              <Button
+                onClick={onConvert}
+                className="flex-1 gap-2 h-11"
+              >
+                <Check className="w-4 h-4" />
+                Convert to Bin
+              </Button>
+              <Button
+                onClick={onDelete}
+                variant="destructive"
+                className="flex-1 gap-2 h-11"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </Button>
+            </div>
           </div>
         )}
       </div>
