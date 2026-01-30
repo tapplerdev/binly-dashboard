@@ -2742,12 +2742,11 @@ function CreateShiftDrawer({
                           {task.type === 'warehouse_stop' && <Warehouse className="w-4 h-4 text-blue-600" />}
                           {task.type === 'collection' && <Package className="w-4 h-4 text-green-600" />}
                           {task.type === 'placement' && <MapPinned className="w-4 h-4 text-purple-600" />}
-                          {task.type === 'move_request' && task.move_type === 'pickup' && <ArrowUp className="w-4 h-4 text-orange-600" />}
-                          {task.type === 'move_request' && task.move_type === 'dropoff' && <ArrowDown className="w-4 h-4 text-orange-600" />}
-                          {task.type === 'move_request' && !task.move_type && <MoveRight className="w-4 h-4 text-orange-600" />}
+                          {task.type === 'pickup' && <ArrowUp className="w-4 h-4 text-orange-600" />}
+                          {task.type === 'dropoff' && <ArrowDown className="w-4 h-4 text-orange-600" />}
                           <span className="text-sm font-medium capitalize">
-                            {task.type === 'move_request' && task.move_type
-                              ? `${task.move_type} (Move Request)`
+                            {(task.type === 'pickup' || task.type === 'dropoff') && task.move_request_id
+                              ? `${task.type} (Move Request)`
                               : task.type.replace('_', ' ')}
                           </span>
                           {task.auto_inserted && (
@@ -2773,21 +2772,15 @@ function CreateShiftDrawer({
                         )}
 
                         {/* Move Request metadata */}
-                        {task.type === 'move_request' && (
+                        {(task.type === 'pickup' || task.type === 'dropoff') && task.move_request_id && (
                           <p className="text-xs text-gray-500 mt-1">
-                            {task.move_type === 'pickup' ? (
+                            {task.type === 'pickup' ? (
                               <>
                                 <span className="font-medium">Pick up Bin #{task.bin_number}</span> from {task.address}
                               </>
-                            ) : task.move_type === 'dropoff' ? (
-                              <>
-                                <span className="font-medium">Drop off Bin #{task.bin_number}</span> at {task.destination_address}
-                              </>
                             ) : (
                               <>
-                                <span className="font-medium">Bin #{task.bin_number}</span> from {task.address}
-                                <br />
-                                → To: {task.destination_address}
+                                <span className="font-medium">Drop off Bin #{task.bin_number}</span> at {task.destination_address}
                               </>
                             )}
                           </p>
