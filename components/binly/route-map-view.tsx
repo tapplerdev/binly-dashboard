@@ -141,12 +141,12 @@ export function RouteMapView({ route }: RouteMapViewProps) {
         console.log('First 5 bins with coords:', allBins.slice(0, 5).map(b => ({ id: b.id, lat: b.latitude, lng: b.longitude })));
         console.log('Route bin IDs we are looking for:', route.bin_ids);
 
-        // Filter to only bins in this route
-        const routeBins = allBins.filter(bin =>
-          route.bin_ids.includes(bin.id) && isMappableBin(bin)
-        );
+        // Map over route.bin_ids to preserve the optimized order
+        const routeBins = route.bin_ids
+          .map(binId => allBins.find(bin => bin.id === binId))
+          .filter((bin): bin is Bin => bin !== undefined && isMappableBin(bin));
 
-        console.log('Filtered mappable bins for route:', routeBins.length, routeBins);
+        console.log('Filtered mappable bins for route (in optimized order):', routeBins.length, routeBins);
 
         // Also check bins that match ID but don't have coordinates
         const matchingBinsNoCoords = allBins.filter(bin =>

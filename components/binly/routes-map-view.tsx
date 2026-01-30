@@ -54,7 +54,9 @@ function ZoomToRoute({ route, allBins }: { route: Route; allBins: Bin[] }) {
   useEffect(() => {
     if (!map || !route) return;
 
-    const routeBins = allBins.filter(bin => route.bin_ids.includes(bin.id) && isMappableBin(bin));
+    const routeBins = route.bin_ids
+      .map(binId => allBins.find(bin => bin.id === binId))
+      .filter((bin): bin is Bin => bin !== undefined && isMappableBin(bin));
 
     if (routeBins.length > 0) {
       const bounds = new google.maps.LatLngBounds();
@@ -181,7 +183,9 @@ function AllRoutesPolylines({ routes, visibleRouteIds, allBins, onRouteSelect, o
         // Mark as fetching
         fetchingRoutes.current.add(route.id);
 
-        const routeBins = allBins.filter(bin => route.bin_ids.includes(bin.id) && isMappableBin(bin));
+        const routeBins = route.bin_ids
+          .map(binId => allBins.find(bin => bin.id === binId))
+          .filter((bin): bin is Bin => bin !== undefined && isMappableBin(bin));
 
         if (routeBins.length < 2) continue; // Need at least 2 bins to draw a route
 
@@ -439,7 +443,9 @@ export function RoutesMapView({ routes, visibleRouteIds, onRouteSelect, onViewDe
 
         {/* Bin Markers - Show numbered markers with START/END labels for all visible routes */}
         {routes.filter(r => visibleRouteIds.has(r.id)).map((route) => {
-          const routeBins = allBins.filter(bin => route.bin_ids.includes(bin.id) && isMappableBin(bin));
+          const routeBins = route.bin_ids
+            .map(binId => allBins.find(bin => bin.id === binId))
+            .filter((bin): bin is Bin => bin !== undefined && isMappableBin(bin));
           const routeIndex = routes.findIndex(r => r.id === route.id);
           const routeColor = ROUTE_COLORS[routeIndex % ROUTE_COLORS.length];
           const isSelectedRoute = selectedRouteId === route.id;
