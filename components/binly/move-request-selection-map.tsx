@@ -19,25 +19,48 @@ function MapController({
   targetLocation,
   onComplete,
 }: {
-  targetLocation: { lat: number; lng: number } | null;
+  targetLocation: { lat: number; lng: number; timestamp: number } | null;
   onComplete: () => void;
 }) {
   const map = useMap();
 
   useEffect(() => {
-    if (!map || !targetLocation) return;
+    console.log('🗺️ [MOVE REQUEST MAP CONTROLLER] useEffect triggered', {
+      hasMap: !!map,
+      targetLocation: targetLocation,
+      timestamp: targetLocation?.timestamp,
+    });
+
+    if (!map) {
+      console.log('❌ [MOVE REQUEST MAP CONTROLLER] No map available');
+      return;
+    }
+
+    if (!targetLocation) {
+      console.log('❌ [MOVE REQUEST MAP CONTROLLER] No target location');
+      return;
+    }
+
+    console.log('✅ [MOVE REQUEST MAP CONTROLLER] Calling panTo:', {
+      lat: targetLocation.lat,
+      lng: targetLocation.lng,
+      timestamp: targetLocation.timestamp,
+    });
 
     // Pan and zoom to the target location
-    map.panTo(targetLocation);
+    map.panTo({ lat: targetLocation.lat, lng: targetLocation.lng });
     map.setZoom(16);
+
+    console.log('✅ [MOVE REQUEST MAP CONTROLLER] panTo and setZoom called');
 
     // Clear target after animation
     const timeout = setTimeout(() => {
+      console.log('✅ [MOVE REQUEST MAP CONTROLLER] Animation complete, calling onComplete');
       onComplete();
     }, 500);
 
     return () => clearTimeout(timeout);
-  }, [map, targetLocation?.lat, targetLocation?.lng, onComplete]);
+  }, [map, targetLocation, onComplete]);
 
   return null;
 }
@@ -119,7 +142,7 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
   const [searchQuery, setSearchQuery] = useState('');
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>('all');
   const [loading, setLoading] = useState(true);
-  const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number; timestamp: number } | null>(null);
 
   // Load bins from API to get coordinates
   useEffect(() => {
@@ -149,17 +172,34 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
 
   // Toggle request selection and pan to location
   const toggleRequestSelection = (requestId: string, request: MappableMoveRequest) => {
+    console.log('🎯 [MOVE REQUEST] toggleRequestSelection called', {
+      requestId,
+      binNumber: request.bin_number,
+      lat: request.latitude,
+      lng: request.longitude,
+    });
+
     const newSelection = new Set(selectedRequestIds);
     if (newSelection.has(requestId)) {
+      console.log('➖ [MOVE REQUEST] Deselecting request');
       newSelection.delete(requestId);
     } else {
+      console.log('➕ [MOVE REQUEST] Selecting request');
       newSelection.add(requestId);
     }
     setSelectedRequestIds(newSelection);
 
     // Always pan to the location when clicked (even if deselecting)
     if (request.latitude && request.longitude) {
-      setTargetLocation({ lat: request.latitude, lng: request.longitude });
+      const timestamp = Date.now();
+      const newTarget = { lat: request.latitude, lng: request.longitude, timestamp };
+
+      console.log('📍 [MOVE REQUEST] Setting target location:', newTarget);
+
+      // Use timestamp to force re-render even if coordinates are the same
+      setTargetLocation(newTarget);
+    } else {
+      console.log('⚠️ [MOVE REQUEST] Request has no coordinates!');
     }
   };
 

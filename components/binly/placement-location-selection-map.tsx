@@ -17,25 +17,48 @@ function MapController({
   targetLocation,
   onComplete,
 }: {
-  targetLocation: { lat: number; lng: number } | null;
+  targetLocation: { lat: number; lng: number; timestamp: number } | null;
   onComplete: () => void;
 }) {
   const map = useMap();
 
   useEffect(() => {
-    if (!map || !targetLocation) return;
+    console.log('🗺️ [PLACEMENT MAP CONTROLLER] useEffect triggered', {
+      hasMap: !!map,
+      targetLocation: targetLocation,
+      timestamp: targetLocation?.timestamp,
+    });
+
+    if (!map) {
+      console.log('❌ [PLACEMENT MAP CONTROLLER] No map available');
+      return;
+    }
+
+    if (!targetLocation) {
+      console.log('❌ [PLACEMENT MAP CONTROLLER] No target location');
+      return;
+    }
+
+    console.log('✅ [PLACEMENT MAP CONTROLLER] Calling panTo:', {
+      lat: targetLocation.lat,
+      lng: targetLocation.lng,
+      timestamp: targetLocation.timestamp,
+    });
 
     // Pan and zoom to the target location
-    map.panTo(targetLocation);
+    map.panTo({ lat: targetLocation.lat, lng: targetLocation.lng });
     map.setZoom(16);
+
+    console.log('✅ [PLACEMENT MAP CONTROLLER] panTo and setZoom called');
 
     // Clear target after animation
     const timeout = setTimeout(() => {
+      console.log('✅ [PLACEMENT MAP CONTROLLER] Animation complete, calling onComplete');
       onComplete();
     }, 500);
 
     return () => clearTimeout(timeout);
-  }, [map, targetLocation?.lat, targetLocation?.lng, onComplete]);
+  }, [map, targetLocation, onComplete]);
 
   return null;
 }
@@ -62,22 +85,38 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
   const [selectedLocationIds, setSelectedLocationIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
-  const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number; timestamp: number } | null>(null);
 
   // Toggle location selection and pan to location
   const toggleLocationSelection = (locationId: string, location: PotentialLocation) => {
+    console.log('🎯 [PLACEMENT] toggleLocationSelection called', {
+      locationId,
+      address: location.address,
+      lat: location.latitude,
+      lng: location.longitude,
+    });
+
     const newSelection = new Set(selectedLocationIds);
     if (newSelection.has(locationId)) {
+      console.log('➖ [PLACEMENT] Deselecting location');
       newSelection.delete(locationId);
     } else {
+      console.log('➕ [PLACEMENT] Selecting location');
       newSelection.add(locationId);
     }
     setSelectedLocationIds(newSelection);
 
     // Always pan to the location when clicked (even if deselecting)
     if (location.latitude && location.longitude) {
+      const timestamp = Date.now();
+      const newTarget = { lat: location.latitude, lng: location.longitude, timestamp };
+
+      console.log('📍 [PLACEMENT] Setting target location:', newTarget);
+
       // Use timestamp to force re-render even if coordinates are the same
-      setTargetLocation({ lat: location.latitude, lng: location.longitude });
+      setTargetLocation(newTarget);
+    } else {
+      console.log('⚠️ [PLACEMENT] Location has no coordinates!');
     }
   };
 
