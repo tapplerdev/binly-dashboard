@@ -1570,6 +1570,16 @@ function CreateShiftDrawer({
         address: `${request.current_street}, ${request.city} ${request.zip}`,
       };
 
+      console.log('🔍 [PICKUP TASK DEBUG]', {
+        type: pickupTask.type,
+        task_type: pickupTask.type,
+        move_type: pickupTask.move_type,
+        bin_id: pickupTask.bin_id,
+        latitude: pickupTask.latitude,
+        longitude: pickupTask.longitude,
+        message: 'Sending to backend with 0,0 - expects backend to populate from bin'
+      });
+
       // 2. Dropoff task at destination
       const dropoffTask: ShiftTask = {
         id: `temp-${Date.now()}-${request.id}-dropoff`,
