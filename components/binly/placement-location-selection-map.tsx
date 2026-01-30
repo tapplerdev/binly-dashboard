@@ -25,15 +25,17 @@ function MapController({
   useEffect(() => {
     if (!map || !targetLocation) return;
 
+    // Pan and zoom to the target location
     map.panTo(targetLocation);
     map.setZoom(16);
 
+    // Clear target after animation
     const timeout = setTimeout(() => {
       onComplete();
     }, 500);
 
     return () => clearTimeout(timeout);
-  }, [map, targetLocation, onComplete]);
+  }, [map, targetLocation?.lat, targetLocation?.lng, onComplete]);
 
   return null;
 }
@@ -69,12 +71,14 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
       newSelection.delete(locationId);
     } else {
       newSelection.add(locationId);
-      // Pan to the selected location
-      if (location.latitude && location.longitude) {
-        setTargetLocation({ lat: location.latitude, lng: location.longitude });
-      }
     }
     setSelectedLocationIds(newSelection);
+
+    // Always pan to the location when clicked (even if deselecting)
+    if (location.latitude && location.longitude) {
+      // Use timestamp to force re-render even if coordinates are the same
+      setTargetLocation({ lat: location.latitude, lng: location.longitude });
+    }
   };
 
   // Select all locations
@@ -176,15 +180,23 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                       onClick={() => toggleLocationSelection(location.id, location)}
                     >
                       <div
-                        className={`cursor-pointer transition-all hover:scale-110 ${
-                          isSelected ? 'ring-4 ring-green-300 rounded-full animate-pulse-glow' : ''
-                        }`}
+                        className="relative cursor-pointer transition-all hover:scale-110"
                         title={`${location.address || location.street} - Requested by ${location.requested_by_name}`}
                       >
-                        <PotentialLocationPin
-                          size={40}
-                          color={isSelected ? '#16a34a' : '#FF9500'}
-                        />
+                        {/* Pulsing background circle for selected state */}
+                        {isSelected && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-14 h-14 rounded-full bg-green-400 opacity-40 animate-ping" />
+                            <div className="absolute w-16 h-16 rounded-full bg-green-300 opacity-30" />
+                          </div>
+                        )}
+                        {/* Pin marker */}
+                        <div className="relative z-10">
+                          <PotentialLocationPin
+                            size={40}
+                            color={isSelected ? '#16a34a' : '#FF9500'}
+                          />
+                        </div>
                       </div>
                     </AdvancedMarker>
                   );

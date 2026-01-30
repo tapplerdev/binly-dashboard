@@ -27,15 +27,17 @@ function MapController({
   useEffect(() => {
     if (!map || !targetLocation) return;
 
+    // Pan and zoom to the target location
     map.panTo(targetLocation);
     map.setZoom(16);
 
+    // Clear target after animation
     const timeout = setTimeout(() => {
       onComplete();
     }, 500);
 
     return () => clearTimeout(timeout);
-  }, [map, targetLocation, onComplete]);
+  }, [map, targetLocation?.lat, targetLocation?.lng, onComplete]);
 
   return null;
 }
@@ -152,12 +154,13 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
       newSelection.delete(requestId);
     } else {
       newSelection.add(requestId);
-      // Pan to the selected request's bin location
-      if (request.latitude && request.longitude) {
-        setTargetLocation({ lat: request.latitude, lng: request.longitude });
-      }
     }
     setSelectedRequestIds(newSelection);
+
+    // Always pan to the location when clicked (even if deselecting)
+    if (request.latitude && request.longitude) {
+      setTargetLocation({ lat: request.latitude, lng: request.longitude });
+    }
   };
 
   // Select all requests
@@ -272,14 +275,22 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
                         position={{ lat: request.latitude!, lng: request.longitude! }}
                         onClick={() => toggleRequestSelection(request.id, request)}
                       >
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold cursor-pointer transition-all hover:scale-110 ${
-                            isSelected ? 'ring-4 ring-green-300 animate-pulse-glow' : ''
-                          }`}
-                          style={{ backgroundColor: markerColor }}
-                          title={`Bin #${request.bin_number} - ${request.current_street}`}
-                        >
-                          {request.bin_number % 100}
+                        <div className="relative">
+                          {/* Pulsing ring for selected state */}
+                          {isSelected && (
+                            <>
+                              <div className="absolute inset-0 w-8 h-8 rounded-full bg-green-400 opacity-40 animate-ping" />
+                              <div className="absolute -inset-2 w-12 h-12 rounded-full border-4 border-green-400 opacity-50" />
+                            </>
+                          )}
+                          {/* Bin marker */}
+                          <div
+                            className="relative w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold cursor-pointer transition-all hover:scale-110"
+                            style={{ backgroundColor: markerColor }}
+                            title={`Bin #${request.bin_number} - ${request.current_street}`}
+                          >
+                            {request.bin_number % 100}
+                          </div>
                         </div>
                       </AdvancedMarker>
                     );
