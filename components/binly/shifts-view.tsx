@@ -7,6 +7,7 @@ import { ShiftDetailsDrawer } from './shift-details-drawer';
 import { BinSelectionMap } from './bin-selection-map';
 import { MoveRequestSelectionMap } from './move-request-selection-map';
 import { PlacementLocationSelectionMap } from './placement-location-selection-map';
+import { RouteSelectionMap } from './route-selection-map';
 import { Route, getRouteLabel } from '@/lib/types/route';
 import { Bin } from '@/lib/types/bin';
 import { getBins } from '@/lib/api/bins';
@@ -1304,8 +1305,6 @@ function CreateShiftDrawer({
   const [showBinSelection, setShowBinSelection] = useState(false);
   const [allBins, setAllBins] = useState<Bin[]>([]);
   const [showRouteImport, setShowRouteImport] = useState(false);
-  const [availableShifts, setAvailableShifts] = useState<Shift[]>([]);
-  const [selectedShiftForImport, setSelectedShiftForImport] = useState<string>('');
   const [editingTaskIndex, setEditingTaskIndex] = useState<number | null>(null);
   const [editingTask, setEditingTask] = useState<ShiftTask | null>(null);
   const [showPlacementSelection, setShowPlacementSelection] = useState(false);
@@ -1420,56 +1419,33 @@ function CreateShiftDrawer({
   };
 
   // Route import handlers
-  const openRouteImport = async () => {
-    try {
-      // Fetch available shifts if not already loaded
-      if (availableShifts.length === 0) {
-        const shifts = await getShifts();
-        // Filter for completed or active shifts (not scheduled)
-        const usableShifts = shifts.filter(
-          shift => shift.status === 'completed' || shift.status === 'active'
-        );
-        setAvailableShifts(usableShifts);
-      }
-      setShowRouteImport(true);
-    } catch (error) {
-      console.error('Failed to fetch shifts:', error);
-      setError('Failed to load shifts. Please try again.');
-    }
+  const openRouteImport = () => {
+    setShowRouteImport(true);
   };
 
-  const handleRouteImport = async () => {
-    if (!selectedShiftForImport) return;
+  const handleRouteSelection = (selectedRoute: Route, routeBins: Bin[]) => {
+    console.log('📋 [ROUTE IMPORT] Selected route:', selectedRoute.name);
+    console.log('📍 [ROUTE IMPORT] Route has', routeBins.length, 'bins');
 
-    try {
-      // Fetch tasks for the selected shift
-      const shiftTasks = await getShiftTasks(selectedShiftForImport);
+    // Convert route bins to shift tasks (collection tasks)
+    const newTasks: ShiftTask[] = routeBins.map((bin, index) => ({
+      id: `route-bin-${bin.id}`,
+      type: 'collection',
+      bin_id: bin.id,
+      bin_number: bin.bin_number,
+      latitude: bin.latitude,
+      longitude: bin.longitude,
+      address: bin.location_name || `${bin.current_street}, ${bin.city}`,
+      fill_percentage: bin.fill_percentage || 0,
+    }));
 
-      if (shiftTasks.length === 0) {
-        setError('No tasks found in selected shift.');
-        return;
-      }
+    console.log('✅ [ROUTE IMPORT] Created', newTasks.length, 'collection tasks');
 
-      // Convert shift tasks to collection tasks
-      const importedTasks: ShiftTask[] = shiftTasks.map((task: any, index: number) => ({
-        id: `imported-${Date.now()}-${index}`,
-        type: 'collection',
-        bin_id: task.bin_id || task.id,
-        bin_number: task.bin_number?.toString() || '',
-        fill_percentage: task.fill_percentage || 0,
-        latitude: task.latitude || 0,
-        longitude: task.longitude || 0,
-        address: task.current_street || task.address || 'Unknown',
-      }));
+    // Add tasks to shift
+    setTasks([...tasks, ...newTasks]);
 
-      // Add imported tasks to the task list
-      setTasks([...tasks, ...importedTasks]);
-      setShowRouteImport(false);
-      setSelectedShiftForImport('');
-    } catch (error) {
-      console.error('Failed to import route:', error);
-      setError('Failed to import route. Please try again.');
-    }
+    // Close modal
+    setShowRouteImport(false);
   };
 
   const openEditTask = (index: number) => {
@@ -2887,58 +2863,10 @@ function CreateShiftDrawer({
 
       {/* Route Import Modal */}
       {showRouteImport && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Import from Route</h3>
-              <button
-                onClick={() => {
-                  setShowRouteImport(false);
-                  setSelectedShiftForImport('');
-                }}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <p className="text-sm text-gray-600 mb-4">
-              Select a previous route/shift to import its collection tasks
-            </p>
-
-            <select
-              value={selectedShiftForImport}
-              onChange={(e) => setSelectedShiftForImport(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none mb-4"
-            >
-              <option value="">Select a route...</option>
-              {availableShifts.map(shift => (
-                <option key={shift.id} value={shift.id}>
-                  {shift.driverName} - {shift.route} ({shift.binCount} bins) - {shift.date}
-                </option>
-              ))}
-            </select>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowRouteImport(false);
-                  setSelectedShiftForImport('');
-                }}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleRouteImport}
-                disabled={!selectedShiftForImport}
-                className="flex-1 px-4 py-2 bg-primary rounded-lg text-sm font-medium text-white hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Import Tasks
-              </button>
-            </div>
-          </div>
-        </div>
+        <RouteSelectionMap
+          onClose={() => setShowRouteImport(false)}
+          onConfirm={handleRouteSelection}
+        />
       )}
 
       {/* Edit Task Modal */}
