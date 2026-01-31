@@ -400,7 +400,9 @@ export function BinTemplateBuilder() {
                   >
                     <div
                       className={`w-8 h-8 rounded-full border-2 shadow-lg transition-all duration-300 flex items-center justify-center ${
-                        isInSelectedTemplate ? 'scale-125 border-white' : 'border-white'
+                        isInSelectedTemplate
+                          ? 'scale-125 border-white ring-4 ring-primary/40 animate-pulse'
+                          : 'border-white'
                       }`}
                       style={{ backgroundColor: markerColor }}
                       title={`Bin #${bin.bin_number} - ${bin.fill_percentage ?? 0}%`}
