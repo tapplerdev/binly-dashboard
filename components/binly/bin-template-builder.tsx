@@ -178,9 +178,9 @@ export function BinTemplateBuilder() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-gray-50">
+    <div className="relative flex h-[calc(100vh-64px)] bg-gray-50">
       {/* Left Sidebar - Template List */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+      <div className="w-80 bg-white border-r border-gray-200 flex flex-col z-10">
         <div className="p-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900 mb-3">Bin Templates</h2>
           <button
@@ -428,9 +428,9 @@ export function BinTemplateBuilder() {
         )}
       </div>
 
-      {/* Right Panel - Template Details (Read-Only) */}
+      {/* Right Panel - Template Details (Read-Only) - Overlay */}
       {selectedTemplate && (
-        <div className={`w-96 bg-white border-l border-gray-200 flex flex-col transition-transform duration-300 ease-in-out ${
+        <div className={`absolute top-0 right-0 bottom-0 w-96 bg-white border-l border-gray-200 flex flex-col shadow-xl z-20 transition-transform duration-300 ease-in-out ${
           isClosing ? 'translate-x-full' : (isDrawerMounted ? 'translate-x-0' : 'translate-x-full')
         }`}>
           {/* Header */}
@@ -509,13 +509,22 @@ export function BinTemplateBuilder() {
 
           {/* Actions */}
           <div className="p-4 border-t border-gray-200">
-            <button
-              onClick={() => openEditModal(selectedTemplate)}
-              className="w-full px-4 py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-fast flex items-center justify-center gap-2"
-            >
-              <Edit2 className="w-4 h-4" />
-              Edit Template
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => openEditModal(selectedTemplate)}
+                className="flex-1 px-4 py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-fast flex items-center justify-center gap-2"
+              >
+                <Edit2 className="w-4 h-4" />
+                Edit
+              </button>
+              <button
+                onClick={() => handleDeleteTemplate(selectedTemplate.id)}
+                className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-fast flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}
