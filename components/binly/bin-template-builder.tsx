@@ -7,7 +7,7 @@ import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { Route } from '@/lib/types/route';
 import { getRoutes, createRoute, updateRoute, deleteRoute } from '@/lib/api/routes';
 import { Card } from '@/components/ui/card';
-import { Loader2, Plus, Save, X, Trash2, Edit2, MapPin, Package, AlertCircle } from 'lucide-react';
+import { Loader2, Plus, Save, X, Trash2, Edit2, MapPin, Package, AlertCircle, Search, Filter, SlidersHorizontal } from 'lucide-react';
 
 // Default map center (San Jose, CA)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -28,6 +28,11 @@ export function BinTemplateBuilder() {
   const [templateArea, setTemplateArea] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterArea, setFilterArea] = useState('all');
+  const [filterBinCount, setFilterBinCount] = useState('all');
+  const [isClosing, setIsClosing] = useState(false);
 
   // Load templates on mount
   useEffect(() => {
@@ -46,6 +51,40 @@ export function BinTemplateBuilder() {
       setLoadingTemplates(false);
     }
   }
+
+  // Get unique areas from templates
+  const areas = useMemo(() => {
+    const uniqueAreas = new Set(templates.map(t => t.geographic_area).filter(Boolean));
+    return Array.from(uniqueAreas).sort();
+  }, [templates]);
+
+  // Filter templates based on search and filters
+  const filteredTemplates = useMemo(() => {
+    return templates.filter(template => {
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesName = template.name.toLowerCase().includes(query);
+        const matchesArea = template.geographic_area?.toLowerCase().includes(query);
+        if (!matchesName && !matchesArea) return false;
+      }
+
+      // Area filter
+      if (filterArea !== 'all' && template.geographic_area !== filterArea) {
+        return false;
+      }
+
+      // Bin count filter
+      if (filterBinCount !== 'all') {
+        const count = template.bin_count;
+        if (filterBinCount === 'small' && count > 5) return false;
+        if (filterBinCount === 'medium' && (count <= 5 || count > 15)) return false;
+        if (filterBinCount === 'large' && count <= 15) return false;
+      }
+
+      return true;
+    });
+  }, [templates, searchQuery, filterArea, filterBinCount]);
 
   // Filter mappable bins
   const mappableBins = useMemo(() => bins.filter(isMappableBin), [bins]);
@@ -173,15 +212,19 @@ export function BinTemplateBuilder() {
     }
   }
 
-  // Cancel editing
+  // Cancel editing with slide-out animation
   function cancelEdit() {
-    setIsCreatingNew(false);
-    setSelectedTemplate(null);
-    setSelectedBinIds(new Set());
-    setTemplateName('');
-    setTemplateDescription('');
-    setTemplateArea('');
-    setError(null);
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsCreatingNew(false);
+      setSelectedTemplate(null);
+      setSelectedBinIds(new Set());
+      setTemplateName('');
+      setTemplateDescription('');
+      setTemplateArea('');
+      setError(null);
+      setIsClosing(false);
+    }, 300); // Match animation duration
   }
 
   const isEditing = isCreatingNew || selectedTemplate !== null;
@@ -201,6 +244,87 @@ export function BinTemplateBuilder() {
           </button>
         </div>
 
+        {/* Search Bar */}
+        <div className="p-4 border-b border-gray-200 space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search templates..."
+              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+            />
+          </div>
+
+          {/* Filter Toggle */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="w-full px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-fast flex items-center justify-center gap-2"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
+          </button>
+
+          {/* Filters */}
+          {showFilters && (
+            <div className="space-y-3 pt-2 animate-fade-in">
+              {/* Area Filter */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Area</label>
+                <select
+                  value={filterArea}
+                  onChange={(e) => setFilterArea(e.target.value)}
+                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="all">All Areas</option>
+                  {areas.map(area => (
+                    <option key={area} value={area}>{area}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Bin Count Filter */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Size</label>
+                <select
+                  value={filterBinCount}
+                  onChange={(e) => setFilterBinCount(e.target.value)}
+                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="all">All Sizes</option>
+                  <option value="small">Small (≤5 bins)</option>
+                  <option value="medium">Medium (6-15 bins)</option>
+                  <option value="large">Large (16+ bins)</option>
+                </select>
+              </div>
+
+              {/* Clear Filters */}
+              {(filterArea !== 'all' || filterBinCount !== 'all' || searchQuery) && (
+                <button
+                  onClick={() => {
+                    setFilterArea('all');
+                    setFilterBinCount('all');
+                    setSearchQuery('');
+                  }}
+                  className="w-full px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium text-gray-700 transition-fast"
+                >
+                  Clear All Filters
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Results Count */}
+        {(searchQuery || filterArea !== 'all' || filterBinCount !== 'all') && (
+          <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
+            <p className="text-xs text-gray-600">
+              Showing {filteredTemplates.length} of {templates.length} templates
+            </p>
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {loadingTemplates ? (
             <div className="flex items-center justify-center py-8">
@@ -212,8 +336,14 @@ export function BinTemplateBuilder() {
               <p className="text-sm text-gray-500">No templates yet</p>
               <p className="text-xs text-gray-400 mt-1">Create your first one!</p>
             </div>
+          ) : filteredTemplates.length === 0 ? (
+            <div className="text-center py-8">
+              <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm text-gray-500">No templates found</p>
+              <p className="text-xs text-gray-400 mt-1">Try adjusting your filters</p>
+            </div>
           ) : (
-            templates.map(template => (
+            filteredTemplates.map(template => (
               <div
                 key={template.id}
                 onClick={() => loadTemplate(template)}
@@ -342,7 +472,9 @@ export function BinTemplateBuilder() {
 
       {/* Right Panel - Template Form */}
       {isEditing && (
-        <div className="w-96 bg-white border-l border-gray-200 flex flex-col">
+        <div className={`w-96 bg-white border-l border-gray-200 flex flex-col transition-transform duration-300 ease-in-out ${
+          isClosing ? 'translate-x-full' : 'translate-x-0'
+        }`}>
           <div className="p-4 border-b border-gray-200">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-lg font-semibold text-gray-900">
