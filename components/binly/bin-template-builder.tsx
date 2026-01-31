@@ -1,12 +1,20 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { useBins } from '@/lib/hooks/use-bins';
-import { Bin } from '@/lib/types/bin';
+import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { Route } from '@/lib/types/route';
 import { getRoutes, createRoute, updateRoute, deleteRoute } from '@/lib/api/routes';
 import { Loader2, Plus, X, Trash2, Edit2, MapPin, Package, Search, Filter } from 'lucide-react';
 import { TemplateEditorModal } from './template-editor-modal';
+
+// Default map center (San Jose, CA)
+const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
+const DEFAULT_ZOOM = 11;
+
+// Warehouse location
+const WAREHOUSE_LOCATION = { lat: 37.34692, lng: -121.92984 };
 
 export function BinTemplateBuilder() {
   const { data: bins = [], isLoading: loadingBins } = useBins();
@@ -20,6 +28,7 @@ export function BinTemplateBuilder() {
   const [filterArea, setFilterArea] = useState('all');
   const [filterBinCount, setFilterBinCount] = useState('all');
   const [isClosing, setIsClosing] = useState(false);
+  const [isDrawerMounted, setIsDrawerMounted] = useState(false);
 
   // Load templates on mount
   useEffect(() => {
@@ -141,8 +150,20 @@ export function BinTemplateBuilder() {
     }
   }
 
+  // Trigger drawer animation when template is selected
+  useEffect(() => {
+    if (selectedTemplate) {
+      setIsDrawerMounted(false);
+      // Small delay to trigger animation
+      requestAnimationFrame(() => {
+        setIsDrawerMounted(true);
+      });
+    }
+  }, [selectedTemplate]);
+
   // View template details
   function viewTemplateDetails(template: Route) {
+    setIsClosing(false);
     setSelectedTemplate(template);
   }
 
@@ -152,6 +173,7 @@ export function BinTemplateBuilder() {
     setTimeout(() => {
       setSelectedTemplate(null);
       setIsClosing(false);
+      setIsDrawerMounted(false);
     }, 300);
   }
 
@@ -199,8 +221,12 @@ export function BinTemplateBuilder() {
           </div>
 
           {/* Filters */}
-          {showFilters && (
-            <div className="space-y-3 pt-3 animate-fade-in">
+          <div
+            className={`overflow-hidden transition-all duration-200 ${
+              showFilters ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+            }`}
+          >
+            <div className="space-y-3 pt-3">
               {/* Area Filter */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">Area</label>
@@ -245,7 +271,7 @@ export function BinTemplateBuilder() {
                 </button>
               )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Results Count */}
@@ -329,15 +355,75 @@ export function BinTemplateBuilder() {
         </div>
       </div>
 
-      {/* Main Content - Empty State or Message */}
-      <div className="flex-1 flex items-center justify-center bg-gray-50">
-        {selectedTemplate ? null : (
-          <div className="text-center">
-            <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-lg font-medium text-gray-700">Select a template to view details</p>
-            <p className="text-sm text-gray-500 mt-1">
-              Or create a new one to get started
-            </p>
+      {/* Main Content - Map View */}
+      <div className="flex-1 relative">
+        {loadingBins ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+            <div className="text-center">
+              <Loader2 className="w-12 h-12 mx-auto mb-4 text-primary animate-spin" />
+              <p className="text-gray-600">Loading bins...</p>
+            </div>
+          </div>
+        ) : (
+          <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
+            <Map
+              mapId="bin-template-builder-map"
+              defaultCenter={DEFAULT_CENTER}
+              defaultZoom={DEFAULT_ZOOM}
+              disableDefaultUI={false}
+              gestureHandling="greedy"
+              style={{ width: '100%', height: '100%' }}
+            >
+              {/* Warehouse Marker */}
+              <AdvancedMarker
+                position={WAREHOUSE_LOCATION}
+                zIndex={20}
+                title="Warehouse"
+              >
+                <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-lg border-2 border-white">
+                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                  </svg>
+                </div>
+              </AdvancedMarker>
+
+              {/* Bin Markers - Highlight selected template's bins */}
+              {bins.filter(isMappableBin).map((bin) => {
+                const isInSelectedTemplate = selectedTemplate?.bin_ids?.includes(bin.id) || false;
+                const markerColor = isInSelectedTemplate ? '#4880FF' : getBinMarkerColor(bin.fill_percentage);
+
+                return (
+                  <AdvancedMarker
+                    key={bin.id}
+                    position={{ lat: bin.latitude, lng: bin.longitude }}
+                    zIndex={isInSelectedTemplate ? 15 : 10}
+                  >
+                    <div
+                      className={`w-8 h-8 rounded-full border-2 shadow-lg transition-all duration-300 flex items-center justify-center ${
+                        isInSelectedTemplate ? 'scale-125 border-white' : 'border-white'
+                      }`}
+                      style={{ backgroundColor: markerColor }}
+                      title={`Bin #${bin.bin_number} - ${bin.fill_percentage ?? 0}%`}
+                    >
+                      <span className="text-xs font-bold text-white">{bin.bin_number}</span>
+                    </div>
+                  </AdvancedMarker>
+                );
+              })}
+            </Map>
+          </APIProvider>
+        )}
+
+        {/* Empty State Overlay (when no template selected) */}
+        {!selectedTemplate && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="text-center bg-white/90 backdrop-blur-sm rounded-2xl p-8 shadow-lg">
+              <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-lg font-medium text-gray-700">Select a template to view details</p>
+              <p className="text-sm text-gray-500 mt-1">
+                Or create a new one to get started
+              </p>
+            </div>
           </div>
         )}
       </div>
@@ -345,7 +431,7 @@ export function BinTemplateBuilder() {
       {/* Right Panel - Template Details (Read-Only) */}
       {selectedTemplate && (
         <div className={`w-96 bg-white border-l border-gray-200 flex flex-col transition-transform duration-300 ease-in-out ${
-          isClosing ? 'translate-x-full' : 'translate-x-0'
+          isClosing ? 'translate-x-full' : (isDrawerMounted ? 'translate-x-0' : 'translate-x-full')
         }`}>
           {/* Header */}
           <div className="p-4 border-b border-gray-200">
