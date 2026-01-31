@@ -4,6 +4,13 @@
 
 export type ShiftStatus = 'scheduled' | 'active' | 'completed' | 'cancelled';
 
+export interface OptimizationMetadata {
+  total_distance_km: number;
+  total_duration_seconds: number;
+  optimized_at: string; // ISO timestamp
+  estimated_completion: string; // ISO timestamp
+}
+
 export interface Shift {
   id: string;
   date: string; // YYYY-MM-DD
@@ -20,6 +27,7 @@ export interface Shift {
   estimatedCompletion?: string; // ISO timestamp for active shifts
   duration?: string; // e.g., "7h 45m" for completed shifts
   truckId?: string;
+  optimization_metadata?: OptimizationMetadata; // Added for HERE Maps optimization data
 }
 
 export interface ShiftBin {

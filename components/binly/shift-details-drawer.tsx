@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shift';
 import { getShiftById, cancelShift } from '@/lib/api/shifts';
+import { ShiftRouteMap } from './shift-route-map';
 
 interface ShiftBin {
   id: number;
@@ -109,6 +110,11 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
               }`}>
                 {statusLabel}
               </span>
+              {shift.optimization_metadata && (
+                <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                  Optimized
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-4 text-sm text-gray-600">
               <div className="flex items-center gap-1.5">
@@ -146,6 +152,44 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
               </div>
             </div>
           </div>
+
+          {/* Optimization Metrics */}
+          {shift.optimization_metadata && (
+            <div className="p-6 border-b border-gray-100 bg-blue-50">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Route Optimization</h3>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-white rounded-lg p-3 border border-blue-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock className="w-4 h-4 text-blue-500" />
+                    <span className="text-xs text-gray-500">Est. Duration</span>
+                  </div>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {Math.floor(shift.optimization_metadata.total_duration_seconds / 3600)}h {Math.floor((shift.optimization_metadata.total_duration_seconds % 3600) / 60)}m
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-lg p-3 border border-blue-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <MapPin className="w-4 h-4 text-blue-500" />
+                    <span className="text-xs text-gray-500">Est. Distance</span>
+                  </div>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {shift.optimization_metadata.total_distance_km.toFixed(1)} mi
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-lg p-3 border border-blue-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <TrendingUp className="w-4 h-4 text-blue-500" />
+                    <span className="text-xs text-gray-500">Est. Complete</span>
+                  </div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {new Date(shift.optimization_metadata.estimated_completion).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Progress Metrics */}
           {(isActive || isCompleted) && (
@@ -213,21 +257,29 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
             </div>
           )}
 
-          {/* Map Placeholder */}
+          {/* Route Map */}
           <div className="p-6 border-b border-gray-100">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Route Map</h3>
-            <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
-              <div className="text-center">
-                <MapPin className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">Map integration coming soon</p>
-                <p className="text-xs text-gray-400 mt-1">Route: {shift.route}</p>
+            {loading ? (
+              <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
+                <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
-            </div>
+            ) : (
+              <ShiftRouteMap
+                bins={bins}
+                isOptimized={!!shift.optimization_metadata}
+              />
+            )}
           </div>
 
           {/* Bin List */}
           <div className="p-6">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">Bins ({shift.binCount})</h3>
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">
+              Bins ({shift.binCount})
+              {shift.optimization_metadata && (
+                <span className="ml-2 text-xs text-gray-500 font-normal">- Optimized Order</span>
+              )}
+            </h3>
             {loading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -239,7 +291,9 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
               </div>
             ) : (
               <div className="space-y-2">
-                {bins.map((bin) => {
+                {bins
+                  .sort((a, b) => a.sequence_order - b.sequence_order)
+                  .map((bin, index) => {
                   const isCompleted = bin.is_completed === 1;
                   const collectedTime = bin.completed_at
                     ? new Date(bin.completed_at * 1000).toLocaleTimeString('en-US', {
@@ -258,6 +312,15 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                           : 'bg-white border-gray-200 hover:bg-gray-50'
                       }`}
                     >
+                      {/* Sequence Number Badge (only show if optimized and sequence > 0) */}
+                      {shift.optimization_metadata && bin.sequence_order > 0 && (
+                        <div className="flex-shrink-0">
+                          <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center">
+                            <span className="text-xs font-bold text-white">{bin.sequence_order}</span>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Status Icon */}
                       <div className="flex-shrink-0">
                         {isCompleted ? (
