@@ -8,6 +8,7 @@ import { Route } from '@/lib/types/route';
 import { getRoutes, createRoute, updateRoute, deleteRoute } from '@/lib/api/routes';
 import { Loader2, Plus, X, Trash2, Edit2, MapPin, Package, Search, Filter } from 'lucide-react';
 import { TemplateEditorModal } from './template-editor-modal';
+import { DeleteConfirmationModal } from './delete-confirmation-modal';
 
 // Default map center (San Jose, CA)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -29,6 +30,9 @@ export function BinTemplateBuilder() {
   const [filterBinCount, setFilterBinCount] = useState('all');
   const [isClosing, setIsClosing] = useState(false);
   const [isDrawerMounted, setIsDrawerMounted] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<Route | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Load templates on mount
   useEffect(() => {
@@ -132,22 +136,38 @@ export function BinTemplateBuilder() {
     await loadTemplates();
   }
 
-  // Delete template
-  async function handleDeleteTemplate(templateId: string) {
-    if (!confirm('Are you sure you want to delete this template?')) {
-      return;
-    }
+  // Open delete confirmation modal
+  function openDeleteModal(template: Route) {
+    setTemplateToDelete(template);
+    setShowDeleteModal(true);
+  }
+
+  // Confirm and delete template
+  async function confirmDeleteTemplate() {
+    if (!templateToDelete) return;
 
     try {
-      await deleteRoute(templateId);
+      setIsDeleting(true);
+      await deleteRoute(templateToDelete.id);
       await loadTemplates();
 
-      if (selectedTemplate?.id === templateId) {
+      if (selectedTemplate?.id === templateToDelete.id) {
         setSelectedTemplate(null);
       }
+
+      setShowDeleteModal(false);
+      setTemplateToDelete(null);
     } catch (err) {
       console.error('Failed to delete template:', err);
+    } finally {
+      setIsDeleting(false);
     }
+  }
+
+  // Cancel delete
+  function cancelDelete() {
+    setShowDeleteModal(false);
+    setTemplateToDelete(null);
   }
 
   // Trigger drawer animation when template is selected
@@ -328,7 +348,7 @@ export function BinTemplateBuilder() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteTemplate(template.id);
+                        openDeleteModal(template);
                       }}
                       className="p-1 hover:bg-red-100 rounded transition-fast"
                       title="Delete Template"
@@ -520,7 +540,7 @@ export function BinTemplateBuilder() {
                 Edit
               </button>
               <button
-                onClick={() => handleDeleteTemplate(selectedTemplate.id)}
+                onClick={() => openDeleteModal(selectedTemplate)}
                 className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-fast flex items-center justify-center gap-2"
               >
                 <Trash2 className="w-4 h-4" />
@@ -546,6 +566,18 @@ export function BinTemplateBuilder() {
           isEditing={!!editingTemplate}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={cancelDelete}
+        onConfirm={confirmDeleteTemplate}
+        title="Delete Template"
+        message={`Are you sure you want to delete "${templateToDelete?.name}"? This action cannot be undone.`}
+        confirmText="Delete Template"
+        cancelText="Cancel"
+        isDeleting={isDeleting}
+      />
     </div>
   );
 }
