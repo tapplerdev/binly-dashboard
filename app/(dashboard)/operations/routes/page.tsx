@@ -1,10 +1,10 @@
-import { RoutesView } from '@/components/binly/routes-view';
+import { BinTemplateBuilder } from '@/components/binly/bin-template-builder';
 
 export const metadata = {
-  title: 'Route Blueprints - Binly Dashboard',
-  description: 'Route templates and route planning',
+  title: 'Route Templates - Binly Dashboard',
+  description: 'Create and manage bin collection templates',
 };
 
 export default function RoutesPage() {
-  return <RoutesView />;
+  return <BinTemplateBuilder />;
 }
