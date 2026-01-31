@@ -662,6 +662,26 @@ export function LiveMapView() {
                 </AdvancedMarker>
               );
             })}
+
+        {/* Warehouse marker - Home icon */}
+        <AdvancedMarker
+          position={{ lat: 37.34692, lng: -121.92984 }}
+          zIndex={20} // Highest to appear above everything
+          title="Warehouse - Base of Operations"
+        >
+          <div className="relative">
+            {/* Home icon container */}
+            <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center shadow-xl border-4 border-white cursor-pointer transition-all duration-300 hover:scale-110">
+              <svg
+                className="w-7 h-7 text-white"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+              </svg>
+            </div>
+          </div>
+        </AdvancedMarker>
         </Map>
       </APIProvider>
     </div>
