@@ -21,6 +21,7 @@ import { useDrivers } from '@/lib/hooks/use-drivers';
 import { ActiveDriver } from '@/lib/types/active-driver';
 import { LiveOpsMap } from './live-ops-map';
 import { useAuthStore } from '@/lib/auth/store';
+import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 
 type ViewMode = 'list' | 'timeline' | 'live';
 
@@ -36,6 +37,7 @@ export function ShiftsView() {
   // React Query hooks
   const { data: shifts = [], isLoading: loadingShifts } = useShifts();
   const assignRouteMutation = useAssignRoute();
+  const { data: warehouse } = useWarehouseLocation();
 
   // Local state
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -1377,9 +1379,9 @@ function CreateShiftDrawer({
       type: 'warehouse_stop',
       warehouse_action: 'load',
       bins_to_load: 1,
-      latitude: 11.1867045, // Ropacal Warehouse - Santa Marta, Colombia
-      longitude: -74.2362302,
-      address: 'Cl. 29 #1-65, Gaira, Santa Marta, Magdalena',
+      latitude: warehouse?.latitude || 0,
+      longitude: warehouse?.longitude || 0,
+      address: warehouse?.address || 'Warehouse',
     };
     setTasks([...tasks, newTask]);
   };
@@ -1599,9 +1601,9 @@ function CreateShiftDrawer({
         type: 'warehouse_stop',
         warehouse_action: suggestion.targetType === 'warehouse_load' ? 'load' : 'unload',
         bins_to_load: suggestion.targetType === 'warehouse_load' ? suggestion.binsCount : undefined,
-        latitude: 11.1867045, // Ropacal Warehouse - Santa Marta, Colombia
-        longitude: -74.2362302,
-        address: 'Cl. 29 #1-65, Gaira, Santa Marta, Magdalena',
+        latitude: warehouse?.latitude || 0,
+        longitude: warehouse?.longitude || 0,
+        address: warehouse?.address || 'Warehouse',
       };
       newTasks.splice((suggestion.insertAfterIndex ?? -1) + 1, 0, newWarehouseTask);
     } else if (suggestion.action === 'update' && suggestion.existingTaskIndex !== undefined) {
@@ -1645,9 +1647,9 @@ function CreateShiftDrawer({
           type: 'warehouse_stop',
           warehouse_action: 'unload',
           auto_inserted: true,
-          latitude: 11.1867045, // Ropacal Warehouse - Santa Marta, Colombia
-          longitude: -74.2362302,
-          address: 'Cl. 29 #1-65, Gaira, Santa Marta, Magdalena',
+          latitude: warehouse?.latitude || 0,
+          longitude: warehouse?.longitude || 0,
+          address: warehouse?.address || 'Warehouse',
         });
         currentLoad = 0; // Reset after unloading
       }
@@ -2285,9 +2287,9 @@ function CreateShiftDrawer({
       const payload = {
         driver_id: driverId,
         truck_bin_capacity: parseInt(truckCapacity),
-        warehouse_latitude: 11.1867045, // Ropacal Warehouse - Santa Marta, Colombia
-        warehouse_longitude: -74.2362302,
-        warehouse_address: 'Cl. 29 #1-65, Gaira, Santa Marta, Magdalena',
+        warehouse_latitude: warehouse?.latitude || 0,
+        warehouse_longitude: warehouse?.longitude || 0,
+        warehouse_address: warehouse?.address || 'Warehouse',
         tasks: tasksPayload,
       };
 
