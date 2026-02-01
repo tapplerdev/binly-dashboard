@@ -176,6 +176,30 @@ function RoutePolylineRetired({ route, routeBins }: { route: Route; routeBins: B
 // END RETIRED CODE
 // ============================================================================
 
+// Map Controller - Handles auto-fitting bounds when route is selected
+function MapController({ routeBins }: { routeBins: Bin[] }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || routeBins.length === 0) return;
+
+    const bounds = new google.maps.LatLngBounds();
+    routeBins.forEach(bin => {
+      if (bin.latitude && bin.longitude) {
+        bounds.extend({ lat: bin.latitude, lng: bin.longitude });
+      }
+    });
+
+    // Include warehouse
+    bounds.extend(WAREHOUSE_LOCATION);
+
+    // Fit bounds with padding
+    map.fitBounds(bounds, { top: 100, right: 100, bottom: 100, left: 100 });
+  }, [map, routeBins]);
+
+  return null;
+}
+
 // Pulsing Marker Component - Shows bins without implying order
 function PulsingMarker({ bin, index, total }: { bin: Bin; index: number; total: number }) {
   return (
@@ -245,19 +269,6 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
       .filter((bin): bin is Bin => bin !== undefined && bin.latitude != null && bin.longitude != null);
   }, [selectedRoute, allBins]);
 
-  // Calculate map center based on selected route bins
-  const mapCenter = useMemo(() => {
-    if (routeBins.length === 0) return DEFAULT_CENTER;
-
-    const validBins = routeBins.filter(b => b.latitude && b.longitude);
-    if (validBins.length === 0) return DEFAULT_CENTER;
-
-    const avgLat = validBins.reduce((sum, b) => sum + b.latitude, 0) / validBins.length;
-    const avgLng = validBins.reduce((sum, b) => sum + b.longitude, 0) / validBins.length;
-
-    return { lat: avgLat, lng: avgLng };
-  }, [routeBins]);
-
   const handleConfirm = () => {
     if (!selectedRoute) return;
     onConfirm(selectedRoute, routeBins);
@@ -318,16 +329,20 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
             <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
               <Map
                 defaultCenter={DEFAULT_CENTER}
-                center={mapCenter}
                 defaultZoom={DEFAULT_ZOOM}
-                zoom={selectedRoute ? 13 : DEFAULT_ZOOM}
                 mapId="route-selection-map"
                 disableDefaultUI={true}
                 gestureHandling="greedy"
                 zoomControl={true}
                 clickableIcons={false}
                 className="w-full h-full"
+                style={{ width: '100%', height: '100%' }}
               >
+                {/* Map Controller - Auto-fit bounds when route selected */}
+                {selectedRoute && routeBins.length > 0 && (
+                  <MapController routeBins={routeBins} />
+                )}
+
                 {/* Route Polyline - RETIRED - No longer showing polylines for templates */}
                 {/* Templates are unoptimized bin collections - routes optimized when driver starts shift */}
 
