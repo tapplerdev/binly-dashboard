@@ -20,6 +20,7 @@ export interface PotentialLocation {
   converted_to_bin_id?: string;
   converted_at_iso?: string;
   converted_by_user_id?: string;
+  converted_via_shift_id?: string; // NEW: Links to shift if converted during driver placement
   bin_number?: number;
 }
 
