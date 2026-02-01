@@ -171,7 +171,10 @@ function RoutePolylineRetired({ route, routeBins }: { route: Route; routeBins: B
 // ============================================================================
 
 // Map Controller - Handles auto-fitting bounds when route is selected
-function MapController({ routeBins }: { routeBins: Bin[] }) {
+function MapController({ routeBins, warehouseLocation }: {
+  routeBins: Bin[];
+  warehouseLocation: { lat: number; lng: number };
+}) {
   const map = useMap();
 
   useEffect(() => {
@@ -185,11 +188,11 @@ function MapController({ routeBins }: { routeBins: Bin[] }) {
     });
 
     // Include warehouse
-    bounds.extend(WAREHOUSE_LOCATION);
+    bounds.extend(warehouseLocation);
 
     // Fit bounds with padding
     map.fitBounds(bounds, { top: 100, right: 100, bottom: 100, left: 100 });
-  }, [map, routeBins]);
+  }, [map, routeBins, warehouseLocation]);
 
   return null;
 }
@@ -343,7 +346,7 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
               >
                 {/* Map Controller - Auto-fit bounds when route selected */}
                 {selectedRoute && routeBins.length > 0 && (
-                  <MapController routeBins={routeBins} />
+                  <MapController routeBins={routeBins} warehouseLocation={WAREHOUSE_LOCATION} />
                 )}
 
                 {/* Route Polyline - RETIRED - No longer showing polylines for templates */}
