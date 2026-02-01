@@ -322,8 +322,10 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
                 defaultZoom={DEFAULT_ZOOM}
                 zoom={selectedRoute ? 13 : DEFAULT_ZOOM}
                 mapId="route-selection-map"
-                disableDefaultUI={false}
+                disableDefaultUI={true}
                 gestureHandling="greedy"
+                zoomControl={true}
+                clickableIcons={false}
                 className="w-full h-full"
               >
                 {/* Route Polyline - RETIRED - No longer showing polylines for templates */}
@@ -362,7 +364,7 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
 
             {/* Info Overlay */}
             {selectedRoute && (
-              <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-4 max-w-xs">
+              <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-4 max-w-xs pointer-events-auto">
                 <h3 className="font-semibold text-gray-900 mb-2">{selectedRoute.name}</h3>
                 {selectedRoute.description && (
                   <p className="text-sm text-gray-600 mb-2">{selectedRoute.description}</p>
