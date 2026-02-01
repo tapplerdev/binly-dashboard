@@ -118,7 +118,19 @@ function LassoSelection({ allBins, onBinsSelected, isActive }: LassoSelectionPro
   return null;
 }
 
-// Route polyline component
+// ============================================================================
+// RETIRED CODE - Polyline rendering (2026-01-31)
+// ============================================================================
+// Reason: Moving to template-based system where routes aren't pre-optimized.
+// Showing polylines with START/END labels implies route order, which is
+// misleading since templates are just bin collections. Routes get optimized
+// when driver starts shift using real-time traffic and driver location.
+//
+// This code is preserved for potential future use if we want to show
+// route previews after optimization or for other visualization needs.
+// ============================================================================
+/*
+// Route polyline component - RETIRED
 interface RoutePreviewProps {
   bins: Bin[];
   onMapReady?: () => void;
@@ -131,7 +143,7 @@ interface RoutePreviewProps {
   onStatsChange: (stats: { distance: number; duration: number }) => void;
 }
 
-function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLassoSelect, onBinClick, onBinRemove, routeStats, onStatsChange }: RoutePreviewProps) {
+function RoutePreviewWithPolylines({ bins, onMapReady, lassoMode = false, allBins = [], onLassoSelect, onBinClick, onBinRemove, routeStats, onStatsChange }: RoutePreviewProps) {
   const map = useMap();
   const polylineRef = useRef<google.maps.Polyline | null>(null);
   const glowPolylineRef = useRef<google.maps.Polyline | null>(null);
@@ -320,6 +332,43 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
       onMapReady();
     }
   }, [routeStats, onMapReady]);
+*/
+// ============================================================================
+// END RETIRED CODE
+// ============================================================================
+
+// Template preview component - Shows bins without implying route order
+interface RoutePreviewProps {
+  bins: Bin[];
+  onMapReady?: () => void;
+  lassoMode?: boolean;
+  allBins?: Bin[];
+  onLassoSelect?: (bins: Bin[]) => void;
+  onBinClick?: (bin: Bin) => void;
+  onBinRemove?: (bin: Bin) => void;
+  routeStats: { distance: number; duration: number };
+  onStatsChange: (stats: { distance: number; duration: number }) => void;
+}
+
+function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLassoSelect, onBinClick, onBinRemove, routeStats, onStatsChange }: RoutePreviewProps) {
+  const map = useMap();
+  const [hoveredBin, setHoveredBin] = useState<{ bin: Bin; index: number } | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fit bounds when bins change
+  useEffect(() => {
+    if (!map || bins.length === 0) return;
+
+    const bounds = new google.maps.LatLngBounds();
+    bins.forEach(bin => {
+      if (bin.latitude != null && bin.longitude != null) {
+        bounds.extend({ lat: bin.latitude, lng: bin.longitude });
+      }
+    });
+    // Include warehouse in bounds
+    bounds.extend(WAREHOUSE_LOCATION);
+    map.fitBounds(bounds);
+  }, [map, bins]);
 
   // Handle lasso selection
   const handleLassoSelection = (selectedBins: Bin[]) => {
@@ -368,7 +417,7 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
               style={{
                 backgroundColor: getBinMarkerColor(bin.fill_percentage),
               }}
-              title={`Bin #${bin.bin_number} - ${bin.fill_percentage ?? 0}% - Click to add to route`}
+              title={`Bin #${bin.bin_number} - ${bin.fill_percentage ?? 0}% - Click to add to template`}
             >
               <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
                 {bin.bin_number}
@@ -378,10 +427,8 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
         );
       })}
 
-      {/* Render selected bins with sequence numbers + bin numbers */}
+      {/* Render selected bins - NO sequence numbers or START labels (template, not optimized route) */}
       {bins.map((bin, index) => {
-        const isFirst = index === 0;
-
         if (bin.latitude == null || bin.longitude == null) return null;
 
         return (
@@ -406,21 +453,13 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
                 setHoveredBin(null);
               }}
             >
-              {/* Glow effect for START bin */}
-              {isFirst && (
-                <div className="absolute inset-0 rounded-full bg-green-400 opacity-40 animate-pulse scale-150" />
-              )}
               <div
                 onClick={() => onBinRemove?.(bin)}
-                className={`w-10 h-10 rounded-full flex flex-col items-center justify-center text-white shadow-lg border-2 border-white cursor-pointer transition-all duration-300 hover:scale-110 hover:border-red-500 group-hover:ring-2 group-hover:ring-red-400 ${
-                  isFirst ? 'bg-green-600 ring-4 ring-green-200' : ''
-                }`}
-                style={isFirst ? undefined : { backgroundColor: getBinMarkerColor(bin.fill_percentage || 0) }}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg border-2 border-white cursor-pointer transition-all duration-300 hover:scale-110 hover:border-red-500 group-hover:ring-2 group-hover:ring-red-400"
+                style={{ backgroundColor: getBinMarkerColor(bin.fill_percentage || 0) }}
               >
-                {/* Bin number (larger) */}
+                {/* Just bin number - no sequence */}
                 <div className="text-sm font-bold leading-none">{bin.bin_number}</div>
-                {/* Sequence number (smaller, below with parentheses) */}
-                <div className="text-[10px] font-medium leading-none opacity-90">({index + 1})</div>
               </div>
               {/* X icon overlay on hover */}
               <div className="absolute inset-0 rounded-full bg-red-600 opacity-0 group-hover:opacity-80 transition-all duration-200 flex items-center justify-center pointer-events-none">
@@ -428,20 +467,13 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
-              {/* START label for first bin */}
-              {isFirst && (
-                <div className="absolute -bottom-7 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap shadow-md">
-                  START
-                </div>
-              )}
 
               {/* Custom Tooltip Bubble */}
               {hoveredBin && hoveredBin.bin.id === bin.id && (
-                <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 animate-fade-in pointer-events-none z-50">
+                <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 animate-fade-in pointer-events-none z-50">
                   <div className="bg-gray-900 text-white rounded-lg shadow-2xl px-3 py-2 min-w-[200px]">
                     <div className="text-xs font-semibold mb-1">Bin #{hoveredBin.bin.bin_number}</div>
-                    <div className="text-xs text-gray-300 mb-1">Position {hoveredBin.index + 1}</div>
-                    <div className="text-xs text-red-300 font-medium">Click to remove from route</div>
+                    <div className="text-xs text-red-300 font-medium">Click to remove from template</div>
                   </div>
                   {/* Arrow pointing down */}
                   <div className="w-0 h-0 mx-auto mt-[-1px]" style={{
@@ -456,24 +488,19 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
         );
       })}
 
-      {/* Stats Overlay */}
-      {bins.length >= 2 && routeStats?.distance > 0 && (
+      {/* Bin counter - removed distance/time stats since route isn't optimized yet */}
+      {bins.length > 0 && (
         <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg px-4 py-3 border border-gray-200">
-          <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-2 text-sm">
             <div>
-              <p className="text-xs text-gray-500">Bins</p>
+              <p className="text-xs text-gray-500">Bins in Template</p>
               <p className="font-semibold text-gray-900">{bins.length}</p>
             </div>
-            <div className="w-px h-8 bg-gray-200" />
-            <div>
-              <p className="text-xs text-gray-500">Distance</p>
-              <p className="font-semibold text-gray-900">{routeStats.distance.toFixed(1)} mi</p>
-            </div>
-            <div className="w-px h-8 bg-gray-200" />
-            <div>
-              <p className="text-xs text-gray-500">Est. Time</p>
-              <p className="font-semibold text-gray-900">{formatDuration(routeStats.duration)}</p>
-            </div>
+          </div>
+          <div className="mt-2 pt-2 border-t border-gray-100">
+            <p className="text-[10px] text-gray-500 leading-tight">
+              Route will be optimized when driver starts shift
+            </p>
           </div>
         </div>
       )}
@@ -804,9 +831,14 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
       <div className={`bg-white rounded-2xl w-full h-[90vh] max-w-7xl overflow-hidden flex flex-col shadow-2xl transition-all duration-200 ease-in-out ${isClosing ? 'scale-95 opacity-0' : isOpening ? 'scale-95 opacity-0' : 'scale-100 opacity-100'}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {editRoute ? 'Edit Route' : 'Create New Route'}
-          </h2>
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">
+              {editRoute ? 'Edit Bin Template' : 'Create New Bin Template'}
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Template will be optimized when driver starts shift
+            </p>
+          </div>
           <button
             onClick={handleClose}
             className="p-2 hover:bg-gray-200 rounded-lg transition-fast"
@@ -820,14 +852,14 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
           {/* Left Panel - Form (40%) */}
           <div className="w-[40%] border-r border-gray-200 flex flex-col">
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
-              {/* Copy from Existing Route */}
+              {/* Copy from Existing Template */}
               {!editRoute && existingRoutes.length > 0 && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Copy className="w-4 h-4 text-primary" />
-                    <h3 className="text-sm font-semibold text-gray-700">Copy from Existing Route</h3>
+                    <h3 className="text-sm font-semibold text-gray-700">Copy from Existing Template</h3>
                   </div>
-                  <p className="text-xs text-gray-600 mb-3">Start with an existing route template and customize it</p>
+                  <p className="text-xs text-gray-600 mb-3">Start with an existing template and customize it</p>
 
                   {/* Custom Dropdown */}
                   <div className="relative" ref={copyDropdownRef}>
@@ -836,7 +868,7 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
                       onClick={() => setIsCopyDropdownOpen(!isCopyDropdownOpen)}
                       className="w-full px-3 py-2 border border-blue-300 rounded-lg text-sm bg-white hover:bg-gray-50 transition-all flex items-center justify-between"
                     >
-                      <span className="text-gray-700">Select a route to copy...</span>
+                      <span className="text-gray-700">Select a template to copy...</span>
                       <ChevronDown className="w-4 h-4 text-gray-400" />
                     </button>
 
@@ -867,13 +899,13 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Route Name *
+                      Template Name *
                     </label>
                     <input
                       type="text"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="e.g., Route 5 - Downtown Commercial"
+                      placeholder="e.g., Downtown Commercial - 24 Bins"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary transition-all"
                       required
                     />
@@ -886,7 +918,7 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
                     <textarea
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="Brief description of this route..."
+                      placeholder="Brief description of this template..."
                       rows={2}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary resize-none transition-all"
                     />
@@ -897,7 +929,7 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
               {/* Schedule Pattern */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Schedule Pattern</h3>
-                <p className="text-xs text-gray-500 mb-3">Select days this route typically runs</p>
+                <p className="text-xs text-gray-500 mb-3">Select days this template typically runs</p>
                 <div className="flex gap-2">
                   {DAYS_OF_WEEK.map((day, index) => {
                     const isSelected = formData.schedule_days.includes(day.full);
@@ -963,7 +995,7 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
                           <span className="hidden group-hover:inline">Revert to Original</span>
                         </>
                       ) : (
-                        'Optimize Route'
+                        'Preview Optimized'
                       )}
                     </button>
                   </div>
@@ -986,7 +1018,7 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
                     <div className="flex items-start gap-2">
                       <Sparkles className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
                       <div className="flex-1">
-                        <p className="text-xs font-semibold text-green-900 mb-2">Route Optimized!</p>
+                        <p className="text-xs font-semibold text-green-900 mb-2">Preview of Optimized Route!</p>
 
                         {/* Before/After Comparison */}
                         <div className="grid grid-cols-2 gap-2 mb-2">
@@ -1097,7 +1129,7 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
                 disabled={!formData.name || selectedBins.length === 0}
                 className="px-6 py-2 bg-primary hover:bg-primary/90 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-all"
               >
-                {editRoute ? 'Save Changes' : 'Create Route'}
+                {editRoute ? 'Save Changes' : 'Create Template'}
               </button>
             </div>
           </div>
