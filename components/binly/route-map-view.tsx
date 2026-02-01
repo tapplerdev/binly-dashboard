@@ -11,13 +11,6 @@ import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 10;
 
-// Default fallback warehouse coordinates (San Jose, CA)
-const DEFAULT_WAREHOUSE = {
-  lat: 37.3009357,
-  lng: -121.9493848,
-  address: '1185 Campbell Ave, San Jose, CA 95126, United States'
-};
-
 interface RouteMapViewProps {
   route: Route;
 }
@@ -25,9 +18,10 @@ interface RouteMapViewProps {
 // Polyline Component - Must be child of Map to use useMap
 interface RoutePolylineProps {
   bins: Bin[];
+  warehouseLocation: { lat: number; lng: number; address: string };
 }
 
-function RoutePolyline({ bins }: RoutePolylineProps) {
+function RoutePolyline({ bins, warehouseLocation }: RoutePolylineProps) {
   const map = useMap();
   const [polyline, setPolyline] = useState<google.maps.Polyline | null>(null);
 
@@ -38,7 +32,7 @@ function RoutePolyline({ bins }: RoutePolylineProps) {
       try {
         // Build route: warehouse -> bins -> warehouse (round trip)
         const binCoordinates = bins.map(bin => `${bin.longitude},${bin.latitude}`);
-        const warehouseCoordinate = `${WAREHOUSE_LOCATION.lng},${WAREHOUSE_LOCATION.lat}`;
+        const warehouseCoordinate = `${warehouseLocation.lng},${warehouseLocation.lat}`;
         const coordinates = [warehouseCoordinate, ...binCoordinates, warehouseCoordinate].join(';');
 
         // Mapbox Directions API endpoint
@@ -70,7 +64,7 @@ function RoutePolyline({ bins }: RoutePolylineProps) {
           if (map) {
             const bounds = new google.maps.LatLngBounds();
             // Include warehouse
-            bounds.extend(WAREHOUSE_LOCATION);
+            bounds.extend(warehouseLocation);
             // Include all bins
             bins.forEach(bin => {
               if (bin.latitude != null && bin.longitude != null) {
@@ -129,9 +123,11 @@ function RoutePolyline({ bins }: RoutePolylineProps) {
 
 export function RouteMapView({ route }: RouteMapViewProps) {
   const { data: warehouse } = useWarehouseLocation();
-  const WAREHOUSE_LOCATION = warehouse
-    ? { lat: warehouse.latitude, lng: warehouse.longitude, address: warehouse.address }
-    : DEFAULT_WAREHOUSE;
+  const WAREHOUSE_LOCATION = {
+    lat: warehouse?.latitude || 0,
+    lng: warehouse?.longitude || 0,
+    address: warehouse?.address || 'Warehouse'
+  };
 
   const [bins, setBins] = useState<Bin[]>([]);
   const [loading, setLoading] = useState(true);
@@ -206,7 +202,7 @@ export function RouteMapView({ route }: RouteMapViewProps) {
         mapTypeId="roadmap"
       >
         {/* Route Polyline with Animation */}
-        <RoutePolyline bins={bins} />
+        <RoutePolyline bins={bins} warehouseLocation={WAREHOUSE_LOCATION} />
 
         {/* Warehouse Marker - Start/End point */}
         <AdvancedMarker

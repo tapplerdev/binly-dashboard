@@ -14,13 +14,6 @@ import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 11;
 
-// Default fallback warehouse coordinates (San Jose, CA)
-const DEFAULT_WAREHOUSE = {
-  lat: 37.3009357,
-  lng: -121.9493848,
-  address: '1185 Campbell Ave, San Jose, CA 95126, United States'
-};
-
 // Route color
 const ROUTE_COLOR = '#4880FF';
 
@@ -229,9 +222,11 @@ function PulsingMarker({ bin, index, total }: { bin: Bin; index: number; total: 
 
 export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps) {
   const { data: warehouse } = useWarehouseLocation();
-  const WAREHOUSE_LOCATION = warehouse
-    ? { lat: warehouse.latitude, lng: warehouse.longitude, address: warehouse.address }
-    : DEFAULT_WAREHOUSE;
+  const WAREHOUSE_LOCATION = {
+    lat: warehouse?.latitude || 0,
+    lng: warehouse?.longitude || 0,
+    address: warehouse?.address || 'Warehouse'
+  };
 
   const [routes, setRoutes] = useState<Route[]>([]);
   const [allBins, setAllBins] = useState<Bin[]>([]);

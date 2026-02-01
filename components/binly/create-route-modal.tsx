@@ -28,13 +28,6 @@ const DAYS_OF_WEEK = [
   { short: 'S', full: 'Sun' },
 ];
 
-// Default fallback warehouse coordinates (San Jose, CA)
-const DEFAULT_WAREHOUSE = {
-  lat: 37.3009357,
-  lng: -121.9493848,
-  address: '1185 Campbell Ave, San Jose, CA 95126, United States'
-};
-
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 11;
 
@@ -513,9 +506,11 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
   // React Query hooks for data
   const { data: allBins = [], isLoading: loading } = useBins();
   const { data: warehouse } = useWarehouseLocation();
-  const WAREHOUSE_LOCATION = warehouse
-    ? { lat: warehouse.latitude, lng: warehouse.longitude, address: warehouse.address }
-    : DEFAULT_WAREHOUSE;
+  const WAREHOUSE_LOCATION = {
+    lat: warehouse?.latitude || 0,
+    lng: warehouse?.longitude || 0,
+    address: warehouse?.address || 'Warehouse'
+  };
 
   // Parse schedule_pattern back into days array
   const initialScheduleDays = editRoute?.schedule_pattern

@@ -10,9 +10,6 @@ import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 11;
 
-// Default fallback warehouse coordinates (San Jose, CA)
-const DEFAULT_WAREHOUSE = { lat: 37.3009357, lng: -121.9493848 };
-
 interface TemplateEditorModalProps {
   onClose: () => void;
   onSave: (data: {
@@ -107,9 +104,7 @@ export function TemplateEditorModal({
   isEditing = false
 }: TemplateEditorModalProps) {
   const { data: warehouse } = useWarehouseLocation();
-  const WAREHOUSE_LOCATION = warehouse
-    ? { lat: warehouse.latitude, lng: warehouse.longitude }
-    : DEFAULT_WAREHOUSE;
+  const WAREHOUSE_LOCATION = { lat: warehouse?.latitude || 0, lng: warehouse?.longitude || 0 };
 
   const [selectedBinIds, setSelectedBinIds] = useState<Set<string>>(
     new Set(initialData?.bin_ids || [])

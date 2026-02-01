@@ -666,10 +666,11 @@ export function LiveMapView() {
             })}
 
         {/* Warehouse marker - Home icon */}
+        {warehouse && (
         <AdvancedMarker
-          position={warehouse ? { lat: warehouse.latitude, lng: warehouse.longitude } : { lat: 37.3009357, lng: -121.9493848 }}
+          position={{ lat: warehouse.latitude, lng: warehouse.longitude }}
           zIndex={20} // Highest to appear above everything
-          title={warehouse?.address || "Warehouse - Base of Operations"}
+          title={warehouse.address || "Warehouse - Base of Operations"}
         >
           <div className="relative">
             {/* Home icon container */}
@@ -684,6 +685,7 @@ export function LiveMapView() {
             </div>
           </div>
         </AdvancedMarker>
+        )}
         </Map>
       </APIProvider>
     </div>

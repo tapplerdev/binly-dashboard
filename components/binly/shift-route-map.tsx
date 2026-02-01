@@ -19,14 +19,9 @@ interface ShiftRouteMapProps {
   isOptimized: boolean;
 }
 
-// Default fallback warehouse coordinates (San Jose, CA)
-const DEFAULT_WAREHOUSE = { lat: 37.3009357, lng: -121.9493848 };
-
 export function ShiftRouteMap({ bins, isOptimized }: ShiftRouteMapProps) {
   const { data: warehouse } = useWarehouseLocation();
-  const WAREHOUSE_LOCATION = warehouse
-    ? { lat: warehouse.latitude, lng: warehouse.longitude }
-    : DEFAULT_WAREHOUSE;
+  const WAREHOUSE_LOCATION = { lat: warehouse?.latitude || 0, lng: warehouse?.longitude || 0 };
   // Filter bins with valid coordinates and sort by sequence
   const mappableBins = useMemo(() => {
     return bins
