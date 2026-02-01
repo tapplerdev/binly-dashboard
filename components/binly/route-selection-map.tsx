@@ -28,8 +28,21 @@ interface RouteSelectionMapProps {
   onConfirm: (selectedRoute: Route, routeBins: Bin[]) => void;
 }
 
-// Route Polyline Component - Renders animated polyline for selected route
-function RoutePolyline({ route, routeBins }: { route: Route; routeBins: Bin[] }) {
+// ============================================================================
+// RETIRED CODE - Route Polyline Rendering (2026-01-31)
+// ============================================================================
+// Reason: Moving to template-based system where routes aren't pre-optimized.
+// Showing polylines with animated routes implies pre-calculated route order,
+// which is misleading since templates are just bin collections. Actual route
+// optimization happens when driver starts shift using HERE Maps API with
+// real-time traffic and driver's current location.
+//
+// This code is preserved for potential future use if we want to show
+// route previews after optimization or for visualization purposes.
+// ============================================================================
+/*
+// Route Polyline Component - RETIRED - Renders animated polyline for selected route
+function RoutePolylineRetired({ route, routeBins }: { route: Route; routeBins: Bin[] }) {
   const map = useMap();
   const polylineRef = useRef<google.maps.Polyline | null>(null);
   const glowPolylineRef = useRef<google.maps.Polyline | null>(null);
@@ -158,12 +171,13 @@ function RoutePolyline({ route, routeBins }: { route: Route; routeBins: Bin[] })
 
   return null;
 }
+*/
+// ============================================================================
+// END RETIRED CODE
+// ============================================================================
 
-// Pulsing Marker Component
+// Pulsing Marker Component - Shows bins without implying order
 function PulsingMarker({ bin, index, total }: { bin: Bin; index: number; total: number }) {
-  const isFirst = index === 0;
-  const isLast = index === total - 1;
-
   return (
     <AdvancedMarker
       key={bin.id}
@@ -176,26 +190,13 @@ function PulsingMarker({ bin, index, total }: { bin: Bin; index: number; total: 
           <div className="w-12 h-12 rounded-full bg-primary opacity-30 animate-ping" />
         </div>
 
-        {/* Bin number marker */}
+        {/* Bin number marker - no special colors for first/last (template, not optimized route) */}
         <div
-          className={`relative w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg ${
-            isFirst ? 'bg-green-600 ring-4 ring-green-200' :
-            isLast ? 'bg-red-600 ring-4 ring-red-200' :
-            'bg-primary ring-2 ring-white'
-          }`}
+          className="relative w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg bg-primary ring-2 ring-white"
           title={`Bin #${bin.bin_number}`}
         >
           {bin.bin_number}
         </div>
-
-        {/* Label for first/last */}
-        {(isFirst || isLast) && (
-          <div className={`absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs font-semibold px-2 py-0.5 rounded ${
-            isFirst ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'
-          }`}>
-            {isFirst ? 'START' : 'END'}
-          </div>
-        )}
       </div>
     </AdvancedMarker>
   );
@@ -298,8 +299,8 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
         <div className="p-6 border-b border-gray-200 shrink-0">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Select Route for Shift</h2>
-              <p className="text-sm text-gray-600 mt-1">Click on a route to view it on the map</p>
+              <h2 className="text-2xl font-bold text-gray-900">Select Template for Shift</h2>
+              <p className="text-sm text-gray-600 mt-1">Click on a template to view bins on the map</p>
             </div>
             <button
               onClick={onClose}
@@ -325,10 +326,8 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
                 gestureHandling="greedy"
                 className="w-full h-full"
               >
-                {/* Route Polyline with pulsing animation */}
-                {selectedRoute && routeBins.length >= 2 && (
-                  <RoutePolyline route={selectedRoute} routeBins={routeBins} />
-                )}
+                {/* Route Polyline - RETIRED - No longer showing polylines for templates */}
+                {/* Templates are unoptimized bin collections - routes optimized when driver starts shift */}
 
                 {/* Pulsing Bin Markers */}
                 {routeBins.map((bin, index) => (
@@ -377,11 +376,11 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
             )}
           </div>
 
-          {/* Routes List - Right Side */}
+          {/* Templates List - Right Side */}
           <div className="w-96 border-l border-gray-200 flex flex-col bg-gray-50">
             <div className="p-4 border-b border-gray-200 bg-white shrink-0">
               <p className="text-sm font-medium text-gray-700">
-                {routes.length} {routes.length === 1 ? 'route' : 'routes'} available
+                {routes.length} {routes.length === 1 ? 'template' : 'templates'} available
               </p>
             </div>
 
@@ -389,8 +388,8 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
               {routes.length === 0 ? (
                 <div className="text-center py-12">
                   <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-sm text-gray-500">No routes found</p>
-                  <p className="text-xs text-gray-400 mt-1">Create routes in Operations → Routes</p>
+                  <p className="text-sm text-gray-500">No templates found</p>
+                  <p className="text-xs text-gray-400 mt-1">Create templates in Operations → Routes</p>
                 </div>
               ) : (
                 routes.map((route) => (
@@ -449,21 +448,28 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
         {/* Footer */}
         <div className="p-6 border-t border-gray-200 bg-gray-50 shrink-0">
           <div className="flex items-center justify-between gap-4">
-            <p className="text-sm text-gray-600">
-              {selectedRoute ? (
-                <>
-                  Selected: <span className="font-medium text-gray-900">{selectedRoute.name}</span> ({routeBins.length} bins)
-                </>
-              ) : (
-                'Select a route to import'
+            <div>
+              <p className="text-sm text-gray-600">
+                {selectedRoute ? (
+                  <>
+                    Selected: <span className="font-medium text-gray-900">{selectedRoute.name}</span> ({routeBins.length} bins)
+                  </>
+                ) : (
+                  'Select a template to import'
+                )}
+              </p>
+              {selectedRoute && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Route will be optimized when driver starts shift
+                </p>
               )}
-            </p>
+            </div>
             <div className="flex gap-3">
               <Button onClick={onClose} variant="outline">
                 Cancel
               </Button>
               <Button onClick={handleConfirm} disabled={!selectedRoute}>
-                Import Route ({routeBins.length} bins)
+                Import Template ({routeBins.length} bins)
               </Button>
             </div>
           </div>
