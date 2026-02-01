@@ -1300,6 +1300,7 @@ function CreateShiftDrawer({
   onClose: () => void;
 }) {
   const { data: drivers = [], isLoading: loadingDrivers } = useDrivers();
+  const { data: warehouse } = useWarehouseLocation();
   const { token } = useAuthStore();
 
   const [driverId, setDriverId] = useState('');
