@@ -304,8 +304,13 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full h-[90vh] max-w-7xl flex flex-col overflow-hidden">
+    <>
+      {/* Overlay */}
+      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
+
+      {/* Modal */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+        <div className="bg-white rounded-2xl shadow-2xl w-full h-[90vh] max-w-7xl flex flex-col overflow-hidden pointer-events-auto">
         {/* Header */}
         <div className="p-6 border-b border-gray-200 shrink-0">
           <div className="flex items-center justify-between">
@@ -331,12 +336,9 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
                 defaultCenter={DEFAULT_CENTER}
                 defaultZoom={DEFAULT_ZOOM}
                 mapId="route-selection-map"
-                disableDefaultUI={true}
                 gestureHandling="greedy"
-                zoomControl={true}
-                clickableIcons={false}
+                disableDefaultUI={false}
                 className="w-full h-full"
-                style={{ width: '100%', height: '100%' }}
               >
                 {/* Map Controller - Auto-fit bounds when route selected */}
                 {selectedRoute && routeBins.length > 0 && (
@@ -491,7 +493,8 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
             </div>
           </div>
         </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
