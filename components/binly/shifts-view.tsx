@@ -37,7 +37,14 @@ export function ShiftsView() {
   // React Query hooks
   const { data: shifts = [], isLoading: loadingShifts } = useShifts();
   const assignRouteMutation = useAssignRoute();
-  const { data: warehouse } = useWarehouseLocation();
+  const { data: warehouse, isLoading: warehouseLoading, error: warehouseError } = useWarehouseLocation();
+
+  // Debug warehouse location
+  useEffect(() => {
+    console.log('🏭 [WAREHOUSE DEBUG] Warehouse data:', warehouse);
+    console.log('🏭 [WAREHOUSE DEBUG] Loading:', warehouseLoading);
+    console.log('🏭 [WAREHOUSE DEBUG] Error:', warehouseError);
+  }, [warehouse, warehouseLoading, warehouseError]);
 
   // Local state
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -1374,6 +1381,12 @@ function CreateShiftDrawer({
 
   // Task management
   const addWarehouseStop = () => {
+    console.log('🏭 [ADD WAREHOUSE STOP] warehouse data:', warehouse);
+    console.log('🏭 [ADD WAREHOUSE STOP] Using coords:', {
+      lat: warehouse?.latitude || 0,
+      lng: warehouse?.longitude || 0,
+      address: warehouse?.address || 'Warehouse'
+    });
     const newTask: ShiftTask = {
       id: `temp-${Date.now()}`,
       type: 'warehouse_stop',
@@ -2282,6 +2295,13 @@ function CreateShiftDrawer({
         }
 
         return baseTask;
+      });
+
+      console.log('🏭 [SHIFT SUBMIT] Warehouse data:', warehouse);
+      console.log('🏭 [SHIFT SUBMIT] Warehouse coords:', {
+        lat: warehouse?.latitude || 0,
+        lng: warehouse?.longitude || 0,
+        address: warehouse?.address || 'Warehouse'
       });
 
       const payload = {
