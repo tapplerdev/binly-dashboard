@@ -1,6 +1,6 @@
 'use client';
 
-import { X, MapPin, User, Calendar, FileText, Check, Trash2, Map, ExternalLink } from 'lucide-react';
+import { X, MapPin, User, Calendar, FileText, Check, Trash2, Map, ExternalLink, Truck, UserCog } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { APIProvider, Map as GoogleMap, AdvancedMarker } from '@vis.gl/react-google-maps';
@@ -21,6 +21,7 @@ interface PotentialLocation {
   converted_to_bin_id?: string;
   converted_at_iso?: string;
   converted_by_user_id?: string;
+  converted_via_shift_id?: string;
   bin_number?: number;
 }
 
@@ -73,10 +74,23 @@ export function PotentialLocationDetailsDrawer({
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <h2 className="text-lg md:text-xl font-bold text-primary">Potential Location</h2>
                 {isConverted && (
-                  <Badge variant="default" className="gap-1">
-                    <Check className="w-3 h-3" />
-                    Converted
-                  </Badge>
+                  <>
+                    <Badge variant="default" className="gap-1">
+                      <Check className="w-3 h-3" />
+                      Converted
+                    </Badge>
+                    {location.converted_via_shift_id ? (
+                      <Badge variant="secondary" className="gap-1 bg-blue-100 text-blue-700 hover:bg-blue-200">
+                        <Truck className="w-3 h-3" />
+                        Driver Placement
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="gap-1 bg-purple-100 text-purple-700 hover:bg-purple-200">
+                        <UserCog className="w-3 h-3" />
+                        Manager Conversion
+                      </Badge>
+                    )}
+                  </>
                 )}
               </div>
               <p className="text-sm text-gray-600">Location ID: {location.id.slice(0, 8)}...</p>
@@ -209,7 +223,11 @@ export function PotentialLocationDetailsDrawer({
             <div className="p-4 md:p-6 border-b border-gray-200 bg-green-50">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                  <Check className="w-5 h-5 text-green-600" />
+                  {location.converted_via_shift_id ? (
+                    <Truck className="w-5 h-5 text-green-600" />
+                  ) : (
+                    <Check className="w-5 h-5 text-green-600" />
+                  )}
                 </div>
                 <div className="flex-1">
                   <p className="text-xs font-semibold text-green-900 uppercase tracking-wide mb-1">
@@ -221,9 +239,27 @@ export function PotentialLocationDetailsDrawer({
                   <p className="text-xs text-green-700">
                     {formatDate(location.converted_at_iso!)}
                   </p>
-                  {location.converted_by_user_id && (
-                    <p className="text-xs text-green-700 mt-1">
-                      By: {location.converted_by_user_id.slice(0, 8)}...
+
+                  {/* Show conversion type with context */}
+                  {location.converted_via_shift_id ? (
+                    <>
+                      <p className="text-xs text-green-700 mt-2">
+                        <span className="font-semibold">Placed by driver</span> during active shift
+                      </p>
+                      <button
+                        onClick={() => router.push(`/operations/shifts/${location.converted_via_shift_id}`)}
+                        className="mt-2 inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline font-medium"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        View Shift Details
+                      </button>
+                    </>
+                  ) : (
+                    <p className="text-xs text-green-700 mt-2">
+                      <span className="font-semibold">Converted manually</span> by manager
+                      {location.converted_by_user_id && (
+                        <span className="block mt-1">User ID: {location.converted_by_user_id.slice(0, 8)}...</span>
+                      )}
                     </p>
                   )}
                 </div>
