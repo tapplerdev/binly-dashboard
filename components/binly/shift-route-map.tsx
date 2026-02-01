@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
+import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 
 interface ShiftBin {
   id: number;
@@ -18,10 +19,14 @@ interface ShiftRouteMapProps {
   isOptimized: boolean;
 }
 
-// Warehouse coordinates
-const WAREHOUSE_LOCATION = { lat: 37.34692, lng: -121.92984 };
+// Default fallback warehouse coordinates (San Jose, CA)
+const DEFAULT_WAREHOUSE = { lat: 37.3009357, lng: -121.9493848 };
 
 export function ShiftRouteMap({ bins, isOptimized }: ShiftRouteMapProps) {
+  const { data: warehouse } = useWarehouseLocation();
+  const WAREHOUSE_LOCATION = warehouse
+    ? { lat: warehouse.latitude, lng: warehouse.longitude }
+    : DEFAULT_WAREHOUSE;
   // Filter bins with valid coordinates and sort by sequence
   const mappableBins = useMemo(() => {
     return bins

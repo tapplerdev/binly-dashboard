@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Search, Lasso, Navigation, Copy, ChevronDown, Sparkles, Loader2 } from 'lucide-react';
 import { Route } from '@/lib/types/route';
 import { useBins } from '@/lib/hooks/use-bins';
+import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 
@@ -27,11 +28,11 @@ const DAYS_OF_WEEK = [
   { short: 'S', full: 'Sun' },
 ];
 
-// Warehouse location - all routes end here
-const WAREHOUSE_LOCATION = {
-  lat: 11.1867045,
-  lng: -74.2362302,
-  address: 'Cl. 29 #1-65, Gaira, Santa Marta, Magdalena'
+// Default fallback warehouse coordinates (San Jose, CA)
+const DEFAULT_WAREHOUSE = {
+  lat: 37.3009357,
+  lng: -121.9493848,
+  address: '1185 Campbell Ave, San Jose, CA 95126, United States'
 };
 
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -509,8 +510,12 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
 }
 
 export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes: propExistingRoutes = [] }: CreateRouteModalProps) {
-  // React Query hook for bins data
+  // React Query hooks for data
   const { data: allBins = [], isLoading: loading } = useBins();
+  const { data: warehouse } = useWarehouseLocation();
+  const WAREHOUSE_LOCATION = warehouse
+    ? { lat: warehouse.latitude, lng: warehouse.longitude, address: warehouse.address }
+    : DEFAULT_WAREHOUSE;
 
   // Parse schedule_pattern back into days array
   const initialScheduleDays = editRoute?.schedule_pattern

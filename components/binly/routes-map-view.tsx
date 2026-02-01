@@ -6,16 +6,17 @@ import { Route } from '@/lib/types/route';
 import { getBins } from '@/lib/api/bins';
 import { Bin, isMappableBin } from '@/lib/types/bin';
 import { Loader2 } from 'lucide-react';
+import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 
 // Default map center (San Jose, CA area)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 11;
 
-// Warehouse location - all routes start and end here
-const WAREHOUSE_LOCATION = {
-  lat: 11.1867045,
-  lng: -74.2362302,
-  address: 'Cl. 29 #1-65, Gaira, Santa Marta, Magdalena'
+// Default fallback warehouse coordinates (San Jose, CA)
+const DEFAULT_WAREHOUSE = {
+  lat: 37.3009357,
+  lng: -121.9493848,
+  address: '1185 Campbell Ave, San Jose, CA 95126, United States'
 };
 
 // Format duration: show minutes if < 1 hour, otherwise show hours
@@ -355,6 +356,11 @@ function AllRoutesPolylines({ routes, visibleRouteIds, allBins, onRouteSelect, o
 }
 
 export function RoutesMapView({ routes, visibleRouteIds, onRouteSelect, onViewDetails, selectedRouteId }: RoutesMapViewProps) {
+  const { data: warehouse } = useWarehouseLocation();
+  const WAREHOUSE_LOCATION = warehouse
+    ? { lat: warehouse.latitude, lng: warehouse.longitude, address: warehouse.address }
+    : DEFAULT_WAREHOUSE;
+
   const [allBins, setAllBins] = useState<Bin[]>([]);
   const [loading, setLoading] = useState(true);
   const [hoveredRouteId, setHoveredRouteId] = useState<string | null>(null);

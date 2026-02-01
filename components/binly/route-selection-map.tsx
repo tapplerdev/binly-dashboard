@@ -8,16 +8,17 @@ import { getRoutes } from '@/lib/api/routes';
 import { getBins } from '@/lib/api/bins';
 import { X, MapPin, Calendar, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 
 // Default map center (San Jose, CA area)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 11;
 
-// Warehouse location - routes start and end here
-const WAREHOUSE_LOCATION = {
-  lat: 11.1867045,
-  lng: -74.2362302,
-  address: 'Cl. 29 #1-65, Gaira, Santa Marta, Magdalena'
+// Default fallback warehouse coordinates (San Jose, CA)
+const DEFAULT_WAREHOUSE = {
+  lat: 37.3009357,
+  lng: -121.9493848,
+  address: '1185 Campbell Ave, San Jose, CA 95126, United States'
 };
 
 // Route color
@@ -227,6 +228,11 @@ function PulsingMarker({ bin, index, total }: { bin: Bin; index: number; total: 
 }
 
 export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps) {
+  const { data: warehouse } = useWarehouseLocation();
+  const WAREHOUSE_LOCATION = warehouse
+    ? { lat: warehouse.latitude, lng: warehouse.longitude, address: warehouse.address }
+    : DEFAULT_WAREHOUSE;
+
   const [routes, setRoutes] = useState<Route[]>([]);
   const [allBins, setAllBins] = useState<Bin[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);

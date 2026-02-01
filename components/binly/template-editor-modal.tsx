@@ -4,13 +4,14 @@ import { useState, useMemo, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { X, Search, Lasso, AlertCircle, Save } from 'lucide-react';
+import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 
 // Default map center (San Jose, CA)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 11;
 
-// Warehouse location
-const WAREHOUSE_LOCATION = { lat: 37.34692, lng: -121.92984 };
+// Default fallback warehouse coordinates (San Jose, CA)
+const DEFAULT_WAREHOUSE = { lat: 37.3009357, lng: -121.9493848 };
 
 interface TemplateEditorModalProps {
   onClose: () => void;
@@ -105,6 +106,11 @@ export function TemplateEditorModal({
   allBins,
   isEditing = false
 }: TemplateEditorModalProps) {
+  const { data: warehouse } = useWarehouseLocation();
+  const WAREHOUSE_LOCATION = warehouse
+    ? { lat: warehouse.latitude, lng: warehouse.longitude }
+    : DEFAULT_WAREHOUSE;
+
   const [selectedBinIds, setSelectedBinIds] = useState<Set<string>>(
     new Set(initialData?.bin_ids || [])
   );

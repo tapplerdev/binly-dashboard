@@ -8,6 +8,7 @@ import { useNoGoZones } from '@/lib/hooks/use-zones';
 import { usePotentialLocations, potentialLocationKeys } from '@/lib/hooks/use-potential-locations';
 import { useActiveDrivers } from '@/lib/hooks/use-active-drivers';
 import { useWebSocket, WebSocketMessage } from '@/lib/hooks/use-websocket';
+import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import {
   Bin,
   isMappableBin,
@@ -171,6 +172,7 @@ function ZoneCircles({
 
 export function LiveMapView() {
   const queryClient = useQueryClient();
+  const { data: warehouse } = useWarehouseLocation();
 
   // Get auth token from localStorage (Zustand persist storage)
   const getAuthToken = () => {
@@ -665,9 +667,9 @@ export function LiveMapView() {
 
         {/* Warehouse marker - Home icon */}
         <AdvancedMarker
-          position={{ lat: 37.34692, lng: -121.92984 }}
+          position={warehouse ? { lat: warehouse.latitude, lng: warehouse.longitude } : { lat: 37.3009357, lng: -121.9493848 }}
           zIndex={20} // Highest to appear above everything
-          title="Warehouse - Base of Operations"
+          title={warehouse?.address || "Warehouse - Base of Operations"}
         >
           <div className="relative">
             {/* Home icon container */}

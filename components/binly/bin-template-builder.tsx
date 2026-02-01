@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { useBins } from '@/lib/hooks/use-bins';
+import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { Route } from '@/lib/types/route';
 import { getRoutes, createRoute, updateRoute, deleteRoute } from '@/lib/api/routes';
@@ -14,11 +15,15 @@ import { DeleteConfirmationModal } from './delete-confirmation-modal';
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 11;
 
-// Warehouse location
-const WAREHOUSE_LOCATION = { lat: 37.34692, lng: -121.92984 };
+// Default fallback warehouse coordinates (San Jose, CA)
+const DEFAULT_WAREHOUSE = { lat: 37.3009357, lng: -121.9493848 };
 
 export function BinTemplateBuilder() {
   const { data: bins = [], isLoading: loadingBins } = useBins();
+  const { data: warehouse } = useWarehouseLocation();
+  const WAREHOUSE_LOCATION = warehouse
+    ? { lat: warehouse.latitude, lng: warehouse.longitude }
+    : DEFAULT_WAREHOUSE;
   const [templates, setTemplates] = useState<Route[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [selectedTemplate, setSelectedTemplate] = useState<Route | null>(null);
