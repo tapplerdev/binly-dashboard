@@ -1276,7 +1276,7 @@ interface ShiftTask {
   fill_percentage?: number;
   // Placement fields
   potential_location_id?: string;
-  new_bin_number?: string;
+  new_bin_number?: number;
   // Move request fields
   move_request_id?: string;
   destination_latitude?: number;
@@ -1508,11 +1508,16 @@ function CreateShiftDrawer({
       selectedLocationIds.includes(loc.id)
     );
 
-    const placementTasks: ShiftTask[] = selectedLocations.map(location => ({
+    // Calculate next available bin number
+    const maxBinNumber = allBins.length > 0
+      ? Math.max(...allBins.map(b => b.bin_number))
+      : 0;
+
+    const placementTasks: ShiftTask[] = selectedLocations.map((location, index) => ({
       id: `temp-${Date.now()}-${location.id}`,
       type: 'placement',
       potential_location_id: location.id,
-      new_bin_number: '', // Manager can edit this later
+      new_bin_number: maxBinNumber + index + 1, // Auto-assign sequential bin numbers
       latitude: location.latitude || 0,
       longitude: location.longitude || 0,
       address: location.address || location.street,
@@ -2281,7 +2286,9 @@ function CreateShiftDrawer({
           baseTask.fill_percentage = task.fill_percentage;
         } else if (task.type === 'placement') {
           baseTask.potential_location_id = task.potential_location_id;
-          baseTask.new_bin_number = task.new_bin_number;
+          if (task.new_bin_number !== undefined && task.new_bin_number !== null) {
+            baseTask.new_bin_number = task.new_bin_number;
+          }
         } else if (task.type === 'pickup' || task.type === 'dropoff') {
           // Pickup/dropoff tasks from move requests
           baseTask.move_request_id = task.move_request_id;
@@ -2999,9 +3006,9 @@ function CreateShiftDrawer({
                 <div>
                   <label className="text-sm font-medium text-gray-700 block mb-1">New Bin Number</label>
                   <input
-                    type="text"
+                    type="number"
                     value={editingTask.new_bin_number || ''}
-                    onChange={(e) => handleEditTaskChange('new_bin_number', e.target.value)}
+                    onChange={(e) => handleEditTaskChange('new_bin_number', e.target.value ? parseInt(e.target.value) : undefined)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
                   />
                 </div>
