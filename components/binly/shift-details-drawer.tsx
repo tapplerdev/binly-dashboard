@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle } from 'lucide-react';
+import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, ArrowUp, ArrowDown, Warehouse } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shift';
-import { getShiftById, cancelShift } from '@/lib/api/shifts';
+import { getShiftById, getShiftTasks, cancelShift } from '@/lib/api/shifts';
+import { RouteTask, getTaskLabel, getTaskSubtitle, getTaskColor, getTaskBgColor } from '@/lib/types/route-task';
 import { ShiftRouteMap } from './shift-route-map';
 
 interface ShiftBin {
@@ -29,6 +30,7 @@ interface ShiftDetailsDrawerProps {
 
 export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) {
   const [isClosing, setIsClosing] = useState(false);
+  const [tasks, setTasks] = useState<RouteTask[]>([]);
   const [bins, setBins] = useState<ShiftBin[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -39,8 +41,20 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
     async function loadShiftDetails() {
       try {
         setLoading(true);
-        const details = await getShiftById(shift.id); // Fetch specific shift by ID
-        setBins(details.bins || []);
+
+        // Try to fetch tasks first (new system)
+        const tasksData = await getShiftTasks(shift.id);
+
+        if (tasksData && tasksData.length > 0) {
+          // New task-based system
+          setTasks(tasksData);
+          console.log('✅ Loaded shift with tasks:', tasksData.length);
+        } else {
+          // Fallback to old bins system
+          const details = await getShiftById(shift.id);
+          setBins(details.bins || []);
+          console.log('✅ Loaded shift with bins:', details.bins?.length || 0);
+        }
       } catch (error) {
         console.error('Failed to load shift details:', error);
       } finally {
@@ -89,8 +103,15 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
   const isActive = shift.status === 'active';
   const isCompleted = shift.status === 'completed';
 
-  const collectedCount = bins.filter(b => b.is_completed === 1).length;
-  const progressPercentage = bins.length > 0 ? Math.round((collectedCount / bins.length) * 100) : 0;
+  // Support both task-based and bin-based systems
+  const usingTasks = tasks.length > 0;
+  const totalItems = usingTasks ? tasks.length : bins.length;
+  const completedItems = usingTasks
+    ? tasks.filter(t => t.is_completed === 1).length
+    : bins.filter(b => b.is_completed === 1).length;
+
+  const collectedCount = completedItems;
+  const progressPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
   const totalWeight = 145; // Mock for now - backend doesn't track weight yet
 
   return (
@@ -264,6 +285,10 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
               <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
                 <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
+            ) : usingTasks ? (
+              <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
+                <p className="text-sm text-gray-500">Task-based route map coming soon</p>
+              </div>
             ) : (
               <ShiftRouteMap
                 bins={bins}
@@ -272,10 +297,10 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
             )}
           </div>
 
-          {/* Bin List */}
+          {/* Task/Bin List */}
           <div className="p-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">
-              Bins ({shift.binCount})
+              {usingTasks ? `Tasks (${shift.binCount})` : `Bins (${shift.binCount})`}
               {shift.optimization_metadata && (
                 <span className="ml-2 text-xs text-gray-500 font-normal">- Optimized Order</span>
               )}
@@ -284,79 +309,174 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
               <div className="flex items-center justify-center py-8">
                 <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
-            ) : bins.length === 0 ? (
-              <div className="bg-gray-50 rounded-lg p-6 text-center border border-gray-200">
-                <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-sm text-gray-600">No bins assigned to this shift</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {bins
-                  .sort((a, b) => a.sequence_order - b.sequence_order)
-                  .map((bin, index) => {
-                  const isCompleted = bin.is_completed === 1;
-                  const collectedTime = bin.completed_at
-                    ? new Date(bin.completed_at * 1000).toLocaleTimeString('en-US', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: true
-                      })
-                    : null;
+            ) : usingTasks ? (
+              // New task-based rendering
+              tasks.length === 0 ? (
+                <div className="bg-gray-50 rounded-lg p-6 text-center border border-gray-200">
+                  <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-sm text-gray-600">No tasks assigned to this shift</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {tasks
+                    .sort((a, b) => a.sequence_order - b.sequence_order)
+                    .map((task) => {
+                    const isCompleted = task.is_completed === 1;
+                    const completedTime = task.completed_at
+                      ? new Date(task.completed_at * 1000).toLocaleTimeString('en-US', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true
+                        })
+                      : null;
 
-                  return (
-                    <div
-                      key={bin.id}
-                      className={`flex items-center gap-3 p-3 rounded-lg border transition-fast ${
-                        isCompleted
-                          ? 'bg-green-50 border-green-200'
-                          : 'bg-white border-gray-200 hover:bg-gray-50'
-                      }`}
-                    >
-                      {/* Sequence Number Badge (only show if optimized and sequence > 0) */}
-                      {shift.optimization_metadata && bin.sequence_order > 0 && (
+                    // Get task type icon
+                    const TaskIcon =
+                      task.task_type === 'collection' ? Trash2 :
+                      task.task_type === 'placement' ? MapPin :
+                      task.task_type === 'pickup' ? ArrowUp :
+                      task.task_type === 'dropoff' ? ArrowDown :
+                      task.task_type === 'warehouse_stop' ? Warehouse :
+                      Circle;
+
+                    return (
+                      <div
+                        key={task.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg border transition-fast ${
+                          isCompleted
+                            ? 'bg-green-50 border-green-200'
+                            : 'bg-white border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        {/* Sequence Number Badge */}
                         <div className="flex-shrink-0">
                           <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center">
-                            <span className="text-xs font-bold text-white">{bin.sequence_order}</span>
+                            <span className="text-xs font-bold text-white">{task.sequence_order}</span>
                           </div>
                         </div>
-                      )}
 
-                      {/* Status Icon */}
-                      <div className="flex-shrink-0">
-                        {isCompleted ? (
-                          <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
-                            <Check className="w-4 h-4 text-white" />
+                        {/* Task Type Icon */}
+                        <div className="flex-shrink-0">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${getTaskBgColor(task.task_type)}`}>
+                            <TaskIcon className={`w-4 h-4 ${getTaskColor(task.task_type)}`} />
                           </div>
-                        ) : (
-                          <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
-                            <Circle className="w-3 h-3 text-gray-400" />
+                        </div>
+
+                        {/* Status Icon */}
+                        <div className="flex-shrink-0">
+                          {isCompleted ? (
+                            <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
+                              <Check className="w-4 h-4 text-white" />
+                            </div>
+                          ) : (
+                            <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
+                              <Circle className="w-3 h-3 text-gray-400" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Task Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <p className="font-medium text-gray-900">{getTaskLabel(task)}</p>
+                            {isCompleted && completedTime && (
+                              <span className="text-xs text-green-600">@ {completedTime}</span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-500 truncate">
+                            {getTaskSubtitle(task)}
+                          </p>
+                        </div>
+
+                        {/* Fill Percentage (only for collection tasks) */}
+                        {task.task_type === 'collection' && (
+                          <div className="flex-shrink-0 text-right">
+                            <p className="text-sm font-semibold text-gray-900">
+                              {task.updated_fill_percentage ?? task.fill_percentage}% Fill
+                            </p>
                           </div>
                         )}
                       </div>
+                    );
+                  })}
+                </div>
+              )
+            ) : (
+              // Old bin-based rendering (fallback)
+              bins.length === 0 ? (
+                <div className="bg-gray-50 rounded-lg p-6 text-center border border-gray-200">
+                  <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-sm text-gray-600">No bins assigned to this shift</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {bins
+                    .sort((a, b) => a.sequence_order - b.sequence_order)
+                    .map((bin) => {
+                    const isCompleted = bin.is_completed === 1;
+                    const collectedTime = bin.completed_at
+                      ? new Date(bin.completed_at * 1000).toLocaleTimeString('en-US', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true
+                        })
+                      : null;
 
-                      {/* Bin Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <p className="font-medium text-gray-900">Bin #{bin.bin_number}</p>
-                          {isCompleted && collectedTime && (
-                            <span className="text-xs text-green-600">@ {collectedTime}</span>
+                    return (
+                      <div
+                        key={bin.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg border transition-fast ${
+                          isCompleted
+                            ? 'bg-green-50 border-green-200'
+                            : 'bg-white border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        {/* Sequence Number Badge (only show if optimized and sequence > 0) */}
+                        {shift.optimization_metadata && bin.sequence_order > 0 && (
+                          <div className="flex-shrink-0">
+                            <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center">
+                              <span className="text-xs font-bold text-white">{bin.sequence_order}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Status Icon */}
+                        <div className="flex-shrink-0">
+                          {isCompleted ? (
+                            <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
+                              <Check className="w-4 h-4 text-white" />
+                            </div>
+                          ) : (
+                            <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
+                              <Circle className="w-3 h-3 text-gray-400" />
+                            </div>
                           )}
                         </div>
-                        <p className="text-sm text-gray-500 truncate">
-                          {bin.current_street}, {bin.city} {bin.zip}
-                        </p>
-                      </div>
 
-                      {/* Fill Percentage */}
-                      <div className="flex-shrink-0 text-right">
-                        <p className="text-sm font-semibold text-gray-900">
-                          {bin.updated_fill_percentage ?? bin.fill_percentage}% Fill
-                        </p>
+                        {/* Bin Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <p className="font-medium text-gray-900">Bin #{bin.bin_number}</p>
+                            {isCompleted && collectedTime && (
+                              <span className="text-xs text-green-600">@ {collectedTime}</span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-500 truncate">
+                            {bin.current_street}, {bin.city} {bin.zip}
+                          </p>
+                        </div>
+
+                        {/* Fill Percentage */}
+                        <div className="flex-shrink-0 text-right">
+                          <p className="text-sm font-semibold text-gray-900">
+                            {bin.updated_fill_percentage ?? bin.fill_percentage}% Fill
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )
             )}
           </div>
         </div>
