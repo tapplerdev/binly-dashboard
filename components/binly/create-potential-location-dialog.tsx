@@ -147,38 +147,19 @@ export function CreatePotentialLocationDialog({
     }
   }, [open]);
 
-  // Reverse geocode coordinates to address (for map clicks)
+  // Reverse geocode coordinates to address (for map clicks) - using HERE Maps
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     setReverseGeocoding(true);
     try {
-      const geocoder = new google.maps.Geocoder();
-      const result = await geocoder.geocode({ location: { lat, lng } });
+      const result = await hereReverseGeocode(lat, lng);
 
-      if (result.results && result.results[0]) {
-        const place = result.results[0];
-        let street = '';
-        let city = '';
-        let zip = '';
-
-        place.address_components.forEach((component) => {
-          if (component.types.includes('street_number')) {
-            street = component.long_name + ' ';
-          }
-          if (component.types.includes('route')) {
-            street += component.long_name;
-          }
-          if (component.types.includes('locality')) {
-            city = component.long_name;
-          }
-          if (component.types.includes('postal_code')) {
-            zip = component.long_name;
-          }
-        });
+      if (result) {
+        console.log('✅ POTENTIAL LOCATION: Reverse geocoding from map click successful');
 
         setFormData({
-          street: street.trim() || place.formatted_address,
-          city: city,
-          zip: zip,
+          street: result.street,
+          city: result.city,
+          zip: result.zip,
           latitude: lat.toString(),
           longitude: lng.toString(),
           notes: '',
@@ -189,9 +170,12 @@ export function CreatePotentialLocationDialog({
           zip: true,
           coordinates: false, // Coordinates were set from map click, not auto-filled
         });
+      } else {
+        console.warn('⚠️ POTENTIAL LOCATION: No address found for map click');
+        setError('No address found for this location');
       }
     } catch (error) {
-      console.error('Reverse geocoding error:', error);
+      console.error('❌ POTENTIAL LOCATION: Reverse geocoding error:', error);
       setError('Failed to get address from location');
     } finally {
       setReverseGeocoding(false);
@@ -367,35 +351,17 @@ export function CreatePotentialLocationDialog({
       setIsGeocodingCoordinates(true);
 
       try {
-        const geocoder = new google.maps.Geocoder();
-        const result = await geocoder.geocode({ location: { lat: latNum, lng: lngNum } });
+        // Use HERE Maps reverse geocoding instead of Google
+        const result = await hereReverseGeocode(latNum, lngNum);
 
-        if (result.results && result.results[0]) {
-          const place = result.results[0];
-          let street = '';
-          let city = '';
-          let zip = '';
-
-          place.address_components.forEach((component) => {
-            if (component.types.includes('street_number')) {
-              street = component.long_name + ' ';
-            }
-            if (component.types.includes('route')) {
-              street += component.long_name;
-            }
-            if (component.types.includes('locality')) {
-              city = component.long_name;
-            }
-            if (component.types.includes('postal_code')) {
-              zip = component.long_name;
-            }
-          });
+        if (result) {
+          console.log('✅ POTENTIAL LOCATION: Reverse geocoding from typed coordinates successful');
 
           setFormData((prev) => ({
             ...prev,
-            street: street.trim() || place.formatted_address,
-            city: city,
-            zip: zip,
+            street: result.street,
+            city: result.city,
+            zip: result.zip,
           }));
 
           setAutoFilled({
@@ -409,9 +375,11 @@ export function CreatePotentialLocationDialog({
           setMarkerPosition({ lat: latNum, lng: lngNum });
           setMapCenter({ lat: latNum, lng: lngNum });
           setHasInteractedWithMap(true);
+        } else {
+          console.warn('⚠️ POTENTIAL LOCATION: No address found for typed coordinates');
         }
       } catch (error) {
-        console.error('Reverse geocoding from coordinates error:', error);
+        console.error('❌ POTENTIAL LOCATION: Reverse geocoding from coordinates error:', error);
       } finally {
         setIsGeocodingCoordinates(false);
       }
@@ -471,45 +439,27 @@ export function CreatePotentialLocationDialog({
     }
   }, []);
 
-  // Forward geocode address from form fields
-  const forwardGeocodeAddress = useCallback(async () => {
-    if (!formData.street || !formData.city || !formData.zip) return;
+  // Forward geocode address from form fields (DISABLED - use autocomplete or map click instead)
+  // Users should use HERE Maps autocomplete for address entry
+  // If they type manually without autocomplete, they can:
+  //   1. Use the autocomplete dropdown
+  //   2. Click on the map
+  //   3. Manually type coordinates
+  // Keeping this code commented for potential future HERE Maps /geocode endpoint integration
+  // const forwardGeocodeAddress = useCallback(async () => {
+  //   if (!formData.street || !formData.city || !formData.zip) return;
+  //   // TODO: Implement HERE Maps forward geocoding if needed
+  //   // For now, users must use autocomplete, map click, or manual coordinates
+  // }, [formData.street, formData.city, formData.zip]);
 
-    try {
-      const geocoder = new google.maps.Geocoder();
-      const address = `${formData.street}, ${formData.city}, ${formData.zip}`;
-
-      const result = await geocoder.geocode({ address });
-
-      if (result.results && result.results[0]?.geometry?.location) {
-        const location = result.results[0].geometry.location;
-        const lat = location.lat();
-        const lng = location.lng();
-
-        setMarkerPosition({ lat, lng });
-        setMapCenter({ lat, lng });
-        setFormData((prev) => ({
-          ...prev,
-          latitude: lat.toString(),
-          longitude: lng.toString(),
-        }));
-      }
-    } catch (error) {
-      console.error('Forward geocoding error:', error);
-      // Silently fail - user can still click on map
-    }
-  }, [formData.street, formData.city, formData.zip]);
-
-  // Debounced forward geocoding when address fields change
-  useEffect(() => {
-    if (!formData.street || !formData.city || !formData.zip) return;
-
-    const timeoutId = setTimeout(() => {
-      forwardGeocodeAddress();
-    }, 1000); // Debounce 1 second
-
-    return () => clearTimeout(timeoutId);
-  }, [formData.street, formData.city, formData.zip, forwardGeocodeAddress]);
+  // Debounced forward geocoding when address fields change (DISABLED)
+  // useEffect(() => {
+  //   if (!formData.street || !formData.city || !formData.zip) return;
+  //   const timeoutId = setTimeout(() => {
+  //     forwardGeocodeAddress();
+  //   }, 1000); // Debounce 1 second
+  //   return () => clearTimeout(timeoutId);
+  // }, [formData.street, formData.city, formData.zip, forwardGeocodeAddress]);
 
   // Add current location to queue
   const handleAddToQueue = useCallback(() => {
