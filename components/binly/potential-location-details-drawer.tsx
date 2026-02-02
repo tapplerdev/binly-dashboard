@@ -23,6 +23,7 @@ interface PotentialLocation {
   converted_by_user_id?: string;
   converted_via_shift_id?: string;
   converted_by_driver_name?: string;
+  converted_by_manager_name?: string;
   bin_number?: number;
 }
 
@@ -257,10 +258,7 @@ export function PotentialLocationDetailsDrawer({
                     </>
                   ) : (
                     <p className="text-xs text-green-700 mt-2">
-                      <span className="font-semibold">Converted manually</span> by manager
-                      {location.converted_by_user_id && (
-                        <span className="block mt-1">User ID: {location.converted_by_user_id.slice(0, 8)}...</span>
-                      )}
+                      Converted by <span className="font-semibold">{location.converted_by_manager_name || 'manager'}</span>
                     </p>
                   )}
                 </div>
