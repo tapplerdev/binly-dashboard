@@ -139,15 +139,27 @@ export function ShiftsView() {
 
   // Filter shifts based on active filters
   const filteredShifts = useMemo(() => {
-    return shifts.filter(shift => {
+    console.log('🔍 [FILTER DEBUG] Starting filter process');
+    console.log('📊 [FILTER DEBUG] Raw shifts count:', shifts.length);
+    console.log('📊 [FILTER DEBUG] Raw shifts data:', shifts);
+    console.log('🎯 [FILTER DEBUG] Current filters:', filters);
+
+    const filtered = shifts.filter(shift => {
+      console.log(`\n🔎 [FILTER DEBUG] Checking shift: ${shift.driverName} (${shift.status}) - ${shift.date}`);
+
       // Date range filter
       if (filters.dateRange !== 'all') {
         const weekRange = getWeekRange(filters.dateRange);
         if (weekRange) {
           const shiftDate = new Date(shift.date);
+          console.log(`   📅 Date filter: shift=${shift.date}, weekStart=${weekRange.start.toISOString()}, weekEnd=${weekRange.end.toISOString()}`);
+          console.log(`   📅 Parsed shift date:`, shiftDate);
+          console.log(`   📅 Comparison: shiftDate < start? ${shiftDate < weekRange.start}, shiftDate > end? ${shiftDate > weekRange.end}`);
           if (shiftDate < weekRange.start || shiftDate > weekRange.end) {
+            console.log(`   ❌ FILTERED OUT by date range`);
             return false;
           }
+          console.log(`   ✅ Passed date filter`);
         }
       }
 
@@ -158,26 +170,38 @@ export function ShiftsView() {
           shift.driverName.toLowerCase().includes(query) ||
           shift.route.toLowerCase().includes(query) ||
           shift.binCount.toString().includes(query);
-        if (!matchesSearch) return false;
+        if (!matchesSearch) {
+          console.log(`   ❌ FILTERED OUT by search query`);
+          return false;
+        }
+        console.log(`   ✅ Passed search filter`);
       }
 
       // Driver filter
       if (filters.drivers.length > 0 && !filters.drivers.includes(shift.driverName)) {
+        console.log(`   ❌ FILTERED OUT by driver filter`);
         return false;
       }
 
       // Status filter
       if (filters.statuses.length > 0 && !filters.statuses.includes(shift.status)) {
+        console.log(`   ❌ FILTERED OUT by status filter`);
         return false;
       }
 
       // Route filter
       if (filters.routes.length > 0 && !filters.routes.includes(shift.route)) {
+        console.log(`   ❌ FILTERED OUT by route filter`);
         return false;
       }
 
+      console.log(`   ✅ SHIFT PASSED ALL FILTERS`);
       return true;
     });
+
+    console.log('\n📊 [FILTER DEBUG] Filtered shifts count:', filtered.length);
+    console.log('📊 [FILTER DEBUG] Filtered shifts data:', filtered);
+    return filtered;
   }, [shifts, filters]);
 
   // Count active filters
