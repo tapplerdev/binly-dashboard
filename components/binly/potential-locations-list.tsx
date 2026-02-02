@@ -231,6 +231,15 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                 <tr>
                   <th
                     className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tl-2xl cursor-pointer"
+                    onClick={() => handleSort('created_at_iso')}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Date Created</span>
+                      <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                    </div>
+                  </th>
+                  <th
+                    className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle cursor-pointer"
                     onClick={() => handleSort('street')}
                   >
                     <div className="flex items-center gap-1.5">
@@ -244,15 +253,6 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                   >
                     <div className="flex items-center gap-1.5">
                       <span>Requested By</span>
-                      <ChevronsUpDown className="w-4 h-4 text-gray-400" />
-                    </div>
-                  </th>
-                  <th
-                    className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle cursor-pointer"
-                    onClick={() => handleSort('created_at_iso')}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>Date Created</span>
                       <ChevronsUpDown className="w-4 h-4 text-gray-400" />
                     </div>
                   </th>
@@ -274,6 +274,11 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                     onClick={() => setSelectedLocation(location)}
                   >
                     <td className="py-4 px-4 align-middle">
+                      <span className="text-sm text-gray-600">
+                        {formatDate(location.created_at_iso)}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4 align-middle">
                       <div className="text-sm">
                         <div className="text-gray-900 font-medium">{location.street}</div>
                         <div className="text-gray-500 text-xs">
@@ -284,11 +289,6 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                     <td className="py-4 px-4 align-middle">
                       <span className="text-sm text-gray-900">
                         {location.requested_by_name}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 align-middle">
-                      <span className="text-sm text-gray-600">
-                        {formatDate(location.created_at_iso)}
                       </span>
                     </td>
                     {filter === 'converted' && (
