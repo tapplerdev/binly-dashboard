@@ -110,28 +110,35 @@ export function ShiftsView() {
   // Helper function to get week range for date filtering
   const getWeekRange = (dateRange: 'this-week' | 'next-week' | 'last-week' | 'all') => {
     const today = new Date(); // Current date
+    today.setHours(0, 0, 0, 0); // Set to midnight local time
     const currentDay = today.getDay();
     const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
 
     const thisWeekMonday = new Date(today);
     thisWeekMonday.setDate(today.getDate() + mondayOffset);
+    thisWeekMonday.setHours(0, 0, 0, 0); // Ensure midnight
 
     const thisWeekSunday = new Date(thisWeekMonday);
     thisWeekSunday.setDate(thisWeekMonday.getDate() + 6);
+    thisWeekSunday.setHours(23, 59, 59, 999); // End of day
 
     if (dateRange === 'this-week') {
       return { start: thisWeekMonday, end: thisWeekSunday };
     } else if (dateRange === 'next-week') {
       const nextWeekMonday = new Date(thisWeekMonday);
       nextWeekMonday.setDate(thisWeekMonday.getDate() + 7);
+      nextWeekMonday.setHours(0, 0, 0, 0);
       const nextWeekSunday = new Date(nextWeekMonday);
       nextWeekSunday.setDate(nextWeekMonday.getDate() + 6);
+      nextWeekSunday.setHours(23, 59, 59, 999);
       return { start: nextWeekMonday, end: nextWeekSunday };
     } else if (dateRange === 'last-week') {
       const lastWeekMonday = new Date(thisWeekMonday);
       lastWeekMonday.setDate(thisWeekMonday.getDate() - 7);
+      lastWeekMonday.setHours(0, 0, 0, 0);
       const lastWeekSunday = new Date(lastWeekMonday);
       lastWeekSunday.setDate(lastWeekMonday.getDate() + 6);
+      lastWeekSunday.setHours(23, 59, 59, 999);
       return { start: lastWeekMonday, end: lastWeekSunday };
     }
     return null; // 'all' - no filtering
@@ -151,9 +158,12 @@ export function ShiftsView() {
       if (filters.dateRange !== 'all') {
         const weekRange = getWeekRange(filters.dateRange);
         if (weekRange) {
-          const shiftDate = new Date(shift.date);
+          // Parse date in local time to avoid timezone issues
+          // shift.date format: "YYYY-MM-DD"
+          const [year, month, day] = shift.date.split('-').map(Number);
+          const shiftDate = new Date(year, month - 1, day); // month is 0-indexed
           console.log(`   📅 Date filter: shift=${shift.date}, weekStart=${weekRange.start.toISOString()}, weekEnd=${weekRange.end.toISOString()}`);
-          console.log(`   📅 Parsed shift date:`, shiftDate);
+          console.log(`   📅 Parsed shift date (local):`, shiftDate);
           console.log(`   📅 Comparison: shiftDate < start? ${shiftDate < weekRange.start}, shiftDate > end? ${shiftDate > weekRange.end}`);
           if (shiftDate < weekRange.start || shiftDate > weekRange.end) {
             console.log(`   ❌ FILTERED OUT by date range`);
