@@ -413,19 +413,18 @@ export async function hereAutosuggest(
   console.log('   Limit:', limit);
 
   try {
+    // Use provided location or default to US center (Kansas City, MO)
+    const location = userLocation || { lat: 39.0997, lng: -94.5786 };
+
     const params = new URLSearchParams({
       q: query,
+      at: `${location.lat},${location.lng}`, // Required: location context
       limit: limit.toString(),
       lang: 'en',
-      in: 'countryCode:USA,COL', // Filter to US and Colombia
       apiKey: HERE_API_KEY,
     });
 
-    // Add user location for better relevance (optional)
-    if (userLocation) {
-      params.append('at', `${userLocation.lat},${userLocation.lng}`);
-      console.log('   User location:', userLocation);
-    }
+    console.log('   Location:', location);
 
     const url = `https://autosuggest.search.hereapi.com/v1/autosuggest?${params.toString()}`;
     console.log('   API URL:', url.replace(HERE_API_KEY, 'API_KEY_HIDDEN'));
