@@ -400,13 +400,17 @@ export async function hereAutosuggest(
   limit: number = 5
 ): Promise<HereSuggestion[]> {
   if (!HERE_API_KEY) {
-    console.error('HERE API key not configured');
+    console.error('🚨 HERE MAPS SERVICE: API key not configured!');
     return [];
   }
 
   if (!query || query.length < 3) {
     return [];
   }
+
+  console.log('🌍 HERE MAPS SERVICE: Calling autosuggest API...');
+  console.log('   Query:', query);
+  console.log('   Limit:', limit);
 
   try {
     const params = new URLSearchParams({
@@ -420,20 +424,25 @@ export async function hereAutosuggest(
     // Add user location for better relevance (optional)
     if (userLocation) {
       params.append('at', `${userLocation.lat},${userLocation.lng}`);
+      console.log('   User location:', userLocation);
     }
 
-    const response = await fetch(
-      `https://autosuggest.search.hereapi.com/v1/autosuggest?${params.toString()}`
-    );
+    const url = `https://autosuggest.search.hereapi.com/v1/autosuggest?${params.toString()}`;
+    console.log('   API URL:', url.replace(HERE_API_KEY, 'API_KEY_HIDDEN'));
+
+    const response = await fetch(url);
+
+    console.log('   Response status:', response.status, response.statusText);
 
     if (!response.ok) {
-      console.error('HERE autosuggest error:', response.status, response.statusText);
+      console.error('❌ HERE MAPS SERVICE: Autosuggest error:', response.status, response.statusText);
       return [];
     }
 
     const data = await response.json();
 
     if (data.items && Array.isArray(data.items)) {
+      console.log('✅ HERE MAPS SERVICE: Got', data.items.length, 'suggestions');
       return data.items.map((item: any) => ({
         id: item.id,
         title: item.title,
@@ -442,9 +451,10 @@ export async function hereAutosuggest(
       }));
     }
 
+    console.warn('⚠️ HERE MAPS SERVICE: No items in response');
     return [];
   } catch (error) {
-    console.error('HERE autosuggest fetch error:', error);
+    console.error('❌ HERE MAPS SERVICE: Fetch error:', error);
     return [];
   }
 }
@@ -458,13 +468,17 @@ export async function hereAutosuggest(
  */
 export async function hereLookup(hereId: string): Promise<HerePlaceDetails | null> {
   if (!HERE_API_KEY) {
-    console.error('HERE API key not configured');
+    console.error('🚨 HERE MAPS SERVICE: API key not configured!');
     return null;
   }
 
   if (!hereId) {
+    console.warn('⚠️ HERE MAPS SERVICE: No place ID provided');
     return null;
   }
+
+  console.log('🔍 HERE MAPS SERVICE: Looking up place details...');
+  console.log('   Place ID:', hereId);
 
   try {
     const params = new URLSearchParams({
@@ -472,16 +486,20 @@ export async function hereLookup(hereId: string): Promise<HerePlaceDetails | nul
       apiKey: HERE_API_KEY,
     });
 
-    const response = await fetch(
-      `https://lookup.search.hereapi.com/v1/lookup?${params.toString()}`
-    );
+    const url = `https://lookup.search.hereapi.com/v1/lookup?${params.toString()}`;
+    console.log('   API URL:', url.replace(HERE_API_KEY, 'API_KEY_HIDDEN'));
+
+    const response = await fetch(url);
+
+    console.log('   Response status:', response.status, response.statusText);
 
     if (!response.ok) {
-      console.error('HERE lookup error:', response.status, response.statusText);
+      console.error('❌ HERE MAPS SERVICE: Lookup error:', response.status, response.statusText);
       return null;
     }
 
     const data = await response.json();
+    console.log('   Response data:', data);
 
     if (data && data.address && data.position) {
       // Parse address components from HERE response
@@ -495,7 +513,7 @@ export async function hereLookup(hereId: string): Promise<HerePlaceDetails | nul
         street = address.street;
       }
 
-      return {
+      const result = {
         street: street.trim(),
         city: address.city || '',
         zip: address.postalCode || '',
@@ -505,12 +523,20 @@ export async function hereLookup(hereId: string): Promise<HerePlaceDetails | nul
         longitude: data.position.lng,
         formattedAddress: address.label || '',
       };
+
+      console.log('✅ HERE MAPS SERVICE: Place details retrieved successfully');
+      console.log('   Street:', result.street);
+      console.log('   City:', result.city);
+      console.log('   ZIP:', result.zip);
+      console.log('   Coordinates:', result.latitude, result.longitude);
+
+      return result;
     }
 
-    console.warn('HERE lookup: Invalid response format');
+    console.warn('⚠️ HERE MAPS SERVICE: Invalid response format');
     return null;
   } catch (error) {
-    console.error('HERE lookup fetch error:', error);
+    console.error('❌ HERE MAPS SERVICE: Fetch error:', error);
     return null;
   }
 }

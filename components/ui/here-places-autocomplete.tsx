@@ -95,33 +95,34 @@ export function HerePlacesAutocomplete({
 
     if (!value || value.length < 3 || disabled) {
       if (value && value.length < 3) {
-        console.log('⏳ Waiting for 3+ characters...');
+        console.log('⏳ HERE Maps: Waiting for 3+ characters...');
       }
       setSuggestions([]);
       setIsOpen(false);
       return;
     }
 
-    console.log('🔍 Fetching HERE suggestions for:', value);
+    console.log('🗺️ HERE MAPS: Fetching suggestions for:', value);
     setIsFetching(true);
 
     const timer = setTimeout(async () => {
       try {
         const results = await hereAutosuggest(value, userLocation);
-        console.log('📍 HERE API response:', results.length, 'results');
+        console.log('📍 HERE MAPS API response:', results.length, 'results');
 
         if (results.length > 0) {
+          console.log('✅ HERE MAPS: Showing', results.length, 'suggestions');
+          console.log('   Sample result:', results[0]);
           setSuggestions(results);
           setIsOpen(true);
           setSelectedIndex(-1);
-          console.log('✅ Showing', results.length, 'suggestions');
         } else {
-          console.warn('❌ No predictions');
+          console.warn('❌ HERE MAPS: No predictions');
           setSuggestions([]);
           setIsOpen(false);
         }
       } catch (error) {
-        console.error('❌ HERE autosuggest error:', error);
+        console.error('❌ HERE MAPS: Autosuggest error:', error);
         setSuggestions([]);
         setIsOpen(false);
       } finally {
@@ -134,25 +135,30 @@ export function HerePlacesAutocomplete({
 
   // Handle place selection
   const selectPlace = async (hereId: string, title: string) => {
-    console.log('📍 Fetching place details for:', hereId);
+    console.log('🔍 HERE MAPS: Fetching place details for:', hereId);
     setIsFetching(true);
 
     try {
       const placeDetails = await hereLookup(hereId);
 
       if (placeDetails) {
+        console.log('✅ HERE MAPS: Place selected successfully!');
+        console.log('   Street:', placeDetails.street);
+        console.log('   City:', placeDetails.city);
+        console.log('   ZIP:', placeDetails.zip);
+        console.log('   Coordinates:', placeDetails.latitude, placeDetails.longitude);
+
         justSelectedRef.current = true; // Prevent dropdown from reopening
         lastSelectedValueRef.current = placeDetails.formattedAddress || title;
         userHasTypedRef.current = false; // Reset typing state after selection
         onPlaceSelect(placeDetails);
         setIsOpen(false);
         setSuggestions([]);
-        console.log('✅ Place selected:', placeDetails);
       } else {
-        console.error('❌ Failed to get place details');
+        console.error('❌ HERE MAPS: Failed to get place details');
       }
     } catch (error) {
-      console.error('❌ Place selection error:', error);
+      console.error('❌ HERE MAPS: Place selection error:', error);
     } finally {
       setIsFetching(false);
     }
@@ -222,7 +228,7 @@ export function HerePlacesAutocomplete({
           type="text"
           value={value}
           onChange={(e) => {
-            console.log('📝 Input changed:', e.target.value);
+            console.log('📝 HERE MAPS: Input changed:', e.target.value);
             userHasTypedRef.current = true; // Mark that user has typed
             onChange(e.target.value);
           }}
