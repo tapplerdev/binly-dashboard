@@ -7,8 +7,11 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X, Plus, Trash2, Loader2, Package, MapPin, Navigation } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
-import { reverseGeocode } from '@/lib/services/geocoding.service';
+// OLD: Google Places Autocomplete (commented out for rollback)
+// import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
+// NEW: HERE Maps Autocomplete
+import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
+import { reverseGeocode, HerePlaceDetails } from '@/lib/services/geocoding.service';
 import { Map, AdvancedMarker, Pin, useMap, InfoWindow } from '@vis.gl/react-google-maps';
 
 interface BinRow {
@@ -204,55 +207,89 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
     setRows(rows.map((r) => (r.id === id ? { ...r, [field]: value, error: undefined } : r)));
   };
 
-  // Handle Google Places autocomplete selection
-  const handlePlaceSelect = (id: string, place: google.maps.places.PlaceResult) => {
-    if (!place.address_components || !place.geometry) return;
+  // OLD: Google Places autocomplete selection (commented out for rollback)
+  // const handlePlaceSelect = (id: string, place: google.maps.places.PlaceResult) => {
+  //   if (!place.address_components || !place.geometry) return;
+  //
+  //   // Parse address components
+  //   let street = '';
+  //   let city = '';
+  //   let zip = '';
+  //
+  //   place.address_components.forEach((component) => {
+  //     const types = component.types;
+  //
+  //     if (types.includes('street_number')) {
+  //       street = component.long_name;
+  //     }
+  //     if (types.includes('route')) {
+  //       street = street ? `${street} ${component.long_name}` : component.long_name;
+  //     }
+  //     if (types.includes('locality')) {
+  //       city = component.long_name;
+  //     }
+  //     if (!city && types.includes('sublocality_level_1')) {
+  //       city = component.long_name;
+  //     }
+  //     if (types.includes('postal_code')) {
+  //       zip = component.long_name;
+  //     }
+  //   });
+  //
+  //   const lat = place.geometry.location?.lat();
+  //   const lng = place.geometry.location?.lng();
+  //
+  //   // Update map center to the selected location
+  //   if (lat && lng) {
+  //     setMapCenter({ lat, lng });
+  //     setMapZoom(16); // Zoom in when address is selected
+  //   }
+  //
+  //   // Update all fields with auto-filled data
+  //   setRows((prevRows) =>
+  //     prevRows.map((r) =>
+  //       r.id === id
+  //         ? {
+  //             ...r,
+  //             current_street: street.trim(),
+  //             city: city.trim(),
+  //             zip: zip.trim(),
+  //             latitude: lat ? lat.toString() : '',
+  //             longitude: lng ? lng.toString() : '',
+  //             cityAutoFilled: true,
+  //             zipAutoFilled: true,
+  //             coordinatesAutoFilled: true,
+  //             addressAutoFilled: false,
+  //             isGeocodingAddress: false,
+  //           }
+  //         : r
+  //     )
+  //   );
+  // };
 
-    // Parse address components
-    let street = '';
-    let city = '';
-    let zip = '';
-
-    place.address_components.forEach((component) => {
-      const types = component.types;
-
-      if (types.includes('street_number')) {
-        street = component.long_name;
-      }
-      if (types.includes('route')) {
-        street = street ? `${street} ${component.long_name}` : component.long_name;
-      }
-      if (types.includes('locality')) {
-        city = component.long_name;
-      }
-      if (!city && types.includes('sublocality_level_1')) {
-        city = component.long_name;
-      }
-      if (types.includes('postal_code')) {
-        zip = component.long_name;
-      }
-    });
-
-    const lat = place.geometry.location?.lat();
-    const lng = place.geometry.location?.lng();
+  // NEW: HERE Maps autocomplete selection
+  const handlePlaceSelect = (id: string, place: HerePlaceDetails) => {
+    console.log('🗺️ HERE MAPS BULK MODAL: Place selected for row', id);
+    console.log('   Street:', place.street);
+    console.log('   City:', place.city);
+    console.log('   ZIP:', place.zip);
+    console.log('   Coordinates:', place.latitude, place.longitude);
 
     // Update map center to the selected location
-    if (lat && lng) {
-      setMapCenter({ lat, lng });
-      setMapZoom(16); // Zoom in when address is selected
-    }
+    setMapCenter({ lat: place.latitude, lng: place.longitude });
+    setMapZoom(16); // Zoom in when address is selected
 
-    // Update all fields with auto-filled data
+    // Update all fields with auto-filled data from HERE Maps (already parsed!)
     setRows((prevRows) =>
       prevRows.map((r) =>
         r.id === id
           ? {
               ...r,
-              current_street: street.trim(),
-              city: city.trim(),
-              zip: zip.trim(),
-              latitude: lat ? lat.toString() : '',
-              longitude: lng ? lng.toString() : '',
+              current_street: place.street.trim(),
+              city: place.city.trim(),
+              zip: place.zip.trim(),
+              latitude: place.latitude.toString(),
+              longitude: place.longitude.toString(),
               cityAutoFilled: true,
               zipAutoFilled: true,
               coordinatesAutoFilled: true,
@@ -591,7 +628,19 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
                         <label className="block text-xs font-medium text-gray-600 mb-1.5">
                           Street Address *
                         </label>
-                        <PlacesAutocomplete
+                        {/* OLD: Google Places Autocomplete (commented out for rollback) */}
+                        {/* <PlacesAutocomplete
+                          value={row.current_street}
+                          onChange={(value) => updateRow(row.id, 'current_street', value)}
+                          onPlaceSelect={(place) => handlePlaceSelect(row.id, place)}
+                          disabled={row.isGeocodingCoordinates}
+                          isAutoFilled={row.addressAutoFilled}
+                          isLoading={row.isGeocodingCoordinates}
+                          error={!!row.error}
+                          placeholder="123 Main Street"
+                        /> */}
+                        {/* NEW: HERE Maps Autocomplete */}
+                        <HerePlacesAutocomplete
                           value={row.current_street}
                           onChange={(value) => updateRow(row.id, 'current_street', value)}
                           onPlaceSelect={(place) => handlePlaceSelect(row.id, place)}
