@@ -1305,6 +1305,7 @@ function CreateShiftDrawer({
 
   const [driverId, setDriverId] = useState('');
   const [truckCapacity, setTruckCapacity] = useState('');
+  const [lockRouteOrder, setLockRouteOrder] = useState(false);
   const [tasks, setTasks] = useState<ShiftTask[]>([]);
   const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -2318,6 +2319,7 @@ function CreateShiftDrawer({
         warehouse_latitude: warehouse?.latitude || 0,
         warehouse_longitude: warehouse?.longitude || 0,
         warehouse_address: warehouse?.address || 'Warehouse',
+        lock_route_order: lockRouteOrder,
         tasks: tasksPayload,
       };
 
@@ -2471,6 +2473,25 @@ function CreateShiftDrawer({
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 required
               />
+            </div>
+
+            {/* Lock Route Order Checkbox */}
+            <div className="flex items-start gap-3 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <input
+                type="checkbox"
+                id="lockRouteOrder"
+                checked={lockRouteOrder}
+                onChange={(e) => setLockRouteOrder(e.target.checked)}
+                className="mt-0.5 w-4 h-4 text-primary border-gray-300 rounded focus:ring-2 focus:ring-primary/20"
+              />
+              <label htmlFor="lockRouteOrder" className="flex-1 cursor-pointer">
+                <div className="text-sm font-semibold text-gray-900 mb-1">
+                  Lock Task Order
+                </div>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  When enabled, the driver will follow your exact task sequence. When disabled, the system will optimize the route using real-time traffic and dynamic warehouse insertion for maximum efficiency.
+                </p>
+              </label>
             </div>
 
             {/* Quick Add Buttons */}
