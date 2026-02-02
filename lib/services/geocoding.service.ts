@@ -418,7 +418,7 @@ export async function hereAutosuggest(
       limit: limit.toString(),
       lang: 'en',
       in: 'countryCode:USA,COL', // Filter to US and Colombia
-      apiKey: HERE_API_KEY,
+      apikey: HERE_API_KEY, // Use lowercase 'apikey' per HERE REST API standard
     });
 
     // Add user location for better relevance (optional)
@@ -483,7 +483,7 @@ export async function hereLookup(hereId: string): Promise<HerePlaceDetails | nul
   try {
     const params = new URLSearchParams({
       id: hereId,
-      apiKey: HERE_API_KEY,
+      apikey: HERE_API_KEY, // Use lowercase 'apikey' per HERE REST API standard
     });
 
     const url = `https://lookup.search.hereapi.com/v1/lookup?${params.toString()}`;
