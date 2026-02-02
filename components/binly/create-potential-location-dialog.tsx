@@ -4,7 +4,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { MapPin, X, Loader2, Search, Plus, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
+// OLD: Google Places Autocomplete (commented out for rollback)
+// import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
+// NEW: HERE Maps Autocomplete
+import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
+import { HerePlaceDetails } from '@/lib/services/geocoding.service';
 import { inputStyles, cn } from '@/lib/utils';
 import { useBins } from '@/lib/hooks/use-bins';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
@@ -206,62 +210,100 @@ export function CreatePotentialLocationDialog({
   );
 
   // Handle place selection from autocomplete - only pan/zoom, no marker
+  // OLD: Google Places version (commented out for rollback)
+  // const handlePlaceSelect = useCallback(
+  //   (place: google.maps.places.PlaceResult) => {
+  //     if (!place.geometry?.location) return;
+  //
+  //     const lat = place.geometry.location.lat();
+  //     const lng = place.geometry.location.lng();
+  //
+  //     // Only pan the map, don't create marker or fill form
+  //     setMapCenter({ lat, lng });
+  //     setSearchQuery('');
+  //   },
+  //   []
+  // );
+
+  // NEW: HERE Maps version
   const handlePlaceSelect = useCallback(
-    (place: google.maps.places.PlaceResult) => {
-      if (!place.geometry?.location) return;
-
-      const lat = place.geometry.location.lat();
-      const lng = place.geometry.location.lng();
-
+    (place: HerePlaceDetails) => {
       // Only pan the map, don't create marker or fill form
-      setMapCenter({ lat, lng });
+      setMapCenter({ lat: place.latitude, lng: place.longitude });
       setSearchQuery('');
     },
     []
   );
 
-  // Handle Google Places autocomplete selection for street address
-  const handleStreetPlaceSelect = useCallback((place: google.maps.places.PlaceResult) => {
-    if (!place.address_components || !place.geometry) return;
+  // Handle autocomplete selection for street address
+  // OLD: Google Places version (commented out for rollback)
+  // const handleStreetPlaceSelect = useCallback((place: google.maps.places.PlaceResult) => {
+  //   if (!place.address_components || !place.geometry) return;
+  //
+  //   // Parse address components
+  //   let street = '';
+  //   let city = '';
+  //   let zip = '';
+  //
+  //   place.address_components.forEach((component) => {
+  //     const types = component.types;
+  //
+  //     if (types.includes('street_number')) {
+  //       street = component.long_name;
+  //     }
+  //     if (types.includes('route')) {
+  //       street = street ? `${street} ${component.long_name}` : component.long_name;
+  //     }
+  //     if (types.includes('locality')) {
+  //       city = component.long_name;
+  //     }
+  //     if (!city && types.includes('sublocality_level_1')) {
+  //       city = component.long_name;
+  //     }
+  //     if (types.includes('postal_code')) {
+  //       zip = component.long_name;
+  //     }
+  //   });
+  //
+  //   const lat = place.geometry.location?.lat();
+  //   const lng = place.geometry.location?.lng();
+  //
+  //   if (!lat || !lng) return;
+  //
+  //   // Update all fields with auto-filled data
+  //   setFormData({
+  //     ...formData,
+  //     street: street.trim(),
+  //     city: city.trim(),
+  //     zip: zip.trim(),
+  //     latitude: lat.toString(),
+  //     longitude: lng.toString(),
+  //   });
+  //
+  //   // Mark fields as auto-filled
+  //   setAutoFilled({
+  //     street: false, // User typed this (from autocomplete)
+  //     city: true,
+  //     zip: true,
+  //     coordinates: true,
+  //   });
+  //
+  //   // Create marker and pan map to location
+  //   setMarkerPosition({ lat, lng });
+  //   setMapCenter({ lat, lng });
+  //   setHasInteractedWithMap(true);
+  // }, [formData]);
 
-    // Parse address components
-    let street = '';
-    let city = '';
-    let zip = '';
-
-    place.address_components.forEach((component) => {
-      const types = component.types;
-
-      if (types.includes('street_number')) {
-        street = component.long_name;
-      }
-      if (types.includes('route')) {
-        street = street ? `${street} ${component.long_name}` : component.long_name;
-      }
-      if (types.includes('locality')) {
-        city = component.long_name;
-      }
-      if (!city && types.includes('sublocality_level_1')) {
-        city = component.long_name;
-      }
-      if (types.includes('postal_code')) {
-        zip = component.long_name;
-      }
-    });
-
-    const lat = place.geometry.location?.lat();
-    const lng = place.geometry.location?.lng();
-
-    if (!lat || !lng) return;
-
-    // Update all fields with auto-filled data
+  // NEW: HERE Maps version
+  const handleStreetPlaceSelect = useCallback((place: HerePlaceDetails) => {
+    // Update all fields with data from HERE Maps
     setFormData({
       ...formData,
-      street: street.trim(),
-      city: city.trim(),
-      zip: zip.trim(),
-      latitude: lat.toString(),
-      longitude: lng.toString(),
+      street: place.street.trim(),
+      city: place.city.trim(),
+      zip: place.zip.trim(),
+      latitude: place.latitude.toString(),
+      longitude: place.longitude.toString(),
     });
 
     // Mark fields as auto-filled
@@ -273,8 +315,8 @@ export function CreatePotentialLocationDialog({
     });
 
     // Create marker and pan map to location
-    setMarkerPosition({ lat, lng });
-    setMapCenter({ lat, lng });
+    setMarkerPosition({ lat: place.latitude, lng: place.longitude });
+    setMapCenter({ lat: place.latitude, lng: place.longitude });
     setHasInteractedWithMap(true);
   }, [formData]);
 
@@ -681,7 +723,22 @@ export function CreatePotentialLocationDialog({
                   <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                     Street Address <span className="text-red-500">*</span>
                   </label>
-                  <PlacesAutocomplete
+                  {/* OLD: Google Places Autocomplete (commented for rollback) */}
+                  {/* <PlacesAutocomplete
+                    value={formData.street}
+                    onChange={(value) => {
+                      setFormData({ ...formData, street: value });
+                      setAutoFilled((prev) => ({ ...prev, street: false }));
+                    }}
+                    onPlaceSelect={handleStreetPlaceSelect}
+                    disabled={isGeocodingCoordinates}
+                    isAutoFilled={autoFilled.street}
+                    isLoading={isGeocodingCoordinates}
+                    placeholder="123 Main St"
+                    className={inputStyles()}
+                  /> */}
+                  {/* NEW: HERE Maps Autocomplete */}
+                  <HerePlacesAutocomplete
                     value={formData.street}
                     onChange={(value) => {
                       setFormData({ ...formData, street: value });
@@ -1025,7 +1082,16 @@ export function CreatePotentialLocationDialog({
             {/* Search Bar Overlay */}
             <div className="absolute top-4 left-1/2 -translate-x-1/2 w-full max-w-md px-4 z-10">
               <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-2">
-                <PlacesAutocomplete
+                {/* OLD: Google Places Autocomplete (commented for rollback) */}
+                {/* <PlacesAutocomplete
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  onPlaceSelect={handlePlaceSelect}
+                  placeholder="Search for an address..."
+                  className="border-0 focus:ring-0"
+                /> */}
+                {/* NEW: HERE Maps Autocomplete */}
+                <HerePlacesAutocomplete
                   value={searchQuery}
                   onChange={setSearchQuery}
                   onPlaceSelect={handlePlaceSelect}

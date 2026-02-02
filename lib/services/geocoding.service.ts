@@ -350,3 +350,167 @@ export async function batchReverseGeocode(
 
   return results;
 }
+
+// ============================================================================
+// HERE MAPS AUTOCOMPLETE (NEW)
+// ============================================================================
+
+const HERE_API_KEY = process.env.NEXT_PUBLIC_HERE_API_KEY;
+
+if (!HERE_API_KEY) {
+  console.warn('⚠️ NEXT_PUBLIC_HERE_API_KEY is not set');
+}
+
+/**
+ * HERE Maps autosuggest suggestion item
+ */
+export interface HereSuggestion {
+  id: string;
+  title: string;
+  resultType: string;
+  address?: {
+    label: string;
+  };
+}
+
+/**
+ * HERE Maps place details (from lookup endpoint)
+ */
+export interface HerePlaceDetails {
+  street: string;
+  city: string;
+  zip: string;
+  state?: string;
+  country?: string;
+  latitude: number;
+  longitude: number;
+  formattedAddress: string;
+}
+
+/**
+ * Get autocomplete suggestions from HERE Maps
+ *
+ * @example
+ * const suggestions = await hereAutosuggest('123 Main', { lat: 37.7749, lng: -122.4194 });
+ * // Returns array of suggestions with id, title, address
+ */
+export async function hereAutosuggest(
+  query: string,
+  userLocation?: { lat: number; lng: number },
+  limit: number = 5
+): Promise<HereSuggestion[]> {
+  if (!HERE_API_KEY) {
+    console.error('HERE API key not configured');
+    return [];
+  }
+
+  if (!query || query.length < 3) {
+    return [];
+  }
+
+  try {
+    const params = new URLSearchParams({
+      q: query,
+      limit: limit.toString(),
+      lang: 'en',
+      in: 'countryCode:USA,COL', // Filter to US and Colombia
+      apiKey: HERE_API_KEY,
+    });
+
+    // Add user location for better relevance (optional)
+    if (userLocation) {
+      params.append('at', `${userLocation.lat},${userLocation.lng}`);
+    }
+
+    const response = await fetch(
+      `https://autosuggest.search.hereapi.com/v1/autosuggest?${params.toString()}`
+    );
+
+    if (!response.ok) {
+      console.error('HERE autosuggest error:', response.status, response.statusText);
+      return [];
+    }
+
+    const data = await response.json();
+
+    if (data.items && Array.isArray(data.items)) {
+      return data.items.map((item: any) => ({
+        id: item.id,
+        title: item.title,
+        resultType: item.resultType,
+        address: item.address,
+      }));
+    }
+
+    return [];
+  } catch (error) {
+    console.error('HERE autosuggest fetch error:', error);
+    return [];
+  }
+}
+
+/**
+ * Get full place details from HERE Maps by ID
+ *
+ * @example
+ * const details = await hereLookup('here:pds:place:...');
+ * // Returns { street, city, zip, latitude, longitude, ... }
+ */
+export async function hereLookup(hereId: string): Promise<HerePlaceDetails | null> {
+  if (!HERE_API_KEY) {
+    console.error('HERE API key not configured');
+    return null;
+  }
+
+  if (!hereId) {
+    return null;
+  }
+
+  try {
+    const params = new URLSearchParams({
+      id: hereId,
+      apiKey: HERE_API_KEY,
+    });
+
+    const response = await fetch(
+      `https://lookup.search.hereapi.com/v1/lookup?${params.toString()}`
+    );
+
+    if (!response.ok) {
+      console.error('HERE lookup error:', response.status, response.statusText);
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (data && data.address && data.position) {
+      // Parse address components from HERE response
+      const address = data.address;
+
+      // Extract street (combine street number and street name if available)
+      let street = '';
+      if (address.houseNumber && address.street) {
+        street = `${address.houseNumber} ${address.street}`;
+      } else if (address.street) {
+        street = address.street;
+      }
+
+      return {
+        street: street.trim(),
+        city: address.city || '',
+        zip: address.postalCode || '',
+        state: address.stateCode || address.state || '',
+        country: address.countryCode || address.countryName || '',
+        latitude: data.position.lat,
+        longitude: data.position.lng,
+        formattedAddress: address.label || '',
+      };
+    }
+
+    console.warn('HERE lookup: Invalid response format');
+    return null;
+  } catch (error) {
+    console.error('HERE lookup fetch error:', error);
+    return null;
+  }
+}

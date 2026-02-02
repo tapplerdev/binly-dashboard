@@ -13,7 +13,11 @@ import { createMoveRequest, updateMoveRequest, assignMoveToShift, assignMoveToUs
 import { getShifts, getShiftDetailsByDriverId } from '@/lib/api/shifts';
 import { getUsers, User as UserType } from '@/lib/api/users';
 import { cn } from '@/lib/utils';
-import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
+// OLD: Google Places Autocomplete (commented out for rollback)
+// import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
+// NEW: HERE Maps Autocomplete
+import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
+import { HerePlaceDetails } from '@/lib/services/geocoding.service';
 import { format } from 'date-fns';
 
 // Schedule Move Modal
@@ -207,46 +211,67 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
     }
   };
 
-  // Handle Google Places autocomplete selection for new location
-  const handleNewLocationPlaceSelect = (place: google.maps.places.PlaceResult) => {
-    if (!place.address_components || !place.geometry) return;
+  // Handle autocomplete selection for new location
+  // OLD: Google Places version (commented out for rollback)
+  // const handleNewLocationPlaceSelect = (place: google.maps.places.PlaceResult) => {
+  //   if (!place.address_components || !place.geometry) return;
+  //
+  //   // Parse address components
+  //   let street = '';
+  //   let city = '';
+  //   let zip = '';
+  //
+  //   place.address_components.forEach((component) => {
+  //     const types = component.types;
+  //
+  //     if (types.includes('street_number')) {
+  //       street = component.long_name;
+  //     }
+  //     if (types.includes('route')) {
+  //       street = street ? `${street} ${component.long_name}` : component.long_name;
+  //     }
+  //     if (types.includes('locality')) {
+  //       city = component.long_name;
+  //     }
+  //     if (!city && types.includes('sublocality_level_1')) {
+  //       city = component.long_name;
+  //     }
+  //     if (types.includes('postal_code')) {
+  //       zip = component.long_name;
+  //     }
+  //   });
+  //
+  //   const lat = place.geometry.location?.lat();
+  //   const lng = place.geometry.location?.lng();
+  //
+  //   // Update all fields with auto-filled data
+  //   setFormData({
+  //     ...formData,
+  //     new_street: street.trim(),
+  //     new_city: city.trim(),
+  //     new_zip: zip.trim(),
+  //     new_latitude: lat || null,
+  //     new_longitude: lng || null,
+  //   });
+  //
+  //   // Mark fields as auto-filled for visual feedback
+  //   setNewLocationAutoFilled({
+  //     street: false, // Street is user-input (from autocomplete)
+  //     city: true,
+  //     zip: true,
+  //   });
+  // };
 
-    // Parse address components
-    let street = '';
-    let city = '';
-    let zip = '';
-
-    place.address_components.forEach((component) => {
-      const types = component.types;
-
-      if (types.includes('street_number')) {
-        street = component.long_name;
-      }
-      if (types.includes('route')) {
-        street = street ? `${street} ${component.long_name}` : component.long_name;
-      }
-      if (types.includes('locality')) {
-        city = component.long_name;
-      }
-      if (!city && types.includes('sublocality_level_1')) {
-        city = component.long_name;
-      }
-      if (types.includes('postal_code')) {
-        zip = component.long_name;
-      }
-    });
-
-    const lat = place.geometry.location?.lat();
-    const lng = place.geometry.location?.lng();
-
-    // Update all fields with auto-filled data
+  // NEW: HERE Maps version
+  const handleNewLocationPlaceSelect = (place: HerePlaceDetails) => {
+    // Update all fields with data from HERE Maps
     setFormData({
       ...formData,
-      new_street: street.trim(),
-      new_city: city.trim(),
-      new_zip: zip.trim(),
-      new_latitude: lat || null,
-      new_longitude: lng || null,
+      new_street: place.street.trim(),
+      new_city: place.city.trim(),
+      new_zip: place.zip.trim(),
+      new_latitude: place.latitude,
+      new_longitude: place.longitude,
     });
 
     // Mark fields as auto-filled for visual feedback
@@ -1185,7 +1210,20 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Street Address *
                   </label>
-                  <PlacesAutocomplete
+                  {/* OLD: Google Places Autocomplete (commented for rollback) */}
+                  {/* <PlacesAutocomplete
+                    value={formData.new_street}
+                    onChange={(value) => {
+                      setFormData({ ...formData, new_street: value });
+                      // Reset auto-filled state when user types
+                      setNewLocationAutoFilled({ street: false, city: false, zip: false });
+                    }}
+                    onPlaceSelect={handleNewLocationPlaceSelect}
+                    placeholder="123 Main Street"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+                  /> */}
+                  {/* NEW: HERE Maps Autocomplete */}
+                  <HerePlacesAutocomplete
                     value={formData.new_street}
                     onChange={(value) => {
                       setFormData({ ...formData, new_street: value });
