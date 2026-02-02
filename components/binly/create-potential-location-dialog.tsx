@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 // import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
 // NEW: HERE Maps Autocomplete
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
-import { HerePlaceDetails } from '@/lib/services/geocoding.service';
+import { HerePlaceDetails, hereReverseGeocode } from '@/lib/services/geocoding.service';
 import { inputStyles, cn } from '@/lib/utils';
 import { useBins } from '@/lib/hooks/use-bins';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
@@ -419,6 +419,57 @@ export function CreatePotentialLocationDialog({
       coordinateTimerRef.current = null;
     }, 1500); // 1.5 second debounce
   }, [formData.latitude, formData.longitude]);
+
+  // Handle marker drag (reverse geocode with HERE Maps)
+  const handleMarkerDrag = useCallback(async (lat: number, lng: number) => {
+    console.log('🗺️ POTENTIAL LOCATION: Marker dragged to', lat, lng);
+
+    // Update coordinates and marker position immediately
+    setFormData((prev) => ({
+      ...prev,
+      latitude: lat.toFixed(6),
+      longitude: lng.toFixed(6),
+    }));
+
+    setMarkerPosition({ lat, lng });
+
+    // Mark coordinates as manually changed (not auto-filled)
+    setAutoFilled((prev) => ({
+      ...prev,
+      coordinates: false,
+    }));
+
+    // Start reverse geocoding
+    setIsGeocodingCoordinates(true);
+
+    try {
+      const result = await hereReverseGeocode(lat, lng);
+
+      if (result) {
+        console.log('✅ POTENTIAL LOCATION: Reverse geocoding successful');
+
+        setFormData((prev) => ({
+          ...prev,
+          street: result.street,
+          city: result.city,
+          zip: result.zip,
+        }));
+
+        setAutoFilled({
+          street: true,
+          city: true,
+          zip: true,
+          coordinates: false, // Coordinates were manually dragged
+        });
+      } else {
+        console.warn('⚠️ POTENTIAL LOCATION: No address found for coordinates');
+      }
+    } catch (error) {
+      console.error('❌ POTENTIAL LOCATION: Reverse geocoding error:', error);
+    } finally {
+      setIsGeocodingCoordinates(false);
+    }
+  }, []);
 
   // Forward geocode address from form fields
   const forwardGeocodeAddress = useCallback(async () => {
@@ -1067,11 +1118,20 @@ export function CreatePotentialLocationDialog({
                   </AdvancedMarker>
                 ))}
 
-                {/* Current potential location marker (orange, bouncing) */}
+                {/* Current potential location marker (orange, bouncing, draggable) */}
                 {markerPosition && (
-                  <AdvancedMarker position={markerPosition} zIndex={10}>
+                  <AdvancedMarker
+                    position={markerPosition}
+                    zIndex={10}
+                    draggable={true}
+                    onDragEnd={(e) => {
+                      if (e.latLng) {
+                        handleMarkerDrag(e.latLng.lat(), e.latLng.lng());
+                      }
+                    }}
+                  >
                     <div className="relative animate-bounce">
-                      <div className="w-10 h-10 rounded-full bg-orange-500 border-4 border-white shadow-xl" />
+                      <div className="w-10 h-10 rounded-full bg-orange-500 border-4 border-white shadow-xl cursor-move" />
                       <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-r-[8px] border-t-[12px] border-l-transparent border-r-transparent border-t-orange-500" />
                     </div>
                   </AdvancedMarker>
