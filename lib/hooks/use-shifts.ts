@@ -27,6 +27,12 @@ export function useShifts() {
     url: wsUrl,
     onMessage: (message: WebSocketMessage) => {
       switch (message.type) {
+        case 'shift_created':
+          // New shift created via custom shift builder
+          console.log('📡 WebSocket: Shift created, refreshing shifts list');
+          queryClient.invalidateQueries({ queryKey: shiftKeys.all });
+          break;
+
         case 'shift_update':
           // Driver started, paused, resumed, or ended their shift
           console.log('📡 WebSocket: Shift updated, refreshing shifts list');

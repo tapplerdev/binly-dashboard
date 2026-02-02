@@ -14,7 +14,8 @@ import { getBins } from '@/lib/api/bins';
 import { getShifts, getShiftTasks } from '@/lib/api/shifts';
 import { PotentialLocation, getPotentialLocations } from '@/lib/api/potential-locations';
 import { MoveRequest, getMoveRequests } from '@/lib/api/move-requests';
-import { useShifts, useAssignRoute } from '@/lib/hooks/use-shifts';
+import { useShifts, useAssignRoute, shiftKeys } from '@/lib/hooks/use-shifts';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRoutes } from '@/lib/hooks/use-routes';
 import { useActiveDrivers } from '@/lib/hooks/use-active-drivers';
 import { useDrivers } from '@/lib/hooks/use-drivers';
@@ -1336,6 +1337,7 @@ function CreateShiftDrawer({
   const { data: drivers = [], isLoading: loadingDrivers } = useDrivers();
   const { data: warehouse } = useWarehouseLocation();
   const { token } = useAuthStore();
+  const queryClient = useQueryClient();
 
   const [driverId, setDriverId] = useState('');
   const [truckCapacity, setTruckCapacity] = useState('');
@@ -2398,6 +2400,10 @@ function CreateShiftDrawer({
         }
         throw new Error(errorMessage);
       }
+
+      // Invalidate shifts cache to trigger refetch and show the new shift immediately
+      console.log('✅ Shift created successfully, invalidating cache...');
+      queryClient.invalidateQueries({ queryKey: shiftKeys.all });
 
       onClose();
     } catch (err) {
