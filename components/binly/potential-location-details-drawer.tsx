@@ -22,6 +22,7 @@ interface PotentialLocation {
   converted_at_iso?: string;
   converted_by_user_id?: string;
   converted_via_shift_id?: string;
+  converted_by_driver_name?: string;
   bin_number?: number;
 }
 
@@ -244,7 +245,7 @@ export function PotentialLocationDetailsDrawer({
                   {location.converted_via_shift_id ? (
                     <>
                       <p className="text-xs text-green-700 mt-2">
-                        <span className="font-semibold">Placed by driver</span> during active shift
+                        Placed by <span className="font-semibold">{location.converted_by_driver_name || 'driver'}</span>
                       </p>
                       <button
                         onClick={() => router.push(`/operations/shifts/${location.converted_via_shift_id}`)}
