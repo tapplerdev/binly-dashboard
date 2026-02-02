@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MapPin, User, Calendar, Check, Trash2, Loader2, MoreVertical, Eye, ChevronsUpDown } from 'lucide-react';
+import { MapPin, User, Calendar, Check, Trash2, Loader2, MoreVertical, Eye, ChevronsUpDown, Truck, UserCog } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PotentialLocationDetailsDrawer } from './potential-location-details-drawer';
@@ -24,6 +24,9 @@ interface PotentialLocation {
   converted_to_bin_id?: string;
   converted_at_iso?: string;
   converted_by_user_id?: string;
+  converted_via_shift_id?: string;
+  converted_by_driver_name?: string;
+  converted_by_manager_name?: string;
   bin_number?: number;
 }
 
@@ -42,8 +45,8 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [locationToDelete, setLocationToDelete] = useState<PotentialLocation | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>('created_at_iso');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     fetchLocations();
@@ -253,6 +256,11 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                       <ChevronsUpDown className="w-4 h-4 text-gray-400" />
                     </div>
                   </th>
+                  {filter === 'converted' && (
+                    <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle">
+                      Conversion Type
+                    </th>
+                  )}
                   <th className="text-center py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tr-2xl">
                     Actions
                   </th>
@@ -283,6 +291,21 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                         {formatDate(location.created_at_iso)}
                       </span>
                     </td>
+                    {filter === 'converted' && (
+                      <td className="py-4 px-4 align-middle">
+                        {location.converted_via_shift_id ? (
+                          <Badge variant="secondary" className="gap-1 bg-blue-100 text-blue-700 hover:bg-blue-200">
+                            <Truck className="w-3 h-3" />
+                            Driver Placement
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="gap-1 bg-purple-100 text-purple-700 hover:bg-purple-200">
+                            <UserCog className="w-3 h-3" />
+                            Manager Conversion
+                          </Badge>
+                        )}
+                      </td>
+                    )}
                     <td className="py-4 px-4 align-middle">
                       <div className="flex items-center justify-center gap-2">
                         {filter === 'active' ? (
@@ -372,10 +395,23 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                       </div>
                     </div>
                     {filter === 'converted' && (
-                      <Badge variant="default" className="gap-1 shrink-0 ml-2">
-                        <Check className="w-3 h-3" />
-                        Bin #{location.bin_number}
-                      </Badge>
+                      <div className="flex flex-col gap-2 shrink-0 ml-2">
+                        <Badge variant="default" className="gap-1">
+                          <Check className="w-3 h-3" />
+                          Bin #{location.bin_number}
+                        </Badge>
+                        {location.converted_via_shift_id ? (
+                          <Badge variant="secondary" className="gap-1 bg-blue-100 text-blue-700 hover:bg-blue-200">
+                            <Truck className="w-3 h-3" />
+                            Driver
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="gap-1 bg-purple-100 text-purple-700 hover:bg-purple-200">
+                            <UserCog className="w-3 h-3" />
+                            Manager
+                          </Badge>
+                        )}
+                      </div>
                     )}
                   </div>
 
