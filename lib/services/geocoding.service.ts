@@ -418,7 +418,7 @@ export async function hereAutosuggest(
       limit: limit.toString(),
       lang: 'en',
       in: 'countryCode:USA,COL', // Filter to US and Colombia
-      apikey: HERE_API_KEY, // Use lowercase 'apikey' per HERE REST API standard
+      apiKey: HERE_API_KEY,
     });
 
     // Add user location for better relevance (optional)
@@ -435,7 +435,10 @@ export async function hereAutosuggest(
     console.log('   Response status:', response.status, response.statusText);
 
     if (!response.ok) {
+      // Get the error details from HERE API
+      const errorText = await response.text();
       console.error('❌ HERE MAPS SERVICE: Autosuggest error:', response.status, response.statusText);
+      console.error('   Error details:', errorText);
       return [];
     }
 
@@ -483,7 +486,7 @@ export async function hereLookup(hereId: string): Promise<HerePlaceDetails | nul
   try {
     const params = new URLSearchParams({
       id: hereId,
-      apikey: HERE_API_KEY, // Use lowercase 'apikey' per HERE REST API standard
+      apiKey: HERE_API_KEY,
     });
 
     const url = `https://lookup.search.hereapi.com/v1/lookup?${params.toString()}`;
@@ -494,7 +497,10 @@ export async function hereLookup(hereId: string): Promise<HerePlaceDetails | nul
     console.log('   Response status:', response.status, response.statusText);
 
     if (!response.ok) {
+      // Get the error details from HERE API
+      const errorText = await response.text();
       console.error('❌ HERE MAPS SERVICE: Lookup error:', response.status, response.statusText);
+      console.error('   Error details:', errorText);
       return null;
     }
 
