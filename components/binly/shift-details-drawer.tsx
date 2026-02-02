@@ -6,6 +6,8 @@ import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shi
 import { getShiftById, getShiftTasks, cancelShift } from '@/lib/api/shifts';
 import { RouteTask, getTaskLabel, getTaskSubtitle, getTaskColor, getTaskBgColor } from '@/lib/types/route-task';
 import { ShiftRouteMap } from './shift-route-map';
+import { useWebSocket, WebSocketMessage } from '@/lib/hooks/use-websocket';
+import { useAuthStore } from '@/lib/auth/store';
 
 interface ShiftBin {
   id: number;
@@ -35,34 +37,53 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
   const [loading, setLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const { token } = useAuthStore();
+
+  // Function to load shift details
+  const loadShiftDetails = async () => {
+    try {
+      setLoading(true);
+
+      // Try to fetch tasks first (new system)
+      const tasksData = await getShiftTasks(shift.id);
+
+      if (tasksData && tasksData.length > 0) {
+        // New task-based system
+        setTasks(tasksData);
+        console.log('✅ Loaded shift with tasks:', tasksData.length);
+      } else {
+        // Fallback to old bins system
+        const details = await getShiftById(shift.id);
+        setBins(details.bins || []);
+        console.log('✅ Loaded shift with bins:', details.bins?.length || 0);
+      }
+    } catch (error) {
+      console.error('Failed to load shift details:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Fetch shift details on mount
   useEffect(() => {
-    async function loadShiftDetails() {
-      try {
-        setLoading(true);
-
-        // Try to fetch tasks first (new system)
-        const tasksData = await getShiftTasks(shift.id);
-
-        if (tasksData && tasksData.length > 0) {
-          // New task-based system
-          setTasks(tasksData);
-          console.log('✅ Loaded shift with tasks:', tasksData.length);
-        } else {
-          // Fallback to old bins system
-          const details = await getShiftById(shift.id);
-          setBins(details.bins || []);
-          console.log('✅ Loaded shift with bins:', details.bins?.length || 0);
-        }
-      } catch (error) {
-        console.error('Failed to load shift details:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
     loadShiftDetails();
   }, [shift.id]);
+
+  // WebSocket connection for real-time shift updates
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+  const WS_URL = API_URL.replace(/^https/, 'wss').replace(/^http/, 'ws');
+  const wsUrl = token ? `${WS_URL}/ws?token=${token}` : `${WS_URL}/ws`;
+
+  useWebSocket({
+    url: wsUrl,
+    onMessage: (message: WebSocketMessage) => {
+      if (message.type === 'shift_update' && message.data?.shift_id === shift.id) {
+        // Shift was updated (e.g., driver started shift and route was optimized)
+        console.log('📡 WebSocket: Shift updated, reloading tasks...');
+        loadShiftDetails();
+      }
+    },
+  });
 
   const handleClose = () => {
     setIsClosing(true);
@@ -274,6 +295,23 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                     <p className="text-sm font-semibold text-gray-900">{shift.duration}</p>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Optimization Status Message for Scheduled Shifts */}
+          {shift.status === 'scheduled' && !shift.optimization_metadata && (
+            <div className="p-6 border-b border-gray-100 bg-blue-50">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-blue-900 mb-1">Route Optimization Pending</h4>
+                  <p className="text-sm text-blue-700">
+                    This route will be automatically optimized when the driver starts their shift, taking into account real-time traffic conditions for the most efficient route.
+                  </p>
+                </div>
               </div>
             </div>
           )}
