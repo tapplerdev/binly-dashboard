@@ -8,7 +8,7 @@ import { useNoGoZones } from '@/lib/hooks/use-zones';
 import { usePotentialLocations, potentialLocationKeys } from '@/lib/hooks/use-potential-locations';
 import { useActiveDrivers } from '@/lib/hooks/use-active-drivers';
 import { useWebSocket, WebSocketMessage } from '@/lib/hooks/use-websocket';
-import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
+import { useWarehouseLocation, warehouseKeys } from '@/lib/hooks/use-warehouse';
 import {
   Bin,
   isMappableBin,
@@ -245,6 +245,12 @@ export function LiveMapView() {
           );
           // Refetch bins to show the new bin on the map
           queryClient.invalidateQueries({ queryKey: ['bins'] });
+          break;
+
+        case 'warehouse_location_updated':
+          // Invalidate warehouse location cache to trigger refetch
+          console.log('📍 Warehouse location updated via WebSocket, invalidating cache...');
+          queryClient.invalidateQueries({ queryKey: warehouseKeys.location });
           break;
 
         default:
