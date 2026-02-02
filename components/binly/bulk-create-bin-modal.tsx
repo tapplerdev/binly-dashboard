@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 // import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
 // NEW: HERE Maps Autocomplete
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
-import { reverseGeocode, HerePlaceDetails } from '@/lib/services/geocoding.service';
+import { hereReverseGeocode, HerePlaceDetails } from '@/lib/services/geocoding.service';
 import { Map, AdvancedMarker, Pin, useMap, InfoWindow } from '@vis.gl/react-google-maps';
 
 interface BinRow {
@@ -414,14 +414,14 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
     // Update map center
     setMapCenter({ lat, lng });
 
-    // Reverse geocode to update address fields
+    // Reverse geocode to update address fields (using HERE Maps)
     setRows((prevRows) =>
       prevRows.map((r, idx) =>
         idx === currentRowIndex ? { ...r, isGeocodingCoordinates: true } : r
       )
     );
 
-    const result = await reverseGeocode(lat, lng);
+    const result = await hereReverseGeocode(lat, lng);
 
     if (result) {
       setRows((prevRows) =>
