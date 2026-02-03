@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { MapPin, X, Loader2, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Dropdown } from '@/components/ui/dropdown';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
 import { HerePlaceDetails, hereReverseGeocode } from '@/lib/services/geocoding.service';
 import { inputStyles, cn } from '@/lib/utils';
@@ -268,7 +269,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
         {/* Content */}
         <div className="h-full pt-[88px] flex">
           {/* Left Panel - Form */}
-          <div className="w-[400px] border-r border-gray-200 p-6 overflow-y-auto">
+          <div className="w-[480px] border-r border-gray-200 p-6 overflow-y-auto">
             {/* Address Search */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -364,33 +365,37 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                   Status <span className="text-red-500">*</span>
                 </label>
-                <select
+                <Dropdown
+                  label=""
                   value={status}
-                  onChange={(e) => setStatus(e.target.value as BinStatus)}
-                  className={inputStyles()}
-                >
-                  <option value="active">Active</option>
-                  <option value="missing">Missing</option>
-                  <option value="retired">Retired</option>
-                  <option value="in_storage">In Storage</option>
-                </select>
+                  options={[
+                    { value: 'active', label: 'Active' },
+                    { value: 'missing', label: 'Missing' },
+                    { value: 'retired', label: 'Retired' },
+                    { value: 'in_storage', label: 'In Storage' },
+                  ]}
+                  onChange={(value) => setStatus(value as BinStatus)}
+                  className="w-full"
+                />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                   Fill Percentage
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="relative">
                   <input
                     type="number"
                     min="0"
                     max="100"
                     value={fillPercentage ?? ''}
                     onChange={(e) => setFillPercentage(e.target.value ? parseInt(e.target.value) : null)}
-                    className={inputStyles()}
+                    className={cn(inputStyles(), 'pr-10')}
                     placeholder="0"
                   />
-                  <span className="text-sm text-gray-500">%</span>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500 pointer-events-none">
+                    %
+                  </div>
                 </div>
               </div>
             </div>
