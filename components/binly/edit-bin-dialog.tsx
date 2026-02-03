@@ -457,8 +457,8 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                   onComplete={() => setMapCenter(null)}
                 />
 
-                {/* Current bin marker (being edited) - draggable */}
-                {markerPosition && bin && (
+                {/* Current bin marker (being edited) - draggable standard Google Maps pin */}
+                {markerPosition && (
                   <AdvancedMarker
                     position={markerPosition}
                     zIndex={10}
@@ -468,23 +468,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                         handleMarkerDrag(e.latLng.lat(), e.latLng.lng());
                       }
                     }}
-                  >
-                    <div className="relative">
-                      <div
-                        className="w-10 h-10 rounded-full border-4 border-white shadow-xl cursor-move transition-all duration-300 hover:scale-110"
-                        style={{
-                          backgroundColor: getBinMarkerColor(fillPercentage),
-                        }}
-                        title={`Bin #${bin.bin_number} - ${fillPercentage ?? 0}% (Drag to move)`}
-                      >
-                        <div className="w-full h-full flex items-center justify-center text-white text-sm font-bold">
-                          {bin.bin_number}
-                        </div>
-                      </div>
-                      {/* Subtle pulsing ring to indicate it's the active/editable bin */}
-                      <div className="absolute inset-0 rounded-full border-2 border-primary animate-ping opacity-75" />
-                    </div>
-                  </AdvancedMarker>
+                  />
                 )}
 
                 {/* Other bins */}
