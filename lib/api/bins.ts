@@ -7,6 +7,40 @@ import { Bin, BinWithPriority, PotentialLocation, BinCheck } from '@/lib/types/b
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
+/**
+ * Get auth token from localStorage (Zustand persist storage)
+ */
+function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const authStorage = localStorage.getItem('binly-auth-storage');
+    if (!authStorage) return null;
+
+    const parsed = JSON.parse(authStorage);
+    return parsed?.state?.token || null;
+  } catch (error) {
+    console.error('Failed to get auth token:', error);
+    return null;
+  }
+}
+
+/**
+ * Get headers with authentication
+ */
+function getAuthHeaders(): HeadersInit {
+  const token = getAuthToken();
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return headers;
+}
+
 export type BinSortOption = 'priority' | 'bin_number' | 'fill_percentage' | 'days_since_check' | 'status';
 export type BinFilterOption = 'all' | 'next_move_request' | 'longest_unchecked' | 'high_fill' | 'has_check_recommendation';
 export type BinStatusFilter = 'active' | 'all' | 'retired' | 'pending_move' | 'in_storage';
@@ -93,9 +127,7 @@ export async function updateBin(
   try {
     const response = await fetch(`${API_URL}/api/bins/${id}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
 
@@ -224,14 +256,13 @@ export async function createBin(bin: {
   try {
     const response = await fetch(`${API_URL}/api/bins`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(bin),
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to create bin: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to create bin: ${response.statusText}`);
     }
 
     const created: Bin = await response.json();
