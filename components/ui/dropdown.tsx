@@ -59,7 +59,7 @@ export function Dropdown({ label, value, options, onChange, className }: Dropdow
         }}
         className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700 min-w-[140px]"
       >
-        <span className="text-gray-500">{label}:</span>
+        {label && <span className="text-gray-500">{label}:</span>}
         <span className="text-gray-900">{selectedOption?.label || 'Select...'}</span>
         <ChevronDown
           className={cn(
@@ -170,7 +170,7 @@ export function MultiSelectDropdown({
         }}
         className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700 min-w-[160px]"
       >
-        <span className="text-gray-500">{label}:</span>
+        {label && <span className="text-gray-500">{label}:</span>}
         <span className="text-gray-900">{displayText}</span>
         <ChevronDown
           className={cn(
