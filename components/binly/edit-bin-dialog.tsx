@@ -132,11 +132,11 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
   const handlePlaceSelect = useCallback((place: HerePlaceDetails) => {
     setStreet(place.street);
     setCity(place.city);
-    setZip(place.postalCode);
-    setLatitude(place.position.lat);
-    setLongitude(place.position.lng);
-    setMarkerPosition({ lat: place.position.lat, lng: place.position.lng });
-    setMapCenter({ lat: place.position.lat, lng: place.position.lng });
+    setZip(place.zip);
+    setLatitude(place.latitude);
+    setLongitude(place.longitude);
+    setMarkerPosition({ lat: place.latitude, lng: place.longitude });
+    setMapCenter({ lat: place.latitude, lng: place.longitude });
     setSearchQuery('');
     setError('');
   }, []);
@@ -153,7 +153,28 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
       if (result) {
         setStreet(result.street);
         setCity(result.city);
-        setZip(result.postalCode);
+        setZip(result.zip);
+      }
+    } catch (err) {
+      console.error('Reverse geocoding failed:', err);
+    } finally {
+      setReverseGeocoding(false);
+    }
+  }, []);
+
+  const handleMarkerDrag = useCallback(async (lat: number, lng: number) => {
+    setMarkerPosition({ lat, lng });
+    setLatitude(lat);
+    setLongitude(lng);
+    setReverseGeocoding(true);
+
+    try {
+      const result = await hereReverseGeocode(lat, lng);
+
+      if (result) {
+        setStreet(result.street);
+        setCity(result.city);
+        setZip(result.zip);
       }
     } catch (err) {
       console.error('Reverse geocoding failed:', err);
@@ -431,17 +452,32 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                   onComplete={() => setMapCenter(null)}
                 />
 
-                {/* Current bin marker (being edited) */}
-                {markerPosition && (
+                {/* Current bin marker (being edited) - draggable */}
+                {markerPosition && bin && (
                   <AdvancedMarker
                     position={markerPosition}
                     zIndex={10}
+                    draggable={true}
+                    onDragEnd={(e) => {
+                      if (e.latLng) {
+                        handleMarkerDrag(e.latLng.lat(), e.latLng.lng());
+                      }
+                    }}
                   >
-                    <div className="relative animate-bounce-subtle">
-                      <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-xl border-4 border-white cursor-move">
-                        <MapPin className="w-6 h-6 text-white" />
+                    <div className="relative">
+                      <div
+                        className="w-10 h-10 rounded-full border-4 border-white shadow-xl cursor-move transition-all duration-300 hover:scale-110"
+                        style={{
+                          backgroundColor: getBinMarkerColor(fillPercentage),
+                        }}
+                        title={`Bin #${bin.bin_number} - ${fillPercentage ?? 0}% (Drag to move)`}
+                      >
+                        <div className="w-full h-full flex items-center justify-center text-white text-sm font-bold">
+                          {bin.bin_number}
+                        </div>
                       </div>
-                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-primary rounded-full" />
+                      {/* Subtle pulsing ring to indicate it's the active/editable bin */}
+                      <div className="absolute inset-0 rounded-full border-2 border-primary animate-ping opacity-75" />
                     </div>
                   </AdvancedMarker>
                 )}
@@ -494,7 +530,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg border border-gray-200">
               <p className="text-sm text-gray-600 flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-primary" />
-                Click anywhere on the map to set location
+                {markerPosition ? 'Drag the marker to adjust location' : 'Click anywhere on the map to set location'}
               </p>
             </div>
 
