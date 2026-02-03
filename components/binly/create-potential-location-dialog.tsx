@@ -11,6 +11,7 @@ import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete
 import { HerePlaceDetails, hereReverseGeocode } from '@/lib/services/geocoding.service';
 import { inputStyles, cn } from '@/lib/utils';
 import { useBins } from '@/lib/hooks/use-bins';
+import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 
 interface QueuedLocation {
@@ -87,6 +88,7 @@ export function CreatePotentialLocationDialog({
   onOpenChange,
 }: CreatePotentialLocationDialogProps) {
   const { data: bins = [] } = useBins();
+  const { data: warehouse } = useWarehouseLocation();
   const mappableBins = bins.filter(isMappableBin);
 
   const [loading, setLoading] = useState(false);
@@ -1037,7 +1039,7 @@ export function CreatePotentialLocationDialog({
                 <MapClickHandler onMapClick={handleMapClick} />
                 <MapCenterController center={mapCenter} onComplete={() => setMapCenter(null)} />
 
-                {/* Render existing bins (gray markers) */}
+                {/* Render existing bins */}
                 {mappableBins.map((bin) => (
                   <AdvancedMarker
                     key={bin.id}
@@ -1045,12 +1047,40 @@ export function CreatePotentialLocationDialog({
                     zIndex={1}
                   >
                     <div
-                      className="w-6 h-6 rounded-full border-2 border-white shadow-md"
-                      style={{ backgroundColor: getBinMarkerColor(bin.fill_percentage) }}
-                      title={`Bin #${bin.bin_number}`}
-                    />
+                      className="w-8 h-8 rounded-full border-2 border-white shadow-lg cursor-pointer transition-all duration-300 animate-scale-in"
+                      style={{
+                        backgroundColor: getBinMarkerColor(bin.fill_percentage),
+                      }}
+                      title={`Bin #${bin.bin_number} - ${bin.fill_percentage ?? 0}%`}
+                    >
+                      <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
+                        {bin.bin_number}
+                      </div>
+                    </div>
                   </AdvancedMarker>
                 ))}
+
+                {/* Warehouse marker - Home icon */}
+                {warehouse && (
+                  <AdvancedMarker
+                    position={{ lat: warehouse.latitude, lng: warehouse.longitude }}
+                    zIndex={2}
+                    title={warehouse.address || "Warehouse - Base of Operations"}
+                  >
+                    <div className="relative">
+                      {/* Home icon container */}
+                      <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center shadow-xl border-4 border-white cursor-pointer transition-all duration-300 hover:scale-110">
+                        <svg
+                          className="w-7 h-7 text-white"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                        </svg>
+                      </div>
+                    </div>
+                  </AdvancedMarker>
+                )}
 
                 {/* Queued location markers (green) */}
                 {locationQueue.map((location, index) => (
