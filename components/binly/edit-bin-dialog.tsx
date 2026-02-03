@@ -262,91 +262,91 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
             </div>
 
             {/* Location Details */}
-            <div className="space-y-4 mb-6">
-              <h3 className="text-sm font-semibold text-gray-900">Location Details</h3>
+            <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-4 mb-6">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Location Details</h3>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="mb-3">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                   Street Address <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={street}
                   onChange={(e) => setStreet(e.target.value)}
-                  className={inputStyles}
+                  className={inputStyles()}
                   placeholder="123 Main St"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                     City <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
-                    className={inputStyles}
-                    placeholder="San Jose"
+                    className={inputStyles()}
+                    placeholder="Mountain View"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                     ZIP <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={zip}
                     onChange={(e) => setZip(e.target.value)}
-                    className={inputStyles}
-                    placeholder="95110"
+                    className={inputStyles()}
+                    placeholder="94040"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                     Latitude
                   </label>
                   <input
                     type="text"
                     value={latitude?.toFixed(6) || ''}
                     readOnly
-                    className={cn(inputStyles, 'bg-gray-50 text-gray-600')}
-                    placeholder="37.7749"
+                    className={cn(inputStyles(), 'bg-gray-100 text-gray-600 cursor-not-allowed')}
+                    placeholder="37.379010"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                     Longitude
                   </label>
                   <input
                     type="text"
                     value={longitude?.toFixed(6) || ''}
                     readOnly
-                    className={cn(inputStyles, 'bg-gray-50 text-gray-600')}
-                    placeholder="-122.4194"
+                    className={cn(inputStyles(), 'bg-gray-100 text-gray-600 cursor-not-allowed')}
+                    placeholder="-122.071880"
                   />
                 </div>
               </div>
             </div>
 
             {/* Bin Details */}
-            <div className="space-y-4 mb-6">
-              <h3 className="text-sm font-semibold text-gray-900">Bin Details</h3>
+            <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-4 mb-6">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Bin Details</h3>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="mb-3">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                   Status <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value as BinStatus)}
-                  className={inputStyles}
+                  className={inputStyles()}
                 >
                   <option value="active">Active</option>
                   <option value="missing">Missing</option>
@@ -356,7 +356,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                   Fill Percentage
                 </label>
                 <div className="flex items-center gap-2">
@@ -366,7 +366,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                     max="100"
                     value={fillPercentage ?? ''}
                     onChange={(e) => setFillPercentage(e.target.value ? parseInt(e.target.value) : null)}
-                    className={inputStyles}
+                    className={inputStyles()}
                     placeholder="0"
                   />
                   <span className="text-sm text-gray-500">%</span>
@@ -382,7 +382,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
             )}
 
             {/* Action Buttons */}
-            <div className="flex gap-3 pt-4 border-t border-gray-200">
+            <div className="flex gap-3 pt-4">
               <Button
                 onClick={() => onOpenChange(false)}
                 variant="outline"
@@ -412,12 +412,18 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
           <div className="flex-1 relative">
             <APIProvider apiKey={mapApiKey}>
               <Map
+                mapId="edit-bin-map"
                 defaultCenter={DEFAULT_CENTER}
                 defaultZoom={12}
-                mapId={process.env.NEXT_PUBLIC_GOOGLE_MAP_ID}
-                disableDefaultUI
+                minZoom={3}
+                maxZoom={20}
                 gestureHandling="greedy"
-                clickableIcons={false}
+                disableDefaultUI={false}
+                zoomControl={true}
+                mapTypeControl={false}
+                streetViewControl={false}
+                fullscreenControl={false}
+                style={{ width: '100%', height: '100%' }}
               >
                 <MapClickHandler onMapClick={handleMapClick} />
                 <MapCenterController
