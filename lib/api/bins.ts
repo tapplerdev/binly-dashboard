@@ -71,6 +71,48 @@ export async function getBinById(id: string): Promise<Bin> {
 }
 
 /**
+ * Update bin details (address, status, fill percentage, coordinates)
+ * @param id Bin ID
+ * @param data Update data
+ * @returns Promise<Bin> Updated bin object
+ */
+export async function updateBin(
+  id: string,
+  data: {
+    current_street: string;
+    city: string;
+    zip: string;
+    status: string;
+    checked: boolean;
+    fill_percentage: number | null;
+    move_requested: boolean;
+    latitude?: number | null;
+    longitude?: number | null;
+  }
+): Promise<Bin> {
+  try {
+    const response = await fetch(`${API_URL}/api/bins/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to update bin: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error(`Error updating bin ${id}:`, error);
+    throw error;
+  }
+}
+
+/**
  * Fetch check history for a specific bin
  * @param binId Bin ID
  * @returns Promise<BinCheck[]> Array of check records (most recent first)

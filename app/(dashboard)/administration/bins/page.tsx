@@ -16,6 +16,7 @@ import { KpiCard } from '@/components/binly/kpi-card';
 import { BulkCreateBinModal } from '@/components/binly/bulk-create-bin-modal';
 import { BinDetailDrawer } from '@/components/binly/bin-detail-drawer';
 import { ScheduleMoveModal, RetireBinModal } from '@/components/binly/bin-modals';
+import { EditBinDialog } from '@/components/binly/edit-bin-dialog';
 import { Dropdown, MultiSelectDropdown } from '@/components/ui/dropdown';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import {
@@ -32,6 +33,7 @@ import {
   Eye,
   MoreVertical,
   X,
+  Edit,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -48,6 +50,7 @@ export default function BinsPage() {
   const [selectedBins, setSelectedBins] = useState<Set<string>>(new Set());
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showRetireModal, setShowRetireModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [modalTargetBin, setModalTargetBin] = useState<BinWithPriority | null>(null);
   const [modalTargetBins, setModalTargetBins] = useState<BinWithPriority[]>([]);
 
@@ -546,10 +549,22 @@ export default function BinsPage() {
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setModalTargetBin(bin);
-                                        setShowScheduleModal(true);
+                                        setShowEditModal(true);
                                         setOpenMenuId(null);
                                       }}
                                       className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-t-lg whitespace-nowrap"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                      Edit Bin
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setModalTargetBin(bin);
+                                        setShowScheduleModal(true);
+                                        setOpenMenuId(null);
+                                      }}
+                                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 whitespace-nowrap"
                                     >
                                       <Calendar className="w-4 h-4" />
                                       Schedule Move
@@ -627,10 +642,22 @@ export default function BinsPage() {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setModalTargetBin(bin);
-                                setShowScheduleModal(true);
+                                setShowEditModal(true);
                                 setOpenMenuId(null);
                               }}
                               className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-t-lg whitespace-nowrap"
+                            >
+                              <Edit className="w-4 h-4" />
+                              Edit Bin
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setModalTargetBin(bin);
+                                setShowScheduleModal(true);
+                                setOpenMenuId(null);
+                              }}
+                              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 whitespace-nowrap"
                             >
                               <Calendar className="w-4 h-4" />
                               Schedule Move
@@ -829,6 +856,12 @@ export default function BinsPage() {
           }}
         />
       )}
+
+      <EditBinDialog
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        bin={modalTargetBin}
+      />
     </div>
   );
 }
