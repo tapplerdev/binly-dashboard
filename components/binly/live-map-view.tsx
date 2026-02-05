@@ -209,6 +209,13 @@ export function LiveMapView() {
   const [showLegend, setShowLegend] = useState(false);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
+  // Bin filters by type
+  const [showMissingBins, setShowMissingBins] = useState(true);
+  const [showCriticalBins, setShowCriticalBins] = useState(true);
+  const [showHighFillBins, setShowHighFillBins] = useState(true);
+  const [showMediumFillBins, setShowMediumFillBins] = useState(true);
+  const [showLowFillBins, setShowLowFillBins] = useState(true);
+
   const wsUrl = token ? `${WS_URL}/ws?token=${token}` : `${WS_URL}/ws`;
 
   // WebSocket connection for real-time updates
@@ -312,6 +319,30 @@ export function LiveMapView() {
   // Memoize filtered bins to prevent recalculation on every render
   const mappableBins = useMemo(() => bins.filter(isMappableBin), [bins]);
 
+  // Filter bins by type based on user selections
+  const filteredMappableBins = useMemo(() => {
+    return mappableBins.filter((bin) => {
+      // Check if bin is missing
+      if (bin.status === 'missing') {
+        return showMissingBins;
+      }
+
+      // Get fill percentage
+      const fillPercentage = bin.fill_percentage ?? 0;
+
+      // Check fill level categories
+      if (fillPercentage >= 80) {
+        return showCriticalBins; // Critical (80%+)
+      } else if (fillPercentage >= 50) {
+        return showHighFillBins; // High (50-79%)
+      } else if (fillPercentage >= 25) {
+        return showMediumFillBins; // Medium (25-49%)
+      } else {
+        return showLowFillBins; // Low (0-24%)
+      }
+    });
+  }, [mappableBins, showMissingBins, showCriticalBins, showHighFillBins, showMediumFillBins, showLowFillBins]);
+
   // Memoize potential locations with valid coordinates
   const mappablePotentialLocations = useMemo(
     () => potentialLocations.filter((loc) => loc.latitude != null && loc.longitude != null),
@@ -398,9 +429,9 @@ export function LiveMapView() {
 
               {/* Dropdown Panel */}
               {showFilterDropdown && (
-                <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
+                <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden max-h-[80vh] overflow-y-auto">
                   {/* Stats Section */}
-                  <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-b border-gray-200">
+                  <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-b border-gray-200 sticky top-0 z-10">
                     <h3 className="text-sm font-bold text-gray-900 mb-3">Map Overview</h3>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-white/80 backdrop-blur rounded-lg px-3 py-2">
@@ -476,6 +507,70 @@ export function LiveMapView() {
                           className="w-4 h-4 text-primary rounded focus:ring-2 focus:ring-primary/20"
                         />
                       </label>
+                      {showFillLevels && (
+                        <div className="ml-4 space-y-1.5 pt-1 border-l-2 border-gray-200 pl-3">
+                          <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-gray-500" />
+                              <span className="text-xs text-gray-700">Missing</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={showMissingBins}
+                              onChange={(e) => setShowMissingBins(e.target.checked)}
+                              className="w-3.5 h-3.5 text-gray-600 rounded focus:ring-2 focus:ring-gray-400/20"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-red-500" />
+                              <span className="text-xs text-gray-700">Critical (80%+)</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={showCriticalBins}
+                              onChange={(e) => setShowCriticalBins(e.target.checked)}
+                              className="w-3.5 h-3.5 text-red-600 rounded focus:ring-2 focus:ring-red-500/20"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-orange-500" />
+                              <span className="text-xs text-gray-700">High (50-79%)</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={showHighFillBins}
+                              onChange={(e) => setShowHighFillBins(e.target.checked)}
+                              className="w-3.5 h-3.5 text-orange-600 rounded focus:ring-2 focus:ring-orange-500/20"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-amber-500" />
+                              <span className="text-xs text-gray-700">Medium (25-49%)</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={showMediumFillBins}
+                              onChange={(e) => setShowMediumFillBins(e.target.checked)}
+                              className="w-3.5 h-3.5 text-amber-600 rounded focus:ring-2 focus:ring-amber-500/20"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-green-500" />
+                              <span className="text-xs text-gray-700">Low (0-24%)</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={showLowFillBins}
+                              onChange={(e) => setShowLowFillBins(e.target.checked)}
+                              className="w-3.5 h-3.5 text-green-600 rounded focus:ring-2 focus:ring-green-500/20"
+                            />
+                          </label>
+                        </div>
+                      )}
                       {zones.length > 0 && (
                         <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
                           <span className="text-sm text-gray-700">No-Go Zones</span>
@@ -676,7 +771,7 @@ export function LiveMapView() {
 
         {/* Render bin markers */}
         {showFillLevels &&
-          mappableBins.map((bin) => (
+          filteredMappableBins.map((bin) => (
             <AdvancedMarker
               key={bin.id}
               position={{ lat: bin.latitude, lng: bin.longitude }}

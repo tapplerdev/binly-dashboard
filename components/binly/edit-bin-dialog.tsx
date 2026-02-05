@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
-import { MapPin, X, Loader2, Edit } from 'lucide-react';
+import { MapPin, X, Loader2, Edit, FileText, Map as MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dropdown } from '@/components/ui/dropdown';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
@@ -85,6 +85,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [markerPosition, setMarkerPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [viewMode, setViewMode] = useState<'form' | 'map'>('form');
 
   // Form state
   const [street, setStreet] = useState('');
@@ -127,6 +128,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
       setMapCenter(null);
       setSearchQuery('');
       setError('');
+      setViewMode('form');
     }
   }, [open]);
 
@@ -242,17 +244,17 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in">
       <div className="relative w-full max-w-[1400px] h-[90vh] bg-white rounded-xl shadow-2xl overflow-hidden animate-slide-in-up">
         {/* Header */}
-        <div className="absolute top-0 left-0 right-0 z-10 bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center justify-between">
+        <div className="absolute top-0 left-0 right-0 z-10 bg-white border-b border-gray-200 px-4 md:px-6 py-4">
+          <div className="flex items-center justify-between mb-3 md:mb-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
                 <Edit className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">
+                <h2 className="text-lg md:text-xl font-semibold text-gray-900">
                   Edit Bin #{bin.bin_number}
                 </h2>
-                <p className="text-sm text-gray-500">
+                <p className="text-xs md:text-sm text-gray-500 hidden md:block">
                   Update bin location and details
                 </p>
               </div>
@@ -264,12 +266,42 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
               <X className="w-5 h-5 text-gray-500" />
             </button>
           </div>
+
+          {/* Mobile View Toggle */}
+          <div className="flex md:hidden gap-2 mt-2">
+            <button
+              onClick={() => setViewMode('form')}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                viewMode === 'form'
+                  ? 'bg-primary text-white'
+                  : 'bg-white text-gray-700 border border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <FileText className="w-4 h-4" />
+                <span>Form</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setViewMode('map')}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                viewMode === 'map'
+                  ? 'bg-primary text-white'
+                  : 'bg-white text-gray-700 border border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <MapIcon className="w-4 h-4" />
+                <span>Map</span>
+              </div>
+            </button>
+          </div>
         </div>
 
         {/* Content */}
-        <div className="h-full pt-[88px] flex">
+        <div className="h-full pt-[140px] md:pt-[88px] flex">
           {/* Left Panel - Form */}
-          <div className="w-[480px] border-r border-gray-200 p-6 overflow-y-auto">
+          <div className={`w-full md:w-[480px] border-r border-gray-200 p-4 md:p-6 overflow-y-auto ${viewMode === 'map' ? 'hidden md:block' : 'block'}`}>
             {/* Address Search */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -435,7 +467,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
           </div>
 
           {/* Right Panel - Map */}
-          <div className="flex-1 relative">
+          <div className={`flex-1 relative ${viewMode === 'form' ? 'hidden md:flex' : 'flex'} flex-col`}>
             <APIProvider apiKey={mapApiKey}>
               <Map
                 mapId="edit-bin-map"

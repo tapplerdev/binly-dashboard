@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
-import { MapPin, X, Loader2, Search, Plus, Layers } from 'lucide-react';
+import { MapPin, X, Loader2, Search, Plus, Layers, FileText, Map as MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 // OLD: Google Places Autocomplete (commented out for rollback)
 // import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
@@ -100,6 +100,7 @@ export function CreatePotentialLocationDialog({
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [locationQueue, setLocationQueue] = useState<QueuedLocation[]>([]);
   const [hasInteractedWithMap, setHasInteractedWithMap] = useState(false);
+  const [viewMode, setViewMode] = useState<'form' | 'map'>('form');
   const [formData, setFormData] = useState({
     street: '',
     city: '',
@@ -141,6 +142,7 @@ export function CreatePotentialLocationDialog({
       setLocationQueue([]);
       setHasInteractedWithMap(false);
       setIsGeocodingCoordinates(false);
+      setViewMode('form');
       // Clear debounce timer if modal closes
       if (coordinateTimerRef.current) {
         clearTimeout(coordinateTimerRef.current);
@@ -673,15 +675,15 @@ export function CreatePotentialLocationDialog({
           onClick={(e) => e.stopPropagation()}
         >
         {/* Header */}
-        <div className="p-6 border-b border-gray-200 flex-shrink-0">
-          <div className="flex items-center justify-between">
+        <div className="px-4 md:px-6 py-4 border-b border-gray-200 flex-shrink-0">
+          <div className="flex items-center justify-between mb-3 md:mb-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center">
                 <MapPin className="w-5 h-5 text-orange-600" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">New Potential Location</h2>
-                <p className="text-sm text-gray-600">
+                <h2 className="text-lg md:text-xl font-bold text-gray-900">New Potential Location</h2>
+                <p className="text-xs md:text-sm text-gray-600 hidden md:block">
                   {markerPosition
                     ? 'Fine-tune the location or add notes'
                     : 'Search for an address or click on the map'}
@@ -695,12 +697,42 @@ export function CreatePotentialLocationDialog({
               <X className="w-5 h-5 text-gray-600" />
             </button>
           </div>
+
+          {/* Mobile View Toggle */}
+          <div className="flex md:hidden gap-2 mt-2">
+            <button
+              onClick={() => setViewMode('form')}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                viewMode === 'form'
+                  ? 'bg-orange-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <FileText className="w-4 h-4" />
+                <span>Form</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setViewMode('map')}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                viewMode === 'map'
+                  ? 'bg-orange-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <MapIcon className="w-4 h-4" />
+                <span>Map</span>
+              </div>
+            </button>
+          </div>
         </div>
 
         {/* Split View Content */}
         <div className="flex-1 flex overflow-hidden">
           {/* Left Side - Form */}
-          <div className="w-[35%] p-6 overflow-y-auto border-r border-gray-200">
+          <div className={`w-full md:w-[35%] p-4 md:p-6 overflow-y-auto border-r border-gray-200 ${viewMode === 'map' ? 'hidden md:block' : 'block'}`}>
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Error Message */}
               {error && (
@@ -1020,7 +1052,7 @@ export function CreatePotentialLocationDialog({
           </div>
 
           {/* Right Side - Map */}
-          <div className="w-[65%] relative">
+          <div className={`w-full md:w-[65%] relative ${viewMode === 'form' ? 'hidden md:flex' : 'flex'} flex-col`}>
             <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
               <Map
                 mapId="potential-location-map"
