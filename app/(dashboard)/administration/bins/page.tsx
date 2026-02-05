@@ -380,8 +380,8 @@ export default function BinsPage() {
         ) : (
           <>
             {/* Desktop Table View */}
-            <Card className="hidden lg:block">
-              <div className="overflow-x-auto">
+            <Card className="hidden lg:block overflow-visible">
+              <div className="overflow-x-auto overflow-y-visible">
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
@@ -515,7 +515,7 @@ export default function BinsPage() {
                               </span>
                             </div>
                           </td>
-                          <td className="py-4 px-4 align-middle">
+                          <td className="py-4 px-4 align-middle relative">
                             <div className="flex items-center justify-center gap-2">
                               {/* View Details Icon */}
                               <button
@@ -530,7 +530,7 @@ export default function BinsPage() {
                               </button>
 
                               {/* More Actions Menu */}
-                              <div className="relative">
+                              <div className="relative z-10">
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
