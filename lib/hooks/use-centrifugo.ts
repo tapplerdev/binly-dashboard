@@ -159,10 +159,17 @@ export function useCentrifugo({ token, enabled = true }: UseCentrifugoOptions = 
     sub.on('publication', (ctx) => {
       console.log(`📍 [Centrifugo] Data received on ${channel}`);
       try {
-        // Parse the data (it's a Uint8Array)
-        const decoder = new TextDecoder();
-        const jsonString = decoder.decode(ctx.data);
-        const data = JSON.parse(jsonString);
+        // Check if data is Uint8Array (binary) or already an object
+        let data: unknown;
+        if (ctx.data instanceof Uint8Array) {
+          // Binary data - decode it
+          const decoder = new TextDecoder();
+          const jsonString = decoder.decode(ctx.data);
+          data = JSON.parse(jsonString);
+        } else {
+          // Already an object - use it directly
+          data = ctx.data;
+        }
         onData(data);
       } catch (error) {
         console.error(`❌ [Centrifugo] Failed to parse data from ${channel}:`, error);
