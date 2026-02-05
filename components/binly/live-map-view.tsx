@@ -606,6 +606,96 @@ export function LiveMapView() {
                       )}
                     </div>
                   </div>
+
+                  {/* Active Drivers List */}
+                  {filteredDrivers.length > 0 && (
+                    <div className="p-4 border-t border-gray-200">
+                      <h3 className="text-sm font-bold text-gray-900 mb-3">Active Drivers</h3>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {filteredDrivers.map((driver) => {
+                          const initials = driver.driverName.split(' ').map(n => n[0]).join('').toUpperCase();
+                          const statusColor =
+                            driver.status === 'active'
+                              ? '#10B981' // Green for active
+                              : driver.status === 'paused'
+                              ? '#F59E0B' // Orange for paused
+                              : '#6B7280'; // Gray for inactive/ended
+                          const statusLabel =
+                            driver.status === 'active'
+                              ? 'Active'
+                              : driver.status === 'paused'
+                              ? 'Paused'
+                              : 'Inactive';
+
+                          return (
+                            <button
+                              key={driver.driverId}
+                              onClick={() => {
+                                if (driver.currentLocation) {
+                                  setTargetLocation({
+                                    lat: driver.currentLocation.latitude,
+                                    lng: driver.currentLocation.longitude,
+                                    zoom: 16,
+                                  });
+                                  setShowFilterDropdown(false);
+                                }
+                              }}
+                              className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-all cursor-pointer text-left group"
+                            >
+                              {/* Driver Avatar */}
+                              <div
+                                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 group-hover:scale-110 transition-transform"
+                                style={{ backgroundColor: statusColor }}
+                              >
+                                {initials}
+                              </div>
+
+                              {/* Driver Info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-semibold text-gray-900 truncate">
+                                  {driver.driverName}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-gray-600">
+                                  <span
+                                    className="w-2 h-2 rounded-full"
+                                    style={{ backgroundColor: statusColor }}
+                                  />
+                                  <span>{statusLabel}</span>
+                                  {driver.shiftId && (
+                                    <>
+                                      <span>•</span>
+                                      <span>On Shift</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Location Icon */}
+                              <svg
+                                className="w-5 h-5 text-gray-400 group-hover:text-primary transition-colors"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                                />
+                              </svg>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
