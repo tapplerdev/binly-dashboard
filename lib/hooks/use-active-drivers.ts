@@ -89,6 +89,7 @@ export function useActiveDrivers({ token, enabled = true }: UseActiveDriversOpti
 
   console.log('📊 Current State:');
   console.log('   Drivers Count:', drivers?.length || 0);
+  console.log('   Drivers Data:', JSON.stringify(drivers, null, 2));
   console.log('   Loading:', isLoading);
   console.log('   Error:', error);
   console.log('   Centrifugo Status:', centrifugoStatus);
