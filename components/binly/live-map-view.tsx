@@ -372,24 +372,20 @@ export function LiveMapView() {
         </div>
       )}
 
-      {/* Search Bar (Desktop) and Navigation Tabs (All) - Top Center */}
+      {/* Search Bar and Filter Button - Top */}
       {!loading && (
         <>
-          {/* Search Bar - Desktop only */}
-          <div className="absolute top-4 lg:top-8 left-1/2 -translate-x-1/2 z-10 w-full max-w-2xl px-3 lg:px-4 pointer-events-auto">
-            <div className="flex flex-col gap-3">
-              <div className="hidden lg:block">
-                <MapSearchBar
-                  bins={bins}
-                  zones={zones}
-                  onSelectResult={handleSearchResult}
-                />
-              </div>
-            </div>
+          {/* Search Bar - All screens */}
+          <div className="absolute top-4 lg:top-8 left-4 right-20 lg:left-1/2 lg:right-auto lg:-translate-x-1/2 z-10 w-auto lg:w-full lg:max-w-2xl pointer-events-auto">
+            <MapSearchBar
+              bins={bins}
+              zones={zones}
+              onSelectResult={handleSearchResult}
+            />
           </div>
 
           {/* Filter/Stats Button - Top Right */}
-          <div className="absolute top-4 lg:top-8 right-3 lg:right-6 z-10 pointer-events-auto">
+          <div className="absolute top-4 lg:top-8 right-4 lg:right-6 z-20 pointer-events-auto">
             <div className="relative">
               <button
                 onClick={() => setShowFilterDropdown(!showFilterDropdown)}
