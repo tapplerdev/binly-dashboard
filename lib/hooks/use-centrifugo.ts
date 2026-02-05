@@ -118,10 +118,13 @@ export function useCentrifugo({ token, enabled = true }: UseCentrifugoOptions = 
     return () => {
       console.log('🧹 [Centrifugo] Cleaning up...');
 
-      // Unsubscribe from all channels
+      // Unsubscribe from all channels and remove from registry
       subscriptionsRef.current.forEach((sub, channel) => {
         console.log(`   Unsubscribing from ${channel}`);
         sub.unsubscribe();
+        if (client) {
+          client.removeSubscription(sub);
+        }
       });
       subscriptionsRef.current.clear();
 
@@ -145,22 +148,35 @@ export function useCentrifugo({ token, enabled = true }: UseCentrifugoOptions = 
       return () => {};
     }
 
-    // Check if already subscribed
-    const existingSub = subscriptionsRef.current.get(channel);
-    if (existingSub) {
-      console.log(`⏭️  [Centrifugo] Already subscribed to ${channel}, removing old subscription first`);
-      try {
-        existingSub.unsubscribe();
-        existingSub.removeAllListeners();
-      } catch (error) {
-        console.warn(`⚠️  [Centrifugo] Error removing old subscription:`, error);
+    // Check if subscription already exists in client registry (proper pattern)
+    let sub = clientRef.current.getSubscription(channel);
+
+    if (sub) {
+      console.log(`✅ [Centrifugo] Subscription to ${channel} already exists, reusing it`);
+      // Subscription exists - just ensure it's subscribed
+      if (sub.state !== 'subscribed' && sub.state !== 'subscribing') {
+        sub.subscribe();
       }
-      subscriptionsRef.current.delete(channel);
+
+      // Track it in our ref for cleanup
+      subscriptionsRef.current.set(channel, sub);
+
+      // Return unsubscribe function
+      return () => {
+        console.log(`🔄 [Centrifugo] Unsubscribing from ${channel}...`);
+        const subscription = clientRef.current?.getSubscription(channel);
+        if (subscription) {
+          subscription.unsubscribe();
+          clientRef.current?.removeSubscription(subscription);
+        }
+        subscriptionsRef.current.delete(channel);
+      };
     }
 
-    console.log(`🔄 [Centrifugo] Subscribing to ${channel}...`);
+    console.log(`🔄 [Centrifugo] Creating new subscription to ${channel}...`);
 
-    const sub = clientRef.current.newSubscription(channel);
+    // Create new subscription (only if it doesn't exist in registry)
+    sub = clientRef.current.newSubscription(channel);
 
     // Publication event (data received)
     sub.on('publication', (ctx) => {
@@ -203,10 +219,14 @@ export function useCentrifugo({ token, enabled = true }: UseCentrifugoOptions = 
     sub.subscribe();
     subscriptionsRef.current.set(channel, sub);
 
-    // Return unsubscribe function
+    // Return unsubscribe function (using proper removeSubscription)
     return () => {
       console.log(`🔄 [Centrifugo] Unsubscribing from ${channel}...`);
-      sub.unsubscribe();
+      const subscription = clientRef.current?.getSubscription(channel);
+      if (subscription) {
+        subscription.unsubscribe();
+        clientRef.current?.removeSubscription(subscription);
+      }
       subscriptionsRef.current.delete(channel);
     };
   }, []);
