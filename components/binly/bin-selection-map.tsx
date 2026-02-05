@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { getBins } from '@/lib/api/bins';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
-import { X, Search, Lasso, MapIcon, List } from 'lucide-react';
+import { X, Search, Lasso, MapIcon, List, Filter, ChevronDown } from 'lucide-react';
 
 // Default map center (San Jose, CA area)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -100,6 +100,14 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
   const [loading, setLoading] = useState(true);
   const [lassoMode, setLassoMode] = useState(false);
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map'); // Mobile view toggle
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+
+  // Filter options
+  const [showMissingBins, setShowMissingBins] = useState(true);
+  const [showCriticalBins, setShowCriticalBins] = useState(true);
+  const [showHighFillBins, setShowHighFillBins] = useState(true);
+  const [showMediumFillBins, setShowMediumFillBins] = useState(true);
+  const [showLowFillBins, setShowLowFillBins] = useState(true);
 
   // Load bins from API
   useEffect(() => {
@@ -147,8 +155,25 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
     setSelectedBinIds(new Set());
   };
 
-  // Filter bins based on search
+  // Filter bins based on search and filter options
   const filteredBins = bins.filter(bin => {
+    // Apply fill level and status filters first
+    if (bin.status === 'missing') {
+      if (!showMissingBins) return false;
+    } else {
+      const fillPercentage = bin.fill_percentage ?? 0;
+      if (fillPercentage >= 80) {
+        if (!showCriticalBins) return false;
+      } else if (fillPercentage >= 50) {
+        if (!showHighFillBins) return false;
+      } else if (fillPercentage >= 25) {
+        if (!showMediumFillBins) return false;
+      } else {
+        if (!showLowFillBins) return false;
+      }
+    }
+
+    // Then apply search filter
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -330,15 +355,110 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
           <div className={`w-full md:w-[40%] border-l border-gray-200 flex flex-col bg-gray-50 ${viewMode === 'map' ? 'hidden md:flex' : 'flex'}`}>
             {/* Search Header */}
             <div className="p-4 border-b border-gray-200 bg-white">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by bin number or address..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
+              {/* Search Bar and Filter Button */}
+              <div className="flex gap-2 mb-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by bin number or address..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  />
+                </div>
+
+                {/* Filter Button */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-fast flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <Filter className="w-4 h-4" />
+                    <span className="hidden sm:inline">Filter</span>
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showFilterDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Filter Dropdown */}
+                  {showFilterDropdown && (
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50 animate-slide-in-down">
+                      <div className="p-3 border-b border-gray-200">
+                        <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Bin Types</p>
+                      </div>
+                      <div className="p-2 space-y-1 max-h-72 overflow-y-auto">
+                        {/* Missing Bins */}
+                        <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-gray-500" />
+                            <span className="text-sm text-gray-700">Missing</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={showMissingBins}
+                            onChange={(e) => setShowMissingBins(e.target.checked)}
+                            className="w-4 h-4 text-gray-600 rounded focus:ring-2 focus:ring-gray-400/20"
+                          />
+                        </label>
+
+                        {/* Critical Fill (80%+) */}
+                        <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-red-500" />
+                            <span className="text-sm text-gray-700">Critical (80%+)</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={showCriticalBins}
+                            onChange={(e) => setShowCriticalBins(e.target.checked)}
+                            className="w-4 h-4 text-red-600 rounded focus:ring-2 focus:ring-red-400/20"
+                          />
+                        </label>
+
+                        {/* High Fill (50-79%) */}
+                        <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-orange-500" />
+                            <span className="text-sm text-gray-700">High Fill (50-79%)</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={showHighFillBins}
+                            onChange={(e) => setShowHighFillBins(e.target.checked)}
+                            className="w-4 h-4 text-orange-600 rounded focus:ring-2 focus:ring-orange-400/20"
+                          />
+                        </label>
+
+                        {/* Medium Fill (25-49%) */}
+                        <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-amber-500" />
+                            <span className="text-sm text-gray-700">Medium Fill (25-49%)</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={showMediumFillBins}
+                            onChange={(e) => setShowMediumFillBins(e.target.checked)}
+                            className="w-4 h-4 text-amber-600 rounded focus:ring-2 focus:ring-amber-400/20"
+                          />
+                        </label>
+
+                        {/* Low Fill (0-24%) */}
+                        <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-green-500" />
+                            <span className="text-sm text-gray-700">Low Fill (0-24%)</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={showLowFillBins}
+                            onChange={(e) => setShowLowFillBins(e.target.checked)}
+                            className="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-400/20"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Quick Actions */}

@@ -42,7 +42,7 @@ function getAuthHeaders(): HeadersInit {
 }
 
 export type BinSortOption = 'priority' | 'bin_number' | 'fill_percentage' | 'days_since_check' | 'status';
-export type BinFilterOption = 'all' | 'next_move_request' | 'longest_unchecked' | 'high_fill' | 'has_check_recommendation';
+export type BinFilterOption = 'all' | 'next_move_request' | 'missing' | 'high_fill' | 'medium_fill' | 'low_fill';
 export type BinStatusFilter = 'active' | 'all' | 'retired' | 'pending_move' | 'in_storage';
 
 /**

@@ -141,11 +141,14 @@ export default function BinsPage() {
           switch (filter) {
             case 'next_move_request':
               return bin.has_pending_move;
-            case 'longest_unchecked':
-            case 'has_check_recommendation':
-              return bin.has_check_recommendation;
+            case 'missing':
+              return bin.status === 'missing';
             case 'high_fill':
-              return (bin.fill_percentage || 0) >= 60;
+              return (bin.fill_percentage || 0) >= 50 && (bin.fill_percentage || 0) < 80;
+            case 'medium_fill':
+              return (bin.fill_percentage || 0) >= 25 && (bin.fill_percentage || 0) < 50;
+            case 'low_fill':
+              return (bin.fill_percentage || 0) >= 0 && (bin.fill_percentage || 0) < 25;
             default:
               return true;
           }
@@ -336,8 +339,10 @@ export default function BinsPage() {
               selectedValues={filters}
               options={[
                 { value: 'next_move_request', label: 'Move Requests' },
-                { value: 'longest_unchecked', label: 'Needs Check' },
+                { value: 'missing', label: 'Missing' },
                 { value: 'high_fill', label: 'High Fill' },
+                { value: 'medium_fill', label: 'Medium Fill' },
+                { value: 'low_fill', label: 'Low Fill' },
               ]}
               onChange={(values) => setFilters(values as BinFilterOption[])}
             />
