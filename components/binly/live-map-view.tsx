@@ -613,8 +613,8 @@ export function LiveMapView() {
         </>
       )}
 
-      {/* Legend/Info Button - Bottom Right (Floating) */}
-      {!loading && (
+      {/* Legend/Info Button - Bottom Right (Floating) - HIDDEN */}
+      {/* {!loading && (
         <button
           onClick={() => setShowLegend(!showLegend)}
           className="fixed bottom-28 lg:bottom-20 right-4 z-20 w-12 h-12 bg-primary text-white rounded-full shadow-xl flex items-center justify-center hover:bg-primary/90 transition-all duration-200 group"
@@ -637,43 +637,37 @@ export function LiveMapView() {
             <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
           )}
         </button>
-      )}
+      )} */}
 
-      {/* Collapsible Legend Panel - Bottom Right (Above button) */}
-      {showLegend && (
+      {/* Collapsible Legend Panel - Bottom Right (Above button) - HIDDEN */}
+      {/* {showLegend && (
         <div className="fixed bottom-44 lg:bottom-36 right-3 lg:right-4 z-20 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-3 lg:p-4 w-72 max-h-[60vh] overflow-y-auto animate-scale-in">
-          {/* Fill Levels Legend */}
-          {showFillLevels && (
-            <div className="mb-4">
-              <p className="text-xs font-semibold text-gray-700 mb-2">
-                Fill Level Legend
-              </p>
-              <div className="space-y-1.5">
-                <LegendItem color="#10B981" label="Low (0-25%)" />
-                <LegendItem color="#F59E0B" label="Medium (25-50%)" />
-                <LegendItem color="#F97316" label="High (50-80%)" />
-                <LegendItem color="#EF4444" label="Critical (80%+)" />
-                <LegendItem color="#9CA3AF" label="Unknown" />
-              </div>
+          <div className="mb-4">
+            <p className="text-xs font-semibold text-gray-700 mb-2">
+              Fill Level Legend
+            </p>
+            <div className="space-y-1.5">
+              <LegendItem color="#10B981" label="Low (0-25%)" />
+              <LegendItem color="#F59E0B" label="Medium (25-50%)" />
+              <LegendItem color="#F97316" label="High (50-80%)" />
+              <LegendItem color="#EF4444" label="Critical (80%+)" />
+              <LegendItem color="#9CA3AF" label="Unknown" />
             </div>
-          )}
+          </div>
 
-          {/* No-Go Zones Legend */}
-          {showNoGoZones && (
-            <div className="pt-3 border-t border-gray-200">
-              <p className="text-xs font-semibold text-gray-700 mb-2">
-                Zone Severity Legend
-              </p>
-              <div className="space-y-1.5">
-                <LegendItem color="#F59E0B" label="Low (0-15)" />
-                <LegendItem color="#F97316" label="Medium (16-30)" />
-                <LegendItem color="#EF4444" label="High (31-50)" />
-                <LegendItem color="#DC2626" label="Critical (51+)" />
-              </div>
+          <div className="pt-3 border-t border-gray-200">
+            <p className="text-xs font-semibold text-gray-700 mb-2">
+              Zone Severity Legend
+            </p>
+            <div className="space-y-1.5">
+              <LegendItem color="#F59E0B" label="Low (0-15)" />
+              <LegendItem color="#F97316" label="Medium (16-30)" />
+              <LegendItem color="#EF4444" label="High (31-50)" />
+              <LegendItem color="#DC2626" label="Critical (51+)" />
             </div>
-          )}
+          </div>
         </div>
-      )}
+      )} */}
 
 
       {/* Bin Details Drawer - Right Side */}
