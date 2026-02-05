@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { getBins } from '@/lib/api/bins';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
-import { X, Search, Lasso } from 'lucide-react';
+import { X, Search, Lasso, MapIcon, List } from 'lucide-react';
 
 // Default map center (San Jose, CA area)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -99,6 +99,7 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [lassoMode, setLassoMode] = useState(false);
+  const [viewMode, setViewMode] = useState<'map' | 'list'>('map'); // Mobile view toggle
 
   // Load bins from API
   useEffect(() => {
@@ -175,25 +176,58 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
       {/* Full-screen Modal */}
       <div className="fixed inset-4 bg-white rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">Select Bins for Shift</h2>
-            <p className="text-sm text-gray-600 mt-0.5">
-              Click bins individually or use Lasso Select to choose multiple at once
-            </p>
+        <div className="flex flex-col px-4 md:px-6 py-4 border-b border-gray-200 bg-gray-50">
+          {/* Top Row: Title and Close */}
+          <div className="flex items-center justify-between mb-3 md:mb-0">
+            <div>
+              <h2 className="text-lg md:text-xl font-semibold text-gray-900">Select Bins for Shift</h2>
+              <p className="text-xs md:text-sm text-gray-600 mt-0.5 hidden md:block">
+                Click bins individually or use Lasso Select to choose multiple at once
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-200 rounded-lg transition-fast"
+            >
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-200 rounded-lg transition-fast"
-          >
-            <X className="w-5 h-5 text-gray-600" />
-          </button>
+
+          {/* Mobile View Toggle (only visible on mobile) */}
+          <div className="flex md:hidden gap-2 mt-2">
+            <button
+              onClick={() => setViewMode('map')}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                viewMode === 'map'
+                  ? 'bg-primary text-white'
+                  : 'bg-white text-gray-700 border border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <MapIcon className="w-4 h-4" />
+                <span>Map</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                viewMode === 'list'
+                  ? 'bg-primary text-white'
+                  : 'bg-white text-gray-700 border border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <List className="w-4 h-4" />
+                <span>List ({filteredBins.length})</span>
+              </div>
+            </button>
+          </div>
         </div>
 
-        {/* Main Content - Split View */}
+        {/* Main Content - Responsive Layout */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Map View - Left 60% */}
-          <div className="flex-1 relative">
+          {/* Map View - Desktop: Left 60% | Mobile: Full screen when viewMode === 'map' */}
+          <div className={`flex-1 relative ${viewMode === 'list' ? 'hidden md:flex' : 'flex'}`}>
             {loading ? (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
                 <div className="text-center">
@@ -248,47 +282,52 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
               </APIProvider>
             )}
 
-            {/* Lasso Tool Button & Instructions */}
-            <div className="absolute top-4 right-4 flex flex-col gap-2">
-              <button
-                onClick={() => setLassoMode(!lassoMode)}
-                className={`px-4 py-2 rounded-lg shadow-lg font-medium text-sm transition-all ${
-                  lassoMode
-                    ? 'bg-primary text-white ring-4 ring-primary/20'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-                title="Draw a polygon to select multiple bins"
-              >
-                <div className="flex items-center gap-2">
-                  <Lasso className="w-4 h-4" />
-                  <span>{lassoMode ? 'Click to Draw' : 'Lasso Select'}</span>
-                </div>
-              </button>
+            {/* Lasso Tool Button & Instructions - Only show in map mode */}
+            {viewMode === 'map' && (
+              <>
+                <div className="absolute top-4 right-4 flex flex-col gap-2">
+                  <button
+                    onClick={() => setLassoMode(!lassoMode)}
+                    className={`px-3 md:px-4 py-2 rounded-lg shadow-lg font-medium text-xs md:text-sm transition-all ${
+                      lassoMode
+                        ? 'bg-primary text-white ring-4 ring-primary/20'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                    title="Draw a polygon to select multiple bins"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Lasso className="w-4 h-4" />
+                      <span className="hidden sm:inline">{lassoMode ? 'Click to Draw' : 'Lasso Select'}</span>
+                      <span className="sm:hidden">{lassoMode ? 'Drawing' : 'Lasso'}</span>
+                    </div>
+                  </button>
 
-              {/* Drawing Instructions */}
-              {lassoMode && (
-                <div className="bg-white rounded-lg shadow-lg p-3 text-xs text-gray-700 max-w-xs animate-slide-in-down">
-                  <p className="font-semibold mb-1">How to use:</p>
-                  <ol className="list-decimal list-inside space-y-0.5">
-                    <li>Click on map to add points</li>
-                    <li>Draw around bins you want</li>
-                    <li>Click first point to close polygon</li>
-                  </ol>
-                  <p className="mt-2 text-gray-500">Bins inside will be selected automatically</p>
+                  {/* Drawing Instructions - Desktop only */}
+                  {lassoMode && (
+                    <div className="hidden md:block bg-white rounded-lg shadow-lg p-3 text-xs text-gray-700 max-w-xs animate-slide-in-down">
+                      <p className="font-semibold mb-1">How to use:</p>
+                      <ol className="list-decimal list-inside space-y-0.5">
+                        <li>Click on map to add points</li>
+                        <li>Draw around bins you want</li>
+                        <li>Click first point to close polygon</li>
+                      </ol>
+                      <p className="mt-2 text-gray-500">Bins inside will be selected automatically</p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* Selection Counter */}
-            <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg px-4 py-2 border border-gray-200">
-              <p className="text-sm font-semibold text-gray-900">
-                {selectedBinIds.size} bin{selectedBinIds.size !== 1 ? 's' : ''} selected
-              </p>
-            </div>
+                {/* Selection Counter */}
+                <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg px-3 md:px-4 py-2 border border-gray-200">
+                  <p className="text-xs md:text-sm font-semibold text-gray-900">
+                    {selectedBinIds.size} bin{selectedBinIds.size !== 1 ? 's' : ''} selected
+                  </p>
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Bin List - Right 40% */}
-          <div className="w-[40%] border-l border-gray-200 flex flex-col bg-gray-50">
+          {/* Bin List - Desktop: Right 40% | Mobile: Full screen when viewMode === 'list' */}
+          <div className={`w-full md:w-[40%] border-l border-gray-200 flex flex-col bg-gray-50 ${viewMode === 'map' ? 'hidden md:flex' : 'flex'}`}>
             {/* Search Header */}
             <div className="p-4 border-b border-gray-200 bg-white">
               <div className="relative">
@@ -380,17 +419,17 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+        <div className="px-4 md:px-6 py-3 md:py-4 border-t border-gray-200 bg-gray-50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-fast"
+            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-fast order-2 sm:order-1"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
             disabled={selectedBinIds.size === 0}
-            className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-fast"
+            className="px-6 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-fast order-1 sm:order-2"
           >
             Confirm Selection ({selectedBinIds.size})
           </button>
