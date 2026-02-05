@@ -535,20 +535,20 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
       />
 
       {/* Modal */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none p-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none p-2 md:p-4">
         <Card
-          className={`w-full max-w-[95vw] h-[90vh] overflow-hidden flex pointer-events-auto rounded-2xl ${isClosing ? 'animate-scale-out' : 'animate-scale-in'}`}
+          className={`w-full max-w-[95vw] h-[95vh] md:h-[90vh] overflow-hidden flex pointer-events-auto rounded-xl md:rounded-2xl ${isClosing ? 'animate-scale-out' : 'animate-scale-in'}`}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Side-by-Side Layout */}
-          <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex">
-            {/* Left Side: Input Panel */}
-            <div className="w-[550px] flex flex-col border-r border-gray-200 bg-white">
+          {/* Responsive Layout: Vertical on mobile, Side-by-Side on desktop */}
+          <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col md:flex-row">
+            {/* Left Side: Input Panel - Full width on mobile, 550px on desktop */}
+            <div className="w-full md:w-[550px] flex flex-col border-b md:border-b-0 md:border-r border-gray-200 bg-white">
               {/* Panel Header */}
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-start justify-between mb-4">
+              <div className="p-4 md:p-6 border-b border-gray-200">
+                <div className="flex items-start justify-between mb-3 md:mb-4">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">Create New Bin</h2>
+                    <h2 className="text-lg md:text-xl font-bold text-gray-900">Create New Bin</h2>
                     <p className="text-xs text-gray-500 mt-1">
                       Bin numbers will be auto-assigned
                     </p>
@@ -563,13 +563,14 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
                 </div>
                 <p className="text-xs text-blue-600 flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5" />
-                  Enter address or drag pin to fine-tune
+                  <span className="hidden sm:inline">Enter address or drag pin to fine-tune</span>
+                  <span className="sm:hidden">Enter address below</span>
                 </p>
               </div>
 
               {/* Scrollable Form Content */}
-              <div className="flex-1 overflow-y-auto p-6">
-                <div className="space-y-4">
+              <div className="flex-1 overflow-y-auto p-4 md:p-6">
+                <div className="space-y-3 md:space-y-4">
                 {/* Bin Cards */}
                 {rows.map((row, index) => {
                   // Helper function for field styling
@@ -756,23 +757,23 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
               </div>
 
               {/* Footer - Inside Left Panel */}
-              <div className="p-6 border-t border-gray-200 bg-gray-50">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs text-gray-600">
+              <div className="p-4 md:p-6 border-t border-gray-200 bg-gray-50">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3">
+                  <div className="text-xs text-gray-600 text-center sm:text-left order-2 sm:order-1">
                     {validRowCount > 0 && (
                       <span className="font-semibold text-gray-900">
                         {validRowCount} bin{validRowCount !== 1 ? 's' : ''} ready
                       </span>
                     )}
                   </div>
-                  <div className="flex gap-2">
-                    <Button type="button" onClick={handleClose} variant="outline" size="sm">
+                  <div className="flex gap-2 order-1 sm:order-2">
+                    <Button type="button" onClick={handleClose} variant="outline" size="sm" className="flex-1 sm:flex-none">
                       Cancel
                     </Button>
                     <Button
                       type="submit"
                       size="sm"
-                      className="bg-primary hover:bg-primary/90"
+                      className="bg-primary hover:bg-primary/90 flex-1 sm:flex-none"
                       disabled={isSubmitting || validRowCount === 0}
                     >
                       {isSubmitting ? (
@@ -792,8 +793,8 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
               </div>
             </div>
 
-            {/* Right Side: Large Map */}
-            <div className="flex-1 bg-gray-50 flex flex-col">
+            {/* Right Side: Large Map - Hidden on mobile, visible on desktop */}
+            <div className="hidden md:flex flex-1 bg-gray-50 flex-col">
               <div className="flex-1 relative" style={{ pointerEvents: 'auto' }}>
                   {rows.some(r => r.latitude && r.longitude) ? (
                     <Map
