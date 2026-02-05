@@ -376,7 +376,7 @@ export function LiveMapView() {
       {!loading && (
         <>
           {/* Search Bar - All screens */}
-          <div className="absolute top-4 lg:top-8 left-4 right-20 lg:left-1/2 lg:right-auto lg:-translate-x-1/2 z-10 w-auto lg:w-full lg:max-w-2xl pointer-events-auto">
+          <div className="absolute top-4 lg:top-8 left-4 right-[72px] lg:left-1/2 lg:right-auto lg:-translate-x-1/2 z-10 w-auto lg:w-full lg:max-w-2xl pointer-events-auto">
             <MapSearchBar
               bins={bins}
               zones={zones}
