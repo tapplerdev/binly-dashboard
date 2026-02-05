@@ -18,7 +18,7 @@ import {
 import { NoGoZone, getZoneColor, getZoneColorRgba, getZoneOpacity } from '@/lib/types/zone';
 import { PotentialLocation } from '@/lib/api/potential-locations';
 import { Card } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Filter, ChevronDown } from 'lucide-react';
 import { ZoneDetailsDrawer } from './zone-details-drawer';
 import { BinDetailDrawer } from './bin-detail-drawer';
 import { PotentialLocationDetailsDrawer } from './potential-location-details-drawer';
@@ -207,6 +207,7 @@ export function LiveMapView() {
   const [currentZoom, setCurrentZoom] = useState(DEFAULT_ZOOM);
   const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
   const [showLegend, setShowLegend] = useState(false);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
   const wsUrl = token ? `${WS_URL}/ws?token=${token}` : `${WS_URL}/ws`;
 
@@ -373,18 +374,144 @@ export function LiveMapView() {
 
       {/* Search Bar (Desktop) and Navigation Tabs (All) - Top Center */}
       {!loading && (
-        <div className="absolute top-4 lg:top-8 left-1/2 -translate-x-1/2 z-10 w-full max-w-2xl px-3 lg:px-4 pointer-events-auto">
-          <div className="flex flex-col gap-3">
-            {/* Search Bar - Desktop only */}
-            <div className="hidden lg:block">
-              <MapSearchBar
-                bins={bins}
-                zones={zones}
-                onSelectResult={handleSearchResult}
-              />
+        <>
+          {/* Search Bar - Desktop only */}
+          <div className="absolute top-4 lg:top-8 left-1/2 -translate-x-1/2 z-10 w-full max-w-2xl px-3 lg:px-4 pointer-events-auto">
+            <div className="flex flex-col gap-3">
+              <div className="hidden lg:block">
+                <MapSearchBar
+                  bins={bins}
+                  zones={zones}
+                  onSelectResult={handleSearchResult}
+                />
+              </div>
             </div>
           </div>
-        </div>
+
+          {/* Filter/Stats Button - Top Right */}
+          <div className="absolute top-4 lg:top-8 right-3 lg:right-6 z-10 pointer-events-auto">
+            <div className="relative">
+              <button
+                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                className="bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-gray-200 px-4 py-2.5 flex items-center gap-2 hover:bg-gray-50 transition-all group"
+              >
+                <Filter className="w-4 h-4 text-gray-700" />
+                <span className="font-semibold text-sm text-gray-900 hidden sm:inline">Filters</span>
+                <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${showFilterDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Dropdown Panel */}
+              {showFilterDropdown && (
+                <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
+                  {/* Stats Section */}
+                  <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-b border-gray-200">
+                    <h3 className="text-sm font-bold text-gray-900 mb-3">Map Overview</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-white/80 backdrop-blur rounded-lg px-3 py-2">
+                        <div className="text-xs text-gray-600 mb-0.5">Total Bins</div>
+                        <div className="text-2xl font-bold text-gray-900">{bins.length}</div>
+                      </div>
+                      <div className="bg-white/80 backdrop-blur rounded-lg px-3 py-2">
+                        <div className="text-xs text-gray-600 mb-0.5">Critical</div>
+                        <div className="text-2xl font-bold text-red-600">
+                          {bins.filter((b) => (b.fill_percentage ?? 0) >= 80).length}
+                        </div>
+                      </div>
+                      {zones.length > 0 && (
+                        <div className="bg-white/80 backdrop-blur rounded-lg px-3 py-2">
+                          <div className="text-xs text-gray-600 mb-0.5">No-Go Zones</div>
+                          <div className="text-2xl font-bold text-red-600">{zones.length}</div>
+                        </div>
+                      )}
+                      {potentialLocations.length > 0 && (
+                        <div className="bg-white/80 backdrop-blur rounded-lg px-3 py-2">
+                          <div className="text-xs text-gray-600 mb-0.5">Potential</div>
+                          <div className="text-2xl font-bold text-orange-600">{potentialLocations.length}</div>
+                        </div>
+                      )}
+                      {drivers.filter(d => d.currentLocation).length > 0 && (
+                        <div className="bg-white/80 backdrop-blur rounded-lg px-3 py-2 col-span-2">
+                          <div className="text-xs text-gray-600 mb-2">Active Drivers</div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setDriverFilter('all')}
+                              className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                driverFilter === 'all'
+                                  ? 'bg-green-600 text-white shadow-md'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                            >
+                              All ({drivers.filter(d => d.currentLocation).length})
+                            </button>
+                            <button
+                              onClick={() => setDriverFilter('on_shift')}
+                              className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                driverFilter === 'on_shift'
+                                  ? 'bg-green-600 text-white shadow-md'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                            >
+                              On Shift ({drivers.filter(d => d.currentLocation && d.shiftId).length})
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Filter Section */}
+                  <div className="p-4">
+                    <h3 className="text-sm font-bold text-gray-900 mb-3">Toggle Layers</h3>
+                    <div className="space-y-2">
+                      <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                        <span className="text-sm text-gray-700">Bin Fill Levels</span>
+                        <input
+                          type="checkbox"
+                          checked={showFillLevels}
+                          onChange={(e) => setShowFillLevels(e.target.checked)}
+                          className="w-4 h-4 text-primary rounded focus:ring-2 focus:ring-primary/20"
+                        />
+                      </label>
+                      {zones.length > 0 && (
+                        <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                          <span className="text-sm text-gray-700">No-Go Zones</span>
+                          <input
+                            type="checkbox"
+                            checked={showNoGoZones}
+                            onChange={(e) => setShowNoGoZones(e.target.checked)}
+                            className="w-4 h-4 text-primary rounded focus:ring-2 focus:ring-primary/20"
+                          />
+                        </label>
+                      )}
+                      {potentialLocations.length > 0 && (
+                        <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                          <span className="text-sm text-gray-700">Potential Locations</span>
+                          <input
+                            type="checkbox"
+                            checked={showPotentialLocations}
+                            onChange={(e) => setShowPotentialLocations(e.target.checked)}
+                            className="w-4 h-4 text-primary rounded focus:ring-2 focus:ring-primary/20"
+                          />
+                        </label>
+                      )}
+                      {drivers.filter(d => d.currentLocation).length > 0 && (
+                        <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                          <span className="text-sm text-gray-700">Driver Locations</span>
+                          <input
+                            type="checkbox"
+                            checked={showDrivers}
+                            onChange={(e) => setShowDrivers(e.target.checked)}
+                            className="w-4 h-4 text-primary rounded focus:ring-2 focus:ring-primary/20"
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
       )}
 
       {/* Legend/Info Button - Bottom Right (Floating) */}
@@ -449,69 +576,6 @@ export function LiveMapView() {
         </div>
       )}
 
-      {/* Bottom Stats Bar - Glassmorphism */}
-      {!loading && (
-        <div className="absolute bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 z-10 w-[calc(100%-2rem)] lg:w-auto max-w-full">
-          <div className="bg-white/90 backdrop-blur-md rounded-full shadow-xl border border-gray-100 px-3 lg:px-6 py-2 lg:py-3 overflow-x-auto scrollbar-hide">
-            <div className="flex items-center gap-2 lg:gap-4 min-w-max">
-          {/* Stats */}
-          <div className="flex items-center gap-2 lg:gap-4 text-xs lg:text-sm">
-            <div className="flex items-center gap-1.5">
-              <span className="text-gray-600">Total:</span>
-              <span className="font-bold text-gray-900">{bins.length}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-gray-600">Critical:</span>
-              <span className="font-bold text-red-600">
-                {bins.filter((b) => (b.fill_percentage ?? 0) >= 80).length}
-              </span>
-            </div>
-            {zones.length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-gray-600">No-Go:</span>
-                <span className="font-bold text-red-600">{zones.length}</span>
-              </div>
-            )}
-            {potentialLocations.length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-gray-600">Potential:</span>
-                <span className="font-bold text-orange-600">{potentialLocations.length}</span>
-              </div>
-            )}
-            {drivers.filter(d => d.currentLocation).length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-gray-600">Drivers:</span>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setDriverFilter('all')}
-                    className={`px-2 py-0.5 rounded-full text-xs font-semibold transition-all ${
-                      driverFilter === 'all'
-                        ? 'bg-green-600 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                    title="Show all drivers with location data"
-                  >
-                    All ({drivers.filter(d => d.currentLocation).length})
-                  </button>
-                  <button
-                    onClick={() => setDriverFilter('on_shift')}
-                    className={`px-2 py-0.5 rounded-full text-xs font-semibold transition-all ${
-                      driverFilter === 'on_shift'
-                        ? 'bg-green-600 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                    title="Show only drivers on active shifts"
-                  >
-                    On Shift ({drivers.filter(d => d.currentLocation && d.shiftId).length})
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Bin Details Drawer - Right Side */}
       {selectedBin && (
