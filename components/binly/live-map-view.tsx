@@ -417,6 +417,14 @@ export function LiveMapView() {
                           {bins.filter((b) => (b.fill_percentage ?? 0) >= 80).length}
                         </div>
                       </div>
+                      {bins.filter((b) => b.status === 'missing').length > 0 && (
+                        <div className="bg-white/80 backdrop-blur rounded-lg px-3 py-2">
+                          <div className="text-xs text-gray-600 mb-0.5">Missing</div>
+                          <div className="text-2xl font-bold text-gray-600">
+                            {bins.filter((b) => b.status === 'missing').length}
+                          </div>
+                        </div>
+                      )}
                       {zones.length > 0 && (
                         <div className="bg-white/80 backdrop-blur rounded-lg px-3 py-2">
                           <div className="text-xs text-gray-600 mb-0.5">No-Go Zones</div>
@@ -682,9 +690,9 @@ export function LiveMapView() {
               <div
                 className="w-8 h-8 rounded-full border-2 border-white shadow-lg cursor-pointer transition-all duration-300 animate-scale-in"
                 style={{
-                  backgroundColor: getBinMarkerColor(bin.fill_percentage),
+                  backgroundColor: getBinMarkerColor(bin.fill_percentage, bin.status),
                 }}
-                title={`Bin #${bin.bin_number} - ${bin.fill_percentage ?? 0}%`}
+                title={`Bin #${bin.bin_number} - ${bin.status === 'missing' ? 'MISSING' : `${bin.fill_percentage ?? 0}%`}`}
               >
                 <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
                   {bin.bin_number}

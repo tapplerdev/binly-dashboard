@@ -73,11 +73,18 @@ export function getFillLevelCategory(
 }
 
 /**
- * Get color for bin marker based on fill level
+ * Get color for bin marker based on status and fill level
+ * Priority: missing status (grey) > fill level colors
  */
 export function getBinMarkerColor(
-  fillPercentage?: number | null
+  fillPercentage?: number | null,
+  status?: BinStatus
 ): string {
+  // Missing bins always show grey, regardless of fill level
+  if (status === 'missing') {
+    return '#6B7280'; // gray-500 (darker grey for missing)
+  }
+
   const category = getFillLevelCategory(fillPercentage);
   switch (category) {
     case 'empty':

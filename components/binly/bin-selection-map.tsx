@@ -258,7 +258,7 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
                   {/* Bin Markers */}
                   {mappableBins.map((bin) => {
                     const isSelected = selectedBinIds.has(bin.id);
-                    const markerColor = isSelected ? '#16a34a' : getBinMarkerColor(bin.fill_percentage);
+                    const markerColor = isSelected ? '#16a34a' : getBinMarkerColor(bin.fill_percentage, bin.status);
 
                     return (
                       <AdvancedMarker
@@ -404,7 +404,7 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
                               className="h-1.5 rounded-full transition-all"
                               style={{
                                 width: `${fillPercentage}%`,
-                                backgroundColor: getBinMarkerColor(fillPercentage),
+                                backgroundColor: getBinMarkerColor(fillPercentage, bin.status),
                               }}
                             />
                           </div>
