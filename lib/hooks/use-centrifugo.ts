@@ -146,9 +146,16 @@ export function useCentrifugo({ token, enabled = true }: UseCentrifugoOptions = 
     }
 
     // Check if already subscribed
-    if (subscriptionsRef.current.has(channel)) {
-      console.log(`⏭️  [Centrifugo] Already subscribed to ${channel}`);
-      return () => {};
+    const existingSub = subscriptionsRef.current.get(channel);
+    if (existingSub) {
+      console.log(`⏭️  [Centrifugo] Already subscribed to ${channel}, removing old subscription first`);
+      try {
+        existingSub.unsubscribe();
+        existingSub.removeAllListeners();
+      } catch (error) {
+        console.warn(`⚠️  [Centrifugo] Error removing old subscription:`, error);
+      }
+      subscriptionsRef.current.delete(channel);
     }
 
     console.log(`🔄 [Centrifugo] Subscribing to ${channel}...`);
