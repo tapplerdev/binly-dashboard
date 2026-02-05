@@ -203,6 +203,7 @@ export function LiveMapView() {
   const [showNoGoZones, setShowNoGoZones] = useState(true);
   const [showPotentialLocations, setShowPotentialLocations] = useState(true);
   const [showDrivers, setShowDrivers] = useState(true);
+  const [driverFilter, setDriverFilter] = useState<'all' | 'on_shift'>('all');
   const [currentZoom, setCurrentZoom] = useState(DEFAULT_ZOOM);
   const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
   const [showLegend, setShowLegend] = useState(false);
@@ -315,6 +316,17 @@ export function LiveMapView() {
     () => potentialLocations.filter((loc) => loc.latitude != null && loc.longitude != null),
     [potentialLocations]
   );
+
+  // Memoize filtered drivers based on filter mode
+  const filteredDrivers = useMemo(() => {
+    const driversWithLocation = drivers.filter((d) => d.currentLocation);
+
+    if (driverFilter === 'on_shift') {
+      return driversWithLocation.filter((d) => d.shiftId != null);
+    }
+
+    return driversWithLocation;
+  }, [drivers, driverFilter]);
 
   // Handle search result selection
   const handleSearchResult = (result: { type: 'bin' | 'zone'; data: Bin | NoGoZone }) => {
@@ -469,9 +481,30 @@ export function LiveMapView() {
             {drivers.filter(d => d.currentLocation).length > 0 && (
               <div className="flex items-center gap-1.5">
                 <span className="text-gray-600">Drivers:</span>
-                <span className="font-bold text-green-600">
-                  {drivers.filter(d => d.currentLocation).length}
-                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setDriverFilter('all')}
+                    className={`px-2 py-0.5 rounded-full text-xs font-semibold transition-all ${
+                      driverFilter === 'all'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                    title="Show all drivers with location data"
+                  >
+                    All ({drivers.filter(d => d.currentLocation).length})
+                  </button>
+                  <button
+                    onClick={() => setDriverFilter('on_shift')}
+                    className={`px-2 py-0.5 rounded-full text-xs font-semibold transition-all ${
+                      driverFilter === 'on_shift'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                    title="Show only drivers on active shifts"
+                  >
+                    On Shift ({drivers.filter(d => d.currentLocation && d.shiftId).length})
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -616,9 +649,7 @@ export function LiveMapView() {
 
         {/* Render driver markers with initials */}
         {showDrivers &&
-          drivers
-            .filter((driver) => driver.currentLocation)
-            .map((driver) => {
+          filteredDrivers.map((driver) => {
               const initials = driver.driverName.split(' ').map(n => n[0]).join('').toUpperCase();
               const statusColor =
                 driver.status === 'active'
