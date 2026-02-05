@@ -87,6 +87,7 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number; timestamp: number } | null>(null);
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map'); // Mobile view toggle
+  const [hoveredLocationId, setHoveredLocationId] = useState<string | null>(null); // For popup display
 
   // Toggle location selection and pan to location
   const toggleLocationSelection = (locationId: string, location: PotentialLocation) => {
@@ -106,6 +107,9 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
       newSelection.add(locationId);
     }
     setSelectedLocationIds(newSelection);
+
+    // Show popup for this location
+    setHoveredLocationId(locationId);
 
     // Always pan to the location when clicked (even if deselecting)
     if (location.latitude && location.longitude) {
@@ -235,6 +239,7 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                 disableDefaultUI={false}
                 streetViewControl={false}
                 className="w-full h-full"
+                onClick={() => setHoveredLocationId(null)} // Close popup when clicking map
               >
                 {/* Map controller for selected location navigation */}
                 <MapController
@@ -245,12 +250,16 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                 {/* Placement Location Markers - Using PotentialLocationPin */}
                 {mappableLocations.map((location) => {
                   const isSelected = selectedLocationIds.has(location.id);
+                  const showPopup = hoveredLocationId === location.id;
 
                   return (
                     <AdvancedMarker
                       key={location.id}
                       position={{ lat: location.latitude, lng: location.longitude }}
-                      onClick={() => toggleLocationSelection(location.id, location)}
+                      onClick={(e) => {
+                        e.stop(); // Prevent map click event
+                        toggleLocationSelection(location.id, location);
+                      }}
                     >
                       <div
                         className="relative cursor-pointer transition-all hover:scale-110"
@@ -270,6 +279,23 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                             color={isSelected ? '#16a34a' : '#FF9500'}
                           />
                         </div>
+
+                        {/* Address Popup - Shows above marker when selected */}
+                        {showPopup && (
+                          <div
+                            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-white rounded-lg shadow-lg border border-gray-200 min-w-[200px] max-w-[280px] animate-slide-in-up z-50"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="text-xs font-semibold text-gray-900 mb-1">
+                              {location.address || `${location.street}`}
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              {location.city}, {location.zip}
+                            </div>
+                            {/* Arrow pointing down to marker */}
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white" />
+                          </div>
+                        )}
                       </div>
                     </AdvancedMarker>
                   );
