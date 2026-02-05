@@ -74,7 +74,7 @@ export function getFillLevelCategory(
 
 /**
  * Get color for bin marker based on status and fill level
- * Priority: missing status (grey) > fill level colors
+ * Priority: missing status (grey) > active bins with 0% (green) > fill level colors
  */
 export function getBinMarkerColor(
   fillPercentage?: number | null,
@@ -85,10 +85,15 @@ export function getBinMarkerColor(
     return '#6B7280'; // gray-500 (darker grey for missing)
   }
 
+  // Active bins with 0% or null fill should show green (healthy/empty)
+  if (status === 'active' && (fillPercentage === 0 || fillPercentage === null || fillPercentage === undefined)) {
+    return '#10B981'; // green-500 (empty but active = good)
+  }
+
   const category = getFillLevelCategory(fillPercentage);
   switch (category) {
     case 'empty':
-      return '#9CA3AF'; // gray-400
+      return '#9CA3AF'; // gray-400 (for non-active bins)
     case 'low':
       return '#10B981'; // green-500
     case 'medium':
