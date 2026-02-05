@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useCentrifugo } from './use-centrifugo';
 import { ActiveDriver, DriverLocation } from '../types/active-driver';
 
@@ -94,6 +94,9 @@ export function useActiveDrivers({ token, enabled = true }: UseActiveDriversOpti
   console.log('   Error:', error);
   console.log('   Centrifugo Status:', centrifugoStatus);
 
+  // Track currently subscribed driver IDs to avoid re-subscribing on location updates
+  const subscribedDriverIdsRef = useRef<Set<string>>(new Set());
+
   // Subscribe to all active driver location channels
   useEffect(() => {
     if (!drivers || drivers.length === 0 || centrifugoStatus !== 'connected') {
@@ -103,34 +106,59 @@ export function useActiveDrivers({ token, enabled = true }: UseActiveDriversOpti
       return;
     }
 
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📡 [Centrifugo] Setting up driver location subscriptions');
-    console.log('   Total drivers:', drivers.length);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    const currentDriverIds = new Set(drivers.map(d => d.driverId));
+    const previousDriverIds = subscribedDriverIdsRef.current;
+
+    // Find drivers to subscribe to (new drivers)
+    const driversToSubscribe = drivers.filter(d => !previousDriverIds.has(d.driverId));
+
+    // Find drivers to unsubscribe from (drivers that left)
+    const driverIdsToUnsubscribe = Array.from(previousDriverIds).filter(id => !currentDriverIds.has(id));
+
+    // Only log if there are changes
+    if (driversToSubscribe.length > 0 || driverIdsToUnsubscribe.length > 0) {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📡 [Centrifugo] Updating driver location subscriptions');
+      console.log('   New drivers:', driversToSubscribe.length);
+      console.log('   Removed drivers:', driverIdsToUnsubscribe.length);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    }
 
     const unsubscribeFunctions: Array<() => void> = [];
 
-    // Subscribe to each driver's location channel
-    drivers.forEach((driver) => {
+    // Subscribe to new drivers only
+    driversToSubscribe.forEach((driver) => {
       const channel = `driver:location:${driver.driverId}`;
       console.log(`   📍 Subscribing to ${driver.driverName} (${channel})`);
 
       const unsubscribe = subscribe(channel, (data: unknown) => {
-        // Pass driver_id along with the data since it's not in the Centrifugo message
         handleDriverLocationUpdate(data as Record<string, unknown>, driver.driverId);
       });
 
       unsubscribeFunctions.push(unsubscribe);
+      subscribedDriverIdsRef.current.add(driver.driverId);
     });
 
-    console.log('✅ [Centrifugo] Subscribed to all driver channels');
+    // Unsubscribe from drivers that left
+    driverIdsToUnsubscribe.forEach((driverId) => {
+      const channel = `driver:location:${driverId}`;
+      console.log(`   🔄 Unsubscribing from ${channel}`);
+      // Let the subscribe function handle unsubscribe via its return value
+      subscribedDriverIdsRef.current.delete(driverId);
+    });
 
-    // Cleanup: unsubscribe when drivers change or component unmounts
+    if (driversToSubscribe.length > 0) {
+      console.log('✅ [Centrifugo] Subscription updates complete');
+    }
+
+    // Cleanup: only cleanup subscriptions we just created
     return () => {
-      console.log('🧹 [Centrifugo] Cleaning up driver subscriptions...');
-      unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
+      if (unsubscribeFunctions.length > 0) {
+        console.log('🧹 [Centrifugo] Cleaning up new subscriptions...');
+        unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
+      }
     };
-  }, [drivers, centrifugoStatus, subscribe]);
+  }, [drivers?.map(d => d.driverId).join(','), centrifugoStatus, subscribe]);
 
   const handleDriverLocationUpdate = (locationData: Record<string, unknown>, driverId: string) => {
     // Extract location data from Centrifugo message
