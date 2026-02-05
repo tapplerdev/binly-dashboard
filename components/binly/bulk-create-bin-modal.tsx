@@ -5,7 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createBin } from '@/lib/api/bins';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, Plus, Trash2, Loader2, Package, MapPin, Navigation } from 'lucide-react';
+import { X, Plus, Trash2, Loader2, Package, MapPin, Navigation, MapIcon, List } from 'lucide-react';
 import { cn } from '@/lib/utils';
 // OLD: Google Places Autocomplete (commented out for rollback)
 // import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
@@ -161,6 +161,7 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
     lng: -122.4194,
   });
   const [mapZoom, setMapZoom] = useState(13);
+  const [viewMode, setViewMode] = useState<'form' | 'map'>('form'); // Mobile view toggle
 
   const handleClose = () => {
     setIsClosing(true);
@@ -546,7 +547,7 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
             <div className="w-full md:w-[550px] flex flex-col border-b md:border-b-0 md:border-r border-gray-200 bg-white">
               {/* Panel Header */}
               <div className="p-4 md:p-6 border-b border-gray-200">
-                <div className="flex items-start justify-between mb-3 md:mb-4">
+                <div className="flex items-start justify-between mb-3">
                   <div>
                     <h2 className="text-lg md:text-xl font-bold text-gray-900">Create New Bin</h2>
                     <p className="text-xs text-gray-500 mt-1">
@@ -561,15 +562,50 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
                     <X className="w-5 h-5 text-gray-500" />
                   </button>
                 </div>
+
+                {/* Mobile View Toggle (only visible on mobile) */}
+                <div className="flex md:hidden gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('form')}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                      viewMode === 'form'
+                        ? 'bg-primary text-white'
+                        : 'bg-white text-gray-700 border border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <List className="w-4 h-4" />
+                      <span>Form</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('map')}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                      viewMode === 'map'
+                        ? 'bg-primary text-white'
+                        : 'bg-white text-gray-700 border border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <MapIcon className="w-4 h-4" />
+                      <span>Map</span>
+                    </div>
+                  </button>
+                </div>
+
                 <p className="text-xs text-blue-600 flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Enter address or drag pin to fine-tune</span>
-                  <span className="sm:hidden">Enter address below</span>
+                  <span className="hidden md:inline">Enter address or drag pin to fine-tune</span>
+                  <span className="md:hidden">
+                    {viewMode === 'form' ? 'Enter address below' : 'View bin locations'}
+                  </span>
                 </p>
               </div>
 
-              {/* Scrollable Form Content */}
-              <div className="flex-1 overflow-y-auto p-4 md:p-6">
+              {/* Scrollable Form Content - Hidden on mobile when map is shown */}
+              <div className={`flex-1 overflow-y-auto p-4 md:p-6 ${viewMode === 'map' ? 'hidden md:block' : 'block'}`}>
                 <div className="space-y-3 md:space-y-4">
                 {/* Bin Cards */}
                 {rows.map((row, index) => {
@@ -756,8 +792,8 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
                 </div>
               </div>
 
-              {/* Footer - Inside Left Panel */}
-              <div className="p-4 md:p-6 border-t border-gray-200 bg-gray-50">
+              {/* Footer - Inside Left Panel - Hidden on mobile when map is shown */}
+              <div className={`p-4 md:p-6 border-t border-gray-200 bg-gray-50 ${viewMode === 'map' ? 'hidden md:block' : 'block'}`}>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3">
                   <div className="text-xs text-gray-600 text-center sm:text-left order-2 sm:order-1">
                     {validRowCount > 0 && (
@@ -793,8 +829,8 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
               </div>
             </div>
 
-            {/* Right Side: Large Map - Hidden on mobile, visible on desktop */}
-            <div className="hidden md:flex flex-1 bg-gray-50 flex-col">
+            {/* Right Side: Large Map - Shows on mobile when viewMode is 'map', always visible on desktop */}
+            <div className={`flex-1 bg-gray-50 flex-col ${viewMode === 'form' ? 'hidden md:flex' : 'flex'}`}>
               <div className="flex-1 relative" style={{ pointerEvents: 'auto' }}>
                   {rows.some(r => r.latitude && r.longitude) ? (
                     <Map
