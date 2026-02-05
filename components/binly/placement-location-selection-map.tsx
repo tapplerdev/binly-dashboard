@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { PotentialLocation } from '@/lib/api/potential-locations';
-import { X, Search, MapPin, Filter } from 'lucide-react';
+import { X, Search, MapPin, Filter, MapIcon, List } from 'lucide-react';
 import { PotentialLocationPin } from '@/components/ui/potential-location-pin';
 
 // Default map center (San Jose, CA area)
@@ -86,6 +86,7 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number; timestamp: number } | null>(null);
+  const [viewMode, setViewMode] = useState<'map' | 'list'>('map'); // Mobile view toggle
 
   // Toggle location selection and pan to location
   const toggleLocationSelection = (locationId: string, location: PotentialLocation) => {
@@ -171,25 +172,58 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
       {/* Full-screen Modal */}
       <div className="fixed inset-4 bg-white rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">Select Placement Locations for Shift</h2>
-            <p className="text-sm text-gray-600 mt-0.5">
-              Click on map markers or cards to add placement tasks to your shift
-            </p>
+        <div className="flex flex-col px-4 md:px-6 py-4 border-b border-gray-200 bg-gray-50">
+          {/* Top Row: Title and Close */}
+          <div className="flex items-center justify-between mb-3 md:mb-0">
+            <div>
+              <h2 className="text-lg md:text-xl font-semibold text-gray-900">Select Placement Locations for Shift</h2>
+              <p className="text-xs md:text-sm text-gray-600 mt-0.5 hidden md:block">
+                Click on map markers or cards to add placement tasks to your shift
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-200 rounded-lg transition-fast"
+            >
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-200 rounded-lg transition-fast"
-          >
-            <X className="w-5 h-5 text-gray-600" />
-          </button>
+
+          {/* Mobile View Toggle (only visible on mobile) */}
+          <div className="flex md:hidden gap-2 mt-2">
+            <button
+              onClick={() => setViewMode('map')}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                viewMode === 'map'
+                  ? 'bg-primary text-white'
+                  : 'bg-white text-gray-700 border border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <MapIcon className="w-4 h-4" />
+                <span>Map</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                viewMode === 'list'
+                  ? 'bg-primary text-white'
+                  : 'bg-white text-gray-700 border border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <List className="w-4 h-4" />
+                <span>List ({filteredLocations.length})</span>
+              </div>
+            </button>
+          </div>
         </div>
 
-        {/* Main Content - Split View */}
+        {/* Main Content - Responsive Layout */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Map View - Left 60% */}
-          <div className="flex-1 relative">
+          {/* Map View - Desktop: Left 60% | Mobile: Full screen when viewMode === 'map' */}
+          <div className={`flex-1 relative ${viewMode === 'list' ? 'hidden md:flex' : 'flex'}`}>
             <APIProvider
               apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}
             >
@@ -243,16 +277,18 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
               </Map>
             </APIProvider>
 
-            {/* Selection Counter */}
-            <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg px-4 py-2 border border-gray-200">
-              <p className="text-sm font-semibold text-gray-900">
-                {selectedLocationIds.size} location{selectedLocationIds.size !== 1 ? 's' : ''} selected
-              </p>
-            </div>
+            {/* Selection Counter - Only show in map mode */}
+            {viewMode === 'map' && (
+              <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg px-3 md:px-4 py-2 border border-gray-200">
+                <p className="text-xs md:text-sm font-semibold text-gray-900">
+                  {selectedLocationIds.size} location{selectedLocationIds.size !== 1 ? 's' : ''} selected
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* Location List - Right 40% */}
-          <div className="w-[40%] border-l border-gray-200 flex flex-col bg-gray-50">
+          {/* Location List - Desktop: Right 40% | Mobile: Full screen when viewMode === 'list' */}
+          <div className={`w-full md:w-[40%] border-l border-gray-200 flex flex-col bg-gray-50 ${viewMode === 'map' ? 'hidden md:flex' : 'flex'}`}>
             {/* Search Header */}
             <div className="p-4 border-b border-gray-200 bg-white">
               <div className="relative">
@@ -410,17 +446,17 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+        <div className="px-4 md:px-6 py-3 md:py-4 border-t border-gray-200 bg-gray-50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-fast"
+            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-fast order-2 sm:order-1"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
             disabled={selectedLocationIds.size === 0}
-            className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-fast"
+            className="px-6 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-fast order-1 sm:order-2"
           >
             Add to Shift ({selectedLocationIds.size})
           </button>
