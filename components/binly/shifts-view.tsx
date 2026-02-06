@@ -1599,8 +1599,8 @@ function CreateShiftDrawer({
         destination_address: request.move_type === 'store'
           ? 'Warehouse Storage'
           : `${request.new_street || ''}, ${request.new_city || ''} ${request.new_zip || ''}`.trim(),
-        latitude: 0, // Will be populated from bin data on backend
-        longitude: 0, // Will be populated from bin data on backend
+        latitude: request.original_latitude, // Use original location from move request
+        longitude: request.original_longitude, // Use original location from move request
         address: `${request.current_street}, ${request.city} ${request.zip}`,
       };
 
@@ -1611,7 +1611,7 @@ function CreateShiftDrawer({
         bin_id: pickupTask.bin_id,
         latitude: pickupTask.latitude,
         longitude: pickupTask.longitude,
-        message: 'Sending to backend with 0,0 - expects backend to populate from bin'
+        message: 'Using original_latitude/longitude from move request'
       });
 
       // 2. Dropoff task at destination
