@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, ArrowUp, ArrowDown, Warehouse } from 'lucide-react';
+import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, ArrowUp, ArrowDown, Warehouse, SkipForward } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shift';
 import { getShiftById, getShiftTasks, cancelShift } from '@/lib/api/shifts';
 import { RouteTask, getTaskLabel, getTaskSubtitle, getTaskColor, getTaskBgColor } from '@/lib/types/route-task';
@@ -360,6 +360,7 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                     .sort((a, b) => a.sequence_order - b.sequence_order)
                     .map((task) => {
                     const isCompleted = task.is_completed === 1;
+                    const isSkipped = task.skipped === true;
                     const completedTime = task.completed_at
                       ? new Date(task.completed_at * 1000).toLocaleTimeString('en-US', {
                           hour: '2-digit',
@@ -381,7 +382,9 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                       <div
                         key={task.id}
                         className={`flex items-center gap-3 p-3 rounded-lg border transition-fast ${
-                          isCompleted
+                          isSkipped
+                            ? 'bg-orange-50 border-orange-200'
+                            : isCompleted
                             ? 'bg-green-50 border-green-200'
                             : 'bg-white border-gray-200 hover:bg-gray-50'
                         }`}
@@ -402,7 +405,11 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
 
                         {/* Status Icon */}
                         <div className="flex-shrink-0">
-                          {isCompleted ? (
+                          {isSkipped ? (
+                            <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
+                              <SkipForward className="w-4 h-4 text-white" />
+                            </div>
+                          ) : isCompleted ? (
                             <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
                               <Check className="w-4 h-4 text-white" />
                             </div>
@@ -417,7 +424,10 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
                             <p className="font-medium text-gray-900">{getTaskLabel(task)}</p>
-                            {isCompleted && completedTime && (
+                            {isSkipped && completedTime && (
+                              <span className="text-xs text-orange-600">@ {completedTime} (Skipped)</span>
+                            )}
+                            {!isSkipped && isCompleted && completedTime && (
                               <span className="text-xs text-green-600">@ {completedTime}</span>
                             )}
                           </div>
@@ -427,7 +437,7 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                         </div>
 
                         {/* Fill Percentage (only for collection tasks) */}
-                        {task.task_type === 'collection' && (
+                        {task.task_type === 'collection' && !isSkipped && (
                           <div className="flex-shrink-0 text-right">
                             <p className="text-sm font-semibold text-gray-900">
                               {task.updated_fill_percentage ?? task.fill_percentage}% Fill
