@@ -59,29 +59,48 @@ export interface RouteTask {
  * Get display label for a task based on its type
  */
 export function getTaskLabel(task: RouteTask): string {
+  console.log('🔍 [TASK LABEL] Getting label for task:', {
+    id: task.id,
+    type: task.task_type,
+    bin_number: task.bin_number,
+    new_bin_number: task.new_bin_number,
+    full_task: JSON.stringify(task, null, 2)
+  });
+
   switch (task.task_type) {
     case 'collection':
-      return `Bin #${task.bin_number || '?'}`;
+      const collectionLabel = `Bin #${task.bin_number || '?'}`;
+      console.log('🔍 [TASK LABEL] Collection label:', collectionLabel, 'from bin_number:', task.bin_number);
+      return collectionLabel;
 
     case 'placement':
-      return task.new_bin_number
+      const placementLabel = task.new_bin_number
         ? `Place New Bin #${task.new_bin_number}`
         : 'Place New Bin';
+      console.log('🔍 [TASK LABEL] Placement label:', placementLabel);
+      return placementLabel;
 
     case 'pickup':
-      return `Pickup Bin #${task.bin_number || '?'}`;
+      const pickupLabel = `Pickup Bin #${task.bin_number || '?'}`;
+      console.log('🔍 [TASK LABEL] Pickup label:', pickupLabel);
+      return pickupLabel;
 
     case 'dropoff':
-      return `Dropoff to ${task.destination_address || 'New Location'}`;
+      const dropoffLabel = `Dropoff to ${task.destination_address || 'New Location'}`;
+      console.log('🔍 [TASK LABEL] Dropoff label:', dropoffLabel);
+      return dropoffLabel;
 
     case 'warehouse_stop':
       const action = task.warehouse_action === 'both' ? 'Load/Unload' :
                      task.warehouse_action === 'load' ? 'Load' :
                      task.warehouse_action === 'unload' ? 'Unload' : 'Stop';
       const binsText = task.bins_to_load ? ` ${task.bins_to_load} bins` : '';
-      return `Warehouse - ${action}${binsText}`;
+      const warehouseLabel = `Warehouse - ${action}${binsText}`;
+      console.log('🔍 [TASK LABEL] Warehouse label:', warehouseLabel);
+      return warehouseLabel;
 
     default:
+      console.log('🔍 [TASK LABEL] Unknown task type:', task.task_type);
       return 'Unknown Task';
   }
 }

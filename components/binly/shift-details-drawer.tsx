@@ -43,22 +43,30 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
   const loadShiftDetails = async () => {
     try {
       setLoading(true);
+      console.log('🔍 [SHIFT DETAILS] Starting to load shift details for shift ID:', shift.id);
 
       // Try to fetch tasks first (new system)
+      console.log('🔍 [SHIFT DETAILS] Fetching tasks from API...');
       const tasksData = await getShiftTasks(shift.id);
+      console.log('🔍 [SHIFT DETAILS] Raw tasks response:', JSON.stringify(tasksData, null, 2));
+      console.log('🔍 [SHIFT DETAILS] Tasks array length:', tasksData?.length || 0);
+      console.log('🔍 [SHIFT DETAILS] Tasks array is array?', Array.isArray(tasksData));
 
       if (tasksData && tasksData.length > 0) {
         // New task-based system
+        console.log('✅ [SHIFT DETAILS] Using task-based system with', tasksData.length, 'tasks');
+        console.log('🔍 [SHIFT DETAILS] First task sample:', JSON.stringify(tasksData[0], null, 2));
         setTasks(tasksData);
-        console.log('✅ Loaded shift with tasks:', tasksData.length);
       } else {
         // Fallback to old bins system
+        console.log('⚠️  [SHIFT DETAILS] No tasks found, falling back to bins system');
         const details = await getShiftById(shift.id);
+        console.log('🔍 [SHIFT DETAILS] Shift details response:', JSON.stringify(details, null, 2));
+        console.log('🔍 [SHIFT DETAILS] Bins array:', details.bins?.length || 0);
         setBins(details.bins || []);
-        console.log('✅ Loaded shift with bins:', details.bins?.length || 0);
       }
     } catch (error) {
-      console.error('Failed to load shift details:', error);
+      console.error('❌ [SHIFT DETAILS] Failed to load shift details:', error);
     } finally {
       setLoading(false);
     }
@@ -356,9 +364,18 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                 </div>
               ) : (
                 <div className="space-y-2">
+                  {(() => {
+                    console.log('🔍 [SHIFT DETAILS RENDER] About to render', tasks.length, 'tasks');
+                    console.log('🔍 [SHIFT DETAILS RENDER] Tasks data:', JSON.stringify(tasks, null, 2));
+                    return null;
+                  })()}
                   {tasks
                     .sort((a, b) => a.sequence_order - b.sequence_order)
                     .map((task) => {
+                    console.log('🔍 [SHIFT DETAILS RENDER] Rendering task:', task.id, 'Type:', task.task_type);
+                    console.log('🔍 [SHIFT DETAILS RENDER] Task label:', getTaskLabel(task));
+                    console.log('🔍 [SHIFT DETAILS RENDER] Task subtitle:', getTaskSubtitle(task));
+
                     const isCompleted = task.is_completed === 1;
                     const isSkipped = task.skipped === true;
                     const completedTime = task.completed_at

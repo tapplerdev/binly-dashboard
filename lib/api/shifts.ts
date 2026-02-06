@@ -409,22 +409,43 @@ export function formatTimestamp(timestamp: number | null): string {
  */
 export async function getShiftTasks(shiftId: string): Promise<any[]> {
   try {
-    console.log(`📥 Fetching tasks for shift ${shiftId}...`);
+    console.log(`🔍 [API] Fetching tasks for shift ${shiftId}...`);
+    const url = `${API_BASE_URL}/api/shifts/${shiftId}/tasks/detailed`;
+    console.log(`🔍 [API] Request URL:`, url);
+    console.log(`🔍 [API] Auth headers:`, JSON.stringify(getAuthHeaders(), null, 2));
 
-    const response = await fetch(`${API_BASE_URL}/api/shifts/${shiftId}/tasks/detailed`, {
+    const response = await fetch(url, {
       headers: getAuthHeaders(),
     });
 
+    console.log(`🔍 [API] Response status:`, response.status);
+    console.log(`🔍 [API] Response ok:`, response.ok);
+
     if (!response.ok) {
-      console.warn(`⚠️  Failed to fetch shift tasks: ${response.statusText}`);
+      console.warn(`⚠️  [API] Failed to fetch shift tasks: ${response.statusText}`);
+      const responseText = await response.text();
+      console.log(`🔍 [API] Error response body:`, responseText);
       return [];
     }
 
-    const data = await response.json();
-    console.log(`✅ Fetched ${data.data?.length || 0} tasks`);
+    const responseText = await response.text();
+    console.log(`🔍 [API] Raw response text:`, responseText);
+
+    const data = JSON.parse(responseText);
+    console.log(`🔍 [API] Parsed response:`, JSON.stringify(data, null, 2));
+    console.log(`🔍 [API] Data.data type:`, typeof data.data);
+    console.log(`🔍 [API] Data.data is array:`, Array.isArray(data.data));
+    console.log(`🔍 [API] Data.data length:`, data.data?.length || 0);
+
+    if (data.data && data.data.length > 0) {
+      console.log(`🔍 [API] First task sample:`, JSON.stringify(data.data[0], null, 2));
+    }
+
+    console.log(`✅ [API] Returning ${data.data?.length || 0} tasks`);
     return data.data || [];
   } catch (error) {
-    console.error('❌ Error fetching shift tasks:', error);
+    console.error('❌ [API] Error fetching shift tasks:', error);
+    console.error('❌ [API] Error details:', error instanceof Error ? error.message : String(error));
     return [];
   }
 }
