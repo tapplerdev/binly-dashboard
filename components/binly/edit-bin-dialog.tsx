@@ -144,6 +144,17 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
     setError('');
   }, []);
 
+  const handleStreetPlaceSelect = useCallback((place: HerePlaceDetails) => {
+    setStreet(place.street);
+    setCity(place.city);
+    setZip(place.zip);
+    setLatitude(place.latitude);
+    setLongitude(place.longitude);
+    setMarkerPosition({ lat: place.latitude, lng: place.longitude });
+    setMapCenter({ lat: place.latitude, lng: place.longitude });
+    setError('');
+  }, []);
+
   const handleMapClick = useCallback(async (lat: number, lng: number) => {
     setMarkerPosition({ lat, lng });
     setLatitude(lat);
@@ -323,12 +334,12 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                   Street Address <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
+                <HerePlacesAutocomplete
                   value={street}
-                  onChange={(e) => setStreet(e.target.value)}
-                  className={inputStyles()}
+                  onChange={setStreet}
+                  onPlaceSelect={handleStreetPlaceSelect}
                   placeholder="123 Main St"
+                  className={inputStyles()}
                 />
               </div>
 
