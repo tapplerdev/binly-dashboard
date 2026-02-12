@@ -412,9 +412,13 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                   Bin Number <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={binNumber}
-                  onChange={(e) => setBinNumber(parseInt(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    setBinNumber(value ? parseInt(value) : 0);
+                  }}
                   className={inputStyles()}
                   placeholder="Enter bin number"
                 />
