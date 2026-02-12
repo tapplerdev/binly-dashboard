@@ -214,7 +214,8 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                     <span className="text-xs text-gray-500">Est. Duration</span>
                   </div>
                   <p className="text-lg font-semibold text-gray-900">
-                    {Math.floor(shift.optimization_metadata.total_duration_seconds / 3600)}h {Math.floor((shift.optimization_metadata.total_duration_seconds % 3600) / 60)}m
+                    {shift.optimization_metadata.total_duration_formatted ||
+                     `${Math.floor(shift.optimization_metadata.total_duration_seconds / 3600)}h ${Math.floor((shift.optimization_metadata.total_duration_seconds % 3600) / 60)}m`}
                   </p>
                 </div>
 
@@ -224,7 +225,9 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                     <span className="text-xs text-gray-500">Est. Distance</span>
                   </div>
                   <p className="text-lg font-semibold text-gray-900">
-                    {shift.optimization_metadata.total_distance_km.toFixed(1)} mi
+                    {shift.total_distance_miles
+                      ? shift.total_distance_miles.toFixed(1)
+                      : (shift.optimization_metadata.total_distance_km * 0.621371).toFixed(1)} mi
                   </p>
                 </div>
 
@@ -234,7 +237,9 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                     <span className="text-xs text-gray-500">Est. Complete</span>
                   </div>
                   <p className="text-sm font-semibold text-gray-900">
-                    {new Date(shift.optimization_metadata.estimated_completion).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                    {shift.estimated_completion_time
+                      ? new Date(shift.estimated_completion_time * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                      : new Date(shift.optimization_metadata.estimated_completion).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                   </p>
                 </div>
               </div>
