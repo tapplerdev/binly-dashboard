@@ -16,6 +16,7 @@ import { Map, AdvancedMarker, Pin, useMap, InfoWindow } from '@vis.gl/react-goog
 
 interface BinRow {
   id: string;
+  bin_number: string; // Optional - auto-assigned if not provided
   current_street: string;
   city: string;
   zip: string;
@@ -137,6 +138,7 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
   const [rows, setRows] = useState<BinRow[]>([
     {
       id: '1',
+      bin_number: '',
       current_street: '',
       city: '',
       zip: '',
@@ -183,6 +185,7 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
       ...rows,
       {
         id: newId,
+        bin_number: '',
         current_street: '',
         city: '',
         zip: '',
@@ -501,6 +504,7 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
       // Create all bins in parallel
       const promises = validRows.map((row) =>
         createBin({
+          bin_number: row.bin_number && parseInt(row.bin_number) > 0 ? parseInt(row.bin_number) : undefined,
           current_street: row.current_street || `Coordinates: ${row.latitude}, ${row.longitude}`,
           city: row.city || 'Unknown',
           zip: row.zip || '00000',
@@ -517,7 +521,13 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
       onSuccess?.();
       handleClose();
     } catch (error) {
-      setGlobalError(error instanceof Error ? error.message : 'Failed to create bins');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create bins';
+      // Check if it's a bin number conflict error
+      if (errorMessage.includes('Bin number already exists') || errorMessage.includes('409')) {
+        setGlobalError('One or more bin numbers already exist. Please use different bin numbers or leave empty for auto-assignment.');
+      } else {
+        setGlobalError(errorMessage);
+      }
       setIsSubmitting(false);
     }
   };
@@ -551,7 +561,7 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
                   <div>
                     <h2 className="text-lg md:text-xl font-bold text-gray-900">Create New Bin</h2>
                     <p className="text-xs text-gray-500 mt-1">
-                      Bin numbers will be auto-assigned
+                      Bin numbers auto-assigned if not specified
                     </p>
                   </div>
                   <button
@@ -633,7 +643,7 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
                     >
                       {/* Header with Bin number and actions */}
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-sm font-semibold text-gray-700">Bin #{index + 1}</h4>
+                        <h4 className="text-sm font-semibold text-gray-700">Bin</h4>
                         <div className="flex items-center gap-2">
                           {/* Locate on Map button - only show if bin has coordinates */}
                           {row.latitude && row.longitude && (
@@ -658,6 +668,24 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
                             </button>
                           )}
                         </div>
+                      </div>
+
+                      {/* Bin Number (Optional) */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                          Bin Number (optional)
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={row.bin_number}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^0-9]/g, '');
+                            updateRow(row.id, 'bin_number', value);
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary transition-colors bg-white text-gray-900"
+                          placeholder="Auto-assigned if left empty"
+                        />
                       </div>
 
                       {/* Street Address */}

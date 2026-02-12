@@ -113,6 +113,7 @@ export async function getBinById(id: string): Promise<Bin> {
 export async function updateBin(
   id: string,
   data: {
+    bin_number: number;
     current_street: string;
     city: string;
     zip: string;
