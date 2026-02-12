@@ -283,6 +283,9 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
     setMapCenter({ lat: place.latitude, lng: place.longitude });
     setMapZoom(16); // Zoom in when address is selected
 
+    // Check if street address is missing
+    const missingStreet = !place.street || place.street.trim() === '';
+
     // Update all fields with auto-filled data from HERE Maps (already parsed!)
     setRows((prevRows) =>
       prevRows.map((r) =>
@@ -299,6 +302,7 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
               coordinatesAutoFilled: true,
               addressAutoFilled: false,
               isGeocodingAddress: false,
+              error: missingStreet ? 'Street address is required. Please enter it manually or select a different location.' : undefined,
             }
           : r
       )
@@ -364,7 +368,7 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
       );
 
       // Reverse geocode
-      const result = await reverseGeocode(lat, lng);
+      const result = await hereReverseGeocode(lat, lng);
 
       if (result) {
         setRows((prevRows) =>
@@ -457,17 +461,21 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
     let isValid = true;
     const updatedRows = rows.map((row) => {
       // Check if row has any data
-      const hasAddressData = row.current_street || row.city || row.zip;
-      const hasCoordinateData = row.latitude || row.longitude;
+      const hasAnyData = row.current_street || row.city || row.zip || row.latitude || row.longitude;
 
-      if (hasAddressData || hasCoordinateData) {
-        // At least one complete set of data is required
+      if (hasAnyData) {
+        // Require BOTH complete address AND coordinates
         const hasCompleteAddress = row.current_street && row.city && row.zip;
         const hasCompleteCoordinates = row.latitude && row.longitude;
 
-        if (!hasCompleteAddress && !hasCompleteCoordinates) {
+        if (!hasCompleteAddress) {
           isValid = false;
-          return { ...row, error: 'Complete either address or coordinates' };
+          return { ...row, error: 'Street address, city, and ZIP are required' };
+        }
+
+        if (!hasCompleteCoordinates) {
+          isValid = false;
+          return { ...row, error: 'Both latitude and longitude are required' };
         }
       }
 
@@ -487,10 +495,10 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
       return;
     }
 
-    // Filter out empty rows (at least one complete set required)
+    // Filter out empty rows (require BOTH complete address AND coordinates)
     const validRows = rows.filter(
       (r) =>
-        (r.current_street && r.city && r.zip) || (r.latitude && r.longitude)
+        r.current_street && r.city && r.zip && r.latitude && r.longitude
     );
 
     if (validRows.length === 0) {
@@ -505,13 +513,13 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
       const promises = validRows.map((row) =>
         createBin({
           bin_number: row.bin_number && parseInt(row.bin_number) > 0 ? parseInt(row.bin_number) : undefined,
-          current_street: row.current_street || `Coordinates: ${row.latitude}, ${row.longitude}`,
-          city: row.city || 'Unknown',
-          zip: row.zip || '00000',
+          current_street: row.current_street,
+          city: row.city,
+          zip: row.zip,
           status: 'active',
           fill_percentage: 0, // New bins are always empty
-          latitude: row.latitude ? parseFloat(row.latitude) : undefined,
-          longitude: row.longitude ? parseFloat(row.longitude) : undefined,
+          latitude: parseFloat(row.latitude),
+          longitude: parseFloat(row.longitude),
         })
       );
 
@@ -534,7 +542,7 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
 
   const validRowCount = rows.filter(
     (r) =>
-      (r.current_street && r.city && r.zip) || (r.latitude && r.longitude)
+      r.current_street && r.city && r.zip && r.latitude && r.longitude
   ).length;
 
   return (
@@ -795,7 +803,14 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
 
                       {/* Error Message */}
                       {row.error && (
-                        <div className="text-xs text-red-600 ml-1">{row.error}</div>
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <svg className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                            </svg>
+                            <p className="text-xs text-red-700 font-medium">{row.error}</p>
+                          </div>
+                        </div>
                       )}
                     </div>
                   );
