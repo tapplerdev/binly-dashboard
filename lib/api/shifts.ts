@@ -81,6 +81,14 @@ interface BackendShiftDetails extends BackendShift {
   driver_email?: string;
 }
 
+interface BackendOptimizationMetadata {
+  total_distance_km: number;
+  total_duration_seconds: number;
+  total_duration_formatted: string;
+  optimized_at: string;
+  estimated_completion: string;
+}
+
 interface BackendDriver {
   driver_id: string;
   driver_name: string;
@@ -96,6 +104,9 @@ interface BackendDriver {
     latitude: number;
     longitude: number;
   } | null;
+  optimization_metadata?: BackendOptimizationMetadata;
+  total_distance_miles?: number;
+  estimated_completion_time?: number;
 }
 
 /**
@@ -392,6 +403,9 @@ function convertBackendShiftToFrontend(driver: BackendDriver): Shift {
     binsCollected: driver.completed_bins > 0 ? driver.completed_bins : undefined,
     status,
     estimatedCompletion,
+    optimization_metadata: driver.optimization_metadata,
+    total_distance_miles: driver.total_distance_miles,
+    estimated_completion_time: driver.estimated_completion_time,
   };
 }
 
