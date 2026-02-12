@@ -31,6 +31,17 @@ interface ShiftDetailsDrawerProps {
 }
 
 export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) {
+  console.log('🔍 [SHIFT DRAWER] Received shift prop:', {
+    id: shift.id,
+    driverName: shift.driverName,
+    status: shift.status,
+    has_optimization_metadata: !!shift.optimization_metadata,
+    optimization_metadata: shift.optimization_metadata,
+    total_distance_miles: shift.total_distance_miles,
+    estimated_completion_time: shift.estimated_completion_time,
+    full_shift: shift,
+  });
+
   const [isClosing, setIsClosing] = useState(false);
   const [tasks, setTasks] = useState<RouteTask[]>([]);
   const [bins, setBins] = useState<ShiftBin[]>([]);
@@ -204,6 +215,13 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
           </div>
 
           {/* Optimization Metrics */}
+          {(() => {
+            console.log('🔍 [SHIFT DRAWER RENDER] Checking optimization_metadata:', {
+              exists: !!shift.optimization_metadata,
+              value: shift.optimization_metadata,
+            });
+            return null;
+          })()}
           {shift.optimization_metadata && (
             <div className="p-6 border-b border-gray-100 bg-blue-50">
               <h3 className="text-sm font-semibold text-gray-700 mb-3">Route Optimization</h3>

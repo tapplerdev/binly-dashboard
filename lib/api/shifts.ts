@@ -136,17 +136,45 @@ export async function getShifts(): Promise<Shift[]> {
 
     const driversData = await driversResponse.json();
     console.log('📦 Drivers data received:', driversData);
+    console.log('📦 RAW RESPONSE DATA:', JSON.stringify(driversData, null, 2));
 
     const drivers: BackendDriver[] = driversData.data || [];
     console.log(`👥 Found ${drivers.length} drivers total`);
+
+    // Log each driver's optimization metadata
+    drivers.forEach((driver, idx) => {
+      if (driver.shift_id) {
+        console.log(`🔍 [RAW DRIVER ${idx}] ${driver.driver_name}:`, {
+          shift_id: driver.shift_id,
+          optimization_metadata: driver.optimization_metadata,
+          total_distance_miles: driver.total_distance_miles,
+          estimated_completion_time: driver.estimated_completion_time,
+        });
+      }
+    });
 
     // Filter drivers with shifts and convert to frontend Shift format
     const driversWithShifts = drivers.filter(driver => driver.shift_id);
     console.log(`✅ ${driversWithShifts.length} drivers have active shifts`);
 
     const shifts: Shift[] = driversWithShifts.map(driver => {
+      console.log(`🔍 [SHIFTS API] Converting driver ${driver.driver_name}:`, {
+        shift_id: driver.shift_id,
+        status: driver.status,
+        total_bins: driver.total_bins,
+        has_optimization_metadata: !!driver.optimization_metadata,
+        optimization_metadata: driver.optimization_metadata,
+        total_distance_miles: driver.total_distance_miles,
+        estimated_completion_time: driver.estimated_completion_time,
+      });
       const shift = convertBackendShiftToFrontend(driver);
-      console.log(`   - ${driver.driver_name}: ${driver.status} (${driver.total_bins} bins)`);
+      console.log(`✅ [SHIFTS API] Converted shift for ${driver.driver_name}:`, {
+        id: shift.id,
+        has_optimization_metadata: !!shift.optimization_metadata,
+        optimization_metadata: shift.optimization_metadata,
+        total_distance_miles: shift.total_distance_miles,
+        estimated_completion_time: shift.estimated_completion_time,
+      });
       return shift;
     });
 
