@@ -88,6 +88,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
   const [viewMode, setViewMode] = useState<'form' | 'map'>('form');
 
   // Form state
+  const [binNumber, setBinNumber] = useState<number>(0);
   const [street, setStreet] = useState('');
   const [city, setCity] = useState('');
   const [zip, setZip] = useState('');
@@ -99,6 +100,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
   // Initialize form with bin data when dialog opens
   useEffect(() => {
     if (open && bin) {
+      setBinNumber(bin.bin_number);
       setStreet(bin.current_street);
       setCity(bin.city);
       setZip(bin.zip);
@@ -202,6 +204,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
       if (!bin) throw new Error('No bin selected');
 
       return updateBin(bin.id, {
+        bin_number: binNumber,
         current_street: street.trim(),
         city: city.trim(),
         zip: zip.trim(),
@@ -403,6 +406,19 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
             {/* Bin Details */}
             <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-4 mb-6">
               <h3 className="text-sm font-semibold text-gray-700 mb-3">Bin Details</h3>
+
+              <div className="mb-3">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  Bin Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={binNumber}
+                  onChange={(e) => setBinNumber(parseInt(e.target.value) || 0)}
+                  className={inputStyles()}
+                  placeholder="Enter bin number"
+                />
+              </div>
 
               <div className="mb-3">
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">
