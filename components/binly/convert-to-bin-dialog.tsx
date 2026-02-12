@@ -28,6 +28,7 @@ export function ConvertToBinDialog({
 }: ConvertToBinDialogProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [binNumber, setBinNumber] = useState('');
   const [fillPercentage, setFillPercentage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,10 +48,15 @@ export function ConvertToBinDialog({
         return;
       }
 
-      // Always send fill_percentage, default to 0 if empty
+      // Build payload with optional bin_number and fill_percentage
       const payload: any = {
         fill_percentage: fillPercentage ? parseInt(fillPercentage, 10) : 0,
       };
+
+      // Only include bin_number if provided
+      if (binNumber && parseInt(binNumber, 10) > 0) {
+        payload.bin_number = parseInt(binNumber, 10);
+      }
 
       const response = await fetch(
         `https://ropacal-backend-production.up.railway.app/api/potential-locations/${location.id}/convert`,
@@ -70,6 +76,7 @@ export function ConvertToBinDialog({
       }
 
       // Success
+      setBinNumber('');
       setFillPercentage('');
       onSuccess();
     } catch (err) {
@@ -134,6 +141,27 @@ export function ConvertToBinDialog({
             </div>
           )}
 
+          {/* Bin Number (Optional) */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Bin Number <span className="text-gray-400 text-xs">(Optional)</span>
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={binNumber}
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^0-9]/g, '');
+                setBinNumber(value);
+              }}
+              placeholder="Auto-assigned if left empty"
+              className={inputStyles()}
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              Leave empty for auto-assignment
+            </p>
+          </div>
+
           {/* Fill Percentage (Optional) */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -166,7 +194,7 @@ export function ConvertToBinDialog({
                 <p className="text-sm font-semibold text-gray-900 mb-1">What happens next?</p>
                 <ul className="text-xs text-gray-600 space-y-1">
                   <li>• A new bin will be created at this location</li>
-                  <li>• Bin number will be auto-assigned</li>
+                  <li>• Bin number auto-assigned if not specified</li>
                   <li>• This potential location will be archived</li>
                   <li>• The bin will be marked as "active"</li>
                 </ul>
