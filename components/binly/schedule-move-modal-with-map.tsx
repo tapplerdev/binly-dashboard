@@ -33,7 +33,7 @@ import { cn } from '@/lib/utils';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
 import { HerePlaceDetails } from '@/lib/services/geocoding.service';
 import { format, addDays } from 'date-fns';
-import { GroupedDropdown } from '@/components/ui/dropdown';
+import { GroupedDropdown, Dropdown } from '@/components/ui/dropdown';
 
 // Google Maps imports
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
@@ -1483,50 +1483,46 @@ export function ScheduleMoveModalWithMap({
                   {/* User Selection Dropdown */}
                   {config.assignmentType === 'user' && users && users.length > 0 && (
                     <div className="mb-3">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                      <label className="block text-xs font-medium text-gray-700 mb-2">
                         Select User
                       </label>
-                      <select
+                      <Dropdown
+                        label=""
+                        placeholder="Choose a user..."
                         value={config.assignedUserId || ''}
-                        onChange={(e) => {
+                        options={users.map((user) => ({
+                          value: user.id,
+                          label: `${user.name} (${user.role})`,
+                        }))}
+                        onChange={(value) => {
                           updateBinConfig(bin.id, {
-                            assignedUserId: e.target.value,
+                            assignedUserId: value,
                           });
                         }}
-                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-                      >
-                        <option value="">Choose a user...</option>
-                        {users.map((user) => (
-                          <option key={user.id} value={user.id}>
-                            {user.name} ({user.role})
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   )}
 
                   {/* Active Shift Selection Dropdown */}
                   {config.assignmentType === 'active_shift' && activeShifts.length > 0 && (
                     <div className="mb-3">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                      <label className="block text-xs font-medium text-gray-700 mb-2">
                         Select Active Shift
                       </label>
-                      <select
+                      <Dropdown
+                        label=""
+                        placeholder="Choose a shift..."
                         value={config.assignedShiftId || ''}
-                        onChange={(e) => {
+                        options={activeShifts.map((shift) => ({
+                          value: shift.id,
+                          label: `${shift.driverName} - Shift #${shift.id.slice(0, 8)}`,
+                        }))}
+                        onChange={(value) => {
                           updateBinConfig(bin.id, {
-                            assignedShiftId: e.target.value,
+                            assignedShiftId: value,
                           });
                         }}
-                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-                      >
-                        <option value="">Choose a shift...</option>
-                        {activeShifts.map((shift) => (
-                          <option key={shift.id} value={shift.id}>
-                            {shift.driverName} - Shift #{shift.id.slice(0, 8)}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   )}
 
@@ -1534,43 +1530,42 @@ export function ScheduleMoveModalWithMap({
                   {config.assignmentType === 'future_shift' && futureShifts.length > 0 && (
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                        <label className="block text-xs font-medium text-gray-700 mb-2">
                           Select Future Shift
                         </label>
-                        <select
+                        <Dropdown
+                          label=""
+                          placeholder="Choose a shift..."
                           value={config.assignedShiftId || ''}
-                          onChange={(e) => {
+                          options={futureShifts.map((shift) => ({
+                            value: shift.id,
+                            label: `${shift.driverName} - ${shift.date} at ${shift.startTime}`,
+                          }))}
+                          onChange={(value) => {
                             updateBinConfig(bin.id, {
-                              assignedShiftId: e.target.value,
+                              assignedShiftId: value,
                             });
                           }}
-                          className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-                        >
-                          <option value="">Choose a shift...</option>
-                          {futureShifts.map((shift) => (
-                            <option key={shift.id} value={shift.id}>
-                              {shift.driverName} - {shift.date} at {shift.startTime}
-                            </option>
-                          ))}
-                        </select>
+                        />
                       </div>
 
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                        <label className="block text-xs font-medium text-gray-700 mb-2">
                           Insert Position
                         </label>
-                        <select
+                        <Dropdown
+                          label=""
                           value={config.insertPosition || 'end'}
-                          onChange={(e) =>
+                          options={[
+                            { value: 'start', label: 'At Start' },
+                            { value: 'end', label: 'At End' },
+                          ]}
+                          onChange={(value) => {
                             updateBinConfig(bin.id, {
-                              insertPosition: e.target.value as 'start' | 'end',
-                            })
-                          }
-                          className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-                        >
-                          <option value="start">At Start</option>
-                          <option value="end">At End</option>
-                        </select>
+                              insertPosition: value as 'start' | 'end',
+                            });
+                          }}
+                        />
                       </div>
                     </div>
                   )}
