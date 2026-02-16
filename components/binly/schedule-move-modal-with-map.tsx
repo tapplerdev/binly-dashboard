@@ -188,12 +188,12 @@ export function ScheduleMoveModalWithMap({
       }
     });
 
-    // Pan to bin
-    if (clickedBin.current_latitude && clickedBin.current_longitude) {
-      setMapCenter({
-        lat: clickedBin.current_latitude,
-        lng: clickedBin.current_longitude,
-      });
+    // Pan to bin (check both coordinate field options)
+    const lat = clickedBin.current_latitude ?? clickedBin.latitude;
+    const lng = clickedBin.current_longitude ?? clickedBin.longitude;
+
+    if (lat && lng) {
+      setMapCenter({ lat, lng });
       setMapZoom(15);
     }
   }, []);
@@ -206,12 +206,12 @@ export function ScheduleMoveModalWithMap({
       return [...prev, clickedBin];
     });
 
-    // Pan to bin
-    if (clickedBin.current_latitude && clickedBin.current_longitude) {
-      setMapCenter({
-        lat: clickedBin.current_latitude,
-        lng: clickedBin.current_longitude,
-      });
+    // Pan to bin (check both coordinate field options)
+    const lat = clickedBin.current_latitude ?? clickedBin.latitude;
+    const lng = clickedBin.current_longitude ?? clickedBin.longitude;
+
+    if (lat && lng) {
+      setMapCenter({ lat, lng });
       setMapZoom(15);
     }
 
@@ -339,14 +339,11 @@ export function ScheduleMoveModalWithMap({
     const lng = bin.current_longitude ?? bin.longitude;
 
     if (!lat || !lng) {
-      console.log(`[MAP] Skipping bin ${bin.bin_number} - no coordinates`, { lat, lng, bin });
       return null;
     }
 
     const isSelected = selectedBins.some((b) => b.id === bin.id);
     const isHovered = hoveredBinId === bin.id;
-
-    console.log(`[MAP] Rendering marker for bin ${bin.bin_number} at (${lat}, ${lng})`);
 
     return (
       <AdvancedMarker
@@ -509,14 +506,7 @@ export function ScheduleMoveModalWithMap({
             style={{ width: '100%', height: '100%' }}
           >
             {/* Render ALL bin markers (not filtered - show everything on map) */}
-            {(() => {
-              console.log(`[MAP] Total bins to render: ${allBins?.length || 0}`);
-              if (allBins) {
-                const withCoords = allBins.filter(b => (b.current_latitude ?? b.latitude) && (b.current_longitude ?? b.longitude));
-                console.log(`[MAP] Bins with coordinates: ${withCoords.length}`);
-              }
-              return allBins?.map((b) => renderBinMarker(b));
-            })()}
+            {allBins?.map((b) => renderBinMarker(b))}
           </Map>
         </APIProvider>
 
@@ -574,13 +564,13 @@ export function ScheduleMoveModalWithMap({
           {/* Search and Filter */}
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search by bin number or address..."
                 value={binSearchQuery}
                 onChange={(e) => setBinSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
 
@@ -589,14 +579,14 @@ export function ScheduleMoveModalWithMap({
               <button
                 onClick={() => setShowFilterDropdown(!showFilterDropdown)}
                 className={cn(
-                  'p-2 border rounded-lg transition-all',
+                  'p-1.5 border rounded-lg transition-all',
                   fillLevelFilter !== 'all'
                     ? 'border-primary bg-blue-50 text-primary'
                     : 'border-gray-300 hover:border-gray-400 text-gray-600'
                 )}
                 title="Filter by fill level"
               >
-                <Filter className="w-4 h-4" />
+                <Filter className="w-3.5 h-3.5" />
               </button>
 
               {showFilterDropdown && (
