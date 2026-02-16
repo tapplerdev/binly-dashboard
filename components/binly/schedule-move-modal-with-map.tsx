@@ -370,305 +370,44 @@ export function ScheduleMoveModalWithMap({
     );
   };
 
+  // Filter bins for list view
+  const filteredBinsForList = useMemo(() => {
+    if (!allBins) return [];
+
+    const query = binSearchQuery.toLowerCase().trim();
+    if (!query) return allBins;
+
+    return allBins.filter((b) => {
+      const binNumber = b.bin_number?.toString() || '';
+      const street = b.current_street?.toLowerCase() || '';
+      const city = b.city?.toLowerCase() || '';
+      const zip = b.zip?.toLowerCase() || '';
+
+      return (
+        binNumber.includes(query) ||
+        street.includes(query) ||
+        city.includes(query) ||
+        zip.includes(query)
+      );
+    });
+  }, [allBins, binSearchQuery]);
+
   // Render Step 1: Selection
   const renderSelectionStep = () => (
     <>
-      {/* Left: Form Panel */}
-      <div
-        className={cn(
-          'w-full md:w-[35%] overflow-y-auto border-r border-gray-200',
-          viewMode === 'map' ? 'hidden md:block' : 'block'
-        )}
-      >
-        <div className="p-4 md:p-6 space-y-6">
-          {/* Mobile View Toggle */}
-          <div className="flex md:hidden gap-2">
-            <button
-              onClick={() => setViewMode('form')}
-              className={cn(
-                'flex-1 py-2 px-4 rounded-lg font-medium transition-all',
-                viewMode === 'form'
-                  ? 'bg-primary text-white'
-                  : 'bg-white border border-gray-300 text-gray-700'
-              )}
-            >
-              <Package className="w-4 h-4 inline mr-2" />
-              Form
-            </button>
-            <button
-              onClick={() => setViewMode('map')}
-              className={cn(
-                'flex-1 py-2 px-4 rounded-lg font-medium transition-all',
-                viewMode === 'map'
-                  ? 'bg-primary text-white'
-                  : 'bg-white border border-gray-300 text-gray-700'
-              )}
-            >
-              <MapIcon className="w-4 h-4 inline mr-2" />
-              Map
-            </button>
-          </div>
-
-          {/* Selected Bins */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Selected Bins ({selectedBins.length})
-            </label>
-            {selectedBins.length === 0 ? (
-              <div className="p-4 border-2 border-dashed border-gray-300 rounded-xl text-center text-gray-500">
-                <Package className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                <p className="text-sm">No bins selected</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Click bins on the map or search below
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {selectedBins.map((selectedBin) => (
-                  <div
-                    key={selectedBin.id}
-                    className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 border-2 border-blue-200 rounded-xl"
-                  >
-                    <span className="font-semibold text-sm text-gray-900">
-                      Bin #{selectedBin.bin_number}
-                    </span>
-                    {selectedBin.fill_percentage !== null && (
-                      <span
-                        className={cn(
-                          'text-xs px-1.5 py-0.5 rounded-full font-medium',
-                          selectedBin.fill_percentage >= 80
-                            ? 'bg-red-100 text-red-700'
-                            : selectedBin.fill_percentage >= 50
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-green-100 text-green-700'
-                        )}
-                      >
-                        {selectedBin.fill_percentage}%
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedBins(selectedBins.filter((b) => b.id !== selectedBin.id));
-                      }}
-                      className="p-0.5 hover:bg-blue-200 rounded transition-colors"
-                    >
-                      <X className="w-3.5 h-3.5 text-gray-600" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {selectedBins.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setSelectedBins([])}
-                className="mt-2 text-xs text-red-600 hover:text-red-700 font-medium"
-              >
-                Clear All
-              </button>
-            )}
-          </div>
-
-          {/* Bin Search */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Add Bins
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search by bin #, street, city, or zip..."
-                value={binSearchQuery}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setBinSearchQuery(value);
-                  setShowBinDropdown(value.length > 0);
-                }}
-                onClick={() => {
-                  if (binSearchQuery.length > 0) {
-                    setShowBinDropdown(true);
-                  }
-                }}
-                className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all"
-              />
-            </div>
-
-            {/* Search Dropdown */}
-            {showBinDropdown && (
-              <>
-                <div
-                  className="fixed inset-0 z-[5]"
-                  onClick={() => setShowBinDropdown(false)}
-                />
-                <div className="relative z-[10] mt-2 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl">
-                  {binsLoading ? (
-                    <div className="p-4 text-center text-gray-500">
-                      <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
-                      Loading bins...
-                    </div>
-                  ) : availableBins && availableBins.length > 0 ? (
-                    <div className="py-2">
-                      {availableBins.slice(0, 50).map((b) => (
-                        <button
-                          key={b.id}
-                          type="button"
-                          onClick={() => handleBinSearchSelect(b)}
-                          className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-all border-b border-gray-100 last:border-b-0"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-semibold text-gray-900">
-                                  Bin #{b.bin_number}
-                                </span>
-                                {b.fill_percentage !== null && (
-                                  <span
-                                    className={cn(
-                                      'text-xs px-2 py-0.5 rounded-full font-medium',
-                                      b.fill_percentage >= 80
-                                        ? 'bg-red-100 text-red-700'
-                                        : b.fill_percentage >= 50
-                                        ? 'bg-yellow-100 text-yellow-700'
-                                        : 'bg-green-100 text-green-700'
-                                    )}
-                                  >
-                                    {b.fill_percentage}%
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-sm text-gray-600">{b.current_street}</div>
-                              <div className="text-xs text-gray-500">
-                                {b.city}, {b.zip}
-                              </div>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                      {availableBins.length > 50 && (
-                        <div className="px-4 py-2 text-xs text-gray-500 text-center bg-gray-50">
-                          Showing first 50 results. Refine your search to see more.
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="p-4 text-center text-gray-500">
-                      <AlertTriangle className="w-5 h-5 mx-auto mb-2 text-gray-400" />
-                      <p className="text-sm">No bins found</p>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Global Settings */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              When should these be moved? *
-            </label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
-              <button
-                type="button"
-                onClick={() => handleDateQuickSelect('24h')}
-                className={cn(
-                  'py-2 px-3 border-2 rounded-lg text-xs md:text-sm font-medium transition-colors',
-                  dateOption === '24h'
-                    ? 'border-primary bg-blue-50 text-primary'
-                    : 'border-gray-200 hover:border-gray-300'
-                )}
-              >
-                Within 24hrs
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDateQuickSelect('3days')}
-                className={cn(
-                  'py-2 px-3 border-2 rounded-lg text-xs md:text-sm font-medium transition-colors',
-                  dateOption === '3days'
-                    ? 'border-primary bg-blue-50 text-primary'
-                    : 'border-gray-200 hover:border-gray-300'
-                )}
-              >
-                Within 3 days
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDateQuickSelect('week')}
-                className={cn(
-                  'py-2 px-3 border-2 rounded-lg text-xs md:text-sm font-medium transition-colors',
-                  dateOption === 'week'
-                    ? 'border-primary bg-blue-50 text-primary'
-                    : 'border-gray-200 hover:border-gray-300'
-                )}
-              >
-                Next week
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDateQuickSelect('custom')}
-                className={cn(
-                  'py-2 px-3 border-2 rounded-lg text-xs md:text-sm font-medium transition-colors',
-                  dateOption === 'custom'
-                    ? 'border-primary bg-blue-50 text-primary'
-                    : 'border-gray-200 hover:border-gray-300'
-                )}
-              >
-                Custom date
-              </button>
-            </div>
-            <input
-              type="date"
-              value={globalDate}
-              onChange={(e) => {
-                setGlobalDate(e.target.value);
-                setDateOption('custom');
-              }}
-              min={new Date().toISOString().split('T')[0]}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
-            />
-          </div>
-
-          {/* Next Button */}
-          <div className="pt-4">
-            <button
-              onClick={handleNext}
-              disabled={selectedBins.length === 0}
-              className={cn(
-                'w-full py-3 rounded-xl font-semibold transition-all',
-                selectedBins.length > 0
-                  ? 'bg-primary text-white hover:bg-primary/90'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              )}
-            >
-              Next: Configure Moves ({selectedBins.length})
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Right: Map Panel */}
-      <div
-        className={cn(
-          'w-full md:w-[65%] relative flex flex-col',
-          viewMode === 'form' ? 'hidden md:flex' : 'flex'
-        )}
-      >
-        {/* Map Search Overlay */}
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 w-full max-w-md px-4 z-10">
-          <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-2">
+      {/* Right Side: Map (60%) */}
+      <div className="w-full md:w-[60%] relative flex flex-col bg-gray-100">
+        {/* Map Header with Search */}
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 w-full max-w-lg px-4 z-10">
+          <div className="bg-white rounded-xl shadow-lg border border-gray-300 p-2.5">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search bins on map..."
+                placeholder="Search by bin number or address..."
                 value={binSearchQuery}
-                onChange={(e) => {
-                  setBinSearchQuery(e.target.value);
-                  setShowBinDropdown(e.target.value.length > 0);
-                }}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                onChange={(e) => setBinSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border-0 rounded-lg focus:ring-2 focus:ring-primary text-sm"
               />
             </div>
           </div>
@@ -680,10 +419,20 @@ export function ScheduleMoveModalWithMap({
             mapId="schedule-move-map"
             center={mapCenter}
             zoom={mapZoom}
+            onCenterChanged={(e) => {
+              if (e.detail.center) {
+                setMapCenter(e.detail.center);
+              }
+            }}
+            onZoomChanged={(e) => {
+              if (e.detail.zoom) {
+                setMapZoom(e.detail.zoom);
+              }
+            }}
             minZoom={3}
             maxZoom={20}
             gestureHandling="greedy"
-            disableDefaultUI={false}
+            disableDefaultUI={true}
             zoomControl={true}
             mapTypeControl={false}
             streetViewControl={false}
@@ -692,33 +441,216 @@ export function ScheduleMoveModalWithMap({
           >
             {/* Render all bin markers */}
             {allBins?.map((b) => renderBinMarker(b))}
-
-            {/* Map Controller for programmatic pan/zoom */}
-            <MapController center={mapCenter} zoom={mapZoom} />
           </Map>
         </APIProvider>
 
         {/* Map Legend */}
-        <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-xl border border-gray-200 p-3 text-xs">
+        <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg border border-gray-200 p-3 text-xs">
           <div className="font-semibold text-gray-900 mb-2">Click bins to select</div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-red-500"></div>
-              <span>80-100% full</span>
+              <div className="w-4 h-4 rounded-full bg-red-500 border border-white shadow-sm"></div>
+              <span className="text-gray-700">80-100% full</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-yellow-500"></div>
-              <span>50-79% full</span>
+              <div className="w-4 h-4 rounded-full bg-yellow-500 border border-white shadow-sm"></div>
+              <span className="text-gray-700">50-79% full</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-green-500"></div>
-              <span>0-49% full</span>
+              <div className="w-4 h-4 rounded-full bg-green-500 border border-white shadow-sm"></div>
+              <span className="text-gray-700">0-49% full</span>
             </div>
-            <div className="flex items-center gap-2 pt-1 border-t">
-              <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-blue-600"></div>
-              <span className="font-medium">Selected</span>
+            <div className="flex items-center gap-2 pt-1.5 border-t border-gray-200">
+              <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-blue-600 shadow-sm"></div>
+              <span className="font-semibold text-gray-900">Selected</span>
             </div>
           </div>
+        </div>
+
+        {/* Selection Counter Badge */}
+        {selectedBins.length > 0 && (
+          <div className="absolute top-4 right-4 bg-primary text-white px-4 py-2 rounded-full shadow-lg font-semibold text-sm z-10">
+            {selectedBins.length} bin{selectedBins.length !== 1 ? 's' : ''} selected
+          </div>
+        )}
+      </div>
+
+      {/* Left Side: Bin List (40%) */}
+      <div className="w-full md:w-[40%] flex flex-col bg-white">
+        {/* Header */}
+        <div className="p-4 border-b border-gray-200 flex-shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-900">Select bins for your route template</h3>
+            {selectedBins.length > 0 && (
+              <button
+                onClick={() => setSelectedBins([])}
+                className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Clear All
+              </button>
+            )}
+          </div>
+
+          {/* Search within list */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search by bin number or address..."
+              value={binSearchQuery}
+              onChange={(e) => setBinSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+        </div>
+
+        {/* Bin List */}
+        <div className="flex-1 overflow-y-auto">
+          {binsLoading ? (
+            <div className="p-8 text-center">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-3 text-primary" />
+              <p className="text-sm text-gray-500">Loading bins...</p>
+            </div>
+          ) : filteredBinsForList.length === 0 ? (
+            <div className="p-8 text-center">
+              <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <p className="text-sm text-gray-500 font-medium">No bins found</p>
+              <p className="text-xs text-gray-400 mt-1">Try adjusting your search</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {filteredBinsForList.map((b) => {
+                const isSelected = selectedBins.some((sb) => sb.id === b.id);
+                const fillColor =
+                  b.fill_percentage >= 80
+                    ? 'bg-red-500'
+                    : b.fill_percentage >= 50
+                    ? 'bg-yellow-500'
+                    : 'bg-green-500';
+
+                return (
+                  <label
+                    key={b.id}
+                    className={cn(
+                      'flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer transition-colors',
+                      isSelected && 'bg-blue-50 hover:bg-blue-100'
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => handleBinMarkerClick(b)}
+                      className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                    />
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-sm text-gray-900">
+                          Bin #{b.bin_number}
+                        </span>
+                        {b.fill_percentage !== null && (
+                          <div className="flex items-center gap-1.5">
+                            <div className={cn('w-2 h-2 rounded-full', fillColor)}></div>
+                            <span className="text-xs text-gray-600 font-medium">
+                              {b.fill_percentage}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-600 truncate">{b.current_street}</div>
+                      <div className="text-xs text-gray-500">
+                        {b.city}, {b.zip}
+                      </div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer with date and next button */}
+        <div className="p-4 border-t border-gray-200 space-y-3 flex-shrink-0 bg-gray-50">
+          {/* Date Selection */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-2">
+              When should these be moved? *
+            </label>
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => handleDateQuickSelect('24h')}
+                className={cn(
+                  'py-1.5 px-2 border rounded-lg text-xs font-medium transition-colors',
+                  dateOption === '24h'
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-gray-300 hover:border-gray-400 bg-white'
+                )}
+              >
+                Within 24hrs
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDateQuickSelect('3days')}
+                className={cn(
+                  'py-1.5 px-2 border rounded-lg text-xs font-medium transition-colors',
+                  dateOption === '3days'
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-gray-300 hover:border-gray-400 bg-white'
+                )}
+              >
+                Within 3 days
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDateQuickSelect('week')}
+                className={cn(
+                  'py-1.5 px-2 border rounded-lg text-xs font-medium transition-colors',
+                  dateOption === 'week'
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-gray-300 hover:border-gray-400 bg-white'
+                )}
+              >
+                Next week
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDateQuickSelect('custom')}
+                className={cn(
+                  'py-1.5 px-2 border rounded-lg text-xs font-medium transition-colors',
+                  dateOption === 'custom'
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-gray-300 hover:border-gray-400 bg-white'
+                )}
+              >
+                Custom
+              </button>
+            </div>
+            <input
+              type="date"
+              value={globalDate}
+              onChange={(e) => {
+                setGlobalDate(e.target.value);
+                setDateOption('custom');
+              }}
+              min={new Date().toISOString().split('T')[0]}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
+          {/* Next Button */}
+          <button
+            onClick={handleNext}
+            disabled={selectedBins.length === 0}
+            className={cn(
+              'w-full py-2.5 rounded-lg font-semibold text-sm transition-all',
+              selectedBins.length > 0
+                ? 'bg-primary text-white hover:bg-primary/90 shadow-sm'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            )}
+          >
+            Next: Configure Moves ({selectedBins.length})
+          </button>
         </div>
       </div>
     </>
