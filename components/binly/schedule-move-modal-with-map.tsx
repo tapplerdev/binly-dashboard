@@ -531,7 +531,7 @@ export function ScheduleMoveModalWithMap({
               isHovered && 'scale-125'
             )}
             style={{
-              backgroundColor: getBinMarkerColor(bin.fill_percentage, bin.status),
+              backgroundColor: isSelected ? '#3B82F6' : getBinMarkerColor(bin.fill_percentage, bin.status),
             }}
             onMouseEnter={() => setHoveredBinId(bin.id)}
             onMouseLeave={() => setHoveredBinId(null)}
@@ -776,7 +776,7 @@ export function ScheduleMoveModalWithMap({
 
         {/* Selection Counter Badge */}
         {selectedBins.length > 0 && (
-          <div className="absolute top-4 right-4 bg-primary text-white px-4 py-2 rounded-full shadow-lg font-semibold text-sm z-10">
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-primary text-white px-4 py-2 rounded-full shadow-lg font-semibold text-sm z-10">
             {selectedBins.length} bin{selectedBins.length !== 1 ? 's' : ''} selected
           </div>
         )}
