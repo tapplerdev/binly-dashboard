@@ -1137,8 +1137,8 @@ export function ScheduleMoveModalWithMap({
   };
 
   // Get active and future shifts
-  const activeShifts = shifts?.filter((s) => s.status === 'in_progress') || [];
-  const futureShifts = shifts?.filter((s) => s.status === 'ready') || [];
+  const activeShifts = shifts?.filter((s) => s.status === 'active') || [];
+  const futureShifts = shifts?.filter((s) => s.status === 'scheduled') || [];
 
   // Render Step 2: Configuration
   const renderConfigurationStep = () => (
@@ -1355,109 +1355,223 @@ export function ScheduleMoveModalWithMap({
                   </div>
                 )}
 
-                {/* Assignment */}
+                {/* Assignment - 4 Box Layout */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
                     Assignment
                   </label>
-                  <GroupedDropdown
-                    placeholder="Leave Unassigned"
-                    value={
-                      config.assignmentType === 'unassigned'
-                        ? 'unassigned'
-                        : config.assignmentType === 'user'
-                        ? `user:${config.assignedUserId}`
-                        : config.assignmentType === 'active_shift'
-                        ? `active:${config.assignedShiftId}`
-                        : `future:${config.assignedShiftId}`
-                    }
-                    optionGroups={[
-                      {
-                        label: 'General',
-                        options: [{ value: 'unassigned', label: 'Leave Unassigned' }],
-                      },
-                      ...(users && users.length > 0
-                        ? [
-                            {
-                              label: 'Users (Manual Assignment)',
-                              options: users.map((user) => ({
-                                value: `user:${user.id}`,
-                                label: `${user.name} (${user.role})`,
-                              })),
-                            },
-                          ]
-                        : []),
-                      ...(activeShifts.length > 0
-                        ? [
-                            {
-                              label: 'Active Shifts',
-                              options: activeShifts.map((shift) => ({
-                                value: `active:${shift.id}`,
-                                label: `${shift.driver_name} (Shift #${shift.id.slice(0, 8)})`,
-                              })),
-                            },
-                          ]
-                        : []),
-                      ...(futureShifts.length > 0
-                        ? [
-                            {
-                              label: 'Future Shifts',
-                              options: futureShifts.map((shift) => ({
-                                value: `future:${shift.id}`,
-                                label: `${shift.driver_name} (Shift #${shift.id.slice(0, 8)})`,
-                              })),
-                            },
-                          ]
-                        : []),
-                    ]}
-                    onChange={(value) => {
-                      if (value === 'unassigned') {
+
+                  {/* 4 Assignment Options Grid */}
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    {/* Leave Unassigned */}
+                    <button
+                      type="button"
+                      onClick={() => {
                         updateBinConfig(bin.id, {
                           assignmentType: 'unassigned',
                           assignedUserId: undefined,
                           assignedShiftId: undefined,
                         });
-                      } else if (value.startsWith('user:')) {
-                        updateBinConfig(bin.id, {
-                          assignmentType: 'user',
-                          assignedUserId: value.replace('user:', ''),
-                          assignedShiftId: undefined,
-                        });
-                      } else if (value.startsWith('active:')) {
-                        updateBinConfig(bin.id, {
-                          assignmentType: 'active_shift',
-                          assignedShiftId: value.replace('active:', ''),
-                          assignedUserId: undefined,
-                        });
-                      } else if (value.startsWith('future:')) {
-                        updateBinConfig(bin.id, {
-                          assignmentType: 'future_shift',
-                          assignedShiftId: value.replace('future:', ''),
-                          assignedUserId: undefined,
-                          insertPosition: 'end',
-                        });
-                      }
-                    }}
-                  />
+                      }}
+                      className={cn(
+                        'p-4 border-2 rounded-lg text-left transition-all hover:border-primary/50',
+                        config.assignmentType === 'unassigned'
+                          ? 'border-primary bg-blue-50'
+                          : 'border-gray-200 bg-white hover:bg-gray-50'
+                      )}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <X className={cn('w-4 h-4', config.assignmentType === 'unassigned' ? 'text-primary' : 'text-gray-400')} />
+                        <span className={cn('text-sm font-semibold', config.assignmentType === 'unassigned' ? 'text-primary' : 'text-gray-700')}>
+                          Leave Unassigned
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500">No driver assigned</p>
+                    </button>
 
-                  {/* Insert Position for Future Shifts */}
-                  {config.assignmentType === 'future_shift' && (
-                    <div className="mt-2">
+                    {/* Assign to Person */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (config.assignmentType !== 'user') {
+                          updateBinConfig(bin.id, {
+                            assignmentType: 'user',
+                            assignedShiftId: undefined,
+                          });
+                        }
+                      }}
+                      className={cn(
+                        'p-4 border-2 rounded-lg text-left transition-all hover:border-primary/50',
+                        config.assignmentType === 'user'
+                          ? 'border-primary bg-blue-50'
+                          : 'border-gray-200 bg-white hover:bg-gray-50'
+                      )}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <User className={cn('w-4 h-4', config.assignmentType === 'user' ? 'text-primary' : 'text-gray-400')} />
+                        <span className={cn('text-sm font-semibold', config.assignmentType === 'user' ? 'text-primary' : 'text-gray-700')}>
+                          Assign to Person
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500">Manual one-off task</p>
+                    </button>
+
+                    {/* Active Shift */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (config.assignmentType !== 'active_shift') {
+                          updateBinConfig(bin.id, {
+                            assignmentType: 'active_shift',
+                            assignedUserId: undefined,
+                          });
+                        }
+                      }}
+                      className={cn(
+                        'p-4 border-2 rounded-lg text-left transition-all',
+                        activeShifts.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary/50',
+                        config.assignmentType === 'active_shift'
+                          ? 'border-primary bg-blue-50'
+                          : 'border-gray-200 bg-white hover:bg-gray-50'
+                      )}
+                      disabled={activeShifts.length === 0}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Truck className={cn('w-4 h-4', config.assignmentType === 'active_shift' ? 'text-primary' : 'text-gray-400')} />
+                        <span className={cn('text-sm font-semibold', config.assignmentType === 'active_shift' ? 'text-primary' : 'text-gray-700')}>
+                          Active Shift
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        {activeShifts.length === 0 ? 'No active shifts' : `${activeShifts.length} available`}
+                      </p>
+                    </button>
+
+                    {/* Future Shift */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (config.assignmentType !== 'future_shift') {
+                          updateBinConfig(bin.id, {
+                            assignmentType: 'future_shift',
+                            assignedUserId: undefined,
+                            insertPosition: 'end',
+                          });
+                        }
+                      }}
+                      className={cn(
+                        'p-4 border-2 rounded-lg text-left transition-all',
+                        futureShifts.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary/50',
+                        config.assignmentType === 'future_shift'
+                          ? 'border-primary bg-blue-50'
+                          : 'border-gray-200 bg-white hover:bg-gray-50'
+                      )}
+                      disabled={futureShifts.length === 0}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Calendar className={cn('w-4 h-4', config.assignmentType === 'future_shift' ? 'text-primary' : 'text-gray-400')} />
+                        <span className={cn('text-sm font-semibold', config.assignmentType === 'future_shift' ? 'text-primary' : 'text-gray-700')}>
+                          Future Shift
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        {futureShifts.length === 0 ? 'No future shifts' : `${futureShifts.length} scheduled`}
+                      </p>
+                    </button>
+                  </div>
+
+                  {/* User Selection Dropdown */}
+                  {config.assignmentType === 'user' && users && users.length > 0 && (
+                    <div className="mb-3">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Insert Position
+                        Select User
                       </label>
                       <select
-                        value={config.insertPosition || 'end'}
-                        onChange={(e) =>
+                        value={config.assignedUserId || ''}
+                        onChange={(e) => {
                           updateBinConfig(bin.id, {
-                            insertPosition: e.target.value as 'start' | 'end',
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            assignedUserId: e.target.value,
+                          });
+                        }}
+                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
                       >
-                        <option value="start">At Start</option>
-                        <option value="end">At End</option>
+                        <option value="">Choose a user...</option>
+                        {users.map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {user.name} ({user.role})
+                          </option>
+                        ))}
                       </select>
+                    </div>
+                  )}
+
+                  {/* Active Shift Selection Dropdown */}
+                  {config.assignmentType === 'active_shift' && activeShifts.length > 0 && (
+                    <div className="mb-3">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Select Active Shift
+                      </label>
+                      <select
+                        value={config.assignedShiftId || ''}
+                        onChange={(e) => {
+                          updateBinConfig(bin.id, {
+                            assignedShiftId: e.target.value,
+                          });
+                        }}
+                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                      >
+                        <option value="">Choose a shift...</option>
+                        {activeShifts.map((shift) => (
+                          <option key={shift.id} value={shift.id}>
+                            {shift.driverName} - Shift #{shift.id.slice(0, 8)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Future Shift Selection Dropdown */}
+                  {config.assignmentType === 'future_shift' && futureShifts.length > 0 && (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Select Future Shift
+                        </label>
+                        <select
+                          value={config.assignedShiftId || ''}
+                          onChange={(e) => {
+                            updateBinConfig(bin.id, {
+                              assignedShiftId: e.target.value,
+                            });
+                          }}
+                          className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                        >
+                          <option value="">Choose a shift...</option>
+                          {futureShifts.map((shift) => (
+                            <option key={shift.id} value={shift.id}>
+                              {shift.driverName} - {shift.date} at {shift.startTime}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Insert Position
+                        </label>
+                        <select
+                          value={config.insertPosition || 'end'}
+                          onChange={(e) =>
+                            updateBinConfig(bin.id, {
+                              insertPosition: e.target.value as 'start' | 'end',
+                            })
+                          }
+                          className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                        >
+                          <option value="start">At Start</option>
+                          <option value="end">At End</option>
+                        </select>
+                      </div>
                     </div>
                   )}
                 </div>
