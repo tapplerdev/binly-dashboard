@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
 import { HerePlaceDetails } from '@/lib/services/geocoding.service';
 import { format, addDays } from 'date-fns';
+import { GroupedDropdown } from '@/components/ui/dropdown';
 
 // Google Maps imports
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
@@ -1176,9 +1177,49 @@ export function ScheduleMoveModalWithMap({
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Assign All To:
               </label>
-              <select
-                onChange={(e) => {
-                  const value = e.target.value;
+              <GroupedDropdown
+                placeholder="Select assignment..."
+                value=""
+                optionGroups={[
+                  {
+                    label: 'General',
+                    options: [{ value: 'unassigned', label: 'Leave Unassigned' }],
+                  },
+                  ...(users && users.length > 0
+                    ? [
+                        {
+                          label: 'Users',
+                          options: users.map((user) => ({
+                            value: `user:${user.id}`,
+                            label: `${user.name} (${user.role})`,
+                          })),
+                        },
+                      ]
+                    : []),
+                  ...(activeShifts.length > 0
+                    ? [
+                        {
+                          label: 'Active Shifts',
+                          options: activeShifts.map((shift) => ({
+                            value: `active:${shift.id}`,
+                            label: `Shift #${shift.id.slice(0, 8)} - ${shift.driver_name}`,
+                          })),
+                        },
+                      ]
+                    : []),
+                  ...(futureShifts.length > 0
+                    ? [
+                        {
+                          label: 'Future Shifts',
+                          options: futureShifts.map((shift) => ({
+                            value: `future:${shift.id}`,
+                            label: `Shift #${shift.id.slice(0, 8)} - ${shift.driver_name}`,
+                          })),
+                        },
+                      ]
+                    : []),
+                ]}
+                onChange={(value) => {
                   if (value === 'unassigned') {
                     applyBulkAssignment('unassigned');
                   } else if (value.startsWith('user:')) {
@@ -1188,40 +1229,8 @@ export function ScheduleMoveModalWithMap({
                   } else if (value.startsWith('future:')) {
                     applyBulkAssignment('future_shift', value.replace('future:', ''));
                   }
-                  e.target.value = ''; // Reset select
                 }}
-                className="w-full py-2 px-3 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-primary"
-              >
-                <option value="">Select assignment...</option>
-                <option value="unassigned">Leave Unassigned</option>
-                {users && users.length > 0 && (
-                  <optgroup label="Users">
-                    {users.map((user) => (
-                      <option key={user.id} value={`user:${user.id}`}>
-                        {user.name} ({user.role})
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-                {activeShifts.length > 0 && (
-                  <optgroup label="Active Shifts">
-                    {activeShifts.map((shift) => (
-                      <option key={shift.id} value={`active:${shift.id}`}>
-                        Shift #{shift.id.slice(0, 8)} - {shift.driver_name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-                {futureShifts.length > 0 && (
-                  <optgroup label="Future Shifts">
-                    {futureShifts.map((shift) => (
-                      <option key={shift.id} value={`future:${shift.id}`}>
-                        Shift #{shift.id.slice(0, 8)} - {shift.driver_name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
+              />
             </div>
           </div>
         </div>
@@ -1351,7 +1360,8 @@ export function ScheduleMoveModalWithMap({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Assignment
                   </label>
-                  <select
+                  <GroupedDropdown
+                    placeholder="Leave Unassigned"
                     value={
                       config.assignmentType === 'unassigned'
                         ? 'unassigned'
@@ -1361,8 +1371,46 @@ export function ScheduleMoveModalWithMap({
                         ? `active:${config.assignedShiftId}`
                         : `future:${config.assignedShiftId}`
                     }
-                    onChange={(e) => {
-                      const value = e.target.value;
+                    optionGroups={[
+                      {
+                        label: 'General',
+                        options: [{ value: 'unassigned', label: 'Leave Unassigned' }],
+                      },
+                      ...(users && users.length > 0
+                        ? [
+                            {
+                              label: 'Users (Manual Assignment)',
+                              options: users.map((user) => ({
+                                value: `user:${user.id}`,
+                                label: `${user.name} (${user.role})`,
+                              })),
+                            },
+                          ]
+                        : []),
+                      ...(activeShifts.length > 0
+                        ? [
+                            {
+                              label: 'Active Shifts',
+                              options: activeShifts.map((shift) => ({
+                                value: `active:${shift.id}`,
+                                label: `${shift.driver_name} (Shift #${shift.id.slice(0, 8)})`,
+                              })),
+                            },
+                          ]
+                        : []),
+                      ...(futureShifts.length > 0
+                        ? [
+                            {
+                              label: 'Future Shifts',
+                              options: futureShifts.map((shift) => ({
+                                value: `future:${shift.id}`,
+                                label: `${shift.driver_name} (Shift #${shift.id.slice(0, 8)})`,
+                              })),
+                            },
+                          ]
+                        : []),
+                    ]}
+                    onChange={(value) => {
                       if (value === 'unassigned') {
                         updateBinConfig(bin.id, {
                           assignmentType: 'unassigned',
@@ -1390,37 +1438,7 @@ export function ScheduleMoveModalWithMap({
                         });
                       }
                     }}
-                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="unassigned">Leave Unassigned</option>
-                    {users && users.length > 0 && (
-                      <optgroup label="Users (Manual Assignment)">
-                        {users.map((user) => (
-                          <option key={user.id} value={`user:${user.id}`}>
-                            {user.name} ({user.role})
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                    {activeShifts.length > 0 && (
-                      <optgroup label="Active Shifts">
-                        {activeShifts.map((shift) => (
-                          <option key={shift.id} value={`active:${shift.id}`}>
-                            {shift.driver_name} (Shift #{shift.id.slice(0, 8)})
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                    {futureShifts.length > 0 && (
-                      <optgroup label="Future Shifts">
-                        {futureShifts.map((shift) => (
-                          <option key={shift.id} value={`future:${shift.id}`}>
-                            {shift.driver_name} (Shift #{shift.id.slice(0, 8)})
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                  </select>
+                  />
 
                   {/* Insert Position for Future Shifts */}
                   {config.assignmentType === 'future_shift' && (
