@@ -502,7 +502,7 @@ export function ScheduleMoveModalWithMap({
             mapTypeControl={false}
             streetViewControl={false}
             fullscreenControl={false}
-            mapTypeId="satellite"
+            mapTypeId="hybrid"
             style={{ width: '100%', height: '100%' }}
           >
             {/* Render ALL bin markers (not filtered - show everything on map) */}
