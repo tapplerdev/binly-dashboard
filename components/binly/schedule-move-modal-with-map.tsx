@@ -22,6 +22,8 @@ import {
   ChevronLeft,
   Package,
   Map as MapIcon,
+  Filter,
+  Lasso,
 } from 'lucide-react';
 import { createMoveRequest, assignMoveToShift, assignMoveToUser } from '@/lib/api/move-requests';
 import { getShifts, getShiftDetailsByDriverId, Shift } from '@/lib/api/shifts';
@@ -84,6 +86,7 @@ export function ScheduleMoveModalWithMap({
   const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER);
   const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM);
   const [hoveredBinId, setHoveredBinId] = useState<string | null>(null);
+  const [lassoMode, setLassoMode] = useState(false);
 
   // Bin Selection State
   const [selectedBins, setSelectedBins] = useState<BinWithPriority[]>(
@@ -91,6 +94,10 @@ export function ScheduleMoveModalWithMap({
   );
   const [binSearchQuery, setBinSearchQuery] = useState('');
   const [showBinDropdown, setShowBinDropdown] = useState(false);
+
+  // Filter State
+  const [fillLevelFilter, setFillLevelFilter] = useState<'all' | 'low' | 'medium' | 'high' | 'critical'>('all');
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
   // Global Settings (Step 1)
   const [globalDate, setGlobalDate] = useState<string>(
@@ -374,23 +381,54 @@ export function ScheduleMoveModalWithMap({
   const filteredBinsForList = useMemo(() => {
     if (!allBins) return [];
 
+    let filtered = [...allBins];
+
+    // Apply search filter
     const query = binSearchQuery.toLowerCase().trim();
-    if (!query) return allBins;
+    if (query) {
+      filtered = filtered.filter((b) => {
+        const binNumber = b.bin_number?.toString() || '';
+        const street = b.current_street?.toLowerCase() || '';
+        const city = b.city?.toLowerCase() || '';
+        const zip = b.zip?.toLowerCase() || '';
 
-    return allBins.filter((b) => {
-      const binNumber = b.bin_number?.toString() || '';
-      const street = b.current_street?.toLowerCase() || '';
-      const city = b.city?.toLowerCase() || '';
-      const zip = b.zip?.toLowerCase() || '';
+        return (
+          binNumber.includes(query) ||
+          street.includes(query) ||
+          city.includes(query) ||
+          zip.includes(query)
+        );
+      });
+    }
 
-      return (
-        binNumber.includes(query) ||
-        street.includes(query) ||
-        city.includes(query) ||
-        zip.includes(query)
-      );
+    // Apply fill level filter
+    if (fillLevelFilter !== 'all') {
+      filtered = filtered.filter((b) => {
+        const fillPct = b.fill_percentage ?? 0;
+        switch (fillLevelFilter) {
+          case 'critical':
+            return fillPct >= 80;
+          case 'high':
+            return fillPct >= 50 && fillPct < 80;
+          case 'medium':
+            return fillPct >= 20 && fillPct < 50;
+          case 'low':
+            return fillPct < 20;
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Sort by bin number (ascending)
+    filtered.sort((a, b) => {
+      const numA = a.bin_number ?? 0;
+      const numB = b.bin_number ?? 0;
+      return numA - numB;
     });
-  }, [allBins, binSearchQuery]);
+
+    return filtered;
+  }, [allBins, binSearchQuery, fillLevelFilter]);
 
   // Render Step 1: Selection
   const renderSelectionStep = () => (
@@ -413,12 +451,28 @@ export function ScheduleMoveModalWithMap({
           </div>
         </div>
 
+        {/* Lasso Select Button */}
+        <div className="absolute top-4 right-4 z-10">
+          <button
+            onClick={() => setLassoMode(!lassoMode)}
+            className={cn(
+              'p-3 rounded-lg shadow-lg border transition-all',
+              lassoMode
+                ? 'bg-primary text-white border-primary'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            )}
+            title="Lasso Select"
+          >
+            <Lasso className="w-5 h-5" />
+          </button>
+        </div>
+
         {/* Google Map */}
         <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
           <Map
             mapId="schedule-move-map"
-            center={mapCenter}
-            zoom={mapZoom}
+            defaultCenter={mapCenter}
+            defaultZoom={mapZoom}
             onCenterChanged={(e) => {
               if (e.detail.center) {
                 setMapCenter(e.detail.center);
@@ -437,10 +491,11 @@ export function ScheduleMoveModalWithMap({
             mapTypeControl={false}
             streetViewControl={false}
             fullscreenControl={false}
+            mapTypeId="satellite"
             style={{ width: '100%', height: '100%' }}
           >
             {/* Render all bin markers */}
-            {allBins?.map((b) => renderBinMarker(b))}
+            {filteredBinsForList?.map((b) => renderBinMarker(b))}
           </Map>
         </APIProvider>
 
@@ -491,16 +546,109 @@ export function ScheduleMoveModalWithMap({
             )}
           </div>
 
-          {/* Search within list */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search by bin number or address..."
-              value={binSearchQuery}
-              onChange={(e) => setBinSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-            />
+          {/* Search and Filter */}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search by bin number or address..."
+                value={binSearchQuery}
+                onChange={(e) => setBinSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+
+            {/* Filter Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                className={cn(
+                  'p-2 border rounded-lg transition-all',
+                  fillLevelFilter !== 'all'
+                    ? 'border-primary bg-blue-50 text-primary'
+                    : 'border-gray-300 hover:border-gray-400 text-gray-600'
+                )}
+                title="Filter by fill level"
+              >
+                <Filter className="w-4 h-4" />
+              </button>
+
+              {showFilterDropdown && (
+                <>
+                  <div
+                    className="fixed inset-0 z-[5]"
+                    onClick={() => setShowFilterDropdown(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[10]">
+                    <button
+                      onClick={() => {
+                        setFillLevelFilter('all');
+                        setShowFilterDropdown(false);
+                      }}
+                      className={cn(
+                        'w-full text-left px-4 py-2 text-sm hover:bg-gray-50',
+                        fillLevelFilter === 'all' && 'bg-blue-50 text-primary font-medium'
+                      )}
+                    >
+                      All bins
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFillLevelFilter('critical');
+                        setShowFilterDropdown(false);
+                      }}
+                      className={cn(
+                        'w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2',
+                        fillLevelFilter === 'critical' && 'bg-blue-50 text-primary font-medium'
+                      )}
+                    >
+                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                      Critical (80-100%)
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFillLevelFilter('high');
+                        setShowFilterDropdown(false);
+                      }}
+                      className={cn(
+                        'w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2',
+                        fillLevelFilter === 'high' && 'bg-blue-50 text-primary font-medium'
+                      )}
+                    >
+                      <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                      High (50-79%)
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFillLevelFilter('medium');
+                        setShowFilterDropdown(false);
+                      }}
+                      className={cn(
+                        'w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2',
+                        fillLevelFilter === 'medium' && 'bg-blue-50 text-primary font-medium'
+                      )}
+                    >
+                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                      Medium (20-49%)
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFillLevelFilter('low');
+                        setShowFilterDropdown(false);
+                      }}
+                      className={cn(
+                        'w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2',
+                        fillLevelFilter === 'low' && 'bg-blue-50 text-primary font-medium'
+                      )}
+                    >
+                      <div className="w-3 h-3 rounded-full bg-gray-400"></div>
+                      Low (0-19%)
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
