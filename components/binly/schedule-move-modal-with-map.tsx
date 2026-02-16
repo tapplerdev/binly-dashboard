@@ -79,17 +79,17 @@ function PolylineConnector({ from, to }: { from: { lat: number; lng: number }; t
     const polyline = new google.maps.Polyline({
       path: [from, to],
       strokeColor: '#9333EA',
-      strokeOpacity: 0.6,
-      strokeWeight: 2,
+      strokeOpacity: 0.8,
+      strokeWeight: 4,
       icons: [
         {
           icon: {
             path: 'M 0,-1 0,1',
             strokeOpacity: 1,
-            scale: 2,
+            scale: 3,
           },
           offset: '0',
-          repeat: '10px',
+          repeat: '15px',
         },
       ],
     });
@@ -515,10 +515,10 @@ export function ScheduleMoveModalWithMap({
         draggable={isDragMode && isSelected}
         onDragEnd={(e) => handleMarkerDragEnd(bin, e)}
       >
-        <div className="relative">
+        <div className="relative pointer-events-auto">
           {/* Pulsing ring for selected bins */}
           {isSelected && (
-            <div className="absolute inset-0 animate-ping">
+            <div className="absolute inset-0 animate-ping pointer-events-none">
               <div className="w-8 h-8 rounded-full border-2 border-blue-500 opacity-75"></div>
             </div>
           )}
@@ -526,7 +526,7 @@ export function ScheduleMoveModalWithMap({
           {/* Bin marker */}
           <div
             className={cn(
-              'w-8 h-8 rounded-full border-2 border-white shadow-lg cursor-pointer transition-all',
+              'w-8 h-8 rounded-full border-2 border-white shadow-lg cursor-pointer transition-all pointer-events-auto',
               isSelected && 'border-blue-500 border-4 scale-110',
               isHovered && 'scale-125'
             )}
@@ -535,6 +535,12 @@ export function ScheduleMoveModalWithMap({
             }}
             onMouseEnter={() => setHoveredBinId(bin.id)}
             onMouseLeave={() => setHoveredBinId(null)}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isDragMode) {
+                handleBinMarkerClick(bin);
+              }
+            }}
             title={`Bin #${bin.bin_number} - ${bin.fill_percentage ?? 0}%`}
           >
             <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
@@ -610,16 +616,16 @@ export function ScheduleMoveModalWithMap({
       {/* Right Side: Map (60%) */}
       <div className="w-full md:w-[60%] relative flex flex-col bg-gray-100">
         {/* Map Header with Search */}
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 w-full max-w-lg px-4 z-10">
-          <div className="bg-white rounded-xl shadow-lg border border-gray-300 p-2.5">
+        <div className="absolute top-4 left-4 w-full max-w-md z-10">
+          <div className="bg-white rounded-lg shadow-lg border border-gray-300 p-1.5">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search by bin number or address..."
                 value={binSearchQuery}
                 onChange={(e) => setBinSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border-0 rounded-lg focus:ring-2 focus:ring-primary text-sm"
+                className="w-full pl-8 pr-3 py-1.5 border-0 rounded-md focus:ring-2 focus:ring-primary text-xs"
               />
             </div>
           </div>
@@ -776,7 +782,7 @@ export function ScheduleMoveModalWithMap({
 
         {/* Selection Counter Badge */}
         {selectedBins.length > 0 && (
-          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-primary text-white px-4 py-2 rounded-full shadow-lg font-semibold text-sm z-10">
+          <div className="absolute top-16 left-4 bg-primary text-white px-3 py-1.5 rounded-full shadow-lg font-semibold text-xs z-10">
             {selectedBins.length} bin{selectedBins.length !== 1 ? 's' : ''} selected
           </div>
         )}
