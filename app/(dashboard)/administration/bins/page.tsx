@@ -15,7 +15,8 @@ import { Button } from '@/components/ui/button';
 import { KpiCard } from '@/components/binly/kpi-card';
 import { BulkCreateBinModal } from '@/components/binly/bulk-create-bin-modal';
 import { BinDetailDrawer } from '@/components/binly/bin-detail-drawer';
-import { ScheduleMoveModal, RetireBinModal } from '@/components/binly/bin-modals';
+import { RetireBinModal } from '@/components/binly/bin-modals';
+import { ScheduleMoveModalWithMap } from '@/components/binly/schedule-move-modal-with-map';
 import { EditBinDialog } from '@/components/binly/edit-bin-dialog';
 import { Dropdown, MultiSelectDropdown } from '@/components/ui/dropdown';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -825,7 +826,7 @@ export default function BinsPage() {
       )}
 
       {showScheduleModal && (modalTargetBin || modalTargetBins.length > 0) && (
-        <ScheduleMoveModal
+        <ScheduleMoveModalWithMap
           bin={modalTargetBin || undefined}
           bins={modalTargetBins.length > 0 ? modalTargetBins : undefined}
           onClose={() => {

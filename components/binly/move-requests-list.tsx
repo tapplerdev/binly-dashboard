@@ -18,7 +18,8 @@ import { KpiCard } from '@/components/binly/kpi-card';
 import { MultiSelectDropdown } from '@/components/ui/dropdown';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { AssignMovesModal } from '@/components/binly/assign-moves-modal';
-import { ScheduleMoveModal } from '@/components/binly/bin-modals';
+import { ScheduleMoveModal } from '@/components/binly/bin-modals'; // For editing
+import { ScheduleMoveModalWithMap } from '@/components/binly/schedule-move-modal-with-map'; // For creating
 import { MoveRequestDetailDrawer } from '@/components/binly/move-request-detail-drawer';
 import { AssignUserModal } from '@/components/binly/assign-user-modal';
 import {
@@ -95,7 +96,8 @@ export function MoveRequestsList() {
   // Modal state
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showAssignUserModal, setShowAssignUserModal] = useState(false);
-  const [showScheduleMoveModal, setShowScheduleMoveModal] = useState(false);
+  const [showScheduleMoveModal, setShowScheduleMoveModal] = useState(false); // For editing existing
+  const [showCreateMoveModal, setShowCreateMoveModal] = useState(false); // For creating new with map
   const [showBulkEditDateModal, setShowBulkEditDateModal] = useState(false);
   const [showBulkCancelModal, setShowBulkCancelModal] = useState(false);
   const [showSingleCancelModal, setShowSingleCancelModal] = useState(false);
@@ -672,7 +674,7 @@ export function MoveRequestsList() {
           {/* Create Button */}
           <Button
             className="whitespace-nowrap w-full lg:w-auto"
-            onClick={() => setShowScheduleMoveModal(true)}
+            onClick={() => setShowCreateMoveModal(true)}
           >
             <Plus className="h-4 w-4 mr-2" />
             New Move Request
@@ -1244,7 +1246,7 @@ export function MoveRequestsList() {
         </>
       )}
 
-      {/* Schedule Move Modal */}
+      {/* Schedule Move Modal (for editing existing) */}
       {showScheduleMoveModal && (
         <ScheduleMoveModal
           moveRequest={moveToEdit}
@@ -1256,6 +1258,17 @@ export function MoveRequestsList() {
             refetch();
             setShowScheduleMoveModal(false);
             setMoveToEdit(null);
+          }}
+        />
+      )}
+
+      {/* Create Move Modal with Map (for creating new) */}
+      {showCreateMoveModal && (
+        <ScheduleMoveModalWithMap
+          onClose={() => setShowCreateMoveModal(false)}
+          onSuccess={() => {
+            refetch();
+            setShowCreateMoveModal(false);
           }}
         />
       )}

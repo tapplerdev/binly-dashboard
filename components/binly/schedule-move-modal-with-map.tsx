@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useQuery, useQueryClient } from '@tantml:function_calls>';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BinWithPriority, MoveRequest, getBinMarkerColor } from '@/lib/types/bin';
 import { getBinsWithPriority } from '@/lib/api/bins';
 import { Card } from '@/components/ui/card';
