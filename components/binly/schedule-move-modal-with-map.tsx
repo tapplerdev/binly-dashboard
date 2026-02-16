@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BinWithPriority, MoveRequest, getBinMarkerColor } from '@/lib/types/bin';
@@ -24,6 +24,7 @@ import {
   Map as MapIcon,
   Filter,
   Lasso,
+  Move,
 } from 'lucide-react';
 import { createMoveRequest, assignMoveToShift, assignMoveToUser } from '@/lib/api/move-requests';
 import { getShifts, getShiftDetailsByDriverId, Shift } from '@/lib/api/shifts';
@@ -68,6 +69,41 @@ interface ScheduleMoveModalWithMapProps {
 
 type WizardStep = 'selection' | 'configuration';
 
+// Polyline connector component to draw lines between original and ghost pins
+function PolylineConnector({ from, to }: { from: { lat: number; lng: number }; to: { lat: number; lng: number } }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+
+    const polyline = new google.maps.Polyline({
+      path: [from, to],
+      strokeColor: '#9333EA',
+      strokeOpacity: 0.6,
+      strokeWeight: 2,
+      icons: [
+        {
+          icon: {
+            path: 'M 0,-1 0,1',
+            strokeOpacity: 1,
+            scale: 2,
+          },
+          offset: '0',
+          repeat: '10px',
+        },
+      ],
+    });
+
+    polyline.setMap(map);
+
+    return () => {
+      polyline.setMap(null);
+    };
+  }, [map, from, to]);
+
+  return null;
+}
+
 export function ScheduleMoveModalWithMap({
   bin,
   bins,
@@ -87,6 +123,16 @@ export function ScheduleMoveModalWithMap({
   const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM);
   const [hoveredBinId, setHoveredBinId] = useState<string | null>(null);
   const [lassoMode, setLassoMode] = useState(false);
+  const [isDragMode, setIsDragMode] = useState(false);
+
+  // Drag-to-Relocate State
+  const [binRelocations, setBinRelocations] = useState<Record<string, {
+    newLat: number;
+    newLng: number;
+    newAddress?: string;
+    newCity?: string;
+    newZip?: string;
+  }>>({});
 
   // Bin Selection State
   const [selectedBins, setSelectedBins] = useState<BinWithPriority[]>(
@@ -220,6 +266,84 @@ export function ScheduleMoveModalWithMap({
     setShowBinDropdown(false);
   };
 
+  // Handle marker drag end (for relocation planning)
+  const handleMarkerDragEnd = async (bin: BinWithPriority, event: google.maps.MapMouseEvent) => {
+    if (!event.latLng) return;
+
+    const newLat = event.latLng.lat();
+    const newLng = event.latLng.lng();
+
+    // Reverse geocode the new location
+    try {
+      const geocoder = new google.maps.Geocoder();
+      const result = await geocoder.geocode({ location: { lat: newLat, lng: newLng } });
+
+      if (result.results && result.results[0]) {
+        const addressComponents = result.results[0].address_components;
+        const formattedAddress = result.results[0].formatted_address;
+
+        // Extract street, city, zip
+        let street = '';
+        let city = '';
+        let zip = '';
+
+        for (const component of addressComponents) {
+          if (component.types.includes('street_number')) {
+            street = component.long_name + ' ';
+          }
+          if (component.types.includes('route')) {
+            street += component.long_name;
+          }
+          if (component.types.includes('locality')) {
+            city = component.long_name;
+          }
+          if (component.types.includes('postal_code')) {
+            zip = component.long_name;
+          }
+        }
+
+        // Save relocation data
+        setBinRelocations((prev) => ({
+          ...prev,
+          [bin.id]: {
+            newLat,
+            newLng,
+            newAddress: street || formattedAddress,
+            newCity: city,
+            newZip: zip,
+          },
+        }));
+
+        console.log(`[DRAG] Bin ${bin.bin_number} relocated to:`, { street, city, zip });
+      }
+    } catch (error) {
+      console.error('[DRAG] Reverse geocoding failed:', error);
+      // Still save coordinates even if geocoding fails
+      setBinRelocations((prev) => ({
+        ...prev,
+        [bin.id]: {
+          newLat,
+          newLng,
+          newAddress: `${newLat.toFixed(6)}, ${newLng.toFixed(6)}`,
+        },
+      }));
+    }
+  };
+
+  // Reset a single bin's relocation
+  const handleResetRelocation = (binId: string) => {
+    setBinRelocations((prev) => {
+      const updated = { ...prev };
+      delete updated[binId];
+      return updated;
+    });
+  };
+
+  // Clear all relocations
+  const handleClearAllRelocations = () => {
+    setBinRelocations({});
+  };
+
   // Handle date quick select
   const handleDateQuickSelect = (option: '24h' | '3days' | 'week' | 'custom') => {
     setDateOption(option);
@@ -245,6 +369,43 @@ export function ScheduleMoveModalWithMap({
       alert('Please select at least one bin');
       return;
     }
+
+    // Initialize bin configs with relocation data for dragged bins
+    const initialConfigs: Record<string, BinMoveConfig> = {};
+
+    selectedBins.forEach((bin) => {
+      const relocation = binRelocations[bin.id];
+      const scheduledDate = new Date(globalDate).getTime();
+
+      if (relocation) {
+        // Bin was relocated via drag - auto-set to relocation mode
+        initialConfigs[bin.id] = {
+          bin,
+          moveType: 'relocation',
+          scheduledDate,
+          newStreet: relocation.newAddress || '',
+          newCity: relocation.newCity || '',
+          newZip: relocation.newZip || '',
+          newLatitude: relocation.newLat,
+          newLongitude: relocation.newLng,
+          reason: '',
+          notes: '',
+          assignmentType: 'unassigned',
+        };
+      } else {
+        // Bin not relocated - default to store
+        initialConfigs[bin.id] = {
+          bin,
+          moveType: 'store',
+          scheduledDate,
+          reason: '',
+          notes: '',
+          assignmentType: 'unassigned',
+        };
+      }
+    });
+
+    setBinConfigs(initialConfigs);
     setWizardStep('configuration');
   };
 
@@ -350,7 +511,9 @@ export function ScheduleMoveModalWithMap({
         key={bin.id}
         position={{ lat, lng }}
         zIndex={isSelected ? 20 : 10}
-        onClick={() => handleBinMarkerClick(bin)}
+        onClick={() => !isDragMode && handleBinMarkerClick(bin)}
+        draggable={isDragMode && isSelected}
+        onDragEnd={(e) => handleMarkerDragEnd(bin, e)}
       >
         <div className="relative">
           {/* Pulsing ring for selected bins */}
@@ -462,20 +625,53 @@ export function ScheduleMoveModalWithMap({
           </div>
         </div>
 
-        {/* Lasso Select Button */}
-        <div className="absolute top-4 right-4 z-10">
+        {/* Map Control Buttons */}
+        <div className="absolute top-4 right-4 z-10 flex gap-2">
+          {/* Drag Mode Toggle */}
           <button
-            onClick={() => setLassoMode(!lassoMode)}
+            onClick={() => {
+              setIsDragMode(!isDragMode);
+              if (lassoMode) setLassoMode(false); // Turn off lasso if turning on drag
+            }}
             className={cn(
-              'p-3 rounded-lg shadow-lg border transition-all',
+              'px-3 py-2 rounded-lg shadow-lg border transition-all flex items-center gap-2 text-sm font-medium',
+              isDragMode
+                ? 'bg-purple-600 text-white border-purple-600'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            )}
+            title="Plan Relocations - Drag bins to plan moves"
+          >
+            <Move className="w-4 h-4" />
+            {isDragMode && <span>Plan Relocations</span>}
+          </button>
+
+          {/* Lasso Select Button */}
+          <button
+            onClick={() => {
+              setLassoMode(!lassoMode);
+              if (isDragMode) setIsDragMode(false); // Turn off drag if turning on lasso
+            }}
+            className={cn(
+              'p-2.5 rounded-lg shadow-lg border transition-all',
               lassoMode
                 ? 'bg-primary text-white border-primary'
                 : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
             )}
             title="Lasso Select"
           >
-            <Lasso className="w-5 h-5" />
+            <Lasso className="w-4 h-4" />
           </button>
+
+          {/* Clear Relocations Button (only show when there are relocations) */}
+          {Object.keys(binRelocations).length > 0 && (
+            <button
+              onClick={handleClearAllRelocations}
+              className="px-3 py-2 rounded-lg shadow-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-all text-sm font-medium"
+              title="Clear all planned relocations"
+            >
+              ↺ Reset All
+            </button>
+          )}
         </div>
 
         {/* Google Map */}
@@ -507,6 +703,47 @@ export function ScheduleMoveModalWithMap({
           >
             {/* Render ALL bin markers (not filtered - show everything on map) */}
             {allBins?.map((b) => renderBinMarker(b))}
+
+            {/* Render ghost pins for relocated bins */}
+            {allBins?.map((bin) => {
+              const relocation = binRelocations[bin.id];
+              if (!relocation) return null;
+
+              const originalLat = bin.current_latitude ?? bin.latitude;
+              const originalLng = bin.current_longitude ?? bin.longitude;
+
+              if (!originalLat || !originalLng) return null;
+
+              return (
+                <React.Fragment key={`ghost-${bin.id}`}>
+                  {/* Ghost pin at new location */}
+                  <AdvancedMarker
+                    position={{ lat: relocation.newLat, lng: relocation.newLng }}
+                    zIndex={15}
+                  >
+                    <div className="relative">
+                      {/* Ghost marker */}
+                      <div
+                        className="w-8 h-8 rounded-full border-2 border-dashed border-purple-600 shadow-lg cursor-pointer bg-purple-500/60 backdrop-blur-sm flex items-center justify-center text-white text-xs font-bold"
+                        title={`New location: ${relocation.newAddress || 'Unknown'}`}
+                      >
+                        ⭢
+                      </div>
+                      {/* Label */}
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 bg-purple-600 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap">
+                        New
+                      </div>
+                    </div>
+                  </AdvancedMarker>
+
+                  {/* Polyline connector */}
+                  <PolylineConnector
+                    from={{ lat: originalLat, lng: originalLng }}
+                    to={{ lat: relocation.newLat, lng: relocation.newLng }}
+                  />
+                </React.Fragment>
+              );
+            })}
           </Map>
         </APIProvider>
 
