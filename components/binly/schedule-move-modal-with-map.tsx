@@ -96,7 +96,7 @@ export function ScheduleMoveModalWithMap({
   const [showBinDropdown, setShowBinDropdown] = useState(false);
 
   // Filter State
-  const [fillLevelFilter, setFillLevelFilter] = useState<'all' | 'low' | 'medium' | 'high' | 'critical'>('all');
+  const [fillLevelFilter, setFillLevelFilter] = useState<'all' | 'low' | 'medium' | 'high' | 'critical' | 'missing'>('all');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
   // Global Settings (Step 1)
@@ -334,15 +334,24 @@ export function ScheduleMoveModalWithMap({
 
   // Render bin marker
   const renderBinMarker = (bin: BinWithPriority) => {
-    if (!bin.current_latitude || !bin.current_longitude) return null;
+    // Check for both current_latitude/current_longitude AND latitude/longitude
+    const lat = bin.current_latitude ?? bin.latitude;
+    const lng = bin.current_longitude ?? bin.longitude;
+
+    if (!lat || !lng) {
+      console.log(`[MAP] Skipping bin ${bin.bin_number} - no coordinates`, { lat, lng, bin });
+      return null;
+    }
 
     const isSelected = selectedBins.some((b) => b.id === bin.id);
     const isHovered = hoveredBinId === bin.id;
 
+    console.log(`[MAP] Rendering marker for bin ${bin.bin_number} at (${lat}, ${lng})`);
+
     return (
       <AdvancedMarker
         key={bin.id}
-        position={{ lat: bin.current_latitude, lng: bin.current_longitude }}
+        position={{ lat, lng }}
         zIndex={isSelected ? 20 : 10}
         onClick={() => handleBinMarkerClick(bin)}
       >
@@ -404,6 +413,11 @@ export function ScheduleMoveModalWithMap({
     // Apply fill level filter
     if (fillLevelFilter !== 'all') {
       filtered = filtered.filter((b) => {
+        // Handle missing bins separately
+        if (fillLevelFilter === 'missing') {
+          return b.status === 'missing';
+        }
+
         const fillPct = b.fill_percentage ?? 0;
         switch (fillLevelFilter) {
           case 'critical':
@@ -494,8 +508,15 @@ export function ScheduleMoveModalWithMap({
             mapTypeId="satellite"
             style={{ width: '100%', height: '100%' }}
           >
-            {/* Render all bin markers */}
-            {filteredBinsForList?.map((b) => renderBinMarker(b))}
+            {/* Render ALL bin markers (not filtered - show everything on map) */}
+            {(() => {
+              console.log(`[MAP] Total bins to render: ${allBins?.length || 0}`);
+              if (allBins) {
+                const withCoords = allBins.filter(b => (b.current_latitude ?? b.latitude) && (b.current_longitude ?? b.longitude));
+                console.log(`[MAP] Bins with coordinates: ${withCoords.length}`);
+              }
+              return allBins?.map((b) => renderBinMarker(b));
+            })()}
           </Map>
         </APIProvider>
 
@@ -514,6 +535,10 @@ export function ScheduleMoveModalWithMap({
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded-full bg-green-500 border border-white shadow-sm"></div>
               <span className="text-gray-700">0-49% full</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-gray-500 border border-white shadow-sm"></div>
+              <span className="text-gray-700">Missing</span>
             </div>
             <div className="flex items-center gap-2 pt-1.5 border-t border-gray-200">
               <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-blue-600 shadow-sm"></div>
@@ -645,6 +670,19 @@ export function ScheduleMoveModalWithMap({
                       <div className="w-3 h-3 rounded-full bg-gray-400"></div>
                       Low (0-19%)
                     </button>
+                    <button
+                      onClick={() => {
+                        setFillLevelFilter('missing');
+                        setShowFilterDropdown(false);
+                      }}
+                      className={cn(
+                        'w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 border-t border-gray-200',
+                        fillLevelFilter === 'missing' && 'bg-blue-50 text-primary font-medium'
+                      )}
+                    >
+                      <AlertTriangle className="w-3 h-3 text-gray-600" />
+                      Missing Bins
+                    </button>
                   </div>
                 </>
               )}
@@ -669,6 +707,7 @@ export function ScheduleMoveModalWithMap({
             <div className="divide-y divide-gray-100">
               {filteredBinsForList.map((b) => {
                 const isSelected = selectedBins.some((sb) => sb.id === b.id);
+                const isMissing = b.status === 'missing';
                 const fillColor =
                   b.fill_percentage >= 80
                     ? 'bg-red-500'
@@ -681,7 +720,8 @@ export function ScheduleMoveModalWithMap({
                     key={b.id}
                     className={cn(
                       'flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer transition-colors',
-                      isSelected && 'bg-blue-50 hover:bg-blue-100'
+                      isSelected && 'bg-blue-50 hover:bg-blue-100',
+                      isMissing && 'bg-gray-50/50'
                     )}
                   >
                     <input
@@ -696,18 +736,27 @@ export function ScheduleMoveModalWithMap({
                         <span className="font-semibold text-sm text-gray-900">
                           Bin #{b.bin_number}
                         </span>
-                        {b.fill_percentage !== null && (
-                          <div className="flex items-center gap-1.5">
-                            <div className={cn('w-2 h-2 rounded-full', fillColor)}></div>
-                            <span className="text-xs text-gray-600 font-medium">
-                              {b.fill_percentage}%
-                            </span>
-                          </div>
+                        {isMissing ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">
+                            <AlertTriangle className="w-3 h-3" />
+                            MISSING
+                          </span>
+                        ) : (
+                          b.fill_percentage !== null && (
+                            <div className="flex items-center gap-1.5">
+                              <div className={cn('w-2 h-2 rounded-full', fillColor)}></div>
+                              <span className="text-xs text-gray-600 font-medium">
+                                {b.fill_percentage}%
+                              </span>
+                            </div>
+                          )
                         )}
                       </div>
-                      <div className="text-xs text-gray-600 truncate">{b.current_street}</div>
+                      <div className="text-xs text-gray-600 truncate">
+                        {b.current_street || 'No address'}
+                      </div>
                       <div className="text-xs text-gray-500">
-                        {b.city}, {b.zip}
+                        {b.city && b.zip ? `${b.city}, ${b.zip}` : 'Location unknown'}
                       </div>
                     </div>
                   </label>
@@ -1227,7 +1276,7 @@ export function ScheduleMoveModalWithMap({
           <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none p-0 md:p-4">
             <Card
               className={cn(
-                'w-full h-full md:w-[90vw] md:max-w-6xl md:h-[85vh] md:rounded-2xl rounded-none pointer-events-auto overflow-hidden flex flex-col',
+                'w-full h-full md:w-[95vw] md:max-w-[1400px] md:h-[90vh] md:rounded-2xl rounded-none pointer-events-auto overflow-hidden flex flex-col',
                 isClosing ? 'animate-scale-out' : 'animate-scale-in'
               )}
               onClick={(e) => e.stopPropagation()}
