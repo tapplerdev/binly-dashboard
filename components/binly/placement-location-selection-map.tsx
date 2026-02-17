@@ -164,9 +164,10 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
   // Get mappable locations
   const mappableLocations = filteredLocations.filter(isMappableLocation);
 
-  // Handle confirm
+  // Handle confirm — only pass newly selected locations (exclude already-added ones)
   const handleConfirm = () => {
-    onConfirm(Array.from(selectedLocationIds));
+    const newlySelectedIds = Array.from(selectedLocationIds).filter(id => !alreadyAdded.has(id));
+    onConfirm(newlySelectedIds);
     onClose();
   };
 
@@ -442,7 +443,7 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                                 </p>
                                 {isAlreadyAdded && (
                                   <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded border border-indigo-300 font-medium shrink-0">
-                                    ✓ Already in shift
+                                    Already in shift
                                   </span>
                                 )}
                               </div>
@@ -501,22 +502,18 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
           >
             Cancel
           </button>
-          <button
-            onClick={handleConfirm}
-            disabled={selectedLocationIds.size === 0}
-            className="px-6 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-fast order-1 sm:order-2"
-          >
-            {(() => {
-              const newlySelected = [...selectedLocationIds].filter(id => !alreadyAdded.has(id)).length;
-              const alreadyAddedSelected = [...selectedLocationIds].filter(id => alreadyAdded.has(id)).length;
-              if (alreadyAddedSelected > 0 && newlySelected > 0) {
-                return `Add to Shift (${newlySelected} new + ${alreadyAddedSelected} existing)`;
-              } else if (alreadyAddedSelected > 0) {
-                return `Add to Shift (${alreadyAddedSelected} already in shift)`;
-              }
-              return `Add to Shift (${newlySelected})`;
-            })()}
-          </button>
+          {(() => {
+            const newlySelected = [...selectedLocationIds].filter(id => !alreadyAdded.has(id)).length;
+            return (
+              <button
+                onClick={handleConfirm}
+                disabled={newlySelected === 0}
+                className="px-6 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-fast order-1 sm:order-2"
+              >
+                Add to Shift ({newlySelected})
+              </button>
+            );
+          })()}
         </div>
       </div>
     </>

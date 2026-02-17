@@ -1453,7 +1453,10 @@ function CreateShiftDrawer({
   };
 
   const handleBinSelectionConfirm = (selectedBinIds: string[]) => {
-    const selectedBins = allBins.filter(bin => selectedBinIds.includes(bin.id));
+    // Safety net: filter out any bins already in the task list to prevent duplicates
+    const existingBinIds = new Set(tasks.filter(t => t.type === 'collection' && t.bin_id).map(t => t.bin_id!));
+    const newBinIds = selectedBinIds.filter(id => !existingBinIds.has(id));
+    const selectedBins = allBins.filter(bin => newBinIds.includes(bin.id));
 
     const collectionTasks: ShiftTask[] = selectedBins.map(bin => ({
       id: `temp-${Date.now()}-${bin.id}`,
