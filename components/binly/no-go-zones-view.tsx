@@ -140,15 +140,38 @@ export function NoGoZonesView() {
 
     const unsubscribe = subscribe('company:events', (raw: unknown) => {
       const event = raw as { type: string; data: unknown };
+
       if (event.type === 'zone_created') {
         const newZone = event.data as NoGoZone;
-        // Update the "all zones" cache (used by this view)
         queryClient.setQueryData<NoGoZone[]>(
           zoneKeys.all,
           (old) => {
             const filtered = old?.filter((z) => z.id !== newZone.id) ?? [];
             return [...filtered, newZone];
           }
+        );
+      }
+
+      if (event.type === 'zone_updated') {
+        // Surviving zone gained score/radius — upsert it in place
+        const updatedZone = event.data as NoGoZone;
+        queryClient.setQueryData<NoGoZone[]>(
+          zoneKeys.all,
+          (old) => old?.map((z) => (z.id === updatedZone.id ? updatedZone : z)) ?? [updatedZone]
+        );
+      }
+
+      if (event.type === 'zone_merged') {
+        // Mark the consumed zone as resolved+merged in the cache
+        const { consumed_zone_id } = event.data as { consumed_zone_id: string; surviving_zone_id: string };
+        queryClient.setQueryData<NoGoZone[]>(
+          zoneKeys.all,
+          (old) =>
+            old?.map((z) =>
+              z.id === consumed_zone_id
+                ? { ...z, status: 'resolved', resolution_type: 'merged' }
+                : z
+            ) ?? []
         );
       }
     });
@@ -266,7 +289,7 @@ export function NoGoZonesView() {
                 onClick={() => setStatusFilter(tab.value as ZoneStatus | 'all')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   statusFilter === tab.value
-                    ? 'bg-gray-900 text-white'
+                    ? 'bg-red-600 text-white'
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
@@ -322,6 +345,10 @@ export function NoGoZonesView() {
             <ZoneDetailsDrawer
               zone={selectedZone}
               onClose={() => setSelectedZone(null)}
+              onNavigateTo={(zoneId) => {
+                const target = zones.find((z) => z.id === zoneId);
+                if (target) setSelectedZone(target);
+              }}
             />
           </>
         )}
@@ -434,7 +461,16 @@ function ZoneRow({ zone, onSelect }: { zone: NoGoZone; onSelect: (z: NoGoZone) =
         </div>
       </td>
       <td className="px-4 py-3">{severityBadge(zone.conflict_score)}</td>
-      <td className="px-4 py-3">{statusBadge(zone.status)}</td>
+      <td className="px-4 py-3">
+        <div className="flex flex-wrap items-center gap-1">
+          {statusBadge(zone.status)}
+          {zone.resolution_type === 'merged' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+              Merged
+            </span>
+          )}
+        </div>
+      </td>
       <td className="px-4 py-3 text-gray-600">{zone.radius_meters}m</td>
       <td className="px-4 py-3 text-gray-500">
         <div className="flex items-center gap-1">

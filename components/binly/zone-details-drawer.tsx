@@ -11,6 +11,7 @@ import {
   Eye,
   ShieldAlert,
   ExternalLink,
+  GitMerge,
 } from 'lucide-react';
 import { useZoneIncidents } from '@/lib/hooks/use-zones';
 import {
@@ -25,9 +26,10 @@ import {
 interface ZoneDetailsDrawerProps {
   zone: NoGoZone;
   onClose: () => void;
+  onNavigateTo?: (zoneId: string) => void;
 }
 
-export function ZoneDetailsDrawer({ zone, onClose }: ZoneDetailsDrawerProps) {
+export function ZoneDetailsDrawer({ zone, onClose, onNavigateTo }: ZoneDetailsDrawerProps) {
   const [isClosing, setIsClosing] = useState(false);
   const { data: incidents = [], isLoading } = useZoneIncidents(zone.id);
 
@@ -101,6 +103,12 @@ export function ZoneDetailsDrawer({ zone, onClose }: ZoneDetailsDrawerProps) {
         {/* Status + Severity row */}
         <div className="flex items-center gap-2 flex-wrap">
           <StatusPill status={zone.status} />
+          {zone.resolution_type === 'merged' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+              <GitMerge className="w-3 h-3" />
+              Merged
+            </span>
+          )}
           <SeverityPill score={zone.conflict_score} />
           <span className="text-xs text-gray-400 flex items-center gap-1">
             <Calendar className="w-3 h-3" />
@@ -157,6 +165,43 @@ export function ZoneDetailsDrawer({ zone, onClose }: ZoneDetailsDrawerProps) {
             </span>
           </div>
         </div>
+
+        {/* Consumed zone banner — shown when this zone was absorbed by another */}
+        {zone.merged_into_zone_id && (
+          <div className="mx-5 mt-4 mb-1 p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-start gap-2.5">
+            <GitMerge className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-purple-900">This zone was absorbed</p>
+              <p className="text-xs text-purple-600 mt-0.5">
+                Its incidents and conflict score were transferred to a higher-priority overlapping zone.
+              </p>
+            </div>
+            {onNavigateTo && (
+              <button
+                onClick={() => onNavigateTo(zone.merged_into_zone_id!)}
+                className="text-xs font-semibold text-purple-700 hover:text-purple-900 whitespace-nowrap underline underline-offset-2"
+              >
+                View surviving zone →
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Surviving zone section — shown when this zone absorbed others */}
+        {(zone.merged_zone_count ?? 0) > 0 && (
+          <div className="mx-5 mt-4 mb-1 p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-start gap-2.5">
+            <GitMerge className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-purple-900">
+                Absorbed {zone.merged_zone_count} zone{zone.merged_zone_count !== 1 ? 's' : ''}
+              </p>
+              <p className="text-xs text-purple-600 mt-0.5">
+                This zone's score and incident log include data from {zone.merged_zone_count}{' '}
+                previously separate overlapping zone{zone.merged_zone_count !== 1 ? 's' : ''}.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Resolution notes */}
         {zone.resolution_notes && (

@@ -271,6 +271,26 @@ export function LiveMapView() {
           break;
         }
 
+        case 'zone_updated': {
+          // Surviving zone gained a higher score/radius after merge — update it in place
+          const updatedZone = event.data as NoGoZone;
+          queryClient.setQueryData<NoGoZone[]>(
+            zoneKeys.byStatus('active'),
+            (old) => old?.map((z) => (z.id === updatedZone.id ? updatedZone : z)) ?? [updatedZone]
+          );
+          break;
+        }
+
+        case 'zone_merged': {
+          // Remove the consumed zone from the active-zones cache — its circle disappears from map
+          const { consumed_zone_id } = event.data as { consumed_zone_id: string; surviving_zone_id: string };
+          queryClient.setQueryData<NoGoZone[]>(
+            zoneKeys.byStatus('active'),
+            (old) => old?.filter((z) => z.id !== consumed_zone_id) ?? []
+          );
+          break;
+        }
+
         default:
           break;
       }

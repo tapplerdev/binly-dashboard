@@ -6,6 +6,8 @@ export type ZoneStatus = 'active' | 'monitoring' | 'resolved';
 export type IncidentType = 'vandalism' | 'landlord_complaint' | 'theft' | 'relocation_request';
 export type IncidentStatus = 'open' | 'resolved' | 'investigating';
 
+export type ZoneResolutionType = 'merged' | 'manual_resolution';
+
 export interface NoGoZone {
   id: string;
   name: string;
@@ -20,6 +22,10 @@ export interface NoGoZone {
   resolved_by_user_id?: string;
   resolved_at_iso?: string;
   resolution_notes?: string;
+  // Merge fields (present when zone was consumed by or consumed another zone)
+  resolution_type?: ZoneResolutionType;
+  merged_into_zone_id?: string;  // set on the consumed zone
+  merged_zone_count?: number;    // count of zones this zone has absorbed
 }
 
 export interface ZoneIncident {
