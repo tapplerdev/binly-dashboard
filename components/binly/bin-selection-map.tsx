@@ -291,9 +291,7 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                   {mappableBins.map((bin) => {
                     const isSelected = selectedBinIds.has(bin.id);
                     const isAlreadyAdded = alreadyAdded.has(bin.id);
-                    const markerColor = isAlreadyAdded && isSelected
-                      ? '#6366f1' // indigo-500 for already-added + still checked
-                      : isSelected
+                    const markerColor = isSelected
                       ? '#16a34a'
                       : getBinMarkerColor(bin.fill_percentage, bin.status);
 
@@ -302,22 +300,18 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                         key={bin.id}
                         position={{ lat: bin.latitude, lng: bin.longitude }}
                         onClick={() => toggleBinSelection(bin.id)}
-                        zIndex={isAlreadyAdded && isSelected ? 20 : isSelected ? 15 : 10}
+                        zIndex={isSelected ? 15 : 10}
                       >
                         <div className="relative cursor-pointer" title={`Bin #${bin.bin_number} - ${bin.location_name || bin.current_street}${isAlreadyAdded ? ' · Already in shift' : ''}${hasMoveRequest(bin) ? ' · Move req. pending' : ''}`}>
-                          {/* Pulsing ring for already-added bins — only when still selected */}
-                          {isAlreadyAdded && isSelected && (
+                          {/* Pulsing ring for all selected bins */}
+                          {isSelected && (
                             <div className="absolute inset-0 -m-2">
-                              <div className="w-12 h-12 rounded-full bg-indigo-500 opacity-30 animate-ping" />
+                              <div className="w-12 h-12 rounded-full bg-green-500 opacity-30 animate-ping" />
                             </div>
                           )}
                           <div
                             className={`relative w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold transition-all hover:scale-110 ${
-                              isAlreadyAdded && isSelected
-                                ? 'ring-2 ring-white shadow-lg'
-                                : isSelected
-                                ? 'ring-4 ring-green-300 animate-pulse-glow'
-                                : ''
+                              isSelected ? 'ring-2 ring-white shadow-lg' : ''
                             }`}
                             style={{ backgroundColor: markerColor }}
                           >
@@ -516,9 +510,7 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                       key={bin.id}
                       onClick={() => toggleBinSelection(bin.id)}
                       className={`p-3 rounded-lg cursor-pointer transition-all ${
-                        isAlreadyAdded && isSelected
-                          ? 'bg-indigo-50 border-2 border-indigo-400'
-                          : isSelected
+                        isSelected
                           ? 'bg-green-50 border-2 border-green-500'
                           : 'bg-white border border-gray-200 hover:bg-gray-50'
                       }`}
@@ -529,11 +521,7 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => {}}
-                          className={`mt-0.5 rounded border-gray-300 focus:ring-2 ${
-                            isAlreadyAdded && isSelected
-                              ? 'text-indigo-600 focus:ring-indigo-500'
-                              : 'text-green-600 focus:ring-green-500'
-                          }`}
+                          className="mt-0.5 rounded border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500"
                         />
 
                         {/* Bin Info */}
@@ -543,8 +531,8 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                               Bin #{bin.bin_number}
                             </p>
                             <span className="text-xs text-gray-500">{fillPercentage}%</span>
-                            {isAlreadyAdded && isSelected && (
-                              <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded border border-indigo-300 font-medium">
+                            {isAlreadyAdded && (
+                              <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 text-xs rounded border border-gray-200">
                                 Already in shift
                               </span>
                             )}
@@ -570,11 +558,7 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                           </div>
 
                           {/* Sub-labels below the bar */}
-                          {isAlreadyAdded && isSelected ? (
-                            <p className="mt-1 text-xs text-indigo-500">
-                              This bin is already in the task list
-                            </p>
-                          ) : moveReqPending ? (
+                          {moveReqPending && (
                             <p className="mt-1 text-xs text-gray-400">
                               This bin also has an open move request.{' '}
                               <a
@@ -587,7 +571,7 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                                 View
                               </a>
                             </p>
-                          ) : null}
+                          )}
                         </div>
                       </div>
                     </div>
