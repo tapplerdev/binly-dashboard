@@ -6,6 +6,7 @@ import {
   getFieldObservations,
   verifyFieldObservation,
   getShiftIncidents,
+  createManagerIncidentReport,
 } from '@/lib/api/zones';
 
 // Query keys
@@ -89,6 +90,21 @@ export function useVerifyFieldObservation() {
     onSuccess: () => {
       // Invalidate field observations to refetch
       queryClient.invalidateQueries({ queryKey: ['field-observations'] });
+    },
+  });
+}
+
+/**
+ * Submit a manager incident report (phone call → zone creation)
+ */
+export function useCreateManagerIncidentReport() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: createManagerIncidentReport,
+    onSuccess: () => {
+      // Refresh all zone queries so the new zone / updated score appears immediately
+      queryClient.invalidateQueries({ queryKey: zoneKeys.all });
     },
   });
 }

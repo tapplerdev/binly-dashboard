@@ -1,16 +1,26 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Card } from '@/components/ui/card';
-import { getZoneIncidents } from '@/lib/api/zones';
+import { useState } from 'react';
+import {
+  X,
+  AlertTriangle,
+  FileText,
+  MapPin,
+  Calendar,
+  CheckCircle2,
+  Eye,
+  ShieldAlert,
+  ExternalLink,
+} from 'lucide-react';
+import { useZoneIncidents } from '@/lib/hooks/use-zones';
 import {
   NoGoZone,
   ZoneIncident,
   formatIncidentType,
   getIncidentIcon,
   getZoneSeverity,
+  getZoneColor,
 } from '@/lib/types/zone';
-import { Loader2, X, AlertTriangle, FileText } from 'lucide-react';
 
 interface ZoneDetailsDrawerProps {
   zone: NoGoZone;
@@ -18,249 +28,361 @@ interface ZoneDetailsDrawerProps {
 }
 
 export function ZoneDetailsDrawer({ zone, onClose }: ZoneDetailsDrawerProps) {
-  const [incidents, setIncidents] = useState<ZoneIncident[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isClosing, setIsClosing] = useState(false);
+  const { data: incidents = [], isLoading } = useZoneIncidents(zone.id);
 
   const handleClose = () => {
     setIsClosing(true);
-    setTimeout(() => {
-      onClose();
-    }, 300); // Match animation duration
+    setTimeout(onClose, 300);
   };
 
-  useEffect(() => {
-    async function fetchIncidents() {
-      try {
-        setLoading(true);
-        const data = await getZoneIncidents(zone.id);
-        setIncidents(data);
-      } catch (error) {
-        console.error('Failed to fetch incidents:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchIncidents();
-  }, [zone.id]);
-
-  const vandalismCount = incidents.filter((i) => i.incident_type === 'vandalism').length;
-  const complaintCount = incidents.filter((i) => i.incident_type === 'landlord_complaint').length;
   const severity = getZoneSeverity(zone.conflict_score);
+  const color = getZoneColor(zone.conflict_score);
 
-  // Group incidents with photos for gallery
-  const incidentsWithPhotos = incidents.filter((i) => i.photo_url);
+  const incidentsByType = {
+    vandalism: incidents.filter((i) => i.incident_type === 'vandalism').length,
+    landlord_complaint: incidents.filter((i) => i.incident_type === 'landlord_complaint').length,
+    theft: incidents.filter((i) => i.incident_type === 'theft').length,
+    relocation_request: incidents.filter((i) => i.incident_type === 'relocation_request').length,
+  };
+
+  const fieldObservations = incidents.filter((i) => i.is_field_observation).length;
+  const shiftReports = incidents.filter((i) => !!i.shift_id && !i.is_field_observation).length;
+  const managerReports = incidents.filter((i) => i.is_field_observation).length;
+
+  const resolvedAt = zone.resolved_at_iso
+    ? new Date(zone.resolved_at_iso).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : null;
+
+  const createdAt = new Date(zone.created_at_iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 
   return (
-    <div className={`fixed top-0 right-0 h-full w-full md:w-[500px] lg:w-[600px] bg-white shadow-2xl z-20 overflow-hidden flex flex-col ${isClosing ? 'animate-slide-out-right' : 'animate-slide-in-right'}`}>
-      {/* Header */}
-      <div className="p-4 md:p-6 border-b border-gray-200 shrink-0">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <AlertTriangle className="w-5 h-5 text-red-600" />
-              <h2 className="text-xl font-semibold text-gray-900">
-                Restricted Area
-              </h2>
+    <div
+      className={`fixed top-0 right-0 h-full w-full md:w-[520px] lg:w-[600px] bg-white shadow-2xl z-20 overflow-hidden flex flex-col ${
+        isClosing ? 'animate-slide-out-right' : 'animate-slide-in-right'
+      }`}
+    >
+      {/* ── Header ── */}
+      <div className="p-5 border-b border-gray-200 shrink-0">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+              style={{ backgroundColor: color + '20' }}
+            >
+              <ShieldAlert className="w-5 h-5" style={{ color }} />
             </div>
-            <p className="text-sm text-gray-600">{zone.name}</p>
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-gray-900 truncate">{zone.name}</h2>
+              <div className="flex items-center gap-2 mt-0.5">
+                <MapPin className="w-3 h-3 text-gray-400" />
+                <span className="text-xs text-gray-500">
+                  {zone.center_latitude.toFixed(4)}, {zone.center_longitude.toFixed(4)} · {zone.radius_meters}m radius
+                </span>
+              </div>
+            </div>
           </div>
           <button
             onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+            className="ml-2 p-1 text-gray-400 hover:text-gray-600 transition-colors rounded shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Conflict Score Badge */}
-        <div
-          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${
-            severity === 'critical'
-              ? 'bg-red-100 text-red-800'
-              : severity === 'high'
-              ? 'bg-orange-100 text-orange-800'
-              : severity === 'medium'
-              ? 'bg-yellow-100 text-yellow-800'
-              : 'bg-gray-100 text-gray-800'
-          }`}
-        >
-          <span className="text-xs font-semibold">
-            Conflict Score: {severity.toUpperCase()}
+        {/* Status + Severity row */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <StatusPill status={zone.status} />
+          <SeverityPill score={zone.conflict_score} />
+          <span className="text-xs text-gray-400 flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            Reported {createdAt}
           </span>
-          <span className="text-sm font-bold">{zone.conflict_score}</span>
+          {resolvedAt && (
+            <span className="text-xs text-green-600 flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" />
+              Resolved {resolvedAt}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Scrollable Content */}
+      {/* ── Scrollable Content ── */}
       <div className="flex-1 overflow-y-auto">
-        {/* Stats Cards */}
-        <div className="p-4 md:p-6 border-b border-gray-200">
-          <div className="grid grid-cols-2 gap-3">
-            <StatCard
-              icon="🔨"
-              label="Vandalism Reports"
-              value={vandalismCount}
-            />
-            <StatCard
-              icon="📋"
-              label="Move Requests"
-              value={complaintCount}
-            />
+        {/* Stats grid */}
+        <div className="p-5 border-b border-gray-100">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Incident Breakdown
+          </h3>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                { type: 'vandalism', label: 'Vandalism', count: incidentsByType.vandalism },
+                { type: 'landlord_complaint', label: 'Landlord Complaints', count: incidentsByType.landlord_complaint },
+                { type: 'theft', label: 'Theft', count: incidentsByType.theft },
+                { type: 'relocation_request', label: 'Relocation Requests', count: incidentsByType.relocation_request },
+              ] as const
+            ).map(({ type, label, count }) => (
+              <div key={type} className="bg-gray-50 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-base">{getIncidentIcon(type)}</span>
+                  <span className="text-xs text-gray-500 truncate">{label}</span>
+                </div>
+                <p className="text-xl font-bold text-gray-900">{count}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Source breakdown */}
+          <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-blue-400" />
+              {shiftReports} from shifts
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-purple-400" />
+              {managerReports} manager reports
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-gray-300" />
+              {fieldObservations} field observations
+            </span>
           </div>
         </div>
 
-        {/* Evidence Timeline */}
-        <div className="p-4 md:p-6 border-b border-gray-200">
+        {/* Resolution notes */}
+        {zone.resolution_notes && (
+          <div className="px-5 py-4 border-b border-gray-100 bg-green-50">
+            <p className="text-xs font-semibold text-green-700 mb-1">Resolution Notes</p>
+            <p className="text-sm text-green-900">{zone.resolution_notes}</p>
+          </div>
+        )}
+
+        {/* Incident timeline */}
+        <div className="p-5">
           <div className="flex items-center gap-2 mb-4">
-            <FileText className="w-4 h-4 text-gray-600" />
+            <FileText className="w-4 h-4 text-gray-500" />
             <h3 className="text-sm font-semibold text-gray-900">
-              Evidence History
+              Incident Log
             </h3>
+            <span className="ml-auto text-xs text-gray-400">{incidents.length} total</span>
           </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 text-primary animate-spin" />
+          {isLoading ? (
+            <div className="flex items-center justify-center py-10 gap-2 text-gray-400 text-sm">
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+              Loading incidents...
             </div>
           ) : incidents.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-8">
-              No incidents recorded
-            </p>
+            <p className="text-sm text-gray-400 text-center py-8">No incidents recorded</p>
           ) : (
-            <div className="space-y-3">
-              {incidents.map((incident) => (
-                <IncidentTimelineItem key={incident.id} incident={incident} />
+            <div className="space-y-1">
+              {incidents.map((incident, idx) => (
+                <IncidentRow
+                  key={incident.id}
+                  incident={incident}
+                  isLast={idx === incidents.length - 1}
+                />
               ))}
             </div>
           )}
         </div>
 
-        {/* Evidence Gallery */}
-        {incidentsWithPhotos.length > 0 && (
-          <div className="p-4 md:p-6">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">
-              Evidence Gallery
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {incidentsWithPhotos.map((incident) => (
-                <div
-                  key={incident.id}
-                  className="aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
-                >
-                  <img
-                    src={incident.photo_url!}
-                    alt={`Evidence from ${formatIncidentType(incident.incident_type)}`}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              ))}
+        {/* Evidence gallery */}
+        {incidents.some((i) => i.photo_url) && (
+          <div className="px-5 pb-5 border-t border-gray-100 pt-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Evidence Photos</h3>
+            <div className="grid grid-cols-3 gap-2">
+              {incidents
+                .filter((i) => i.photo_url)
+                .map((incident) => (
+                  <a
+                    key={incident.id}
+                    href={incident.photo_url!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="aspect-square rounded-lg overflow-hidden bg-gray-100 block hover:opacity-80 transition-opacity relative group"
+                  >
+                    <img
+                      src={incident.photo_url!}
+                      alt={`Evidence: ${formatIncidentType(incident.incident_type)}`}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                      <ExternalLink className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </a>
+                ))}
             </div>
           </div>
         )}
       </div>
 
-      {/* Footer Actions */}
-      <div className="p-4 md:p-6 border-t border-gray-200 bg-gray-50 shrink-0">
-        <div className="flex gap-2 md:gap-3">
-          <button className="flex-1 px-4 py-2.5 md:py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors h-10 md:h-auto">
-            Clear Zone
+      {/* ── Footer ── */}
+      <div className="p-5 border-t border-gray-200 bg-gray-50 shrink-0">
+        {zone.status !== 'resolved' ? (
+          <div className="flex gap-2">
+            <button className="flex-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
+              <CheckCircle2 className="w-4 h-4" />
+              Resolve Zone
+            </button>
+            <button className="flex-1 px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+              <Eye className="w-4 h-4" />
+              Set to Monitoring
+            </button>
+          </div>
+        ) : (
+          <button className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+            <AlertTriangle className="w-4 h-4" />
+            Re-activate Zone
           </button>
-          <button className="flex-1 px-4 py-2.5 md:py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors h-10 md:h-auto">
-            Add Note
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );
 }
 
-// Helper Components
-function StatCard({
-  icon,
-  label,
-  value,
-}: {
-  icon: string;
-  label: string;
-  value: number;
-}) {
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function StatusPill({ status }: { status: NoGoZone['status'] }) {
+  if (status === 'active')
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+        Active
+      </span>
+    );
+  if (status === 'monitoring')
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+        <Eye className="w-3 h-3" />
+        Monitoring
+      </span>
+    );
   return (
-    <div className="bg-gray-50 rounded-lg p-3">
-      <div className="flex items-center gap-2 mb-1">
-        <span className="text-lg">{icon}</span>
-        <span className="text-xs text-gray-600">{label}</span>
-      </div>
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-    </div>
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+      <CheckCircle2 className="w-3 h-3" />
+      Resolved
+    </span>
   );
 }
 
-function IncidentTimelineItem({ incident }: { incident: ZoneIncident }) {
-  const date = new Date(incident.reported_at_iso);
-  const formattedDate = date.toLocaleDateString('en-US', {
+function SeverityPill({ score }: { score: number }) {
+  const sev = getZoneSeverity(score);
+  const color = getZoneColor(score);
+  const cls =
+    sev === 'critical'
+      ? 'bg-red-100 text-red-800'
+      : sev === 'high'
+      ? 'bg-orange-100 text-orange-800'
+      : sev === 'medium'
+      ? 'bg-yellow-100 text-yellow-800'
+      : 'bg-gray-100 text-gray-700';
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${cls}`}>
+      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+      {sev.charAt(0).toUpperCase() + sev.slice(1)} · {score}
+    </span>
+  );
+}
+
+function IncidentRow({ incident, isLast }: { incident: ZoneIncident; isLast: boolean }) {
+  const date = new Date(incident.reported_at_iso).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
+    year: 'numeric',
   });
+
+  const sourceLabel = incident.shift_id
+    ? 'Driver report'
+    : incident.is_field_observation
+    ? 'Manager report'
+    : 'System';
 
   return (
     <div className="flex gap-3">
-      <div className="flex flex-col items-center">
-        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm relative">
+      {/* Timeline line */}
+      <div className="flex flex-col items-center pt-1 shrink-0">
+        <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-sm relative">
           {getIncidentIcon(incident.incident_type)}
           {incident.is_field_observation && (
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white" title="Field Observation" />
+            <div
+              className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-purple-500 rounded-full border border-white"
+              title="Manager report"
+            />
           )}
         </div>
-        <div className="w-px h-full bg-gray-200 mt-2" />
+        {!isLast && <div className="w-px flex-1 bg-gray-100 mt-1 mb-1 min-h-[12px]" />}
       </div>
-      <div className="flex-1 pb-4">
-        <div className="flex items-baseline gap-2 mb-1">
-          <span className="text-xs font-semibold text-gray-900">
-            {formattedDate}
-          </span>
-          <span
-            className={`text-xs px-2 py-0.5 rounded-full ${
-              incident.incident_type === 'vandalism'
-                ? 'bg-red-100 text-red-700'
-                : incident.incident_type === 'landlord_complaint'
-                ? 'bg-orange-100 text-orange-700'
-                : 'bg-gray-100 text-gray-700'
-            }`}
-          >
-            {formatIncidentType(incident.incident_type)}
-          </span>
+
+      {/* Content */}
+      <div className={`flex-1 pb-3 ${isLast ? '' : ''}`}>
+        <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+          <span className="text-xs font-semibold text-gray-700">{date}</span>
+          <IncidentTypeBadge type={incident.incident_type} />
           {incident.is_field_observation && !incident.verified_by_user_id && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
-              Needs Verification
+            <span className="text-xs px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
+              Unverified
             </span>
           )}
-          {incident.is_field_observation && incident.verified_by_user_id && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+          {incident.verified_by_user_id && (
+            <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
               ✓ Verified
             </span>
           )}
         </div>
-        <p className="text-sm text-gray-900 mb-1">
-          {incident.is_field_observation && (
-            <span className="text-blue-600 font-medium">Field Report: </span>
-          )}
-          {incident.incident_type === 'vandalism'
-            ? `Vandalism reported${incident.reported_by_name ? ` by ${incident.reported_by_name}` : ''}`
-            : incident.incident_type === 'landlord_complaint'
-            ? `Landlord requested removal${incident.bin_number ? ` of Bin #${incident.bin_number}` : ''}`
-            : formatIncidentType(incident.incident_type)}
+
+        <p className="text-xs text-gray-500 mb-0.5">
+          {sourceLabel}
+          {incident.reported_by_name ? ` · ${incident.reported_by_name}` : ''}
+          {incident.bin_number ? ` · Bin #${incident.bin_number}` : ''}
+          {incident.shift_id ? (
+            <a
+              href={`/operations/shifts?id=${incident.shift_id}`}
+              className="ml-1 text-blue-500 hover:text-blue-700 inline-flex items-center gap-0.5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              View shift <ExternalLink className="w-2.5 h-2.5" />
+            </a>
+          ) : null}
         </p>
+
         {incident.description && (
-          <p className="text-xs text-gray-600">{incident.description}</p>
+          <p className="text-xs text-gray-600 mt-1 bg-gray-50 rounded px-2 py-1.5">
+            {incident.description}
+          </p>
         )}
-        {incident.is_field_observation && incident.verified_by_name && (
-          <p className="text-xs text-green-600 mt-1">
+
+        {incident.verified_by_name && (
+          <p className="text-xs text-green-600 mt-0.5">
             Verified by {incident.verified_by_name}
           </p>
         )}
       </div>
     </div>
+  );
+}
+
+function IncidentTypeBadge({ type }: { type: ZoneIncident['incident_type'] }) {
+  const cls =
+    type === 'vandalism'
+      ? 'bg-red-100 text-red-700'
+      : type === 'theft'
+      ? 'bg-purple-100 text-purple-700'
+      : type === 'landlord_complaint'
+      ? 'bg-orange-100 text-orange-700'
+      : 'bg-gray-100 text-gray-600';
+  return (
+    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${cls}`}>
+      {formatIncidentType(type)}
+    </span>
   );
 }

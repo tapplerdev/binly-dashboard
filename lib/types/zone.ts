@@ -25,7 +25,7 @@ export interface NoGoZone {
 export interface ZoneIncident {
   id: string;
   zone_id: string;
-  bin_id: string;
+  bin_id?: string; // nil for address-only manager reports
   bin_number?: number;
   incident_type: IncidentType;
   reported_by_user_id?: string;
@@ -132,5 +132,32 @@ export function getIncidentIcon(type: IncidentType): string {
       return '🚨';
     case 'relocation_request':
       return '📦';
+  }
+}
+
+/**
+ * Request body for POST /manager/incident-report
+ */
+export interface CreateManagerIncidentRequest {
+  // Mode 1: bin-linked (bin_id provided → coordinates looked up automatically)
+  bin_id?: string;
+  // Mode 2: address-only (no bin, manager geocoded the address)
+  latitude?: number;
+  longitude?: number;
+  address?: string;
+  // Common fields
+  incident_type: IncidentType;
+  description: string;
+}
+
+/**
+ * Get severity label
+ */
+export function getSeverityLabel(severity: 'low' | 'medium' | 'high' | 'critical'): string {
+  switch (severity) {
+    case 'low': return 'Low';
+    case 'medium': return 'Medium';
+    case 'high': return 'High';
+    case 'critical': return 'Critical';
   }
 }
