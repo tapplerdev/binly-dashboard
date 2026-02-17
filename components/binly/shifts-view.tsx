@@ -12,7 +12,8 @@ import { Route, getRouteLabel } from '@/lib/types/route';
 import { Bin } from '@/lib/types/bin';
 import { getBins } from '@/lib/api/bins';
 import { getShifts, getShiftTasks } from '@/lib/api/shifts';
-import { PotentialLocation, getPotentialLocations } from '@/lib/api/potential-locations';
+import { PotentialLocation } from '@/lib/api/potential-locations';
+import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
 import { MoveRequest, getMoveRequests } from '@/lib/api/move-requests';
 import { useShifts, useAssignRoute, shiftKeys } from '@/lib/hooks/use-shifts';
 import { useQueryClient } from '@tanstack/react-query';
@@ -1355,7 +1356,7 @@ function CreateShiftDrawer({
   const [editingTaskIndex, setEditingTaskIndex] = useState<number | null>(null);
   const [editingTask, setEditingTask] = useState<ShiftTask | null>(null);
   const [showPlacementSelection, setShowPlacementSelection] = useState(false);
-  const [potentialLocations, setPotentialLocations] = useState<PotentialLocation[]>([]);
+  const { data: potentialLocations = [] } = usePotentialLocations('active');
   const [showMoveRequestSelection, setShowMoveRequestSelection] = useState(false);
   const [moveRequests, setMoveRequests] = useState<MoveRequest[]>([]);
   const [moveRequestFocusBinId, setMoveRequestFocusBinId] = useState<string | null>(null);
@@ -1536,17 +1537,8 @@ function CreateShiftDrawer({
     setEditingTask(null);
   };
 
-  const openPlacementSelection = async () => {
-    try {
-      if (potentialLocations.length === 0) {
-        const locations = await getPotentialLocations('active');
-        setPotentialLocations(locations);
-      }
-      setShowPlacementSelection(true);
-    } catch (error) {
-      console.error('Failed to fetch potential locations:', error);
-      setError('Failed to load potential locations. Please try again.');
-    }
+  const openPlacementSelection = () => {
+    setShowPlacementSelection(true);
   };
 
   const handlePlacementSelectionConfirm = (selectedLocationIds: string[]) => {

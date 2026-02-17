@@ -8,6 +8,7 @@ import { useNoGoZones } from '@/lib/hooks/use-zones';
 import { usePotentialLocations, potentialLocationKeys } from '@/lib/hooks/use-potential-locations';
 import { useActiveDrivers } from '@/lib/hooks/use-active-drivers';
 import { useWebSocket, WebSocketMessage } from '@/lib/hooks/use-websocket';
+import { useCentrifugo } from '@/lib/hooks/use-centrifugo';
 import { useWarehouseLocation, warehouseKeys } from '@/lib/hooks/use-warehouse';
 import {
   Bin,
@@ -218,53 +219,60 @@ export function LiveMapView() {
 
   const wsUrl = token ? `${WS_URL}/ws?token=${token}` : `${WS_URL}/ws`;
 
-  // WebSocket connection for real-time updates
-  const { status: wsStatus } = useWebSocket({
-    url: wsUrl,
-    onMessage: (message: WebSocketMessage) => {
-      switch (message.type) {
+  // Centrifugo — real-time potential location events via company:events channel
+  const { status: centrifugoStatus, subscribe } = useCentrifugo({
+    token: token || undefined,
+    enabled: !!token,
+  });
+
+  useEffect(() => {
+    if (centrifugoStatus !== 'connected') return;
+
+    const unsubscribe = subscribe('company:events', (raw: unknown) => {
+      const event = raw as { type: string; data: unknown };
+
+      switch (event.type) {
         case 'potential_location_created':
-          // Invalidate and refetch to get the new location
           queryClient.invalidateQueries({ queryKey: potentialLocationKeys.list('active') });
           break;
 
-        case 'potential_location_deleted':
-          // Remove from cache immediately for instant UI update
-          const deleteData = message.data as { location_id: string };
+        case 'potential_location_deleted': {
+          const d = event.data as { location_id: string };
           queryClient.setQueryData<PotentialLocation[]>(
             potentialLocationKeys.list('active'),
-            (old) => old?.filter((loc) => loc.id !== deleteData.location_id) || []
+            (old) => old?.filter((loc) => loc.id !== d.location_id) ?? []
           );
-          // Close drawer if it's the deleted location
-          setSelectedPotentialLocation((current) =>
-            current?.id === deleteData.location_id ? null : current
-          );
+          setSelectedPotentialLocation((cur) => (cur?.id === d.location_id ? null : cur));
           break;
+        }
 
-        case 'potential_location_converted':
-          // Remove from potential locations list
-          const convertData = message.data as { location_id: string; bin: unknown };
+        case 'potential_location_converted': {
+          const d = event.data as { location_id: string };
           queryClient.setQueryData<PotentialLocation[]>(
             potentialLocationKeys.list('active'),
-            (old) => old?.filter((loc) => loc.id !== convertData.location_id) || []
+            (old) => old?.filter((loc) => loc.id !== d.location_id) ?? []
           );
-          // Close drawer if it's the converted location
-          setSelectedPotentialLocation((current) =>
-            current?.id === convertData.location_id ? null : current
-          );
+          setSelectedPotentialLocation((cur) => (cur?.id === d.location_id ? null : cur));
           // Refetch bins to show the new bin on the map
           queryClient.invalidateQueries({ queryKey: ['bins'] });
           break;
-
-        case 'warehouse_location_updated':
-          // Invalidate warehouse location cache to trigger refetch
-          console.log('📍 Warehouse location updated via WebSocket, invalidating cache...');
-          queryClient.invalidateQueries({ queryKey: warehouseKeys.location });
-          break;
+        }
 
         default:
-          // Ignore other message types
           break;
+      }
+    });
+
+    return unsubscribe;
+  }, [centrifugoStatus, subscribe, queryClient]);
+
+  // WebSocket — kept only for warehouse_location_updated (still uses WebSocket Hub)
+  const { status: wsStatus } = useWebSocket({
+    url: wsUrl,
+    onMessage: (message: WebSocketMessage) => {
+      if (message.type === 'warehouse_location_updated') {
+        console.log('📍 Warehouse location updated via WebSocket, invalidating cache...');
+        queryClient.invalidateQueries({ queryKey: warehouseKeys.location });
       }
     },
     autoReconnect: true,

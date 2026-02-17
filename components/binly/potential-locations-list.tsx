@@ -1,34 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { MapPin, User, Calendar, Check, Trash2, Loader2, MoreVertical, Eye, ChevronsUpDown, Truck, UserCog } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PotentialLocationDetailsDrawer } from './potential-location-details-drawer';
 import { ConvertToBinDialog } from './convert-to-bin-dialog';
 import { DeleteConfirmDialog } from './delete-confirm-dialog';
-import { cn } from '@/lib/utils';
-
-interface PotentialLocation {
-  id: string;
-  address: string;
-  street: string;
-  city: string;
-  zip: string;
-  latitude?: number;
-  longitude?: number;
-  requested_by_user_id: string;
-  requested_by_name: string;
-  notes?: string;
-  created_at_iso: string;
-  converted_to_bin_id?: string;
-  converted_at_iso?: string;
-  converted_by_user_id?: string;
-  converted_via_shift_id?: string;
-  converted_by_driver_name?: string;
-  converted_by_manager_name?: string;
-  bin_number?: number;
-}
+import { usePotentialLocations, potentialLocationKeys } from '@/lib/hooks/use-potential-locations';
+import { PotentialLocation, PotentialLocationStatus } from '@/lib/api/potential-locations';
+import { useCentrifugo } from '@/lib/hooks/use-centrifugo';
 
 interface PotentialLocationsListProps {
   onCreateNew: () => void;
@@ -37,9 +19,8 @@ interface PotentialLocationsListProps {
 type SortColumn = 'street' | 'requested_by_name' | 'created_at_iso';
 
 export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListProps) {
-  const [locations, setLocations] = useState<PotentialLocation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'active' | 'converted'>('active');
+  const queryClient = useQueryClient();
+  const [filter, setFilter] = useState<PotentialLocationStatus>('active');
   const [selectedLocation, setSelectedLocation] = useState<PotentialLocation | null>(null);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -48,16 +29,73 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
   const [sortColumn, setSortColumn] = useState<SortColumn | null>('created_at_iso');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  useEffect(() => {
-    fetchLocations();
-  }, [filter]);
+  // React Query — replaces raw useState/useEffect/fetchLocations
+  const { data: locations = [], isLoading } = usePotentialLocations(filter);
 
+  // Auth token for Centrifugo (same pattern as live-map-view)
+  const getAuthToken = useCallback(() => {
+    try {
+      const authStorage = localStorage.getItem('binly-auth-storage');
+      if (!authStorage) return null;
+      const parsed = JSON.parse(authStorage);
+      return parsed?.state?.token || null;
+    } catch {
+      return null;
+    }
+  }, []);
+  const token = getAuthToken();
+
+  // Centrifugo — real-time updates via company:events channel
+  const { status: centrifugoStatus, subscribe } = useCentrifugo({
+    token: token || undefined,
+    enabled: !!token,
+  });
+
+  // Subscribe to company:events and react to potential location events
   useEffect(() => {
-    // Listen for create events to refresh the list
-    const handleRefresh = () => fetchLocations();
-    window.addEventListener('potential-location-created', handleRefresh);
-    return () => window.removeEventListener('potential-location-created', handleRefresh);
-  }, [filter]);
+    if (centrifugoStatus !== 'connected') return;
+
+    const unsubscribe = subscribe('company:events', (raw: unknown) => {
+      const event = raw as { type: string; data: unknown };
+
+      switch (event.type) {
+        case 'potential_location_created':
+          // Invalidate active list so new location appears
+          if (filter === 'active') {
+            queryClient.invalidateQueries({ queryKey: potentialLocationKeys.list('active') });
+          }
+          break;
+
+        case 'potential_location_deleted': {
+          const d = event.data as { location_id: string };
+          queryClient.setQueryData<PotentialLocation[]>(
+            potentialLocationKeys.list(filter),
+            (old) => old?.filter((loc) => loc.id !== d.location_id) ?? []
+          );
+          setSelectedLocation((cur) => (cur?.id === d.location_id ? null : cur));
+          break;
+        }
+
+        case 'potential_location_converted': {
+          const d = event.data as { location_id: string };
+          // Remove from active list immediately
+          queryClient.setQueryData<PotentialLocation[]>(
+            potentialLocationKeys.list('active'),
+            (old) => old?.filter((loc) => loc.id !== d.location_id) ?? []
+          );
+          // Invalidate converted list so it refreshes when user switches tab
+          queryClient.invalidateQueries({ queryKey: potentialLocationKeys.list('converted') });
+          setSelectedLocation((cur) => (cur?.id === d.location_id ? null : cur));
+          break;
+        }
+
+        default:
+          break;
+      }
+    });
+
+    return unsubscribe;
+  }, [centrifugoStatus, subscribe, filter, queryClient]);
 
   // Close menu on click outside
   useEffect(() => {
@@ -67,21 +105,6 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
       return () => document.removeEventListener('click', handleClickOutside);
     }
   }, [openMenuId]);
-
-  const fetchLocations = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(
-        `https://ropacal-backend-production.up.railway.app/api/potential-locations?status=${filter === 'converted' ? 'converted' : 'active'}`
-      );
-      const data = await response.json();
-      setLocations(data || []);
-    } catch (error) {
-      console.error('Error fetching potential locations:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleConvert = (location: PotentialLocation) => {
     setSelectedLocation(location);
@@ -96,13 +119,15 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
   const handleConvertSuccess = () => {
     setConvertDialogOpen(false);
     setSelectedLocation(null);
-    fetchLocations();
+    // Invalidate both lists — active loses the row, converted gains it
+    queryClient.invalidateQueries({ queryKey: potentialLocationKeys.list('active') });
+    queryClient.invalidateQueries({ queryKey: potentialLocationKeys.list('converted') });
   };
 
   const handleDeleteSuccess = () => {
     setDeleteDialogOpen(false);
     setLocationToDelete(null);
-    fetchLocations();
+    queryClient.invalidateQueries({ queryKey: potentialLocationKeys.list(filter) });
   };
 
   // Handle column sorting
@@ -200,7 +225,7 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
         </div>
 
         {/* Loading & Empty States */}
-        {loading ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 text-primary animate-spin" />
           </div>
