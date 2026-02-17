@@ -146,15 +146,6 @@ export function TemplateEditorModal({
     setLassoMode(false);
   };
 
-  // Select all bins — locked (pending move) bins are excluded
-  const selectAll = () => {
-    const allBinIds = new Set(filteredBins.filter(b => !isBinLocked(b)).map(b => b.id));
-    setSelectedBinIds(allBinIds);
-  };
-
-  // Count of locked bins in current filtered list (for Select All label)
-  const lockedBinCount = filteredBins.filter(b => isBinLocked(b)).length;
-
   // Clear all selections
   const clearAll = () => {
     setSelectedBinIds(new Set());
@@ -171,6 +162,15 @@ export function TemplateEditorModal({
       bin.location_name?.toLowerCase().includes(query)
     );
   });
+
+  // Select all bins — locked (pending move) bins are excluded
+  const selectAll = () => {
+    const allBinIds = new Set(filteredBins.filter(b => !isBinLocked(b)).map(b => b.id));
+    setSelectedBinIds(allBinIds);
+  };
+
+  // Count of locked bins in current filtered list (for Select All label)
+  const lockedBinCount = filteredBins.filter(b => isBinLocked(b)).length;
 
   // Get mappable bins for map display
   const mappableBins = filteredBins.filter(isMappableBin);
