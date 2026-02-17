@@ -32,6 +32,7 @@ export function GlobalCentrifugoSync() {
 
     const unsubscribe = subscribe('company:events', (raw: unknown) => {
       const event = raw as { type: string; data: unknown };
+      console.log('📡 [GlobalCentrifugoSync] received event:', event.type, event.data);
 
       switch (event.type) {
         // ── Bin events ─────────────────────────────────────────────────────────
@@ -141,6 +142,7 @@ export function GlobalCentrifugoSync() {
         case 'move_request_cancelled': {
           // Invalidate ALL move-request queries (list view, shift creation modal, etc.)
           // The broad prefix match ['move-requests'] covers every sub-key variant.
+          console.log('🔄 [GlobalCentrifugoSync] invalidating move-requests queries');
           queryClient.invalidateQueries({ queryKey: ['move-requests'] });
           break;
         }

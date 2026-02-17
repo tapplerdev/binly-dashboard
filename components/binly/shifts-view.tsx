@@ -1359,12 +1359,20 @@ function CreateShiftDrawer({
   const { data: potentialLocations = [] } = usePotentialLocations('active');
   const [showMoveRequestSelection, setShowMoveRequestSelection] = useState(false);
   // React Query — automatically refetches when GlobalCentrifugoSync invalidates ['move-requests']
-  const { data: moveRequests = [] } = useQuery<MoveRequest[]>({
+  const { data: moveRequests = [], isFetching: moveRequestsFetching } = useQuery<MoveRequest[]>({
     queryKey: ['move-requests', 'pending-unassigned'],
-    queryFn: () => getMoveRequests({ status: 'pending', assigned: 'unassigned' }),
+    queryFn: () => {
+      console.log('🔃 [CreateShiftDrawer] fetching pending-unassigned move requests...');
+      return getMoveRequests({ status: 'pending', assigned: 'unassigned' });
+    },
     staleTime: 30_000,
     refetchOnWindowFocus: true,
   });
+
+  // Debug: log whenever the move request list changes
+  useEffect(() => {
+    console.log(`📋 [CreateShiftDrawer] moveRequests updated: ${moveRequests.length} items, fetching=${moveRequestsFetching}`);
+  }, [moveRequests, moveRequestsFetching]);
   const [moveRequestFocusBinId, setMoveRequestFocusBinId] = useState<string | null>(null);
   const driverDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -1572,6 +1580,7 @@ function CreateShiftDrawer({
   };
 
   const openMoveRequestSelection = () => {
+    console.log(`🗺️ [CreateShiftDrawer] opening move request modal with ${moveRequests.length} requests`);
     setMoveRequestFocusBinId(null);
     setShowMoveRequestSelection(true);
   };
