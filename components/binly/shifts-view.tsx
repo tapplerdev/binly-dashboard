@@ -2562,6 +2562,7 @@ function CreateShiftDrawer({
             <div>
               <label className="text-sm font-semibold text-gray-900 mb-3 block">Add Tasks</label>
               <div className="grid grid-cols-2 gap-2">
+                {/* Warehouse Stop button — temporarily hidden
                 <button
                   type="button"
                   onClick={addWarehouseStop}
@@ -2570,6 +2571,7 @@ function CreateShiftDrawer({
                   <Warehouse className="w-4 h-4" />
                   Warehouse Stop
                 </button>
+                */}
                 <button
                   type="button"
                   onClick={openBinSelection}
@@ -2605,10 +2607,9 @@ function CreateShiftDrawer({
               </div>
             </div>
 
-            {/* Smart Suggestions - Priority-Based Grouping */}
+            {/* Smart Suggestions — temporarily hidden
             {smartSuggestions.length > 0 && (
               <div className="space-y-3">
-                {/* Critical Issues */}
                 {smartSuggestions.filter(s => s.priority === 'critical').length > 0 && (
                   <div className="bg-red-50 border border-red-300 rounded-lg p-4 space-y-3">
                     <div className="flex items-center gap-2">
@@ -2629,11 +2630,8 @@ function CreateShiftDrawer({
                             </p>
                             <p className="text-xs text-gray-600 mt-1">{suggestion.reason}</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => acceptSuggestion(suggestion)}
-                            className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-medium hover:bg-red-700 transition-colors whitespace-nowrap"
-                          >
+                          <button type="button" onClick={() => acceptSuggestion(suggestion)}
+                            className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-medium hover:bg-red-700 transition-colors whitespace-nowrap">
                             {suggestion.action === 'add' && 'Add'}
                             {suggestion.action === 'update' && 'Update'}
                             {suggestion.action === 'remove' && 'Remove'}
@@ -2643,8 +2641,6 @@ function CreateShiftDrawer({
                     ))}
                   </div>
                 )}
-
-                {/* Optimizations */}
                 {smartSuggestions.filter(s => s.priority === 'optimization').length > 0 && (
                   <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4 space-y-3">
                     <div className="flex items-center gap-2">
@@ -2665,11 +2661,8 @@ function CreateShiftDrawer({
                             </p>
                             <p className="text-xs text-gray-600 mt-1">{suggestion.reason}</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => acceptSuggestion(suggestion)}
-                            className="px-3 py-1.5 bg-yellow-600 text-white rounded-md text-xs font-medium hover:bg-yellow-700 transition-colors whitespace-nowrap"
-                          >
+                          <button type="button" onClick={() => acceptSuggestion(suggestion)}
+                            className="px-3 py-1.5 bg-yellow-600 text-white rounded-md text-xs font-medium hover:bg-yellow-700 transition-colors whitespace-nowrap">
                             {suggestion.action === 'add' && 'Add'}
                             {suggestion.action === 'update' && 'Update'}
                             {suggestion.action === 'remove' && 'Remove'}
@@ -2679,8 +2672,6 @@ function CreateShiftDrawer({
                     ))}
                   </div>
                 )}
-
-                {/* Info/Suggestions */}
                 {smartSuggestions.filter(s => s.priority === 'info').length > 0 && (
                   <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 space-y-3">
                     <div className="flex items-center gap-2">
@@ -2701,11 +2692,8 @@ function CreateShiftDrawer({
                             </p>
                             <p className="text-xs text-gray-600 mt-1">{suggestion.reason}</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => acceptSuggestion(suggestion)}
-                            className="px-3 py-1.5 bg-primary text-white rounded-md text-xs font-medium hover:bg-primary/90 transition-colors whitespace-nowrap"
-                          >
+                          <button type="button" onClick={() => acceptSuggestion(suggestion)}
+                            className="px-3 py-1.5 bg-primary text-white rounded-md text-xs font-medium hover:bg-primary/90 transition-colors whitespace-nowrap">
                             {suggestion.action === 'add' && 'Add'}
                             {suggestion.action === 'update' && 'Update'}
                             {suggestion.action === 'remove' && 'Remove'}
@@ -2717,6 +2705,7 @@ function CreateShiftDrawer({
                 )}
               </div>
             )}
+            */}
 
             {/* Shift Analysis */}
             {tasks.length > 0 && (
@@ -2944,13 +2933,6 @@ function CreateShiftDrawer({
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEditTask(index)}
-                          className="text-blue-500 hover:text-blue-700 transition-fast"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
                         <button
                           type="button"
                           onClick={() => removeTask(index)}
