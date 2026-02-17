@@ -1450,13 +1450,17 @@ function CreateShiftDrawer({
     }
   };
 
-  const handleBinSelectionConfirm = (selectedBinIds: string[]) => {
-    // Safety net: filter out any bins already in the task list to prevent duplicates
-    const existingBinIds = new Set(tasks.filter(t => t.type === 'collection' && t.bin_id).map(t => t.bin_id!));
-    const newBinIds = selectedBinIds.filter(id => !existingBinIds.has(id));
-    const selectedBins = allBins.filter(bin => newBinIds.includes(bin.id));
+  const handleBinSelectionConfirm = (newBinIds: string[], removedBinIds: string[]) => {
+    // Remove unchecked bins from the task list
+    const removedSet = new Set(removedBinIds);
+    const tasksAfterRemoval = tasks.filter(t => !(t.type === 'collection' && t.bin_id && removedSet.has(t.bin_id)));
 
-    const collectionTasks: ShiftTask[] = selectedBins.map(bin => ({
+    // Add newly selected bins (safety net dedup against remaining tasks)
+    const remainingBinIds = new Set(tasksAfterRemoval.filter(t => t.type === 'collection' && t.bin_id).map(t => t.bin_id!));
+    const trulyNewBinIds = newBinIds.filter(id => !remainingBinIds.has(id));
+    const newBins = allBins.filter(bin => trulyNewBinIds.includes(bin.id));
+
+    const collectionTasks: ShiftTask[] = newBins.map(bin => ({
       id: `temp-${Date.now()}-${bin.id}`,
       type: 'collection',
       bin_id: bin.id,
@@ -1467,7 +1471,7 @@ function CreateShiftDrawer({
       address: bin.current_street || 'Unknown',
     }));
 
-    setTasks([...tasks, ...collectionTasks]);
+    setTasks([...tasksAfterRemoval, ...collectionTasks]);
     setShowBinSelection(false);
   };
 

@@ -12,7 +12,7 @@ const DEFAULT_ZOOM = 12;
 
 interface BinSelectionMapProps {
   onClose: () => void;
-  onConfirm: (selectedBinIds: string[]) => void;
+  onConfirm: (newBinIds: string[], removedBinIds: string[]) => void;
   initialSelectedBins?: string[];
   alreadyAddedBinIds?: string[]; // Bins already in the task list — shown as pre-checked with distinct style
 }
@@ -192,10 +192,11 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
   // Get mappable bins for map display
   const mappableBins = filteredBins.filter(isMappableBin);
 
-  // Handle confirm — only pass newly selected bins (exclude already-added ones)
+  // Handle confirm — pass newly added bins AND bins that were removed (unchecked from alreadyAdded)
   const handleConfirm = () => {
-    const newlySelectedIds = Array.from(selectedBinIds).filter(id => !alreadyAdded.has(id));
-    onConfirm(newlySelectedIds);
+    const newBinIds = Array.from(selectedBinIds).filter(id => !alreadyAdded.has(id));
+    const removedBinIds = Array.from(alreadyAdded).filter(id => !selectedBinIds.has(id));
+    onConfirm(newBinIds, removedBinIds);
     onClose();
   };
 
@@ -606,14 +607,16 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
             Cancel
           </button>
           {(() => {
-            const newlySelected = [...selectedBinIds].filter(id => !alreadyAdded.has(id)).length;
+            const added = [...selectedBinIds].filter(id => !alreadyAdded.has(id)).length;
+            const removed = [...alreadyAdded].filter(id => !selectedBinIds.has(id)).length;
+            const hasChanges = added > 0 || removed > 0;
             return (
               <button
                 onClick={handleConfirm}
-                disabled={newlySelected === 0}
+                disabled={!hasChanges}
                 className="px-6 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-fast order-1 sm:order-2"
               >
-                Confirm Selection ({newlySelected})
+                Save
               </button>
             );
           })()}
