@@ -71,7 +71,18 @@ export function CentrifugoProvider({ token, children }: CentrifugoProviderProps)
 
   /** Create a Centrifuge channel subscription and wire up the fan-out publication handler. */
   const createChannelSubscription = useCallback((client: Centrifuge, channel: string) => {
-    if (subscriptionsRef.current.has(channel)) return; // already exists
+    if (subscriptionsRef.current.has(channel)) return; // already tracked — nothing to do
+
+    // Defensive: the Centrifuge client may still hold a subscription we've lost track of
+    // (e.g. an 'unsubscribed' event cleared our ref but didn't remove it from the client).
+    // Reuse it instead of calling newSubscription() which would throw "already exists".
+    const existing = client.getSubscription(channel);
+    if (existing) {
+      console.log(`♻️  [Centrifugo] Re-syncing lost subscription for ${channel}`);
+      subscriptionsRef.current.set(channel, existing);
+      if (existing.state === 'unsubscribed') existing.subscribe();
+      return;
+    }
 
     const sub = client.newSubscription(channel);
 
@@ -87,6 +98,9 @@ export function CentrifugoProvider({ token, children }: CentrifugoProviderProps)
     sub.on('unsubscribed', (ctx) => {
       console.log(`❌ [Centrifugo] Unsubscribed from ${channel} (code: ${ctx.code})`);
       subscriptionsRef.current.delete(channel);
+      // Remove from the Centrifuge client's internal map too, so the channel
+      // can be cleanly re-created next time a component subscribes.
+      clientRef.current?.removeSubscription(sub);
     });
 
     sub.on('error', (ctx) =>
