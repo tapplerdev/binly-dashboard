@@ -301,19 +301,27 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                         key={bin.id}
                         position={{ lat: bin.latitude, lng: bin.longitude }}
                         onClick={() => toggleBinSelection(bin.id)}
+                        zIndex={isAlreadyAdded ? 20 : isSelected ? 15 : 10}
                       >
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold cursor-pointer transition-all hover:scale-110 ${
-                            isAlreadyAdded
-                              ? 'ring-4 ring-indigo-300'
-                              : isSelected
-                              ? 'ring-4 ring-green-300 animate-pulse-glow'
-                              : ''
-                          }`}
-                          style={{ backgroundColor: markerColor }}
-                          title={`Bin #${bin.bin_number} - ${bin.location_name || bin.current_street}${isAlreadyAdded ? ' · Already in shift' : ''}${hasMoveRequest(bin) ? ' · Move req. pending' : ''}`}
-                        >
-                          {bin.bin_number % 100}
+                        <div className="relative cursor-pointer" title={`Bin #${bin.bin_number} - ${bin.location_name || bin.current_street}${isAlreadyAdded ? ' · Already in shift' : ''}${hasMoveRequest(bin) ? ' · Move req. pending' : ''}`}>
+                          {/* Pulsing ring for already-added bins */}
+                          {isAlreadyAdded && (
+                            <div className="absolute inset-0 -m-2">
+                              <div className="w-12 h-12 rounded-full bg-indigo-500 opacity-30 animate-ping" />
+                            </div>
+                          )}
+                          <div
+                            className={`relative w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold transition-all hover:scale-110 ${
+                              isAlreadyAdded
+                                ? 'ring-2 ring-white shadow-lg'
+                                : isSelected
+                                ? 'ring-4 ring-green-300 animate-pulse-glow'
+                                : ''
+                            }`}
+                            style={{ backgroundColor: markerColor }}
+                          >
+                            {bin.bin_number % 100}
+                          </div>
                         </div>
                       </AdvancedMarker>
                     );

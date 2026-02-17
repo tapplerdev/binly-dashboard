@@ -1440,11 +1440,9 @@ function CreateShiftDrawer({
 
   const openBinSelection = async () => {
     try {
-      // Fetch bins if not already loaded
-      if (allBins.length === 0) {
-        const bins = await getBins();
-        setAllBins(bins);
-      }
+      // Always fetch all bins to ensure we have the complete set (not just route-merged bins)
+      const bins = await getBins();
+      setAllBins(bins);
       setShowBinSelection(true);
     } catch (error) {
       console.error('Failed to fetch bins:', error);
