@@ -39,6 +39,11 @@ export function CentrifugoProvider({ token, children }: CentrifugoProviderProps)
   // Single Centrifuge client for the entire app session
   const clientRef = useRef<Centrifuge | null>(null);
 
+  // Ref-shadowed status — lets subscribe() check connection state without
+  // being a dep, so its reference stays stable across status changes.
+  const statusRef = useRef<CentrifugoStatus>('disconnected');
+  statusRef.current = status;
+
   // channel → Set<handler>  (fan-out: many handlers per channel)
   const handlersRef = useRef<Map<string, Set<(data: unknown) => void>>>(new Map());
 
@@ -94,6 +99,10 @@ export function CentrifugoProvider({ token, children }: CentrifugoProviderProps)
 
   // ── subscribe API (stable ref — safe as a useEffect dependency) ─────────────
 
+  // subscribe is intentionally stable (no status dep) — uses statusRef so its
+  // reference never changes across status transitions, preventing spurious
+  // useEffect cleanup/re-run cycles in consumers that would otherwise cause
+  // "Subscription already exists" errors in the Centrifuge client.
   const subscribe = useCallback(
     (channel: string, handler: (data: unknown) => void): (() => void) => {
       // Register handler in the fan-out map
@@ -103,7 +112,7 @@ export function CentrifugoProvider({ token, children }: CentrifugoProviderProps)
       handlersRef.current.get(channel)!.add(handler);
 
       // If already connected, wire up the channel subscription immediately
-      if (clientRef.current && status === 'connected') {
+      if (clientRef.current && statusRef.current === 'connected') {
         createChannelSubscription(clientRef.current, channel);
       }
       // If not yet connected, the 'connected' handler below will create it
@@ -126,7 +135,7 @@ export function CentrifugoProvider({ token, children }: CentrifugoProviderProps)
         }
       };
     },
-    [status, createChannelSubscription]
+    [createChannelSubscription]  // stable — statusRef is a ref, not state
   );
 
   // ── Connection lifecycle ────────────────────────────────────────────────────
