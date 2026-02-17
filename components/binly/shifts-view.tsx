@@ -2829,6 +2829,10 @@ function CreateShiftDrawer({
                     const isTaskLocked = task.type === 'collection' && task.bin_id
                       ? allBins.find(b => b.id === task.bin_id)?.move_requested === true
                       : false;
+                    // True if a pickup task for this bin's move request is already in the task list
+                    const moveRequestAlreadyInShift = isTaskLocked && task.bin_id
+                      ? tasks.some(t => (t.type === 'pickup' || t.type === 'dropoff') && t.bin_id === task.bin_id)
+                      : false;
 
                     return (
                     <div
@@ -2863,8 +2867,12 @@ function CreateShiftDrawer({
                             </span>
                           )}
                           {isTaskLocked && (
-                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-xs rounded border border-blue-200">
-                              Move req. pending
+                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full border ${
+                              moveRequestAlreadyInShift
+                                ? 'bg-green-50 text-green-700 border-green-300'
+                                : 'bg-amber-50 text-amber-700 border-amber-300'
+                            }`}>
+                              {moveRequestAlreadyInShift ? 'Move req. added' : 'Move req. pending'}
                             </span>
                           )}
                         </div>
@@ -2876,20 +2884,29 @@ function CreateShiftDrawer({
                               <span className="font-medium">Bin #{task.bin_number}</span> - {task.address}
                             </p>
                             {isTaskLocked && (
-                              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                <p className="text-xs text-gray-400">
-                                  This bin has an open move request.
+                              <div className={`flex items-center gap-2 mt-1.5 px-2 py-1.5 rounded-md ${
+                                moveRequestAlreadyInShift
+                                  ? 'bg-green-50 border border-green-200'
+                                  : 'bg-amber-50 border border-amber-200'
+                              }`}>
+                                <MoveRight className={`w-3.5 h-3.5 shrink-0 ${moveRequestAlreadyInShift ? 'text-green-600' : 'text-amber-600'}`} />
+                                <p className={`text-xs font-medium flex-1 ${moveRequestAlreadyInShift ? 'text-green-700' : 'text-amber-700'}`}>
+                                  {moveRequestAlreadyInShift
+                                    ? 'Move request is already in this shift.'
+                                    : 'This bin has an open move request.'}
                                 </p>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (task.bin_id) openMoveRequestSelectionForBin(task.bin_id);
-                                  }}
-                                  className="px-2 py-0.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors"
-                                >
-                                  + Add to shift
-                                </button>
+                                {!moveRequestAlreadyInShift && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (task.bin_id) openMoveRequestSelectionForBin(task.bin_id);
+                                    }}
+                                    className="px-2 py-0.5 text-xs font-semibold text-amber-700 bg-amber-100 border border-amber-300 rounded hover:bg-amber-200 transition-colors shrink-0"
+                                  >
+                                    + Add to shift
+                                  </button>
+                                )}
                               </div>
                             )}
                           </>
