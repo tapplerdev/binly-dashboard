@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
+import { APIProvider, Map as GoogleMap, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { getBins } from '@/lib/api/bins';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { X, Search, Lasso, MapIcon, List, Filter, ChevronDown } from 'lucide-react';
@@ -272,11 +272,13 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                 apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}
                 libraries={['drawing', 'geometry']}
               >
-                <Map
+                <GoogleMap
                   defaultCenter={DEFAULT_CENTER}
                   defaultZoom={DEFAULT_ZOOM}
                   mapId="binly-bin-selection"
+                  mapTypeId="hybrid"
                   gestureHandling="greedy"
+                  streetViewControl={false}
                   disableDefaultUI={false}
                   className="w-full h-full"
                 >
@@ -291,9 +293,9 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                   {mappableBins.map((bin) => {
                     const isSelected = selectedBinIds.has(bin.id);
                     const isAlreadyAdded = alreadyAdded.has(bin.id);
-                    const markerColor = isSelected
-                      ? '#16a34a'
-                      : getBinMarkerColor(bin.fill_percentage, bin.status);
+                    const fillColor = getBinMarkerColor(bin.fill_percentage, bin.status);
+                    const markerColor = isSelected ? '#16a34a' : fillColor;
+                    const pingColor = isSelected ? '#16a34a' : fillColor;
 
                     return (
                       <AdvancedMarker
@@ -303,16 +305,15 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                         zIndex={isSelected ? 15 : 10}
                       >
                         <div className="relative cursor-pointer" title={`Bin #${bin.bin_number} - ${bin.location_name || bin.current_street}${isAlreadyAdded ? ' · Already in shift' : ''}${hasMoveRequest(bin) ? ' · Move req. pending' : ''}`}>
-                          {/* Pulsing ring for all selected bins */}
-                          {isSelected && (
-                            <div className="absolute inset-0 -m-2">
-                              <div className="w-12 h-12 rounded-full bg-green-500 opacity-30 animate-ping" />
-                            </div>
-                          )}
+                          {/* Pulsing ring — fill-level color unselected, green when selected */}
+                          <div className="absolute inset-0 -m-2">
+                            <div
+                              className="w-12 h-12 rounded-full opacity-30 animate-ping"
+                              style={{ backgroundColor: pingColor }}
+                            />
+                          </div>
                           <div
-                            className={`relative w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold transition-all hover:scale-110 ${
-                              isSelected ? 'ring-2 ring-white shadow-lg' : ''
-                            }`}
+                            className="relative w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg ring-2 ring-white transition-all hover:scale-110"
                             style={{ backgroundColor: markerColor }}
                           >
                             {bin.bin_number % 100}
@@ -321,7 +322,7 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                       </AdvancedMarker>
                     );
                   })}
-                </Map>
+                </GoogleMap>
               </APIProvider>
             )}
 
