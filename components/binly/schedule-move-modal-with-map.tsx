@@ -25,6 +25,9 @@ import {
   Filter,
   Lasso,
   Move,
+  ExternalLink,
+  Clock,
+  CheckCircle2,
 } from 'lucide-react';
 import { createMoveRequest, assignMoveToShift, assignMoveToUser } from '@/lib/api/move-requests';
 import { getShifts, getShiftDetailsByDriverId, Shift } from '@/lib/api/shifts';
@@ -1446,49 +1449,142 @@ export function ScheduleMoveModalWithMap({
                     </div>
                   )}
 
-                  {/* Active Shift Selection Dropdown */}
+                  {/* Active Shift Selection — rich cards */}
                   {config.assignmentType === 'active_shift' && activeShifts.length > 0 && (
                     <div className="mb-3">
                       <label className="block text-xs font-medium text-gray-700 mb-2">
                         Select Active Shift
                       </label>
-                      <Dropdown
-                        label=""
-                        placeholder="Choose a shift..."
-                        value={config.assignedShiftId || ''}
-                        options={activeShifts.map((shift) => ({
-                          value: shift.id,
-                          label: `${shift.driverName} - Shift #${shift.id.slice(0, 8)}`,
-                        }))}
-                        onChange={(value) => {
-                          updateBinConfig(bin.id, {
-                            assignedShiftId: value,
-                          });
-                        }}
-                      />
+                      <div className="flex flex-col gap-2">
+                        {activeShifts.map((shift) => {
+                          const isSelected = config.assignedShiftId === shift.id;
+                          const collected = shift.binsCollected ?? 0;
+                          const total = shift.binCount ?? 0;
+                          const progressPct = total > 0 ? Math.round((collected / total) * 100) : 0;
+                          return (
+                            <div
+                              key={shift.id}
+                              onClick={() => updateBinConfig(bin.id, { assignedShiftId: shift.id })}
+                              className={cn(
+                                'relative rounded-lg border-2 px-3 py-2.5 cursor-pointer transition-all',
+                                isSelected
+                                  ? 'border-primary bg-blue-50'
+                                  : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                              )}
+                            >
+                              {/* Top row: driver name + view link */}
+                              <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="inline-flex items-center justify-center w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                                  <span className="text-sm font-semibold text-gray-900">
+                                    {shift.driverName}
+                                  </span>
+                                </div>
+                                <a
+                                  href={`/operations/shifts`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="flex items-center gap-1 text-xs text-primary hover:underline"
+                                >
+                                  View
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </div>
+                              {/* Stats row */}
+                              <div className="flex items-center gap-3 text-xs text-gray-500 mb-2">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  Started {shift.startTime}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  {collected}/{total} bins
+                                </span>
+                                {shift.total_distance_miles != null && (
+                                  <span>{shift.total_distance_miles.toFixed(1)} mi</span>
+                                )}
+                              </div>
+                              {/* Progress bar */}
+                              <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                <div
+                                  className={cn(
+                                    'h-full rounded-full transition-all',
+                                    progressPct >= 75
+                                      ? 'bg-green-500'
+                                      : progressPct >= 40
+                                      ? 'bg-yellow-400'
+                                      : 'bg-blue-500'
+                                  )}
+                                  style={{ width: `${progressPct}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 
-                  {/* Future Shift Selection Dropdown */}
+                  {/* Future Shift Selection — rich cards */}
                   {config.assignmentType === 'future_shift' && futureShifts.length > 0 && (
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-2">
                         Select Future Shift
                       </label>
-                      <Dropdown
-                        label=""
-                        placeholder="Choose a shift..."
-                        value={config.assignedShiftId || ''}
-                        options={futureShifts.map((shift) => ({
-                          value: shift.id,
-                          label: `${shift.driverName} - ${shift.date} at ${shift.startTime}`,
-                        }))}
-                        onChange={(value) => {
-                          updateBinConfig(bin.id, {
-                            assignedShiftId: value,
-                          });
-                        }}
-                      />
+                      <div className="flex flex-col gap-2">
+                        {futureShifts.map((shift) => {
+                          const isSelected = config.assignedShiftId === shift.id;
+                          const total = shift.binCount ?? 0;
+                          return (
+                            <div
+                              key={shift.id}
+                              onClick={() => updateBinConfig(bin.id, { assignedShiftId: shift.id })}
+                              className={cn(
+                                'relative rounded-lg border-2 px-3 py-2.5 cursor-pointer transition-all',
+                                isSelected
+                                  ? 'border-primary bg-blue-50'
+                                  : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                              )}
+                            >
+                              {/* Top row: driver name + view link */}
+                              <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="inline-flex items-center justify-center w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />
+                                  <span className="text-sm font-semibold text-gray-900">
+                                    {shift.driverName}
+                                  </span>
+                                </div>
+                                <a
+                                  href={`/operations/shifts`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="flex items-center gap-1 text-xs text-primary hover:underline"
+                                >
+                                  View
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </div>
+                              {/* Stats row */}
+                              <div className="flex items-center gap-3 text-xs text-gray-500">
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="w-3 h-3" />
+                                  {shift.date}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {shift.startTime}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Package className="w-3 h-3" />
+                                  {total} bins planned
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
