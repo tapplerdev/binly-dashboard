@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
-import { useBins } from '@/lib/hooks/use-bins';
+import { useBins, binKeys } from '@/lib/hooks/use-bins';
 import { useNoGoZones, zoneKeys } from '@/lib/hooks/use-zones';
 import { usePotentialLocations, potentialLocationKeys } from '@/lib/hooks/use-potential-locations';
 import { useActiveDrivers } from '@/lib/hooks/use-active-drivers';
@@ -288,6 +288,18 @@ export function LiveMapView() {
             zoneKeys.byStatus('active'),
             (old) => old?.filter((z) => z.id !== consumed_zone_id) ?? []
           );
+          break;
+        }
+
+        case 'bin_updated': {
+          // Surgically update the bin in the all-bins cache (e.g. status flipped to 'missing')
+          const updatedBin = event.data as Bin;
+          queryClient.setQueryData<Bin[]>(
+            binKeys.all,
+            (old) => old?.map((b) => (b.id === updatedBin.id ? updatedBin : b)) ?? [updatedBin]
+          );
+          // Also update the detail cache if it's loaded
+          queryClient.setQueryData<Bin>(binKeys.detail(updatedBin.id), updatedBin);
           break;
         }
 

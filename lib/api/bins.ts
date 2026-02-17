@@ -4,6 +4,7 @@
  */
 
 import { Bin, BinWithPriority, PotentialLocation, BinCheck } from '@/lib/types/bin';
+import { ZoneIncident } from '@/lib/types/zone';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -319,6 +320,33 @@ export async function deletePotentialLocation(id: string): Promise<void> {
     }
   } catch (error) {
     console.error(`Error deleting potential location ${id}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch zone incidents associated with a specific bin
+ * @param binId Bin ID
+ * @returns Promise<ZoneIncident[]> Array of zone incidents (most recent first)
+ */
+export async function getBinIncidents(binId: string): Promise<ZoneIncident[]> {
+  try {
+    const response = await fetch(`${API_URL}/api/bins/${binId}/incidents`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch bin incidents: ${response.statusText}`);
+    }
+
+    const incidents: ZoneIncident[] = await response.json();
+    return incidents;
+  } catch (error) {
+    console.error(`Error fetching incidents for bin ${binId}:`, error);
     throw error;
   }
 }

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getBins, getBinById, getBinChecks, getBinMoves } from '@/lib/api/bins';
+import { getBins, getBinById, getBinChecks, getBinMoves, getBinIncidents } from '@/lib/api/bins';
 
 // Query keys
 export const binKeys = {
@@ -7,6 +7,7 @@ export const binKeys = {
   detail: (id: string) => ['bins', id] as const,
   checks: (id: string) => ['bins', id, 'checks'] as const,
   moves: (id: string) => ['bins', id, 'moves'] as const,
+  incidents: (id: string) => ['bins', id, 'incidents'] as const,
 };
 
 /**
@@ -56,6 +57,17 @@ export function useBinMoves(binId: string) {
   return useQuery({
     queryKey: binKeys.moves(binId),
     queryFn: () => getBinMoves(binId),
+    enabled: !!binId,
+  });
+}
+
+/**
+ * Fetch zone incidents for a bin
+ */
+export function useBinIncidents(binId: string) {
+  return useQuery({
+    queryKey: binKeys.incidents(binId),
+    queryFn: () => getBinIncidents(binId),
     enabled: !!binId,
   });
 }

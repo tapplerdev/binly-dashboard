@@ -46,6 +46,7 @@ export function ZoneDetailsDrawer({ zone, onClose, onNavigateTo }: ZoneDetailsDr
     landlord_complaint: incidents.filter((i) => i.incident_type === 'landlord_complaint').length,
     theft: incidents.filter((i) => i.incident_type === 'theft').length,
     relocation_request: incidents.filter((i) => i.incident_type === 'relocation_request').length,
+    missing: incidents.filter((i) => i.incident_type === 'missing').length,
   };
 
   const fieldObservations = incidents.filter((i) => i.is_field_observation).length;
@@ -137,6 +138,7 @@ export function ZoneDetailsDrawer({ zone, onClose, onNavigateTo }: ZoneDetailsDr
                 { type: 'landlord_complaint', label: 'Landlord Complaints', count: incidentsByType.landlord_complaint },
                 { type: 'theft', label: 'Theft', count: incidentsByType.theft },
                 { type: 'relocation_request', label: 'Relocation Requests', count: incidentsByType.relocation_request },
+                { type: 'missing', label: 'Missing Bin', count: incidentsByType.missing },
               ] as const
             ).map(({ type, label, count }) => (
               <div key={type} className="bg-gray-50 rounded-lg p-3">
@@ -424,6 +426,8 @@ function IncidentTypeBadge({ type }: { type: ZoneIncident['incident_type'] }) {
       ? 'bg-purple-100 text-purple-700'
       : type === 'landlord_complaint'
       ? 'bg-orange-100 text-orange-700'
+      : type === 'missing'
+      ? 'bg-gray-200 text-gray-700'
       : 'bg-gray-100 text-gray-600';
   return (
     <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${cls}`}>

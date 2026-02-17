@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getBinChecks, getBinMoves, type BinMove } from '@/lib/api/bins';
+import { getBinChecks, getBinMoves, getBinIncidents, type BinMove } from '@/lib/api/bins';
+import { ZoneIncident, formatIncidentType, getIncidentIcon } from '@/lib/types/zone';
 import { getMoveRequest, getMoveRequests, cancelMoveRequest } from '@/lib/api/move-requests';
 import { BinWithPriority, getMoveRequestUrgency, getMoveRequestBadgeColor, type MoveRequest, type BinCheck } from '@/lib/types/bin';
 import { AssignMovesModal } from '@/components/binly/assign-moves-modal';
@@ -42,7 +43,7 @@ interface BinDetailDrawerProps {
 export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinDetailDrawerProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'overview' | 'checks' | 'moves'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'checks' | 'moves' | 'incidents'>('overview');
   const [isClosing, setIsClosing] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedCheck, setSelectedCheck] = useState<BinCheck | null>(null);
@@ -77,6 +78,13 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
     queryKey: ['bin-moves', bin.id],
     queryFn: () => getBinMoves(bin.id),
     enabled: activeTab === 'moves',
+  });
+
+  // Fetch incident history
+  const { data: incidents, isLoading: incidentsLoading } = useQuery({
+    queryKey: ['bin-incidents', bin.id],
+    queryFn: () => getBinIncidents(bin.id),
+    enabled: activeTab === 'incidents',
   });
 
   // Fetch all move requests for this bin
@@ -298,6 +306,7 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
               { key: 'overview', label: 'Overview' },
               { key: 'checks', label: 'Check History' },
               { key: 'moves', label: 'Move History' },
+              { key: 'incidents', label: 'Incidents' },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -712,6 +721,57 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
                 <div className="text-center py-12">
                   <CheckCircle2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-500">No check history available</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'incidents' && (
+            <div className="space-y-4">
+              {incidentsLoading ? (
+                <div className="text-center py-12">
+                  <AlertTriangle className="w-12 h-12 text-gray-300 animate-pulse mx-auto mb-4" />
+                  <p className="text-gray-500">Loading incidents...</p>
+                </div>
+              ) : incidents && incidents.length > 0 ? (
+                <div className="space-y-3">
+                  {incidents.map((incident) => (
+                    <Card key={incident.id} className="p-4">
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl leading-none mt-0.5">{getIncidentIcon(incident.incident_type)}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="font-medium text-gray-900">{formatIncidentType(incident.incident_type)}</span>
+                            {incident.is_field_observation && (
+                              <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Manager</span>
+                            )}
+                            {incident.shift_id && !incident.is_field_observation && (
+                              <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">Shift</span>
+                            )}
+                          </div>
+                          {incident.description && (
+                            <p className="text-sm text-gray-600 mb-1">{incident.description}</p>
+                          )}
+                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                            {incident.reported_by_name && (
+                              <span>{incident.reported_by_name}</span>
+                            )}
+                            {incident.reported_by_name && incident.reported_at_iso && (
+                              <span>·</span>
+                            )}
+                            {incident.reported_at_iso && (
+                              <span>{format(new Date(incident.reported_at_iso), 'PPp')}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <AlertTriangle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">No incidents reported for this bin</p>
                 </div>
               )}
             </div>

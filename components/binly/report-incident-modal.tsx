@@ -24,6 +24,7 @@ const INCIDENT_TYPES: IncidentType[] = [
   'landlord_complaint',
   'theft',
   'relocation_request',
+  'missing',
 ];
 
 export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {

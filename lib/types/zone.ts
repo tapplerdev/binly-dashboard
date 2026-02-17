@@ -3,7 +3,7 @@
  */
 
 export type ZoneStatus = 'active' | 'monitoring' | 'resolved';
-export type IncidentType = 'vandalism' | 'landlord_complaint' | 'theft' | 'relocation_request';
+export type IncidentType = 'vandalism' | 'landlord_complaint' | 'theft' | 'relocation_request' | 'missing';
 export type IncidentStatus = 'open' | 'resolved' | 'investigating';
 
 export type ZoneResolutionType = 'merged' | 'manual_resolution';
@@ -122,6 +122,8 @@ export function formatIncidentType(type: IncidentType): string {
       return 'Theft';
     case 'relocation_request':
       return 'Relocation Request';
+    case 'missing':
+      return 'Missing Bin';
   }
 }
 
@@ -138,6 +140,8 @@ export function getIncidentIcon(type: IncidentType): string {
       return '🚨';
     case 'relocation_request':
       return '📦';
+    case 'missing':
+      return '❓';
   }
 }
 
