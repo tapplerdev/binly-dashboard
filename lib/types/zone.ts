@@ -101,11 +101,11 @@ export function getZoneColorRgba(score: number, alpha: number = 0.4): string {
 export function getZoneOpacity(status: ZoneStatus): number {
   switch (status) {
     case 'active':
-      return 0.4;
+      return 0.45;
     case 'monitoring':
-      return 0.25;
+      return 0.35;
     case 'resolved':
-      return 0.1;
+      return 0.15;
   }
 }
 

@@ -140,9 +140,9 @@ function ZoneCircles({
         });
 
         const circle = new google.maps.Circle({
-          strokeColor: getZoneColor(zone.conflict_score),
-          strokeOpacity: 0.8,
-          strokeWeight: 2,
+          strokeColor: '#FFFFFF',
+          strokeOpacity: 0.9,
+          strokeWeight: 4,
           fillColor: getZoneColor(zone.conflict_score),
           fillOpacity: getZoneOpacity(zone.status),
           map,
@@ -826,25 +826,31 @@ export function LiveMapView() {
               }}
             >
               <div
-                className="flex flex-col items-center cursor-pointer group"
+                className="flex flex-col items-center cursor-pointer"
                 title={`${zone.name} · Score: ${zone.conflict_score}`}
               >
+                {/* White ring + colored ring = high contrast on satellite */}
                 <div
-                  className="rounded-full border-2 flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+                  className="rounded-full flex items-center justify-center hover:scale-110 transition-transform animate-pulse"
                   style={{
                     width: 36,
                     height: 36,
-                    backgroundColor: getZoneColor(zone.conflict_score) + '33',
-                    borderColor: getZoneColor(zone.conflict_score),
+                    backgroundColor: getZoneColor(zone.conflict_score) + '99',
+                    border: '2px solid white',
+                    boxShadow: `0 0 0 2px ${getZoneColor(zone.conflict_score)}, 0 2px 10px rgba(0,0,0,0.7)`,
                   }}
                 >
-                  <ShieldAlert className="w-4 h-4" style={{ color: getZoneColor(zone.conflict_score) }} />
+                  <ShieldAlert className="w-4 h-4 text-white drop-shadow" />
                 </div>
+                {/* Always-visible label */}
                 <div
-                  className="mt-1 px-2 py-0.5 rounded text-xs font-semibold text-white shadow opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap"
-                  style={{ backgroundColor: getZoneColor(zone.conflict_score) }}
+                  className="mt-1 px-2 py-0.5 rounded text-xs font-bold text-white whitespace-nowrap"
+                  style={{
+                    backgroundColor: getZoneColor(zone.conflict_score),
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.7)',
+                  }}
                 >
-                  {getZoneSeverity(zone.conflict_score).toUpperCase()} · {zone.conflict_score}
+                  {zone.name}
                 </div>
               </div>
             </AdvancedMarker>

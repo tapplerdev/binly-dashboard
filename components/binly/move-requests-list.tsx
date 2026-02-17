@@ -4,7 +4,6 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getMoveRequests, updateMoveRequest, bulkCancelMoves, cancelMoveRequest, clearMoveAssignment } from '@/lib/api/move-requests';
-import { useWebSocket, WebSocketMessage } from '@/lib/hooks/use-websocket';
 import {
   MoveRequest,
   MoveRequestStatus,
@@ -61,30 +60,14 @@ function getAuthToken(): string | null {
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-const WS_URL = API_URL.replace(/^https/, 'wss').replace(/^http/, 'ws');
 
 export function MoveRequestsList() {
   // State
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<MoveFilterOption[]>([]);
 
-  // WebSocket connection for real-time updates
-  const token = getAuthToken();
-  const wsUrl = token ? `${WS_URL}/ws?token=${token}` : `${WS_URL}/ws`;
-
-  useWebSocket({
-    url: wsUrl,
-    onMessage: (message: WebSocketMessage) => {
-      if (message.type === 'move_request_status_updated') {
-        console.log('📡 Received move request status update:', message.data);
-        // Invalidate and refetch move requests to show updated status
-        queryClient.invalidateQueries({ queryKey: ['move-requests'] });
-      }
-    },
-    autoReconnect: true,
-    reconnectInterval: 3000,
-    reconnectAttempts: 5,
-  });
+  // Real-time updates are now handled by GlobalCentrifugoSync via company:events
+  // (move_request_created, move_request_updated, move_request_cancelled)
   const [assignedFilter, setAssignedFilter] = useState<'all' | 'assigned' | 'unassigned'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMoves, setSelectedMoves] = useState<Set<string>>(new Set());

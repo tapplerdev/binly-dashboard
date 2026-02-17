@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { APIProvider, Map as GoogleMap, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
-import { MapPin, X, Loader2, Search, Plus, Layers, FileText, Map as MapIcon } from 'lucide-react';
+import { MapPin, X, Loader2, Search, Plus, Layers, FileText, Map as MapIcon, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 // OLD: Google Places Autocomplete (commented out for rollback)
 // import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
@@ -12,7 +12,9 @@ import { HerePlaceDetails, hereReverseGeocode } from '@/lib/services/geocoding.s
 import { inputStyles, cn } from '@/lib/utils';
 import { useBins } from '@/lib/hooks/use-bins';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
+import { useNoGoZones } from '@/lib/hooks/use-zones';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
+import { getZoneColor } from '@/lib/types/zone';
 
 interface QueuedLocation {
   street: string;
@@ -89,6 +91,7 @@ export function CreatePotentialLocationDialog({
 }: CreatePotentialLocationDialogProps) {
   const { data: bins = [] } = useBins();
   const { data: warehouse } = useWarehouseLocation();
+  const { data: activeZones = [] } = useNoGoZones('active');
   const mappableBins = bins.filter(isMappableBin);
 
   const [loading, setLoading] = useState(false);
@@ -1149,6 +1152,43 @@ export function CreatePotentialLocationDialog({
                     </div>
                   </AdvancedMarker>
                 )}
+
+                {/* No-Go Zone markers — warn when placing near a problem area */}
+                {activeZones.map((zone) => {
+                  const color = getZoneColor(zone.conflict_score);
+                  return (
+                    <AdvancedMarker
+                      key={`zone-${zone.id}`}
+                      position={{ lat: zone.center_latitude, lng: zone.center_longitude }}
+                      zIndex={3}
+                    >
+                      <div className="flex flex-col items-center">
+                        <div
+                          className="rounded-full flex items-center justify-center animate-pulse"
+                          style={{
+                            width: 30,
+                            height: 30,
+                            backgroundColor: color + '99',
+                            border: '2px solid white',
+                            boxShadow: `0 0 0 2px ${color}, 0 2px 8px rgba(0,0,0,0.6)`,
+                          }}
+                        >
+                          <ShieldAlert className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        <div
+                          className="mt-0.5 px-1.5 py-0 rounded text-xs font-bold text-white whitespace-nowrap"
+                          style={{
+                            backgroundColor: color,
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.6)',
+                            fontSize: '10px',
+                          }}
+                        >
+                          {zone.name}
+                        </div>
+                      </div>
+                    </AdvancedMarker>
+                  );
+                })}
               </GoogleMap>
             </APIProvider>
 

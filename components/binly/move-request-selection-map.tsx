@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { getBins } from '@/lib/api/bins';
 import { Bin, isMappableBin, MoveRequest } from '@/lib/types/bin';
-import { X, Search, Filter, MapPin, MapIcon, List } from 'lucide-react';
+import { useNoGoZones } from '@/lib/hooks/use-zones';
+import { getZoneColor } from '@/lib/types/zone';
+import { X, Search, Filter, MapPin, MapIcon, List, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -153,6 +155,9 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests, init
   const [loading, setLoading] = useState(true);
   const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number; timestamp: number } | null>(null);
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map'); // Mobile view toggle
+
+  // Active no-go zones for map overlay
+  const { data: activeZones = [] } = useNoGoZones('active');
 
   // Load bins from API to get coordinates
   useEffect(() => {
@@ -337,6 +342,7 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests, init
                   defaultCenter={DEFAULT_CENTER}
                   defaultZoom={DEFAULT_ZOOM}
                   mapId="binly-move-request-selection"
+                  mapTypeId="hybrid"
                   gestureHandling="greedy"
                   disableDefaultUI={false}
                   streetViewControl={false}
@@ -374,6 +380,44 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests, init
                             title={`Bin #${request.bin_number} - ${request.current_street}`}
                           >
                             {request.bin_number % 100}
+                          </div>
+                        </div>
+                      </AdvancedMarker>
+                    );
+                  })}
+
+                  {/* No-Go Zone markers — highlight problem areas */}
+                  {activeZones.map((zone) => {
+                    const color = getZoneColor(zone.conflict_score);
+                    return (
+                      <AdvancedMarker
+                        key={`zone-${zone.id}`}
+                        position={{ lat: zone.center_latitude, lng: zone.center_longitude }}
+                        zIndex={0}
+                      >
+                        <div className="flex flex-col items-center pointer-events-none">
+                          <div
+                            className="rounded-full flex items-center justify-center animate-pulse"
+                            style={{
+                              width: 28,
+                              height: 28,
+                              backgroundColor: color + '99',
+                              border: '2px solid white',
+                              boxShadow: `0 0 0 2px ${color}, 0 2px 8px rgba(0,0,0,0.6)`,
+                            }}
+                          >
+                            <ShieldAlert className="w-3 h-3 text-white" />
+                          </div>
+                          <div
+                            className="mt-0.5 px-1.5 rounded text-white whitespace-nowrap"
+                            style={{
+                              backgroundColor: color,
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.6)',
+                              fontSize: '9px',
+                              fontWeight: 700,
+                            }}
+                          >
+                            {zone.name}
                           </div>
                         </div>
                       </AdvancedMarker>

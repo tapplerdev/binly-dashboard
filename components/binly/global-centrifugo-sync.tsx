@@ -134,6 +134,17 @@ export function GlobalCentrifugoSync() {
           break;
         }
 
+        // ── Move Request events ────────────────────────────────────────────────
+
+        case 'move_request_created':
+        case 'move_request_updated':
+        case 'move_request_cancelled': {
+          // Invalidate all move-request queries so every consumer (list, modals,
+          // shift creation map) sees the latest data immediately.
+          queryClient.invalidateQueries({ queryKey: ['move-requests'] });
+          break;
+        }
+
         default:
           break;
       }
