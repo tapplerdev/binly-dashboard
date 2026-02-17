@@ -47,6 +47,7 @@ interface BinMoveConfig {
   bin: BinWithPriority;
   moveType: 'store' | 'relocation';
   scheduledDate: number; // Unix timestamp
+  dateOption: '24h' | '3days' | 'week' | 'custom'; // Quick-pick date option
   newStreet?: string;
   newCity?: string;
   newZip?: string;
@@ -177,6 +178,7 @@ export function ScheduleMoveModalWithMap({
           bin: b,
           moveType: 'store',
           scheduledDate: defaultScheduledDate,
+          dateOption: '24h',
           assignmentType: 'unassigned',
         };
       } else {
@@ -360,6 +362,7 @@ export function ScheduleMoveModalWithMap({
           bin,
           moveType: 'relocation',
           scheduledDate: defaultScheduledDate,
+          dateOption: '24h',
           newStreet: relocation.newAddress || '',
           newCity: relocation.newCity || '',
           newZip: relocation.newZip || '',
@@ -375,6 +378,7 @@ export function ScheduleMoveModalWithMap({
           bin,
           moveType: 'store',
           scheduledDate: defaultScheduledDate,
+          dateOption: '24h',
           reason: '',
           notes: '',
           assignmentType: 'unassigned',
@@ -1041,6 +1045,7 @@ export function ScheduleMoveModalWithMap({
       updates[bin.id] = {
         ...binConfigs[bin.id],
         scheduledDate,
+        dateOption: 'custom',
       };
     });
     setBinConfigs((prev) => ({ ...prev, ...updates }));
@@ -1493,6 +1498,75 @@ export function ScheduleMoveModalWithMap({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Scheduled Date *
                   </label>
+                  {/* Quick-pick date badges */}
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateBinConfig(bin.id, {
+                          scheduledDate: addDays(new Date(), 1).getTime(),
+                          dateOption: '24h',
+                        });
+                      }}
+                      className={cn(
+                        'px-3 py-2 rounded-lg border-2 text-xs font-medium transition-colors text-center',
+                        config.dateOption === '24h'
+                          ? 'border-red-500 bg-red-50 text-red-700'
+                          : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                      )}
+                    >
+                      Within 24hrs
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateBinConfig(bin.id, {
+                          scheduledDate: addDays(new Date(), 3).getTime(),
+                          dateOption: '3days',
+                        });
+                      }}
+                      className={cn(
+                        'px-3 py-2 rounded-lg border-2 text-xs font-medium transition-colors text-center',
+                        config.dateOption === '3days'
+                          ? 'border-orange-500 bg-orange-50 text-orange-700'
+                          : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                      )}
+                    >
+                      Within 3 days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateBinConfig(bin.id, {
+                          scheduledDate: addDays(new Date(), 7).getTime(),
+                          dateOption: 'week',
+                        });
+                      }}
+                      className={cn(
+                        'px-3 py-2 rounded-lg border-2 text-xs font-medium transition-colors text-center',
+                        config.dateOption === 'week'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                      )}
+                    >
+                      Next week
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateBinConfig(bin.id, { dateOption: 'custom' });
+                      }}
+                      className={cn(
+                        'px-3 py-2 rounded-lg border-2 text-xs font-medium transition-colors text-center',
+                        config.dateOption === 'custom'
+                          ? 'border-primary bg-blue-50 text-primary'
+                          : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                      )}
+                    >
+                      Custom date
+                    </button>
+                  </div>
+                  {/* Custom date input - always visible but prominent when custom is selected */}
                   <input
                     type="date"
                     value={new Date(config.scheduledDate).toISOString().split('T')[0]}
@@ -1500,10 +1574,16 @@ export function ScheduleMoveModalWithMap({
                       const newDate = new Date(e.target.value).getTime();
                       updateBinConfig(bin.id, {
                         scheduledDate: newDate,
+                        dateOption: 'custom',
                       });
                     }}
                     min={new Date().toISOString().split('T')[0]}
-                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                    className={cn(
+                      'w-full px-3 py-2 border-2 rounded-lg text-sm focus:ring-2 focus:ring-primary transition-colors',
+                      config.dateOption === 'custom'
+                        ? 'border-primary focus:border-primary'
+                        : 'border-gray-200 focus:border-primary'
+                    )}
                   />
                 </div>
 
