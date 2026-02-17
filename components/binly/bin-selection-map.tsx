@@ -290,8 +290,8 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                   {mappableBins.map((bin) => {
                     const isSelected = selectedBinIds.has(bin.id);
                     const isAlreadyAdded = alreadyAdded.has(bin.id);
-                    const markerColor = isAlreadyAdded
-                      ? '#6366f1' // indigo-500 for already-added
+                    const markerColor = isAlreadyAdded && isSelected
+                      ? '#6366f1' // indigo-500 for already-added + still checked
                       : isSelected
                       ? '#16a34a'
                       : getBinMarkerColor(bin.fill_percentage, bin.status);
@@ -301,18 +301,18 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                         key={bin.id}
                         position={{ lat: bin.latitude, lng: bin.longitude }}
                         onClick={() => toggleBinSelection(bin.id)}
-                        zIndex={isAlreadyAdded ? 20 : isSelected ? 15 : 10}
+                        zIndex={isAlreadyAdded && isSelected ? 20 : isSelected ? 15 : 10}
                       >
                         <div className="relative cursor-pointer" title={`Bin #${bin.bin_number} - ${bin.location_name || bin.current_street}${isAlreadyAdded ? ' · Already in shift' : ''}${hasMoveRequest(bin) ? ' · Move req. pending' : ''}`}>
-                          {/* Pulsing ring for already-added bins */}
-                          {isAlreadyAdded && (
+                          {/* Pulsing ring for already-added bins — only when still selected */}
+                          {isAlreadyAdded && isSelected && (
                             <div className="absolute inset-0 -m-2">
                               <div className="w-12 h-12 rounded-full bg-indigo-500 opacity-30 animate-ping" />
                             </div>
                           )}
                           <div
                             className={`relative w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold transition-all hover:scale-110 ${
-                              isAlreadyAdded
+                              isAlreadyAdded && isSelected
                                 ? 'ring-2 ring-white shadow-lg'
                                 : isSelected
                                 ? 'ring-4 ring-green-300 animate-pulse-glow'
@@ -515,7 +515,7 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                       key={bin.id}
                       onClick={() => toggleBinSelection(bin.id)}
                       className={`p-3 rounded-lg cursor-pointer transition-all ${
-                        isAlreadyAdded
+                        isAlreadyAdded && isSelected
                           ? 'bg-indigo-50 border-2 border-indigo-400'
                           : isSelected
                           ? 'bg-green-50 border-2 border-green-500'
@@ -529,7 +529,7 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                           checked={isSelected}
                           onChange={() => {}}
                           className={`mt-0.5 rounded border-gray-300 focus:ring-2 ${
-                            isAlreadyAdded
+                            isAlreadyAdded && isSelected
                               ? 'text-indigo-600 focus:ring-indigo-500'
                               : 'text-green-600 focus:ring-green-500'
                           }`}
@@ -542,7 +542,7 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                               Bin #{bin.bin_number}
                             </p>
                             <span className="text-xs text-gray-500">{fillPercentage}%</span>
-                            {isAlreadyAdded && (
+                            {isAlreadyAdded && isSelected && (
                               <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded border border-indigo-300 font-medium">
                                 Already in shift
                               </span>
@@ -557,7 +557,19 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                             {bin.location_name || `${bin.current_street}, ${bin.city}`}
                           </p>
 
-                          {isAlreadyAdded ? (
+                          {/* Always show the fill bar */}
+                          <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
+                            <div
+                              className="h-1.5 rounded-full transition-all"
+                              style={{
+                                width: `${fillPercentage}%`,
+                                backgroundColor: getBinMarkerColor(fillPercentage, bin.status),
+                              }}
+                            />
+                          </div>
+
+                          {/* Sub-labels below the bar */}
+                          {isAlreadyAdded && isSelected ? (
                             <p className="mt-1 text-xs text-indigo-500">
                               This bin is already in the task list
                             </p>
@@ -574,17 +586,7 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                                 View
                               </a>
                             </p>
-                          ) : (
-                            <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
-                              <div
-                                className="h-1.5 rounded-full transition-all"
-                                style={{
-                                  width: `${fillPercentage}%`,
-                                  backgroundColor: getBinMarkerColor(fillPercentage, bin.status),
-                                }}
-                              />
-                            </div>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                     </div>
