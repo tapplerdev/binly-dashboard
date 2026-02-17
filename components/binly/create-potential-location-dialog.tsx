@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
+import { APIProvider, Map as GoogleMap, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { MapPin, X, Loader2, Search, Plus, Layers, FileText, Map as MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 // OLD: Google Places Autocomplete (commented out for rollback)
@@ -1054,12 +1054,13 @@ export function CreatePotentialLocationDialog({
           {/* Right Side - Map */}
           <div className={`w-full md:w-[65%] relative ${viewMode === 'form' ? 'hidden md:flex' : 'flex'} flex-col`}>
             <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
-              <Map
+              <GoogleMap
                 mapId="potential-location-map"
                 defaultCenter={DEFAULT_CENTER}
                 defaultZoom={11}
                 minZoom={3}
                 maxZoom={20}
+                mapTypeId="hybrid"
                 gestureHandling="greedy"
                 disableDefaultUI={false}
                 zoomControl={true}
@@ -1148,7 +1149,7 @@ export function CreatePotentialLocationDialog({
                     </div>
                   </AdvancedMarker>
                 )}
-              </Map>
+              </GoogleMap>
             </APIProvider>
 
             {/* Search Bar Overlay */}

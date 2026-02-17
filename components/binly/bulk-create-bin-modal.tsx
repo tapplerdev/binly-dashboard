@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 // NEW: HERE Maps Autocomplete
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
 import { hereReverseGeocode, HerePlaceDetails } from '@/lib/services/geocoding.service';
-import { Map, AdvancedMarker, Pin, useMap, InfoWindow } from '@vis.gl/react-google-maps';
+import { Map as GoogleMap, AdvancedMarker, Pin, useMap, InfoWindow } from '@vis.gl/react-google-maps';
 
 interface BinRow {
   id: string;
@@ -875,20 +875,21 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
             {/* Right Side: Large Map - Shows on mobile when viewMode is 'map', always visible on desktop */}
             <div className={`flex-1 bg-gray-50 flex-col ${viewMode === 'form' ? 'hidden md:flex' : 'flex'}`}>
               <div className="flex-1 relative" style={{ pointerEvents: 'auto' }}>
-                  {rows.some(r => r.latitude && r.longitude) ? (
-                    <Map
-                      defaultCenter={mapCenter}
-                      defaultZoom={mapZoom}
-                      gestureHandling="greedy"
-                      disableDefaultUI={false}
-                      zoomControl={true}
-                      mapTypeControl={false}
-                      streetViewControl={false}
-                      fullscreenControl={true}
-                      clickableIcons={true}
-                      mapId="bin-creation-map"
-                      style={{ width: '100%', height: '100%' }}
-                    >
+                  <GoogleMap
+                    defaultCenter={mapCenter}
+                    defaultZoom={mapZoom}
+                    mapTypeId="hybrid"
+                    gestureHandling="greedy"
+                    disableDefaultUI={false}
+                    zoomControl={true}
+                    mapTypeControl={false}
+                    streetViewControl={false}
+                    fullscreenControl={false}
+                    clickableIcons={true}
+                    mapId="bin-creation-map"
+                    style={{ width: '100%', height: '100%' }}
+                  >
+                    {rows.some(r => r.latitude && r.longitude) && (
                       <MapContent
                         rows={rows}
                         currentRowIndex={currentRowIndex}
@@ -898,15 +899,8 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
                         mapCenter={mapCenter}
                         mapZoom={mapZoom}
                       />
-                    </Map>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-gray-400">
-                      <div className="text-center">
-                        <MapPin className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">Enter an address to see location</p>
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </GoogleMap>
                 </div>
               </div>
           </form>
