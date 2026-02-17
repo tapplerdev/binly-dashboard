@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
+import { APIProvider, Map as GoogleMap, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { Route } from '@/lib/types/route';
 import { Bin } from '@/lib/types/bin';
 import { getBinMarkerColor } from '@/lib/types/bin';
@@ -228,7 +228,7 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
             {/* Map — Left */}
             <div className="flex-1 relative">
               <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
-                <Map
+                <GoogleMap
                   defaultCenter={DEFAULT_CENTER}
                   defaultZoom={DEFAULT_ZOOM}
                   mapId="route-selection-map"
@@ -259,7 +259,7 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
                       </div>
                     </AdvancedMarker>
                   )}
-                </Map>
+                </GoogleMap>
               </APIProvider>
 
               {/* No template selected hint */}
