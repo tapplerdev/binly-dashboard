@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { useBins } from '@/lib/hooks/use-bins';
-import { useNoGoZones } from '@/lib/hooks/use-zones';
+import { useNoGoZones, zoneKeys } from '@/lib/hooks/use-zones';
 import { usePotentialLocations, potentialLocationKeys } from '@/lib/hooks/use-potential-locations';
 import { useActiveDrivers } from '@/lib/hooks/use-active-drivers';
 import { useWebSocket, WebSocketMessage } from '@/lib/hooks/use-websocket';
@@ -255,6 +255,19 @@ export function LiveMapView() {
           setSelectedPotentialLocation((cur) => (cur?.id === d.location_id ? null : cur));
           // Refetch bins to show the new bin on the map
           queryClient.invalidateQueries({ queryKey: ['bins'] });
+          break;
+        }
+
+        case 'zone_created': {
+          // Upsert the zone into the active-zones cache — circle appears on map without refetch
+          const newZone = event.data as NoGoZone;
+          queryClient.setQueryData<NoGoZone[]>(
+            zoneKeys.byStatus('active'),
+            (old) => {
+              const filtered = old?.filter((z) => z.id !== newZone.id) ?? [];
+              return [...filtered, newZone];
+            }
+          );
           break;
         }
 

@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCentrifugo } from '@/lib/hooks/use-centrifugo';
 import {
   ShieldAlert,
   List,
@@ -14,7 +16,7 @@ import {
   ChevronUp,
   ChevronDown,
 } from 'lucide-react';
-import { useNoGoZones } from '@/lib/hooks/use-zones';
+import { useNoGoZones, zoneKeys } from '@/lib/hooks/use-zones';
 import {
   NoGoZone,
   ZoneStatus,
@@ -127,7 +129,32 @@ export function NoGoZonesView() {
   const [selectedZone, setSelectedZone] = useState<NoGoZone | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
 
+  const queryClient = useQueryClient();
+  const { status: centrifugoStatus, subscribe } = useCentrifugo();
+
   const { data: zones = [], isLoading, error } = useNoGoZones();
+
+  // Real-time: upsert new/updated zones from company:events without a full refetch
+  useEffect(() => {
+    if (centrifugoStatus !== 'connected') return;
+
+    const unsubscribe = subscribe('company:events', (raw: unknown) => {
+      const event = raw as { type: string; data: unknown };
+      if (event.type === 'zone_created') {
+        const newZone = event.data as NoGoZone;
+        // Update the "all zones" cache (used by this view)
+        queryClient.setQueryData<NoGoZone[]>(
+          zoneKeys.all,
+          (old) => {
+            const filtered = old?.filter((z) => z.id !== newZone.id) ?? [];
+            return [...filtered, newZone];
+          }
+        );
+      }
+    });
+
+    return unsubscribe;
+  }, [centrifugoStatus, subscribe, queryClient]);
 
   const filtered = useMemo(() => {
     let list = [...zones];
