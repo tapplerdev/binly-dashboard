@@ -778,6 +778,7 @@ export function LiveMapView() {
           defaultZoom={DEFAULT_ZOOM}
           minZoom={3}
           maxZoom={20}
+          mapTypeId="hybrid"
           gestureHandling="greedy"
           disableDefaultUI={true}
           restriction={{
