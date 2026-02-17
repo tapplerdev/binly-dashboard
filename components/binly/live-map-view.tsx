@@ -16,10 +16,10 @@ import {
   getBinMarkerColor,
   getFillLevelCategory,
 } from '@/lib/types/bin';
-import { NoGoZone, getZoneColor, getZoneColorRgba, getZoneOpacity } from '@/lib/types/zone';
+import { NoGoZone, getZoneColor, getZoneColorRgba, getZoneOpacity, getZoneSeverity } from '@/lib/types/zone';
 import { PotentialLocation } from '@/lib/api/potential-locations';
 import { Card } from '@/components/ui/card';
-import { Loader2, Filter, ChevronDown } from 'lucide-react';
+import { Loader2, Filter, ChevronDown, ShieldAlert } from 'lucide-react';
 import { ZoneDetailsDrawer } from './zone-details-drawer';
 import { BinDetailDrawer } from './bin-detail-drawer';
 import { PotentialLocationDetailsDrawer } from './potential-location-details-drawer';
@@ -863,14 +863,27 @@ export function LiveMapView() {
               }}
             >
               <div
-                className="rounded-full shadow-lg cursor-pointer transition-all duration-300 hover:scale-110 animate-scale-in"
-                style={{
-                  width: '48px',
-                  height: '48px',
-                  backgroundColor: getZoneColorRgba(zone.conflict_score, 0.4),
-                }}
-                title={`${zone.name} - Score: ${zone.conflict_score}`}
-              />
+                className="flex flex-col items-center cursor-pointer group"
+                title={`${zone.name} · Score: ${zone.conflict_score}`}
+              >
+                <div
+                  className="rounded-full border-2 flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+                  style={{
+                    width: 36,
+                    height: 36,
+                    backgroundColor: getZoneColor(zone.conflict_score) + '33',
+                    borderColor: getZoneColor(zone.conflict_score),
+                  }}
+                >
+                  <ShieldAlert className="w-4 h-4" style={{ color: getZoneColor(zone.conflict_score) }} />
+                </div>
+                <div
+                  className="mt-1 px-2 py-0.5 rounded text-xs font-semibold text-white shadow opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap"
+                  style={{ backgroundColor: getZoneColor(zone.conflict_score) }}
+                >
+                  {getZoneSeverity(zone.conflict_score).toUpperCase()} · {zone.conflict_score}
+                </div>
+              </div>
             </AdvancedMarker>
           ))}
 
