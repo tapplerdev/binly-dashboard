@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Calendar, List, User, X, Search, ChevronDown, Filter, MapPin, Loader2, Trash2, GripVertical, Package, MapPinned, Warehouse, MoveRight, Plus, Pencil, ArrowUp, ArrowDown, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Calendar, List, User, X, Search, ChevronDown, Filter, MapPin, Loader2, Trash2, GripVertical, Package, MapPinned, Warehouse, MoveRight, Plus, Pencil, ArrowUp, ArrowDown } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel, ShiftStatus } from '@/lib/types/shift';
 import { ShiftDetailsDrawer } from './shift-details-drawer';
 import { BinSelectionMap } from './bin-selection-map';
@@ -1347,7 +1347,6 @@ function CreateShiftDrawer({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [submitWarning, setSubmitWarning] = useState<string | null>(null);
   const [isDriverDropdownOpen, setIsDriverDropdownOpen] = useState(false);
   const [isDriverClosing, setIsDriverClosing] = useState(false);
   const [showBinSelection, setShowBinSelection] = useState(false);
@@ -2299,7 +2298,6 @@ function CreateShiftDrawer({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSubmitWarning(null);
     setIsSubmitting(true);
 
     try {
@@ -2313,29 +2311,8 @@ function CreateShiftDrawer({
         throw new Error('Please add at least one task to the shift');
       }
 
-      // Filter out locked collection tasks (bins with open move requests)
-      const lockedTasks = tasks.filter(task =>
-        task.type === 'collection' && task.bin_id &&
-        allBins.find(b => b.id === task.bin_id)?.move_requested === true
-      );
-      const tasksToSubmit = tasks.filter(task =>
-        !(task.type === 'collection' && task.bin_id &&
-          allBins.find(b => b.id === task.bin_id)?.move_requested === true)
-      );
-
-      if (lockedTasks.length > 0) {
-        const skippedNumbers = lockedTasks.map(t => `#${t.bin_number}`).join(', ');
-        setSubmitWarning(
-          `${lockedTasks.length} bin${lockedTasks.length !== 1 ? 's' : ''} skipped (move request pending): ${skippedNumbers}`
-        );
-      }
-
-      if (tasksToSubmit.length === 0) {
-        throw new Error('All tasks have open move requests. Resolve them before creating this shift.');
-      }
-
       // Convert tasks to API format
-      const tasksPayload = tasksToSubmit.map(task => {
+      const tasksPayload = tasks.map(task => {
         const baseTask: Record<string, unknown> = {
           task_type: task.type,
           latitude: task.latitude,
@@ -2842,11 +2819,7 @@ function CreateShiftDrawer({
                       className={`flex items-center gap-3 px-4 py-3 border rounded-lg cursor-move hover:shadow-md transition-all ${
                         draggedTaskIndex === index ? 'opacity-50' : ''
                       } ${dragOverIndex === index && draggedTaskIndex !== index ? 'border-blue-500 border-2 shadow-lg' : ''} ${
-                        isTaskLocked
-                          ? 'bg-amber-50 border-amber-300'
-                          : task.auto_inserted
-                          ? 'bg-blue-50 border-blue-200'
-                          : 'bg-white'
+                        task.auto_inserted ? 'bg-blue-50 border-blue-200' : 'bg-white'
                       }`}
                     >
                       <GripVertical className="w-4 h-4 text-gray-400" />
@@ -2854,7 +2827,7 @@ function CreateShiftDrawer({
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs font-semibold text-gray-500">#{index + 1}</span>
                           {task.type === 'warehouse_stop' && <Warehouse className="w-4 h-4 text-blue-600" />}
-                          {task.type === 'collection' && <Package className={`w-4 h-4 ${isTaskLocked ? 'text-amber-600' : 'text-green-600'}`} />}
+                          {task.type === 'collection' && <Package className="w-4 h-4 text-green-600" />}
                           {task.type === 'placement' && <MapPinned className="w-4 h-4 text-purple-600" />}
                           {task.type === 'pickup' && <ArrowUp className="w-4 h-4 text-orange-600" />}
                           {task.type === 'dropoff' && <ArrowDown className="w-4 h-4 text-orange-600" />}
@@ -2869,9 +2842,8 @@ function CreateShiftDrawer({
                             </span>
                           )}
                           {isTaskLocked && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
-                              <AlertTriangle className="w-3 h-3" />
-                              Move pending
+                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-xs rounded border border-blue-200">
+                              Move req. pending
                             </span>
                           )}
                         </div>
@@ -2883,15 +2855,15 @@ function CreateShiftDrawer({
                               <span className="font-medium">Bin #{task.bin_number}</span> - {task.address}
                             </p>
                             {isTaskLocked && (
-                              <p className="text-xs text-amber-600 mt-1">
-                                This bin has an open move request — it will be skipped on submit.{' '}
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                This bin also has an open move request.{' '}
                                 <a
                                   href="/operations/move-requests"
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-0.5 underline hover:text-amber-800"
+                                  className="underline hover:text-gray-600"
                                 >
-                                  View <ExternalLink className="w-3 h-3" />
+                                  View
                                 </a>
                               </p>
                             )}
@@ -2963,12 +2935,6 @@ function CreateShiftDrawer({
 
           {/* Footer */}
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-            {submitWarning && (
-              <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
-                <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                <span className="text-sm text-amber-800">{submitWarning}</span>
-              </div>
-            )}
             {error && (
               <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
                 <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
