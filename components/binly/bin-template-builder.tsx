@@ -390,7 +390,9 @@ export function BinTemplateBuilder() {
               mapId="bin-template-builder-map"
               defaultCenter={DEFAULT_CENTER}
               defaultZoom={DEFAULT_ZOOM}
+              mapTypeId="hybrid"
               disableDefaultUI={false}
+              streetViewControl={false}
               gestureHandling="greedy"
               style={{ width: '100%', height: '100%' }}
             >

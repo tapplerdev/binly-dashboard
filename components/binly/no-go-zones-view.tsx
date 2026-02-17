@@ -482,16 +482,7 @@ function ZoneMapView({
 
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
-  // Default center: average of all zone coords, or a fallback
-  const center =
-    zones.length > 0
-      ? {
-          lat:
-            zones.reduce((s, z) => s + z.center_latitude, 0) / zones.length,
-          lng:
-            zones.reduce((s, z) => s + z.center_longitude, 0) / zones.length,
-        }
-      : { lat: 25.2048, lng: 55.2708 }; // Dubai default
+  const center = { lat: 37.3382, lng: -121.8863 }; // San Jose, CA
 
   const { APIProvider, Map, AdvancedMarker } = MapComponents;
 
@@ -499,9 +490,11 @@ function ZoneMapView({
     <APIProvider apiKey={apiKey}>
       <Map
         defaultCenter={center}
-        defaultZoom={zones.length > 0 ? 12 : 10}
+        defaultZoom={11}
         mapId="no-go-zones-map"
+        mapTypeId="hybrid"
         disableDefaultUI={false}
+        streetViewControl={false}
         style={{ width: '100%', height: '100%' }}
       >
         {zones.map((zone) => (

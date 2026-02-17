@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { APIProvider, Map as GoogleMap, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { Route } from '@/lib/types/route';
-import { getBins } from '@/lib/api/bins';
+import { useBins } from '@/lib/hooks/use-bins';
 import { Bin, isMappableBin } from '@/lib/types/bin';
 import { Loader2 } from 'lucide-react';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
@@ -190,7 +190,7 @@ function AllRoutesPolylines({ routes, visibleRouteIds, allBins, onRouteSelect, o
           const coordinates = [warehouseCoordinate, ...binCoordinates, warehouseCoordinate].join(';');
 
           // Mapbox Directions API endpoint
-          const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?geometries=geojson&overview=full&access_token=pk.eyJ1IjoiYmlubHl5YWkiLCJhIjoiY21pNzN4bzlhMDVheTJpcHdqd2FtYjhpeSJ9.sQM8WHE2C9zWH0xG107xhw`;
+          const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?geometries=geojson&overview=full&access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}`;
 
           const response = await fetch(mapboxUrl);
           const data = await response.json();
@@ -356,25 +356,8 @@ export function RoutesMapView({ routes, visibleRouteIds, onRouteSelect, onViewDe
     address: warehouse?.address || 'Warehouse'
   };
 
-  const [allBins, setAllBins] = useState<Bin[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: allBins = [], isLoading: loading } = useBins();
   const [hoveredRouteId, setHoveredRouteId] = useState<string | null>(null);
-
-  // Load all bins once
-  useEffect(() => {
-    async function loadBins() {
-      try {
-        setLoading(true);
-        const bins = await getBins();
-        setAllBins(bins);
-      } catch (error) {
-        console.error('Failed to load bins:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadBins();
-  }, []);
 
   if (loading) {
     return (
@@ -421,7 +404,7 @@ export function RoutesMapView({ routes, visibleRouteIds, onRouteSelect, onViewDe
           strictBounds: false,
         }}
         className="w-full h-full rounded-xl"
-        mapTypeId="roadmap"
+        mapTypeId="hybrid"
       >
         {/* Zoom to selected route */}
         {selectedRouteId && routes.find(r => r.id === selectedRouteId) && (
