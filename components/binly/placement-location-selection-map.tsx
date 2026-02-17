@@ -67,6 +67,7 @@ interface PlacementLocationSelectionMapProps {
   onClose: () => void;
   onConfirm: (selectedLocationIds: string[]) => void;
   potentialLocations: PotentialLocation[];
+  initialSelectedLocations?: string[]; // Location IDs already in the task list — shown as pre-checked with distinct style
 }
 
 /**
@@ -81,8 +82,9 @@ function isMappableLocation(location: PotentialLocation): location is PotentialL
   );
 }
 
-export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLocations }: PlacementLocationSelectionMapProps) {
-  const [selectedLocationIds, setSelectedLocationIds] = useState<Set<string>>(new Set());
+export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLocations, initialSelectedLocations = [] }: PlacementLocationSelectionMapProps) {
+  const alreadyAdded = new Set(initialSelectedLocations);
+  const [selectedLocationIds, setSelectedLocationIds] = useState<Set<string>>(new Set(initialSelectedLocations));
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number; timestamp: number } | null>(null);
@@ -396,6 +398,7 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                 ) : (
                   filteredLocations.map((location) => {
                     const isSelected = selectedLocationIds.has(location.id);
+                    const isAlreadyAdded = alreadyAdded.has(location.id);
 
                     // Format created date
                     const createdDate = new Date(location.created_at_iso);
@@ -410,7 +413,9 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                         key={location.id}
                         onClick={() => toggleLocationSelection(location.id, location)}
                         className={`p-3 rounded-lg cursor-pointer transition-all ${
-                          isSelected
+                          isAlreadyAdded
+                            ? 'bg-indigo-50 border-2 border-indigo-400'
+                            : isSelected
                             ? 'bg-green-50 border-2 border-green-500'
                             : 'bg-white border border-gray-200 hover:bg-gray-50'
                         }`}
@@ -421,16 +426,27 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => {}}
-                            className="mt-0.5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                            className={`mt-0.5 rounded border-gray-300 focus:ring-2 ${
+                              isAlreadyAdded
+                                ? 'text-indigo-600 focus:ring-indigo-500'
+                                : 'text-green-600 focus:ring-green-500'
+                            }`}
                           />
 
                           {/* Location Info */}
                           <div className="flex-1 min-w-0">
                             <div className="mb-2">
-                              <p className="font-semibold text-sm text-gray-900 truncate">
-                                {location.address || `${location.street}, ${location.city}`}
-                              </p>
-                              <p className="text-xs text-gray-600 mt-0.5">
+                              <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                <p className="font-semibold text-sm text-gray-900 truncate">
+                                  {location.address || `${location.street}, ${location.city}`}
+                                </p>
+                                {isAlreadyAdded && (
+                                  <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded border border-indigo-300 font-medium shrink-0">
+                                    ✓ Already in shift
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-600">
                                 {location.city}, {location.zip}
                               </p>
                             </div>
@@ -459,6 +475,12 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                                   ✓ Converted to Bin #{location.bin_number}
                                 </div>
                               )}
+
+                              {isAlreadyAdded && (
+                                <p className="text-xs text-indigo-500 mt-1">
+                                  This location is already in the task list
+                                </p>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -484,7 +506,16 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
             disabled={selectedLocationIds.size === 0}
             className="px-6 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-fast order-1 sm:order-2"
           >
-            Add to Shift ({selectedLocationIds.size})
+            {(() => {
+              const newlySelected = [...selectedLocationIds].filter(id => !alreadyAdded.has(id)).length;
+              const alreadyAddedSelected = [...selectedLocationIds].filter(id => alreadyAdded.has(id)).length;
+              if (alreadyAddedSelected > 0 && newlySelected > 0) {
+                return `Add to Shift (${newlySelected} new + ${alreadyAddedSelected} existing)`;
+              } else if (alreadyAddedSelected > 0) {
+                return `Add to Shift (${alreadyAddedSelected} already in shift)`;
+              }
+              return `Add to Shift (${newlySelected})`;
+            })()}
           </button>
         </div>
       </div>

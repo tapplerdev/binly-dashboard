@@ -1358,6 +1358,7 @@ function CreateShiftDrawer({
   const [potentialLocations, setPotentialLocations] = useState<PotentialLocation[]>([]);
   const [showMoveRequestSelection, setShowMoveRequestSelection] = useState(false);
   const [moveRequests, setMoveRequests] = useState<MoveRequest[]>([]);
+  const [moveRequestFocusBinId, setMoveRequestFocusBinId] = useState<string | null>(null);
   const driverDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown with animation
@@ -1573,6 +1574,21 @@ function CreateShiftDrawer({
         const requests = await getMoveRequests({ status: 'pending', assigned: 'unassigned' });
         setMoveRequests(requests);
       }
+      setMoveRequestFocusBinId(null);
+      setShowMoveRequestSelection(true);
+    } catch (error) {
+      console.error('Failed to fetch move requests:', error);
+      setError('Failed to load move requests. Please try again.');
+    }
+  };
+
+  const openMoveRequestSelectionForBin = async (binId: string) => {
+    try {
+      if (moveRequests.length === 0) {
+        const requests = await getMoveRequests({ status: 'pending', assigned: 'unassigned' });
+        setMoveRequests(requests);
+      }
+      setMoveRequestFocusBinId(binId);
       setShowMoveRequestSelection(true);
     } catch (error) {
       console.error('Failed to fetch move requests:', error);
@@ -2855,17 +2871,21 @@ function CreateShiftDrawer({
                               <span className="font-medium">Bin #{task.bin_number}</span> - {task.address}
                             </p>
                             {isTaskLocked && (
-                              <p className="text-xs text-gray-400 mt-0.5">
-                                This bin also has an open move request.{' '}
-                                <a
-                                  href="/operations/move-requests"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="underline hover:text-gray-600"
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                <p className="text-xs text-gray-400">
+                                  This bin has an open move request.
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (task.bin_id) openMoveRequestSelectionForBin(task.bin_id);
+                                  }}
+                                  className="px-2 py-0.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors"
                                 >
-                                  View
-                                </a>
-                              </p>
+                                  + Add to shift
+                                </button>
+                              </div>
                             )}
                           </>
                         )}
@@ -2978,6 +2998,9 @@ function CreateShiftDrawer({
           onClose={() => setShowBinSelection(false)}
           onConfirm={handleBinSelectionConfirm}
           initialSelectedBins={[]}
+          alreadyAddedBinIds={tasks
+            .filter(t => t.type === 'collection' && t.bin_id)
+            .map(t => t.bin_id!)}
         />
       )}
 
@@ -3155,15 +3178,22 @@ function CreateShiftDrawer({
           onClose={() => setShowPlacementSelection(false)}
           onConfirm={handlePlacementSelectionConfirm}
           potentialLocations={potentialLocations}
+          initialSelectedLocations={tasks
+            .filter(t => t.type === 'placement' && t.potential_location_id)
+            .map(t => t.potential_location_id!)}
         />
       )}
 
       {/* Move Request Selection Modal - Map-Based */}
       {showMoveRequestSelection && (
         <MoveRequestSelectionMap
-          onClose={() => setShowMoveRequestSelection(false)}
+          onClose={() => { setShowMoveRequestSelection(false); setMoveRequestFocusBinId(null); }}
           onConfirm={handleMoveRequestSelectionConfirm}
           moveRequests={moveRequests}
+          initialSelectedRequests={tasks
+            .filter(t => (t.type === 'pickup' || t.type === 'dropoff') && t.move_request_id)
+            .map(t => t.move_request_id!)}
+          focusBinId={moveRequestFocusBinId || undefined}
         />
       )}
     </div>

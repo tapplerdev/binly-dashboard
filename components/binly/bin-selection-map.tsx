@@ -14,6 +14,7 @@ interface BinSelectionMapProps {
   onClose: () => void;
   onConfirm: (selectedBinIds: string[]) => void;
   initialSelectedBins?: string[];
+  alreadyAddedBinIds?: string[]; // Bins already in the task list — shown as pre-checked with distinct style
 }
 
 // Drawing Manager Component - Must be child of Map to use useMap
@@ -93,9 +94,10 @@ function DrawingManagerComponent({ lassoMode, bins, onBinsSelected }: DrawingMan
   return null;
 }
 
-export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }: BinSelectionMapProps) {
+export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], alreadyAddedBinIds = [] }: BinSelectionMapProps) {
   const [bins, setBins] = useState<Bin[]>([]);
-  const [selectedBinIds, setSelectedBinIds] = useState<Set<string>>(new Set(initialSelectedBins));
+  const alreadyAdded = new Set(alreadyAddedBinIds);
+  const [selectedBinIds, setSelectedBinIds] = useState<Set<string>>(new Set([...initialSelectedBins, ...alreadyAddedBinIds]));
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [lassoMode, setLassoMode] = useState(false);
@@ -286,7 +288,10 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
                   {/* Bin Markers */}
                   {mappableBins.map((bin) => {
                     const isSelected = selectedBinIds.has(bin.id);
-                    const markerColor = isSelected
+                    const isAlreadyAdded = alreadyAdded.has(bin.id);
+                    const markerColor = isAlreadyAdded
+                      ? '#6366f1' // indigo-500 for already-added
+                      : isSelected
                       ? '#16a34a'
                       : getBinMarkerColor(bin.fill_percentage, bin.status);
 
@@ -298,10 +303,14 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
                       >
                         <div
                           className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold cursor-pointer transition-all hover:scale-110 ${
-                            isSelected ? 'ring-4 ring-green-300 animate-pulse-glow' : ''
+                            isAlreadyAdded
+                              ? 'ring-4 ring-indigo-300'
+                              : isSelected
+                              ? 'ring-4 ring-green-300 animate-pulse-glow'
+                              : ''
                           }`}
                           style={{ backgroundColor: markerColor }}
-                          title={`Bin #${bin.bin_number} - ${bin.location_name || bin.current_street}${hasMoveRequest(bin) ? ' · Move req. pending' : ''}`}
+                          title={`Bin #${bin.bin_number} - ${bin.location_name || bin.current_street}${isAlreadyAdded ? ' · Already in shift' : ''}${hasMoveRequest(bin) ? ' · Move req. pending' : ''}`}
                         >
                           {bin.bin_number % 100}
                         </div>
@@ -488,6 +497,7 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
               <div className="p-2 space-y-1">
                 {filteredBins.map((bin) => {
                   const isSelected = selectedBinIds.has(bin.id);
+                  const isAlreadyAdded = alreadyAdded.has(bin.id);
                   const fillPercentage = bin.fill_percentage ?? 0;
                   const moveReqPending = hasMoveRequest(bin);
 
@@ -496,7 +506,9 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
                       key={bin.id}
                       onClick={() => toggleBinSelection(bin.id)}
                       className={`p-3 rounded-lg cursor-pointer transition-all ${
-                        isSelected
+                        isAlreadyAdded
+                          ? 'bg-indigo-50 border-2 border-indigo-400'
+                          : isSelected
                           ? 'bg-green-50 border-2 border-green-500'
                           : 'bg-white border border-gray-200 hover:bg-gray-50'
                       }`}
@@ -507,7 +519,11 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => {}}
-                          className="mt-0.5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          className={`mt-0.5 rounded border-gray-300 focus:ring-2 ${
+                            isAlreadyAdded
+                              ? 'text-indigo-600 focus:ring-indigo-500'
+                              : 'text-green-600 focus:ring-green-500'
+                          }`}
                         />
 
                         {/* Bin Info */}
@@ -517,6 +533,11 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
                               Bin #{bin.bin_number}
                             </p>
                             <span className="text-xs text-gray-500">{fillPercentage}%</span>
+                            {isAlreadyAdded && (
+                              <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded border border-indigo-300 font-medium">
+                                ✓ Already in shift
+                              </span>
+                            )}
                             {moveReqPending && (
                               <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-xs rounded border border-blue-200">
                                 Move req. pending
@@ -527,7 +548,11 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
                             {bin.location_name || `${bin.current_street}, ${bin.city}`}
                           </p>
 
-                          {moveReqPending ? (
+                          {isAlreadyAdded ? (
+                            <p className="mt-1 text-xs text-indigo-500">
+                              This bin is already in the task list
+                            </p>
+                          ) : moveReqPending ? (
                             <p className="mt-1 text-xs text-gray-400">
                               This bin also has an open move request.{' '}
                               <a
@@ -574,7 +599,16 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
             disabled={selectedBinIds.size === 0}
             className="px-6 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-fast order-1 sm:order-2"
           >
-            Confirm Selection ({selectedBinIds.size})
+            {(() => {
+              const newlySelected = [...selectedBinIds].filter(id => !alreadyAdded.has(id)).length;
+              const alreadyAddedSelected = [...selectedBinIds].filter(id => alreadyAdded.has(id)).length;
+              if (alreadyAddedSelected > 0 && newlySelected > 0) {
+                return `Confirm (${newlySelected} new + ${alreadyAddedSelected} existing)`;
+              } else if (alreadyAddedSelected > 0) {
+                return `Confirm (${alreadyAddedSelected} already in shift)`;
+              }
+              return `Confirm Selection (${newlySelected})`;
+            })()}
           </button>
         </div>
       </div>

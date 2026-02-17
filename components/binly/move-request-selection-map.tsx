@@ -69,6 +69,8 @@ interface MoveRequestSelectionMapProps {
   onClose: () => void;
   onConfirm: (selectedRequestIds: string[]) => void;
   moveRequests: MoveRequest[];
+  initialSelectedRequests?: string[]; // Move request IDs already in the task list — shown as pre-checked with distinct style
+  focusBinId?: string; // When set, pre-selects the move request for this bin and scrolls to it
 }
 
 /**
@@ -136,9 +138,16 @@ function getUrgencyBadge(move: MoveRequest) {
   );
 }
 
-export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: MoveRequestSelectionMapProps) {
+export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests, initialSelectedRequests = [], focusBinId }: MoveRequestSelectionMapProps) {
   const [bins, setBins] = useState<Bin[]>([]);
-  const [selectedRequestIds, setSelectedRequestIds] = useState<Set<string>>(new Set());
+  const alreadyAdded = new Set(initialSelectedRequests);
+  // If focusBinId is provided, find and pre-select the matching move request
+  const focusedRequestId = focusBinId
+    ? moveRequests.find(r => r.bin_id === focusBinId)?.id
+    : undefined;
+  const [selectedRequestIds, setSelectedRequestIds] = useState<Set<string>>(
+    new Set([...initialSelectedRequests, ...(focusedRequestId ? [focusedRequestId] : [])])
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>('all');
   const [loading, setLoading] = useState(true);
@@ -486,6 +495,8 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
                 ) : (
                   filteredRequests.map((request) => {
                     const isSelected = selectedRequestIds.has(request.id);
+                    const isAlreadyAdded = alreadyAdded.has(request.id);
+                    const isFocused = focusedRequestId === request.id;
 
                     // Get bin coordinates for this request
                     const bin = bins.find(b => b.id === request.bin_id);
@@ -508,7 +519,9 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
                         key={request.id}
                         onClick={() => toggleRequestSelection(request.id, mappableRequest)}
                         className={`p-3 rounded-lg cursor-pointer transition-all ${
-                          isSelected
+                          isAlreadyAdded
+                            ? 'bg-indigo-50 border-2 border-indigo-400'
+                            : isSelected
                             ? 'bg-green-50 border-2 border-green-500'
                             : 'bg-white border border-gray-200 hover:bg-gray-50'
                         }`}
@@ -519,16 +532,32 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => {}}
-                            className="mt-0.5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                            className={`mt-0.5 rounded border-gray-300 focus:ring-2 ${
+                              isAlreadyAdded
+                                ? 'text-indigo-600 focus:ring-indigo-500'
+                                : 'text-green-600 focus:ring-green-500'
+                            }`}
                           />
 
                           {/* Request Info */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2 mb-2">
                               <div className="flex-1">
-                                <p className="font-semibold text-sm text-gray-900">
-                                  Bin #{request.bin_number}
-                                </p>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-semibold text-sm text-gray-900">
+                                    Bin #{request.bin_number}
+                                  </p>
+                                  {isFocused && !isAlreadyAdded && (
+                                    <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded border border-blue-300 font-medium">
+                                      Suggested
+                                    </span>
+                                  )}
+                                  {isAlreadyAdded && (
+                                    <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded border border-indigo-300 font-medium">
+                                      ✓ Already in shift
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="text-xs text-gray-600 mt-0.5 truncate">
                                   {request.current_street}, {request.city} {request.zip}
                                 </p>
@@ -565,6 +594,12 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
                                   {request.reason}
                                 </p>
                               )}
+
+                              {isAlreadyAdded && (
+                                <p className="text-xs text-indigo-500 mt-1">
+                                  This move request is already in the task list
+                                </p>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -590,7 +625,16 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests }: Mo
             disabled={selectedRequestIds.size === 0}
             className="px-6 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-fast order-1 sm:order-2"
           >
-            Add to Shift ({selectedRequestIds.size})
+            {(() => {
+              const newlySelected = [...selectedRequestIds].filter(id => !alreadyAdded.has(id)).length;
+              const alreadyAddedSelected = [...selectedRequestIds].filter(id => alreadyAdded.has(id)).length;
+              if (alreadyAddedSelected > 0 && newlySelected > 0) {
+                return `Add to Shift (${newlySelected} new + ${alreadyAddedSelected} existing)`;
+              } else if (alreadyAddedSelected > 0) {
+                return `Add to Shift (${alreadyAddedSelected} already in shift)`;
+              }
+              return `Add to Shift (${newlySelected})`;
+            })()}
           </button>
         </div>
       </div>
