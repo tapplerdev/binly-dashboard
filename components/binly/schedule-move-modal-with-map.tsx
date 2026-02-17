@@ -170,13 +170,13 @@ export function ScheduleMoveModalWithMap({
   // Initialize bin configs when bins are selected
   useEffect(() => {
     const newConfigs: Record<string, BinMoveConfig> = {};
+    const defaultScheduledDate = addDays(new Date(), 1).getTime();
     selectedBins.forEach((b) => {
       if (!binConfigs[b.id]) {
-        const scheduledDate = new Date(globalDate).getTime();
         newConfigs[b.id] = {
           bin: b,
           moveType: 'store',
-          scheduledDate,
+          scheduledDate: defaultScheduledDate,
           assignmentType: 'unassigned',
         };
       } else {
@@ -184,7 +184,7 @@ export function ScheduleMoveModalWithMap({
       }
     });
     setBinConfigs(newConfigs);
-  }, [selectedBins, globalDate]);
+  }, [selectedBins]);
 
   // Filter bins for search
   const availableBins = useMemo(() => {
