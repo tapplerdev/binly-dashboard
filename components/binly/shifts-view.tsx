@@ -1352,6 +1352,7 @@ function CreateShiftDrawer({
   const [showBinSelection, setShowBinSelection] = useState(false);
   const [allBins, setAllBins] = useState<Bin[]>([]);
   const [showRouteImport, setShowRouteImport] = useState(false);
+  const [routeImportPreselectedBins, setRouteImportPreselectedBins] = useState<string[]>([]);
   const [editingTaskIndex, setEditingTaskIndex] = useState<number | null>(null);
   const [editingTask, setEditingTask] = useState<ShiftTask | null>(null);
   const [showPlacementSelection, setShowPlacementSelection] = useState(false);
@@ -1452,10 +1453,20 @@ function CreateShiftDrawer({
   };
 
   const handleBinSelectionConfirm = (selectedBinIds: string[]) => {
-    // Convert selected bin IDs to collection tasks
+    // Filter out locked bins (those with an open move request)
     const selectedBins = allBins.filter(bin => selectedBinIds.includes(bin.id));
+    const lockedBins = selectedBins.filter(bin => bin.move_requested === true);
+    const selectableBins = selectedBins.filter(bin => bin.move_requested !== true);
 
-    const collectionTasks: ShiftTask[] = selectedBins.map(bin => ({
+    // Warn if any locked bins were in the selection (e.g. pre-selected from route import)
+    if (lockedBins.length > 0) {
+      const lockedNumbers = lockedBins.map(b => `#${b.bin_number}`).join(', ');
+      setError(
+        `${lockedBins.length} bin${lockedBins.length !== 1 ? 's' : ''} skipped — move request pending: ${lockedNumbers}. Resolve the move request first.`
+      );
+    }
+
+    const collectionTasks: ShiftTask[] = selectableBins.map(bin => ({
       id: `temp-${Date.now()}-${bin.id}`,
       type: 'collection',
       bin_id: bin.id,
@@ -1469,6 +1480,8 @@ function CreateShiftDrawer({
     // Add collection tasks to the task list
     setTasks([...tasks, ...collectionTasks]);
     setShowBinSelection(false);
+    // Reset route import pre-selection
+    setRouteImportPreselectedBins([]);
   };
 
   // Route import handlers
@@ -1476,29 +1489,26 @@ function CreateShiftDrawer({
     setShowRouteImport(true);
   };
 
-  const handleRouteSelection = (selectedRoute: Route, routeBins: Bin[]) => {
+  const handleRouteSelection = async (selectedRoute: Route, routeBins: Bin[]) => {
     console.log('📋 [ROUTE IMPORT] Selected route:', selectedRoute.name);
     console.log('📍 [ROUTE IMPORT] Route has', routeBins.length, 'bins');
 
-    // Convert route bins to shift tasks (collection tasks)
-    const newTasks: ShiftTask[] = routeBins.map((bin, index) => ({
-      id: `route-bin-${bin.id}`,
-      type: 'collection',
-      bin_id: bin.id,
-      bin_number: bin.bin_number,
-      latitude: bin.latitude,
-      longitude: bin.longitude,
-      address: bin.location_name || `${bin.current_street}, ${bin.city}`,
-      fill_percentage: bin.fill_percentage || 0,
-    }));
+    // Fetch all bins if not already loaded (needed for BinSelectionMap)
+    if (allBins.length === 0) {
+      try {
+        const fetchedBins = await getBins();
+        setAllBins(fetchedBins);
+      } catch (err) {
+        console.error('Failed to fetch bins for route import:', err);
+        setError('Failed to load bins. Please try again.');
+        return;
+      }
+    }
 
-    console.log('✅ [ROUTE IMPORT] Created', newTasks.length, 'collection tasks');
-
-    // Add tasks to shift
-    setTasks([...tasks, ...newTasks]);
-
-    // Close modal
+    // Pre-select route bin IDs and open BinSelectionMap for review
+    setRouteImportPreselectedBins(routeBins.map(b => b.id));
     setShowRouteImport(false);
+    setShowBinSelection(true);
   };
 
   const openEditTask = (index: number) => {
@@ -2946,9 +2956,12 @@ function CreateShiftDrawer({
       {/* Bin Selection Map Modal */}
       {showBinSelection && (
         <BinSelectionMap
-          onClose={() => setShowBinSelection(false)}
+          onClose={() => {
+            setShowBinSelection(false);
+            setRouteImportPreselectedBins([]);
+          }}
           onConfirm={handleBinSelectionConfirm}
-          initialSelectedBins={[]}
+          initialSelectedBins={routeImportPreselectedBins}
         />
       )}
 

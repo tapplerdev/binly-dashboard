@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
-import { X, Search, Lasso, AlertCircle, Save, AlertTriangle, ExternalLink } from 'lucide-react';
+import { X, Search, Lasso, AlertCircle, Save } from 'lucide-react';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 
 // Default map center (San Jose, CA)
@@ -117,13 +117,8 @@ export function TemplateEditorModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Helper: check if a bin is locked due to an open move request
-  const isBinLocked = (bin: Bin): boolean => bin.move_requested === true;
-
   // Toggle bin selection
   const toggleBinSelection = (binId: string) => {
-    const bin = allBins.find(b => b.id === binId);
-    if (bin && isBinLocked(bin)) return; // Block selection of locked bins
     const newSelection = new Set(selectedBinIds);
     if (newSelection.has(binId)) {
       newSelection.delete(binId);
@@ -133,15 +128,10 @@ export function TemplateEditorModal({
     setSelectedBinIds(newSelection);
   };
 
-  // Handle lasso selection — exclude locked bins
+  // Handle lasso selection
   const handleLassoSelection = (binIds: string[]) => {
     const newSelection = new Set(selectedBinIds);
-    binIds.forEach(id => {
-      const bin = allBins.find(b => b.id === id);
-      if (bin && !isBinLocked(bin)) {
-        newSelection.add(id);
-      }
-    });
+    binIds.forEach(id => newSelection.add(id));
     setSelectedBinIds(newSelection);
     setLassoMode(false);
   };
@@ -163,14 +153,11 @@ export function TemplateEditorModal({
     );
   });
 
-  // Select all bins — locked (pending move) bins are excluded
+  // Select all bins
   const selectAll = () => {
-    const allBinIds = new Set(filteredBins.filter(b => !isBinLocked(b)).map(b => b.id));
+    const allBinIds = new Set(filteredBins.map(b => b.id));
     setSelectedBinIds(allBinIds);
   };
-
-  // Count of locked bins in current filtered list (for Select All label)
-  const lockedBinCount = filteredBins.filter(b => isBinLocked(b)).length;
 
   // Get mappable bins for map display
   const mappableBins = filteredBins.filter(isMappableBin);
@@ -436,10 +423,7 @@ export function TemplateEditorModal({
                   onClick={selectAll}
                   className="flex-1 px-3 py-1.5 text-xs font-medium text-primary border border-primary rounded-lg hover:bg-primary/5 transition-fast"
                 >
-                  Select All ({filteredBins.length - lockedBinCount})
-                  {lockedBinCount > 0 && (
-                    <span className="ml-1 text-amber-600">({lockedBinCount} locked)</span>
-                  )}
+                  Select All ({filteredBins.length})
                 </button>
                 <button
                   onClick={clearAll}
@@ -456,23 +440,15 @@ export function TemplateEditorModal({
                 {filteredBins.map((bin) => {
                   const isSelected = selectedBinIds.has(bin.id);
                   const fillPercentage = bin.fill_percentage ?? 0;
-                  const locked = isBinLocked(bin);
 
                   return (
                     <div
                       key={bin.id}
-                      onClick={() => !locked && toggleBinSelection(bin.id)}
-                      title={
-                        locked
-                          ? `Bin #${bin.bin_number} has an open move request and can't be added until it's resolved.`
-                          : undefined
-                      }
-                      className={`p-3 rounded-lg transition-all ${
-                        locked
-                          ? 'bg-gray-50 border border-gray-200 opacity-60 cursor-not-allowed'
-                          : isSelected
-                          ? 'bg-primary/10 border-2 border-primary cursor-pointer'
-                          : 'bg-white border border-gray-200 hover:bg-gray-50 cursor-pointer'
+                      onClick={() => toggleBinSelection(bin.id)}
+                      className={`p-3 rounded-lg cursor-pointer transition-all ${
+                        isSelected
+                          ? 'bg-primary/10 border-2 border-primary'
+                          : 'bg-white border border-gray-200 hover:bg-gray-50'
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -480,59 +456,32 @@ export function TemplateEditorModal({
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          disabled={locked}
                           onChange={() => {}}
-                          className="mt-0.5 rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-not-allowed"
+                          className="mt-0.5 rounded border-gray-300 text-primary focus:ring-primary"
                         />
 
                         {/* Bin Info */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <p className={`font-semibold text-sm ${locked ? 'text-gray-500' : 'text-gray-900'}`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-semibold text-sm text-gray-900">
                               Bin #{bin.bin_number}
                             </p>
-                            {locked ? (
-                              /* Move pending badge */
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
-                                <AlertTriangle className="w-3 h-3" />
-                                Move pending
-                              </span>
-                            ) : (
-                              <span className="text-xs text-gray-500">
-                                {fillPercentage}%
-                              </span>
-                            )}
+                            <span className="text-xs text-gray-500">
+                              {fillPercentage}%
+                            </span>
                           </div>
                           <p className="text-xs text-gray-500 truncate">
                             {bin.location_name || `${bin.current_street}, ${bin.city}`}
                           </p>
-
-                          {locked ? (
-                            /* Locked state: show explanation + link */
-                            <p className="mt-1.5 text-xs text-amber-600">
-                              Can't be added until move request is resolved.{' '}
-                              <a
-                                href="/operations/move-requests"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className="inline-flex items-center gap-0.5 underline hover:text-amber-800"
-                              >
-                                View <ExternalLink className="w-3 h-3" />
-                              </a>
-                            </p>
-                          ) : (
-                            /* Normal state: fill level bar */
-                            <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
-                              <div
-                                className="h-1.5 rounded-full transition-all"
-                                style={{
-                                  width: `${fillPercentage}%`,
-                                  backgroundColor: getBinMarkerColor(fillPercentage),
-                                }}
-                              />
-                            </div>
-                          )}
+                          <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
+                            <div
+                              className="h-1.5 rounded-full transition-all"
+                              style={{
+                                width: `${fillPercentage}%`,
+                                backgroundColor: getBinMarkerColor(fillPercentage),
+                              }}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
