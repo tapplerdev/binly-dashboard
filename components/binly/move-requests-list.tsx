@@ -18,7 +18,8 @@ import { KpiCard } from '@/components/binly/kpi-card';
 import { MultiSelectDropdown } from '@/components/ui/dropdown';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { AssignMovesModal } from '@/components/binly/assign-moves-modal';
-import { ScheduleMoveModal } from '@/components/binly/bin-modals'; // For editing
+import { ScheduleMoveModal } from '@/components/binly/bin-modals'; // For editing (legacy fallback)
+import { EditMoveRequestModal } from '@/components/binly/edit-move-request-modal'; // New edit modal with satellite map
 import { ScheduleMoveModalWithMap } from '@/components/binly/schedule-move-modal-with-map'; // For creating
 import { MoveRequestDetailDrawer } from '@/components/binly/move-request-detail-drawer';
 import { AssignUserModal } from '@/components/binly/assign-user-modal';
@@ -96,7 +97,8 @@ export function MoveRequestsList() {
   // Modal state
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showAssignUserModal, setShowAssignUserModal] = useState(false);
-  const [showScheduleMoveModal, setShowScheduleMoveModal] = useState(false); // For editing existing
+  const [showScheduleMoveModal, setShowScheduleMoveModal] = useState(false); // Legacy edit modal
+  const [showEditMoveModal, setShowEditMoveModal] = useState(false); // New satellite-map edit modal
   const [showCreateMoveModal, setShowCreateMoveModal] = useState(false); // For creating new with map
   const [showBulkEditDateModal, setShowBulkEditDateModal] = useState(false);
   const [showBulkCancelModal, setShowBulkCancelModal] = useState(false);
@@ -428,7 +430,7 @@ export function MoveRequestsList() {
   // Handlers for individual row menu actions
   const handleEditDetails = (move: MoveRequest) => {
     setMoveToEdit(move);
-    setShowScheduleMoveModal(true);
+    setShowEditMoveModal(true); // Open new satellite-map edit modal
     setOpenMenuId(null);
     setMenuPosition(null);
   };
@@ -1246,10 +1248,26 @@ export function MoveRequestsList() {
         </>
       )}
 
-      {/* Schedule Move Modal (for editing existing) */}
+      {/* New Edit Move Request Modal — satellite map + drag-to-relocate */}
+      {showEditMoveModal && moveToEdit && (
+        <EditMoveRequestModal
+          moveRequest={moveToEdit}
+          onClose={() => {
+            setShowEditMoveModal(false);
+            setMoveToEdit(null);
+          }}
+          onSuccess={() => {
+            refetch();
+            setShowEditMoveModal(false);
+            setMoveToEdit(null);
+          }}
+        />
+      )}
+
+      {/* Legacy Schedule Move Modal (kept as fallback, no longer triggered by three-dot menu) */}
       {showScheduleMoveModal && (
         <ScheduleMoveModal
-          moveRequest={moveToEdit}
+          moveRequest={moveToEdit ?? undefined}
           onClose={() => {
             setShowScheduleMoveModal(false);
             setMoveToEdit(null);
@@ -1441,7 +1459,7 @@ export function MoveRequestsList() {
           onEdit={(move) => {
             setShowDetailDrawer(false);
             setMoveToEdit(move);
-            setShowScheduleMoveModal(true);
+            setShowEditMoveModal(true);
           }}
           onCancel={(move) => {
             setShowDetailDrawer(false);
