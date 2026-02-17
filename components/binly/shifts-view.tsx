@@ -16,7 +16,7 @@ import { PotentialLocation } from '@/lib/api/potential-locations';
 import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
 import { MoveRequest, getMoveRequests } from '@/lib/api/move-requests';
 import { useShifts, useAssignRoute, shiftKeys } from '@/lib/hooks/use-shifts';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRoutes } from '@/lib/hooks/use-routes';
 import { useActiveDrivers } from '@/lib/hooks/use-active-drivers';
 import { useDrivers } from '@/lib/hooks/use-drivers';
@@ -1358,7 +1358,13 @@ function CreateShiftDrawer({
   const [showPlacementSelection, setShowPlacementSelection] = useState(false);
   const { data: potentialLocations = [] } = usePotentialLocations('active');
   const [showMoveRequestSelection, setShowMoveRequestSelection] = useState(false);
-  const [moveRequests, setMoveRequests] = useState<MoveRequest[]>([]);
+  // React Query — automatically refetches when GlobalCentrifugoSync invalidates ['move-requests']
+  const { data: moveRequests = [] } = useQuery<MoveRequest[]>({
+    queryKey: ['move-requests', 'pending-unassigned'],
+    queryFn: () => getMoveRequests({ status: 'pending', assigned: 'unassigned' }),
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+  });
   const [moveRequestFocusBinId, setMoveRequestFocusBinId] = useState<string | null>(null);
   const driverDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -1565,32 +1571,14 @@ function CreateShiftDrawer({
     setShowPlacementSelection(false);
   };
 
-  const openMoveRequestSelection = async () => {
-    try {
-      if (moveRequests.length === 0) {
-        const requests = await getMoveRequests({ status: 'pending', assigned: 'unassigned' });
-        setMoveRequests(requests);
-      }
-      setMoveRequestFocusBinId(null);
-      setShowMoveRequestSelection(true);
-    } catch (error) {
-      console.error('Failed to fetch move requests:', error);
-      setError('Failed to load move requests. Please try again.');
-    }
+  const openMoveRequestSelection = () => {
+    setMoveRequestFocusBinId(null);
+    setShowMoveRequestSelection(true);
   };
 
-  const openMoveRequestSelectionForBin = async (binId: string) => {
-    try {
-      if (moveRequests.length === 0) {
-        const requests = await getMoveRequests({ status: 'pending', assigned: 'unassigned' });
-        setMoveRequests(requests);
-      }
-      setMoveRequestFocusBinId(binId);
-      setShowMoveRequestSelection(true);
-    } catch (error) {
-      console.error('Failed to fetch move requests:', error);
-      setError('Failed to load move requests. Please try again.');
-    }
+  const openMoveRequestSelectionForBin = (binId: string) => {
+    setMoveRequestFocusBinId(binId);
+    setShowMoveRequestSelection(true);
   };
 
   const handleMoveRequestSelectionConfirm = (selectedRequestIds: string[]) => {

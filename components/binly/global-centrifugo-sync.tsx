@@ -139,8 +139,8 @@ export function GlobalCentrifugoSync() {
         case 'move_request_created':
         case 'move_request_updated':
         case 'move_request_cancelled': {
-          // Invalidate all move-request queries so every consumer (list, modals,
-          // shift creation map) sees the latest data immediately.
+          // Invalidate ALL move-request queries (list view, shift creation modal, etc.)
+          // The broad prefix match ['move-requests'] covers every sub-key variant.
           queryClient.invalidateQueries({ queryKey: ['move-requests'] });
           break;
         }
