@@ -146,12 +146,6 @@ export function ScheduleMoveModalWithMap({
   const [fillLevelFilter, setFillLevelFilter] = useState<'all' | 'low' | 'medium' | 'high' | 'critical' | 'missing'>('all');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
-  // Global Settings (Step 1)
-  const [globalDate, setGlobalDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
-  const [dateOption, setDateOption] = useState<'24h' | '3days' | 'week' | 'custom'>('custom');
-
   // Per-Bin Configuration (Step 2)
   const [binConfigs, setBinConfigs] = useState<Record<string, BinMoveConfig>>({});
 
@@ -345,25 +339,6 @@ export function ScheduleMoveModalWithMap({
     setBinRelocations({});
   };
 
-  // Handle date quick select
-  const handleDateQuickSelect = (option: '24h' | '3days' | 'week' | 'custom') => {
-    setDateOption(option);
-    const now = new Date();
-    switch (option) {
-      case '24h':
-        setGlobalDate(addDays(now, 1).toISOString().split('T')[0]);
-        break;
-      case '3days':
-        setGlobalDate(addDays(now, 3).toISOString().split('T')[0]);
-        break;
-      case 'week':
-        setGlobalDate(addDays(now, 7).toISOString().split('T')[0]);
-        break;
-      default:
-        break;
-    }
-  };
-
   // Handle moving to configuration step
   const handleNext = () => {
     if (selectedBins.length === 0) {
@@ -373,17 +348,18 @@ export function ScheduleMoveModalWithMap({
 
     // Initialize bin configs with relocation data for dragged bins
     const initialConfigs: Record<string, BinMoveConfig> = {};
+    // Default scheduled date to tomorrow
+    const defaultScheduledDate = addDays(new Date(), 1).getTime();
 
     selectedBins.forEach((bin) => {
       const relocation = binRelocations[bin.id];
-      const scheduledDate = new Date(globalDate).getTime();
 
       if (relocation) {
         // Bin was relocated via drag - auto-set to relocation mode
         initialConfigs[bin.id] = {
           bin,
           moveType: 'relocation',
-          scheduledDate,
+          scheduledDate: defaultScheduledDate,
           newStreet: relocation.newAddress || '',
           newCity: relocation.newCity || '',
           newZip: relocation.newZip || '',
@@ -398,7 +374,7 @@ export function ScheduleMoveModalWithMap({
         initialConfigs[bin.id] = {
           bin,
           moveType: 'store',
-          scheduledDate,
+          scheduledDate: defaultScheduledDate,
           reason: '',
           notes: '',
           assignmentType: 'unassigned',
@@ -1000,75 +976,8 @@ export function ScheduleMoveModalWithMap({
           )}
         </div>
 
-        {/* Footer with date and next button */}
-        <div className="p-4 border-t border-gray-200 space-y-3 flex-shrink-0 bg-gray-50">
-          {/* Date Selection */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-2">
-              When should these be moved? *
-            </label>
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <button
-                type="button"
-                onClick={() => handleDateQuickSelect('24h')}
-                className={cn(
-                  'py-1.5 px-2 border rounded-lg text-xs font-medium transition-colors',
-                  dateOption === '24h'
-                    ? 'border-primary bg-primary text-white'
-                    : 'border-gray-300 hover:border-gray-400 bg-white'
-                )}
-              >
-                Within 24hrs
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDateQuickSelect('3days')}
-                className={cn(
-                  'py-1.5 px-2 border rounded-lg text-xs font-medium transition-colors',
-                  dateOption === '3days'
-                    ? 'border-primary bg-primary text-white'
-                    : 'border-gray-300 hover:border-gray-400 bg-white'
-                )}
-              >
-                Within 3 days
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDateQuickSelect('week')}
-                className={cn(
-                  'py-1.5 px-2 border rounded-lg text-xs font-medium transition-colors',
-                  dateOption === 'week'
-                    ? 'border-primary bg-primary text-white'
-                    : 'border-gray-300 hover:border-gray-400 bg-white'
-                )}
-              >
-                Next week
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDateQuickSelect('custom')}
-                className={cn(
-                  'py-1.5 px-2 border rounded-lg text-xs font-medium transition-colors',
-                  dateOption === 'custom'
-                    ? 'border-primary bg-primary text-white'
-                    : 'border-gray-300 hover:border-gray-400 bg-white'
-                )}
-              >
-                Custom
-              </button>
-            </div>
-            <input
-              type="date"
-              value={globalDate}
-              onChange={(e) => {
-                setGlobalDate(e.target.value);
-                setDateOption('custom');
-              }}
-              min={new Date().toISOString().split('T')[0]}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary"
-            />
-          </div>
-
+        {/* Footer with next button */}
+        <div className="p-4 border-t border-gray-200 flex-shrink-0 bg-gray-50">
           {/* Next Button */}
           <button
             onClick={handleNext}
@@ -1125,6 +1034,18 @@ export function ScheduleMoveModalWithMap({
     setBinConfigs((prev) => ({ ...prev, ...updates }));
   };
 
+  const applyBulkDate = (dateString: string) => {
+    const scheduledDate = new Date(dateString).getTime();
+    const updates: Record<string, BinMoveConfig> = {};
+    selectedBins.forEach((bin) => {
+      updates[bin.id] = {
+        ...binConfigs[bin.id],
+        scheduledDate,
+      };
+    });
+    setBinConfigs((prev) => ({ ...prev, ...updates }));
+  };
+
   // Handle place selection for relocation address
   const handlePlaceSelect = (binId: string, place: HerePlaceDetails) => {
     updateBinConfig(binId, {
@@ -1150,7 +1071,7 @@ export function ScheduleMoveModalWithMap({
             <Truck className="w-4 h-4" />
             Quick Bulk Actions
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {/* Bulk Move Type */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -1230,6 +1151,23 @@ export function ScheduleMoveModalWithMap({
                     applyBulkAssignment('future_shift', value.replace('future:', ''));
                   }
                 }}
+              />
+            </div>
+
+            {/* Bulk Date */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Set All Dates:
+              </label>
+              <input
+                type="date"
+                onChange={(e) => {
+                  if (e.target.value) {
+                    applyBulkDate(e.target.value);
+                  }
+                }}
+                min={new Date().toISOString().split('T')[0]}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-primary"
               />
             </div>
           </div>
@@ -1528,47 +1466,45 @@ export function ScheduleMoveModalWithMap({
 
                   {/* Future Shift Selection Dropdown */}
                   {config.assignmentType === 'future_shift' && futureShifts.length > 0 && (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-2">
-                          Select Future Shift
-                        </label>
-                        <Dropdown
-                          label=""
-                          placeholder="Choose a shift..."
-                          value={config.assignedShiftId || ''}
-                          options={futureShifts.map((shift) => ({
-                            value: shift.id,
-                            label: `${shift.driverName} - ${shift.date} at ${shift.startTime}`,
-                          }))}
-                          onChange={(value) => {
-                            updateBinConfig(bin.id, {
-                              assignedShiftId: value,
-                            });
-                          }}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-2">
-                          Insert Position
-                        </label>
-                        <Dropdown
-                          label=""
-                          value={config.insertPosition || 'end'}
-                          options={[
-                            { value: 'start', label: 'At Start' },
-                            { value: 'end', label: 'At End' },
-                          ]}
-                          onChange={(value) => {
-                            updateBinConfig(bin.id, {
-                              insertPosition: value as 'start' | 'end',
-                            });
-                          }}
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-2">
+                        Select Future Shift
+                      </label>
+                      <Dropdown
+                        label=""
+                        placeholder="Choose a shift..."
+                        value={config.assignedShiftId || ''}
+                        options={futureShifts.map((shift) => ({
+                          value: shift.id,
+                          label: `${shift.driverName} - ${shift.date} at ${shift.startTime}`,
+                        }))}
+                        onChange={(value) => {
+                          updateBinConfig(bin.id, {
+                            assignedShiftId: value,
+                          });
+                        }}
+                      />
                     </div>
                   )}
+                </div>
+
+                {/* Scheduled Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Scheduled Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={new Date(config.scheduledDate).toISOString().split('T')[0]}
+                    onChange={(e) => {
+                      const newDate = new Date(e.target.value).getTime();
+                      updateBinConfig(bin.id, {
+                        scheduledDate: newDate,
+                      });
+                    }}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                  />
                 </div>
 
                 {/* Notes */}
