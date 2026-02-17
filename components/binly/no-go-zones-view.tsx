@@ -1,8 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { useCentrifugo } from '@/lib/hooks/use-centrifugo';
+import { useState, useMemo } from 'react';
 import {
   ShieldAlert,
   List,
@@ -16,7 +14,7 @@ import {
   ChevronUp,
   ChevronDown,
 } from 'lucide-react';
-import { useNoGoZones, zoneKeys } from '@/lib/hooks/use-zones';
+import { useNoGoZones } from '@/lib/hooks/use-zones';
 import {
   NoGoZone,
   ZoneStatus,
@@ -129,55 +127,9 @@ export function NoGoZonesView() {
   const [selectedZone, setSelectedZone] = useState<NoGoZone | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
 
-  const queryClient = useQueryClient();
-  const { status: centrifugoStatus, subscribe } = useCentrifugo();
-
   const { data: zones = [], isLoading, error } = useNoGoZones();
 
-  // Real-time: upsert new/updated zones from company:events without a full refetch
-  useEffect(() => {
-    if (centrifugoStatus !== 'connected') return;
-
-    const unsubscribe = subscribe('company:events', (raw: unknown) => {
-      const event = raw as { type: string; data: unknown };
-
-      if (event.type === 'zone_created') {
-        const newZone = event.data as NoGoZone;
-        queryClient.setQueryData<NoGoZone[]>(
-          zoneKeys.all,
-          (old) => {
-            const filtered = old?.filter((z) => z.id !== newZone.id) ?? [];
-            return [...filtered, newZone];
-          }
-        );
-      }
-
-      if (event.type === 'zone_updated') {
-        // Surviving zone gained score/radius — upsert it in place
-        const updatedZone = event.data as NoGoZone;
-        queryClient.setQueryData<NoGoZone[]>(
-          zoneKeys.all,
-          (old) => old?.map((z) => (z.id === updatedZone.id ? updatedZone : z)) ?? [updatedZone]
-        );
-      }
-
-      if (event.type === 'zone_merged') {
-        // Mark the consumed zone as resolved+merged in the cache
-        const { consumed_zone_id } = event.data as { consumed_zone_id: string; surviving_zone_id: string };
-        queryClient.setQueryData<NoGoZone[]>(
-          zoneKeys.all,
-          (old) =>
-            old?.map((z) =>
-              z.id === consumed_zone_id
-                ? { ...z, status: 'resolved', resolution_type: 'merged' }
-                : z
-            ) ?? []
-        );
-      }
-    });
-
-    return unsubscribe;
-  }, [centrifugoStatus, subscribe, queryClient]);
+  // Real-time zone cache updates are handled globally by GlobalCentrifugoSync in the layout.
 
   const filtered = useMemo(() => {
     let list = [...zones];

@@ -1,22 +1,18 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { useCentrifugo } from './use-centrifugo';
+import { useAuthStore } from '@/lib/auth/store';
 import { ActiveDriver, DriverLocation } from '../types/active-driver';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
 
-interface UseActiveDriversOptions {
-  token?: string;
-  enabled?: boolean;
-}
-
-export function useActiveDrivers({ token, enabled = true }: UseActiveDriversOptions = {}) {
+export function useActiveDrivers() {
+  const { token } = useAuthStore();
   const queryClient = useQueryClient();
 
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('🚗 useActiveDrivers Hook Called');
   console.log('   Token:', token ? `${token.substring(0, 20)}...` : 'NONE');
-  console.log('   Enabled:', enabled);
   console.log('   Backend URL:', BACKEND_URL);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
@@ -75,34 +71,31 @@ export function useActiveDrivers({ token, enabled = true }: UseActiveDriversOpti
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       return data;
     },
-    enabled,
+    enabled: !!token,
     refetchInterval: 30000, // Refetch every 30 seconds as backup
     staleTime: 10000, // Consider data fresh for 10 seconds
     placeholderData: [], // Provide placeholder data to prevent undefined
   });
 
-  // Connect to Centrifugo
-  const { status: centrifugoStatus, subscribe } = useCentrifugo({
-    token,
-    enabled: enabled && !!token,
-  });
+  // Connect to the shared Centrifugo connection (singleton managed by CentrifugoProvider)
+  const { subscribe, isConnected } = useCentrifugo();
 
   console.log('📊 Current State:');
   console.log('   Drivers Count:', drivers?.length || 0);
   console.log('   Drivers Data:', JSON.stringify(drivers, null, 2));
   console.log('   Loading:', isLoading);
   console.log('   Error:', error);
-  console.log('   Centrifugo Status:', centrifugoStatus);
+  console.log('   Centrifugo Connected:', isConnected);
 
   // Track currently subscribed driver IDs to avoid re-subscribing on location updates
   const subscribedDriverIdsRef = useRef<Set<string>>(new Set());
 
   // Subscribe to all active driver location channels
   useEffect(() => {
-    if (!drivers || drivers.length === 0 || centrifugoStatus !== 'connected') {
+    if (!drivers || drivers.length === 0 || !isConnected) {
       console.log('⏭️  [Centrifugo] Not ready to subscribe:');
       console.log('   Drivers:', drivers?.length || 0);
-      console.log('   Status:', centrifugoStatus);
+      console.log('   Connected:', isConnected);
       return;
     }
 
@@ -158,7 +151,7 @@ export function useActiveDrivers({ token, enabled = true }: UseActiveDriversOpti
         unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
       }
     };
-  }, [drivers?.map(d => d.driverId).join(','), centrifugoStatus, subscribe]);
+  }, [drivers?.map(d => d.driverId).join(','), isConnected, subscribe]);
 
   const handleDriverLocationUpdate = (locationData: Record<string, unknown>, driverId: string) => {
     // Extract location data from Centrifugo message
@@ -217,6 +210,5 @@ export function useActiveDrivers({ token, enabled = true }: UseActiveDriversOpti
     drivers: drivers || [], // Ensure drivers is always an array
     isLoading,
     error,
-    centrifugoStatus,
   };
 }

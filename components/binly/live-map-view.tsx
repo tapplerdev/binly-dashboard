@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
-import { useBins, binKeys } from '@/lib/hooks/use-bins';
-import { useNoGoZones, zoneKeys } from '@/lib/hooks/use-zones';
-import { usePotentialLocations, potentialLocationKeys } from '@/lib/hooks/use-potential-locations';
+import { useBins } from '@/lib/hooks/use-bins';
+import { useNoGoZones } from '@/lib/hooks/use-zones';
+import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
 import { useActiveDrivers } from '@/lib/hooks/use-active-drivers';
 import { useWebSocket, WebSocketMessage } from '@/lib/hooks/use-websocket';
 import { useCentrifugo } from '@/lib/hooks/use-centrifugo';
+import { useQueryClient } from '@tanstack/react-query';
 import { useWarehouseLocation, warehouseKeys } from '@/lib/hooks/use-warehouse';
 import {
   Bin,
@@ -195,7 +195,7 @@ export function LiveMapView() {
   const { data: bins = [], isLoading: loadingBins, error: binsError } = useBins();
   const { data: zones = [], isLoading: loadingZones, error: zonesError } = useNoGoZones('active');
   const { data: potentialLocations = [], isLoading: loadingLocations, error: locationsError } = usePotentialLocations('active');
-  const { drivers = [], isLoading: loadingDrivers } = useActiveDrivers({ token: token || undefined });
+  const { drivers = [], isLoading: loadingDrivers } = useActiveDrivers();
 
   const [selectedBin, setSelectedBin] = useState<Bin | null>(null);
   const [selectedZone, setSelectedZone] = useState<NoGoZone | null>(null);
@@ -219,97 +219,27 @@ export function LiveMapView() {
 
   const wsUrl = token ? `${WS_URL}/ws?token=${token}` : `${WS_URL}/ws`;
 
-  // Centrifugo — real-time potential location events via company:events channel
-  const { status: centrifugoStatus, subscribe } = useCentrifugo({
-    token: token || undefined,
-    enabled: !!token,
-  });
+  // Centrifugo — UI state only: close the potential-location drawer if the open location is
+  // deleted or converted. All cache updates are handled by GlobalCentrifugoSync in the layout.
+  const { subscribe, isConnected } = useCentrifugo();
 
   useEffect(() => {
-    if (centrifugoStatus !== 'connected') return;
+    if (!isConnected) return;
 
     const unsubscribe = subscribe('company:events', (raw: unknown) => {
       const event = raw as { type: string; data: unknown };
 
-      switch (event.type) {
-        case 'potential_location_created':
-          queryClient.invalidateQueries({ queryKey: potentialLocationKeys.list('active') });
-          break;
-
-        case 'potential_location_deleted': {
-          const d = event.data as { location_id: string };
-          queryClient.setQueryData<PotentialLocation[]>(
-            potentialLocationKeys.list('active'),
-            (old) => old?.filter((loc) => loc.id !== d.location_id) ?? []
-          );
-          setSelectedPotentialLocation((cur) => (cur?.id === d.location_id ? null : cur));
-          break;
-        }
-
-        case 'potential_location_converted': {
-          const d = event.data as { location_id: string };
-          queryClient.setQueryData<PotentialLocation[]>(
-            potentialLocationKeys.list('active'),
-            (old) => old?.filter((loc) => loc.id !== d.location_id) ?? []
-          );
-          setSelectedPotentialLocation((cur) => (cur?.id === d.location_id ? null : cur));
-          // Refetch bins to show the new bin on the map
-          queryClient.invalidateQueries({ queryKey: ['bins'] });
-          break;
-        }
-
-        case 'zone_created': {
-          // Upsert the zone into the active-zones cache — circle appears on map without refetch
-          const newZone = event.data as NoGoZone;
-          queryClient.setQueryData<NoGoZone[]>(
-            zoneKeys.byStatus('active'),
-            (old) => {
-              const filtered = old?.filter((z) => z.id !== newZone.id) ?? [];
-              return [...filtered, newZone];
-            }
-          );
-          break;
-        }
-
-        case 'zone_updated': {
-          // Surviving zone gained a higher score/radius after merge — update it in place
-          const updatedZone = event.data as NoGoZone;
-          queryClient.setQueryData<NoGoZone[]>(
-            zoneKeys.byStatus('active'),
-            (old) => old?.map((z) => (z.id === updatedZone.id ? updatedZone : z)) ?? [updatedZone]
-          );
-          break;
-        }
-
-        case 'zone_merged': {
-          // Remove the consumed zone from the active-zones cache — its circle disappears from map
-          const { consumed_zone_id } = event.data as { consumed_zone_id: string; surviving_zone_id: string };
-          queryClient.setQueryData<NoGoZone[]>(
-            zoneKeys.byStatus('active'),
-            (old) => old?.filter((z) => z.id !== consumed_zone_id) ?? []
-          );
-          break;
-        }
-
-        case 'bin_updated': {
-          // Surgically update the bin in the all-bins cache (e.g. status flipped to 'missing')
-          const updatedBin = event.data as Bin;
-          queryClient.setQueryData<Bin[]>(
-            binKeys.all,
-            (old) => old?.map((b) => (b.id === updatedBin.id ? updatedBin : b)) ?? [updatedBin]
-          );
-          // Also update the detail cache if it's loaded
-          queryClient.setQueryData<Bin>(binKeys.detail(updatedBin.id), updatedBin);
-          break;
-        }
-
-        default:
-          break;
+      if (
+        event.type === 'potential_location_deleted' ||
+        event.type === 'potential_location_converted'
+      ) {
+        const d = event.data as { location_id: string };
+        setSelectedPotentialLocation((cur) => (cur?.id === d.location_id ? null : cur));
       }
     });
 
     return unsubscribe;
-  }, [centrifugoStatus, subscribe, queryClient]);
+  }, [isConnected, subscribe]);
 
   // WebSocket — kept only for warehouse_location_updated (still uses WebSocket Hub)
   const { status: wsStatus } = useWebSocket({

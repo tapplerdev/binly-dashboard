@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { MapPin, User, Calendar, Check, Trash2, Loader2, MoreVertical, Eye, ChevronsUpDown, Truck, UserCog } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -32,70 +32,27 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
   // React Query — replaces raw useState/useEffect/fetchLocations
   const { data: locations = [], isLoading } = usePotentialLocations(filter);
 
-  // Auth token for Centrifugo (same pattern as live-map-view)
-  const getAuthToken = useCallback(() => {
-    try {
-      const authStorage = localStorage.getItem('binly-auth-storage');
-      if (!authStorage) return null;
-      const parsed = JSON.parse(authStorage);
-      return parsed?.state?.token || null;
-    } catch {
-      return null;
-    }
-  }, []);
-  const token = getAuthToken();
+  // Centrifugo — UI state only: close the drawer if the currently open location is
+  // deleted or converted. All cache updates are handled by GlobalCentrifugoSync in the layout.
+  const { subscribe, isConnected } = useCentrifugo();
 
-  // Centrifugo — real-time updates via company:events channel
-  const { status: centrifugoStatus, subscribe } = useCentrifugo({
-    token: token || undefined,
-    enabled: !!token,
-  });
-
-  // Subscribe to company:events and react to potential location events
   useEffect(() => {
-    if (centrifugoStatus !== 'connected') return;
+    if (!isConnected) return;
 
     const unsubscribe = subscribe('company:events', (raw: unknown) => {
       const event = raw as { type: string; data: unknown };
 
-      switch (event.type) {
-        case 'potential_location_created':
-          // Invalidate active list so new location appears
-          if (filter === 'active') {
-            queryClient.invalidateQueries({ queryKey: potentialLocationKeys.list('active') });
-          }
-          break;
-
-        case 'potential_location_deleted': {
-          const d = event.data as { location_id: string };
-          queryClient.setQueryData<PotentialLocation[]>(
-            potentialLocationKeys.list(filter),
-            (old) => old?.filter((loc) => loc.id !== d.location_id) ?? []
-          );
-          setSelectedLocation((cur) => (cur?.id === d.location_id ? null : cur));
-          break;
-        }
-
-        case 'potential_location_converted': {
-          const d = event.data as { location_id: string };
-          // Remove from active list immediately
-          queryClient.setQueryData<PotentialLocation[]>(
-            potentialLocationKeys.list('active'),
-            (old) => old?.filter((loc) => loc.id !== d.location_id) ?? []
-          );
-          // Invalidate converted list so it refreshes when user switches tab
-          queryClient.invalidateQueries({ queryKey: potentialLocationKeys.list('converted') });
-          setSelectedLocation((cur) => (cur?.id === d.location_id ? null : cur));
-          break;
-        }
-
-        default:
-          break;
+      if (
+        event.type === 'potential_location_deleted' ||
+        event.type === 'potential_location_converted'
+      ) {
+        const d = event.data as { location_id: string };
+        setSelectedLocation((cur) => (cur?.id === d.location_id ? null : cur));
       }
     });
 
     return unsubscribe;
-  }, [centrifugoStatus, subscribe, filter, queryClient]);
+  }, [isConnected, subscribe]);
 
   // Close menu on click outside
   useEffect(() => {
