@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import {
   X, Hash, MapPin, AlertTriangle, Loader2, CheckCircle2,
-  ChevronDown, Search, Building2,
+  ChevronDown, Search, Building2, CheckCircle,
 } from 'lucide-react';
 import { useCreateManagerIncidentReport } from '@/lib/hooks/use-zones';
 import { useBins } from '@/lib/hooks/use-bins';
@@ -76,8 +76,6 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
   // ── Bin mode state ────────────────────────────────────────────────────────
   const [binSearch, setBinSearch] = useState('');
   const [selectedBin, setSelectedBin] = useState<Bin | null>(null);
-  const [showBinDropdown, setShowBinDropdown] = useState(false);
-  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   // ── Address mode state ────────────────────────────────────────────────────
   const [addressText, setAddressText] = useState('');
@@ -93,44 +91,29 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
   const [description, setDescription] = useState('');
   const [success, setSuccess] = useState(false);
 
-  // ── Filtered bins (by bin number or street search) ────────────────────────
+  // ── Filtered bins ─────────────────────────────────────────────────────────
   const filteredBins = binSearch.trim()
-    ? bins
-        .filter(
-          (b) =>
-            String(b.bin_number).includes(binSearch.trim().replace('#', '')) ||
-            (b.current_street ?? '').toLowerCase().includes(binSearch.toLowerCase())
-        )
-        .slice(0, 10)
-    : bins.slice(0, 10);
-
-  // ── Click outside → close dropdown ───────────────────────────────────────
-  useEffect(() => {
-    function handleMouseDown(e: MouseEvent) {
-      if (
-        searchContainerRef.current &&
-        !searchContainerRef.current.contains(e.target as Node)
-      ) {
-        setShowBinDropdown(false);
-      }
-    }
-    if (showBinDropdown) {
-      document.addEventListener('mousedown', handleMouseDown);
-    }
-    return () => document.removeEventListener('mousedown', handleMouseDown);
-  }, [showBinDropdown]);
+    ? bins.filter(
+        (b) =>
+          String(b.bin_number).includes(binSearch.trim().replace('#', '')) ||
+          (b.current_street ?? '').toLowerCase().includes(binSearch.toLowerCase())
+      )
+    : bins;
 
   // ── Select a bin ─────────────────────────────────────────────────────────
   function selectBin(bin: Bin) {
     setSelectedBin(bin);
-    setBinSearch(`#${bin.bin_number}`);
-    setShowBinDropdown(false);
     if (bin.latitude && bin.longitude) {
       setPendingCenter({ lat: bin.latitude, lng: bin.longitude });
     }
   }
 
-  // ── Map click: address mode → place marker + reverse geocode ──────────────
+  // ── Bin marker clicked on map ─────────────────────────────────────────────
+  function handleBinMarkerClick(bin: Bin) {
+    if (mode === 'bin') selectBin(bin);
+  }
+
+  // ── Map click: address mode → reverse geocode ─────────────────────────────
   const handleMapClick = useCallback(
     async (lat: number, lng: number) => {
       if (mode !== 'address') return;
@@ -150,11 +133,6 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
     [mode]
   );
 
-  // ── Bin marker clicked on map ─────────────────────────────────────────────
-  function handleBinMarkerClick(bin: Bin) {
-    if (mode === 'bin') selectBin(bin);
-  }
-
   // ── HERE autocomplete select ──────────────────────────────────────────────
   function handlePlaceSelect(place: HerePlaceDetails) {
     setAddressText(place.formattedAddress);
@@ -163,7 +141,7 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
     setPendingCenter({ lat: place.latitude, lng: place.longitude });
   }
 
-  // ── Mode switch: reset location state ────────────────────────────────────
+  // ── Mode switch ───────────────────────────────────────────────────────────
   function switchMode(m: Mode) {
     setMode(m);
     setSelectedBin(null);
@@ -174,11 +152,9 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
     setPendingCenter(null);
   }
 
-  // ── Map selected-location marker position ────────────────────────────────
-  const locationMarkerPos =
-    mode === 'bin' && selectedBin?.latitude && selectedBin?.longitude
-      ? { lat: selectedBin.latitude, lng: selectedBin.longitude }
-      : mode === 'address' && addressLat !== null && addressLng !== null
+  // ── Address mode marker pos ───────────────────────────────────────────────
+  const addressMarkerPos =
+    mode === 'address' && addressLat !== null && addressLng !== null
       ? { lat: addressLat, lng: addressLng }
       : null;
 
@@ -214,25 +190,21 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
   // ── Keyboard ─────────────────────────────────────────────────────────────
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        if (showBinDropdown) setShowBinDropdown(false);
-        else onClose();
-      }
+      if (e.key === 'Escape') onClose();
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showBinDropdown, onClose]);
+  }, [onClose]);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-50 flex bg-black/50 backdrop-blur-[1px]">
-      {/* Backdrop click */}
       <div className="absolute inset-0" onClick={onClose} />
 
-      {/* Modal panel — same sizing as edit-bin-dialog */}
+      {/* Modal — match edit-bin-dialog sizing */}
       <div className="relative z-10 m-auto w-full max-w-[1400px] h-[90vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
 
-        {/* ── Header ────────────────────────────────────────────────────── */}
+        {/* ── Header ──────────────────────────────────────────────────── */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200 shrink-0">
           <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center">
             <AlertTriangle className="w-5 h-5 text-red-600" />
@@ -251,12 +223,13 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
           </button>
         </div>
 
-        {/* ── Body ──────────────────────────────────────────────────────── */}
+        {/* ── Body ────────────────────────────────────────────────────── */}
         <div className="flex flex-1 min-h-0">
 
           {/* ── Left: Map ─────────────────────────────────────────────── */}
           <div className="flex-1 relative bg-gray-100">
             <Map
+              mapId="report-incident-map"
               defaultCenter={DEFAULT_CENTER}
               defaultZoom={11}
               mapTypeId="hybrid"
@@ -268,10 +241,7 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
               className="w-full h-full"
               style={{ borderRadius: 0 }}
             >
-              {/* Map click handler (address mode only) */}
               <MapClickHandler onClick={handleMapClick} />
-
-              {/* Pan to selected location */}
               {pendingCenter && (
                 <MapCenterController
                   center={pendingCenter}
@@ -279,7 +249,7 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
                 />
               )}
 
-              {/* ── All bin markers (live-map style) ────────────────── */}
+              {/* All bin markers */}
               {mappableBins.map((bin) => {
                 const isSelected = selectedBin?.id === bin.id;
                 return (
@@ -292,7 +262,7 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
                     <div
                       className={`rounded-full border-2 border-white shadow-lg cursor-pointer transition-all duration-200 flex items-center justify-center text-white font-bold ${
                         isSelected
-                          ? 'w-11 h-11 text-sm ring-2 ring-white ring-offset-1 ring-offset-red-500 scale-110'
+                          ? 'w-11 h-11 text-sm ring-2 ring-white ring-offset-2 ring-offset-red-500 scale-110'
                           : 'w-8 h-8 text-xs hover:scale-110'
                       }`}
                       style={{
@@ -308,9 +278,9 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
                 );
               })}
 
-              {/* ── Address mode pin ────────────────────────────────── */}
-              {mode === 'address' && locationMarkerPos && (
-                <AdvancedMarker position={locationMarkerPos} zIndex={30}>
+              {/* Address mode pin */}
+              {addressMarkerPos && (
+                <AdvancedMarker position={addressMarkerPos} zIndex={30}>
                   <div className="flex flex-col items-center">
                     <div className="w-10 h-10 rounded-full bg-purple-600 border-2 border-white shadow-lg flex items-center justify-center">
                       <MapPin className="w-5 h-5 text-white" />
@@ -321,8 +291,8 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
               )}
             </Map>
 
-            {/* Hint overlay (address mode, no pin yet) */}
-            {mode === 'address' && !locationMarkerPos && (
+            {/* Address mode tap hint */}
+            {mode === 'address' && !addressMarkerPos && (
               <div className="absolute inset-0 flex items-end justify-center pb-8 pointer-events-none">
                 <div className="bg-black/60 text-white text-xs px-4 py-2 rounded-full backdrop-blur-sm">
                   Search an address or tap the map to place a marker
@@ -341,7 +311,7 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
 
           {/* ── Right: Form ───────────────────────────────────────────── */}
           {success ? (
-            <div className="w-[440px] flex flex-col items-center justify-center gap-4 px-8 border-l border-gray-100">
+            <div className="w-[460px] flex flex-col items-center justify-center gap-4 px-8 border-l border-gray-100">
               <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center">
                 <CheckCircle2 className="w-9 h-9 text-green-500" />
               </div>
@@ -353,173 +323,144 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
               </div>
             </div>
           ) : (
-            <div className="w-[440px] flex flex-col border-l border-gray-100 min-h-0">
-              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+            <div className="w-[460px] flex flex-col border-l border-gray-100 min-h-0">
+              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
 
                 {/* ── Mode toggle ─────────────────────────────────────── */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                    Location Source
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <ModeButton
-                      active={mode === 'bin'}
-                      onClick={() => switchMode('bin')}
-                      icon={<Hash className="w-4 h-4" />}
-                      title="By Bin #"
-                      subtitle="Pulls coords from bin record"
-                    />
-                    <ModeButton
-                      active={mode === 'address'}
-                      onClick={() => switchMode('address')}
-                      icon={<Building2 className="w-4 h-4" />}
-                      title="By Address"
-                      subtitle="Search or tap map to place"
-                    />
-                  </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <ModeButton
+                    active={mode === 'bin'}
+                    onClick={() => switchMode('bin')}
+                    icon={<Hash className="w-4 h-4" />}
+                    title="By Bin #"
+                    subtitle="Pulls coords from bin record"
+                  />
+                  <ModeButton
+                    active={mode === 'address'}
+                    onClick={() => switchMode('address')}
+                    icon={<Building2 className="w-4 h-4" />}
+                    title="By Address"
+                    subtitle="Search or tap map to place"
+                  />
                 </div>
 
                 {/* ── Bin mode ─────────────────────────────────────────── */}
                 {mode === 'bin' && (
-                  <div className="space-y-3">
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      Search Bin
-                    </label>
+                  <>
+                    {/* Search bar */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={binSearch}
+                        onChange={(e) => setBinSearch(e.target.value)}
+                        placeholder="Search by bin # or street..."
+                        className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-400"
+                      />
+                    </div>
 
-                    {/* Search + dropdown container */}
-                    <div ref={searchContainerRef} className="relative">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-                        <input
-                          type="text"
-                          value={binSearch}
-                          onChange={(e) => {
-                            setBinSearch(e.target.value);
-                            setSelectedBin(null);
-                            setShowBinDropdown(true);
-                          }}
-                          onFocus={() => setShowBinDropdown(true)}
-                          placeholder="Search by bin # or street..."
-                          className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-400"
-                        />
+                    {/* Bin list — always visible, scrollable */}
+                    <div className="rounded-xl border border-gray-200 overflow-hidden">
+                      {/* List header */}
+                      <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                          {binSearch ? `${filteredBins.length} result${filteredBins.length !== 1 ? 's' : ''}` : `All Bins (${bins.length})`}
+                        </span>
+                        {selectedBin && (
+                          <button
+                            onClick={() => setSelectedBin(null)}
+                            className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors"
+                          >
+                            Clear selection
+                          </button>
+                        )}
                       </div>
 
-                      {/* Animated dropdown */}
-                      <div
-                        className={`mt-1 rounded-xl border border-gray-200 overflow-hidden shadow-lg bg-white transition-all duration-200 ease-out ${
-                          showBinDropdown
-                            ? 'max-h-64 opacity-100 translate-y-0'
-                            : 'max-h-0 opacity-0 -translate-y-1 pointer-events-none'
-                        }`}
-                        style={{ overflow: showBinDropdown ? 'auto' : 'hidden' }}
-                      >
+                      <div className="max-h-[280px] overflow-y-auto divide-y divide-gray-100">
                         {binsLoading ? (
-                          <div className="flex items-center justify-center gap-2 py-5 text-xs text-gray-400">
+                          <div className="flex items-center justify-center gap-2 py-8 text-xs text-gray-400">
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             Loading bins...
                           </div>
                         ) : filteredBins.length === 0 ? (
-                          <div className="py-5 text-center text-xs text-gray-400">
+                          <div className="py-8 text-center text-xs text-gray-400">
                             No bins match &ldquo;{binSearch}&rdquo;
                           </div>
                         ) : (
-                          filteredBins.map((bin) => (
-                            <button
-                              key={bin.id}
-                              type="button"
-                              onMouseDown={(e) => {
-                                // prevent blur from closing before click fires
-                                e.preventDefault();
-                                selectBin(bin);
-                              }}
-                              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left border-b border-gray-100 last:border-0"
-                            >
-                              {/* Mini marker preview */}
-                              <div
-                                className="w-7 h-7 rounded-full border-2 border-white shadow flex items-center justify-center text-white text-xs font-bold shrink-0"
-                                style={{
-                                  backgroundColor: getBinMarkerColor(
-                                    bin.fill_percentage,
-                                    bin.status
-                                  ),
-                                }}
-                              >
-                                {bin.bin_number}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-gray-900">
-                                  Bin #{bin.bin_number}
-                                </p>
-                                <p className="text-xs text-gray-400 truncate">
-                                  {bin.current_street ?? '—'}
-                                  {bin.city ? `, ${bin.city}` : ''}
-                                </p>
-                              </div>
-                              <span
-                                className={`text-xs px-1.5 py-0.5 rounded-full shrink-0 ${
-                                  bin.status === 'active'
-                                    ? 'bg-green-100 text-green-700'
-                                    : bin.status === 'missing'
-                                    ? 'bg-red-100 text-red-700'
-                                    : 'bg-gray-100 text-gray-500'
+                          filteredBins.map((bin) => {
+                            const isSelected = selectedBin?.id === bin.id;
+                            const fill = bin.fill_percentage ?? 0;
+                            return (
+                              <button
+                                key={bin.id}
+                                type="button"
+                                onClick={() => selectBin(bin)}
+                                className={`w-full flex items-start gap-3 px-3 py-3 text-left transition-all ${
+                                  isSelected
+                                    ? 'bg-red-50 border-l-2 border-l-red-500'
+                                    : 'hover:bg-gray-50 border-l-2 border-l-transparent'
                                 }`}
                               >
-                                {bin.status}
-                              </span>
-                            </button>
-                          ))
+                                {/* Marker-style color dot */}
+                                <div
+                                  className="w-8 h-8 rounded-full border-2 border-white shadow flex items-center justify-center text-white text-xs font-bold shrink-0 mt-0.5"
+                                  style={{
+                                    backgroundColor: getBinMarkerColor(bin.fill_percentage, bin.status),
+                                  }}
+                                >
+                                  {bin.bin_number}
+                                </div>
+
+                                {/* Info */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm font-semibold text-gray-900">
+                                      Bin #{bin.bin_number}
+                                    </span>
+                                    <span className="text-xs text-gray-500">{fill}%</span>
+                                    <span
+                                      className={`text-xs px-1.5 py-0.5 rounded-full ${
+                                        bin.status === 'active'
+                                          ? 'bg-green-100 text-green-700'
+                                          : bin.status === 'missing'
+                                          ? 'bg-red-100 text-red-700'
+                                          : 'bg-gray-100 text-gray-500'
+                                      }`}
+                                    >
+                                      {bin.status}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-gray-500 truncate mt-0.5">
+                                    {bin.location_name || `${bin.current_street ?? '—'}${bin.city ? ', ' + bin.city : ''}`}
+                                  </p>
+                                  {/* Fill bar */}
+                                  <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
+                                    <div
+                                      className="h-1.5 rounded-full transition-all"
+                                      style={{
+                                        width: `${fill}%`,
+                                        backgroundColor: getBinMarkerColor(bin.fill_percentage, bin.status),
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Selected checkmark */}
+                                {isSelected && (
+                                  <CheckCircle className="w-4 h-4 text-red-500 shrink-0 mt-1" />
+                                )}
+                              </button>
+                            );
+                          })
                         )}
                       </div>
                     </div>
 
-                    {/* Selected bin card */}
-                    {selectedBin && (
-                      <div className="flex items-start gap-3 p-3 rounded-xl border border-blue-200 bg-blue-50">
-                        <div
-                          className="w-9 h-9 rounded-full border-2 border-white shadow-md flex items-center justify-center text-white text-xs font-bold shrink-0"
-                          style={{
-                            backgroundColor: getBinMarkerColor(
-                              selectedBin.fill_percentage,
-                              selectedBin.status
-                            ),
-                          }}
-                        >
-                          {selectedBin.bin_number}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-blue-900">
-                            Bin #{selectedBin.bin_number}
-                          </p>
-                          <p className="text-xs text-blue-600 truncate">
-                            {selectedBin.current_street}
-                            {selectedBin.city ? `, ${selectedBin.city}` : ''}
-                            {selectedBin.zip ? ` ${selectedBin.zip}` : ''}
-                          </p>
-                          {selectedBin.latitude && selectedBin.longitude && (
-                            <p className="text-xs text-blue-400 mt-0.5 font-mono">
-                              {selectedBin.latitude.toFixed(5)}, {selectedBin.longitude.toFixed(5)}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => {
-                            setSelectedBin(null);
-                            setBinSearch('');
-                          }}
-                          className="text-blue-400 hover:text-blue-600 transition-colors mt-0.5 shrink-0"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Hint */}
-                    {!selectedBin && (
-                      <p className="text-xs text-gray-400">
-                        You can also click any bin marker on the map to select it.
-                      </p>
-                    )}
-                  </div>
+                    {/* Map click hint */}
+                    <p className="text-xs text-gray-400 -mt-1">
+                      You can also click any bin marker on the map to select it.
+                    </p>
+                  </>
                 )}
 
                 {/* ── Address mode ────────────────────────────────────── */}
@@ -542,11 +483,7 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
                           {addressLat.toFixed(5)}, {addressLng.toFixed(5)}
                         </span>
                         <button
-                          onClick={() => {
-                            setAddressLat(null);
-                            setAddressLng(null);
-                            setAddressText('');
-                          }}
+                          onClick={() => { setAddressLat(null); setAddressLng(null); setAddressText(''); }}
                           className="ml-auto text-purple-400 hover:text-purple-600"
                         >
                           <X className="w-3 h-3" />
@@ -568,9 +505,7 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
                       className="w-full appearance-none px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-400 pr-8 bg-white"
                     >
                       {INCIDENT_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {formatIncidentType(t)}
-                        </option>
+                        <option key={t} value={t}>{formatIncidentType(t)}</option>
                       ))}
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
@@ -583,7 +518,7 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
                     Description <span className="text-red-400">*</span>
                   </label>
                   <textarea
-                    rows={4}
+                    rows={3}
                     placeholder="Describe the incident — what was reported, when, and any additional context from the caller..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
@@ -603,7 +538,7 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
               </div>
 
               {/* ── Footer ──────────────────────────────────────────────── */}
-              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 shrink-0 flex gap-3">
+              <div className="px-5 py-4 border-t border-gray-100 bg-gray-50 shrink-0 flex gap-3">
                 <button
                   onClick={onClose}
                   className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -616,10 +551,7 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
                   className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                 >
                   {mutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Submitting...
-                    </>
+                    <><Loader2 className="w-4 h-4 animate-spin" />Submitting...</>
                   ) : (
                     'Submit Report'
                   )}
@@ -636,33 +568,19 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
 function ModeButton({
-  active,
-  onClick,
-  icon,
-  title,
-  subtitle,
+  active, onClick, icon, title, subtitle,
 }: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
+  active: boolean; onClick: () => void; icon: React.ReactNode; title: string; subtitle: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={`flex flex-col items-start gap-1 p-3 rounded-xl border-2 text-left transition-all ${
-        active
-          ? 'border-red-500 bg-red-50'
-          : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+        active ? 'border-red-500 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
       }`}
     >
-      <div
-        className={`flex items-center gap-1.5 font-semibold text-sm ${
-          active ? 'text-red-700' : 'text-gray-700'
-        }`}
-      >
+      <div className={`flex items-center gap-1.5 font-semibold text-sm ${active ? 'text-red-700' : 'text-gray-700'}`}>
         <span className={active ? 'text-red-600' : 'text-gray-400'}>{icon}</span>
         {title}
       </div>
