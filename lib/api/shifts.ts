@@ -411,6 +411,50 @@ export async function getShiftHistory(params?: {
   return data.data as ShiftHistoryResponse;
 }
 
+// ── Shift History Task Types ───────────────────────────────────────────────
+
+export interface ShiftHistoryTask {
+  id: string;
+  sequence_order: number;
+  task_type: 'collection' | 'placement' | 'pickup' | 'dropoff' | 'warehouse_stop';
+  is_completed: number; // 0 | 1
+  skipped: boolean;
+  completed_at: number | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  task_data: string | null; // JSON string — contains skip_reason etc.
+  // Collection/bin
+  bin_id: string | null;
+  bin_number: number | null;
+  updated_fill_percentage: number | null;
+  bin_street: string | null;
+  bin_city: string | null;
+  // Placement
+  potential_location_id: string | null;
+  new_bin_number: number | null;
+  placement_address: string | null;
+  placement_created_bin_id: string | null;
+  placement_created_bin_number: number | null;
+  // Move request
+  move_request_id: string | null;
+  move_type: string | null;
+  destination_address: string | null;
+  // Warehouse
+  warehouse_action: string | null;
+  bins_to_load: number | null;
+}
+
+export async function getShiftHistoryTasks(shiftId: string): Promise<ShiftHistoryTask[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/manager/shifts/history/${shiftId}/tasks`,
+    { headers: getAuthHeaders() }
+  );
+  if (!response.ok) throw new Error(`Failed to fetch shift tasks: ${response.statusText}`);
+  const data = await response.json();
+  return data.data as ShiftHistoryTask[];
+}
+
 /**
  * Helper: Converts backend driver with shift to frontend Shift format
  */

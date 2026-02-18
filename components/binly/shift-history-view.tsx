@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useShiftHistory } from '@/lib/hooks/use-shift-history';
 import { useDrivers } from '@/lib/hooks/use-drivers';
 import { ShiftHistoryEntry } from '@/lib/api/shifts';
+import { ShiftHistoryDetailDrawer } from './shift-history-detail-drawer';
 import {
   Clock, Package, MapPin, Truck, SkipForward, AlertTriangle,
   ChevronDown, ChevronUp, CheckCircle2, XCircle, User, Calendar,
@@ -153,6 +154,7 @@ export function ShiftHistoryView() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [driverFilter, setDriverFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedShift, setSelectedShift] = useState<ShiftHistoryEntry | null>(null);
 
   const { data: driversData } = useDrivers();
   const drivers = driversData ?? [];
@@ -329,6 +331,16 @@ export function ShiftHistoryView() {
                     </div>
                   </button>
 
+                  {/* View details button */}
+                  <div className="px-5 pb-3 flex justify-end">
+                    <button
+                      onClick={e => { e.stopPropagation(); setSelectedShift(shift); }}
+                      className="text-xs text-primary font-medium hover:underline flex items-center gap-1"
+                    >
+                      View task details →
+                    </button>
+                  </div>
+
                   {/* Expanded details */}
                   {isExpanded && <ExpandedRow shift={shift} />}
                 </div>
@@ -336,6 +348,14 @@ export function ShiftHistoryView() {
             })}
           </div>
         </div>
+      )}
+
+      {/* Detail drawer */}
+      {selectedShift && (
+        <ShiftHistoryDetailDrawer
+          shift={selectedShift}
+          onClose={() => setSelectedShift(null)}
+        />
       )}
     </div>
   );
