@@ -509,6 +509,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                 gestureHandling="greedy"
                 disableDefaultUI={false}
                 zoomControl={true}
+                mapTypeId="hybrid"
                 mapTypeControl={false}
                 streetViewControl={false}
                 fullscreenControl={false}
