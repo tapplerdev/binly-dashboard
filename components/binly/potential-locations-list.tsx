@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { MapPin, User, Calendar, Check, Trash2, Loader2, MoreVertical, Eye, ChevronsUpDown, Truck, UserCog } from 'lucide-react';
+import { MapPin, User, Calendar, Check, Trash2, Loader2, MoreVertical, Eye, ChevronsUpDown, Truck, UserCog, Search, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PotentialLocationDetailsDrawer } from './potential-location-details-drawer';
@@ -28,6 +28,7 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [sortColumn, setSortColumn] = useState<SortColumn | null>('created_at_iso');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [search, setSearch] = useState('');
 
   // React Query — replaces raw useState/useEffect/fetchLocations
   const { data: locations = [], isLoading } = usePotentialLocations(filter);
@@ -54,8 +55,9 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
     return unsubscribe;
   }, [isConnected, subscribe]);
 
-  // Reset sort when switching tabs
+  // Reset sort + search when switching tabs
   useEffect(() => {
+    setSearch('');
     if (filter === 'converted') {
       setSortColumn('converted_at_iso');
       setSortDirection('desc');
@@ -141,6 +143,18 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
     return sortDirection === 'asc' ? comparison : -comparison;
   });
 
+  // Search filter — applied on top of sorting
+  const q = search.trim().toLowerCase();
+  const displayedLocations = q
+    ? sortedLocations.filter(
+        (loc) =>
+          loc.street.toLowerCase().includes(q) ||
+          loc.city.toLowerCase().includes(q) ||
+          loc.zip.toLowerCase().includes(q) ||
+          (loc.bin_number != null && String(loc.bin_number).includes(q))
+      )
+    : sortedLocations;
+
   return (
     <>
       <div className="bg-white rounded-2xl card-shadow">
@@ -192,6 +206,26 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                 <span className="sm:hidden">Add</span>
               </Button>
             </div>
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative mt-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by address, city, zip, or bin #…"
+              className="w-full pl-9 pr-9 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -287,7 +321,7 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {sortedLocations.map((location) => (
+                {displayedLocations.map((location) => (
                   <tr
                     key={location.id}
                     className="hover:bg-gray-50 cursor-pointer transition-colors"
@@ -412,9 +446,23 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
               </table>
             </div>
 
+            {/* No search results */}
+            {q && displayedLocations.length === 0 && (
+              <div className="text-center py-10">
+                <Search className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                <p className="text-sm font-medium text-gray-500">No results for &quot;{search}&quot;</p>
+                <button
+                  onClick={() => setSearch('')}
+                  className="mt-2 text-xs text-primary hover:underline"
+                >
+                  Clear search
+                </button>
+              </div>
+            )}
+
             {/* Mobile Card View */}
             <div className="lg:hidden p-3 space-y-3">
-              {sortedLocations.map((location) => (
+              {displayedLocations.map((location) => (
                 <div
                   key={location.id}
                   onClick={() => setSelectedLocation(location)}
