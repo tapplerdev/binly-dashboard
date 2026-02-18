@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
-import { MapPin, X, Loader2, Edit, FileText, Map as MapIcon } from 'lucide-react';
+import { MapPin, X, Loader2, Edit, FileText, Map as MapIcon, AlertTriangle, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dropdown } from '@/components/ui/dropdown';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
@@ -11,8 +11,17 @@ import { inputStyles, cn } from '@/lib/utils';
 import { useBins } from '@/lib/hooks/use-bins';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { Bin, isMappableBin, getBinMarkerColor, BinStatus } from '@/lib/types/bin';
-import { updateBin } from '@/lib/api/bins';
+import { updateBin, BinChangeReasonCategory } from '@/lib/api/bins';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+const REASON_OPTIONS: { value: BinChangeReasonCategory; label: string; autoZone: boolean }[] = [
+  { value: 'landlord_complaint', label: 'Landlord Complaint', autoZone: true },
+  { value: 'theft', label: 'Theft', autoZone: true },
+  { value: 'vandalism', label: 'Vandalism', autoZone: true },
+  { value: 'missing', label: 'Missing Bin', autoZone: true },
+  { value: 'relocation_request', label: 'Relocation Request', autoZone: false },
+  { value: 'other', label: 'Other', autoZone: false },
+];
 
 interface EditBinDialogProps {
   open: boolean;
@@ -87,6 +96,14 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [viewMode, setViewMode] = useState<'form' | 'map'>('form');
 
+  // Step state: 'edit' = form, 'reason' = reason step
+  const [step, setStep] = useState<'edit' | 'reason'>('edit');
+
+  // Reason step state
+  const [reasonCategory, setReasonCategory] = useState<BinChangeReasonCategory | ''>('');
+  const [reasonNotes, setReasonNotes] = useState('');
+  const [createNoGoZone, setCreateNoGoZone] = useState(false);
+
   // Form state
   const [binNumber, setBinNumber] = useState<number>(0);
   const [street, setStreet] = useState('');
@@ -131,6 +148,10 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
       setSearchQuery('');
       setError('');
       setViewMode('form');
+      setStep('edit');
+      setReasonCategory('');
+      setReasonNotes('');
+      setCreateNoGoZone(false);
     }
   }, [open]);
 
@@ -214,6 +235,9 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
         move_requested: bin.move_requested ?? false,
         latitude,
         longitude,
+        reason_category: reasonCategory || null,
+        reason_notes: reasonNotes.trim() || null,
+        create_no_go_zone: reasonCategory === 'relocation_request' ? createNoGoZone : null,
       });
     },
     onSuccess: () => {
@@ -226,20 +250,27 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
     },
   });
 
-  const handleSubmit = async () => {
+  // Step 1: validate form → advance to reason step
+  const handleNextStep = () => {
     setError('');
-
-    // Validation
     if (!street.trim() || !city.trim() || !zip.trim()) {
       setError('Please fill in all address fields');
       return;
     }
-
     if (!latitude || !longitude) {
       setError('Please select a location on the map or search for an address');
       return;
     }
+    setStep('reason');
+  };
 
+  // Step 2: validate reason → submit
+  const handleSubmit = async () => {
+    setError('');
+    if (!reasonCategory) {
+      setError('Please select a reason for this change');
+      return;
+    }
     setLoading(true);
     try {
       await updateBinMutation.mutateAsync();
@@ -249,6 +280,9 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
       setLoading(false);
     }
   };
+
+  // Auto-creates zone for selected reason (for display)
+  const selectedReasonOption = REASON_OPTIONS.find((o) => o.value === reasonCategory);
 
   if (!open || !bin) return null;
 
@@ -314,187 +348,297 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
 
         {/* Content */}
         <div className="h-full pt-[140px] md:pt-[88px] flex">
-          {/* Left Panel - Form */}
+          {/* Left Panel */}
           <div className={`w-full md:w-[480px] border-r border-gray-200 p-4 md:p-6 overflow-y-auto ${viewMode === 'map' ? 'hidden md:block' : 'block'}`}>
-            {/* Address Search */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search Address
-              </label>
-              <HerePlacesAutocomplete
-                value={searchQuery}
-                onChange={setSearchQuery}
-                onPlaceSelect={handlePlaceSelect}
-                placeholder="Search for a new address..."
-              />
-            </div>
 
-            {/* Location Details */}
-            <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-4 mb-6">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Location Details</h3>
-
-              <div className="mb-3">
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                  Street Address <span className="text-red-500">*</span>
-                </label>
-                <HerePlacesAutocomplete
-                  value={street}
-                  onChange={setStreet}
-                  onPlaceSelect={handleStreetPlaceSelect}
-                  placeholder="123 Main St"
-                  className={inputStyles()}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                    City <span className="text-red-500">*</span>
+            {step === 'edit' ? (
+              <>
+                {/* Address Search */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Search Address
                   </label>
-                  <input
-                    type="text"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className={inputStyles()}
-                    placeholder="Mountain View"
+                  <HerePlacesAutocomplete
+                    value={searchQuery}
+                    onChange={setSearchQuery}
+                    onPlaceSelect={handlePlaceSelect}
+                    placeholder="Search for a new address..."
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                    ZIP <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={zip}
-                    onChange={(e) => setZip(e.target.value)}
-                    className={inputStyles()}
-                    placeholder="94040"
-                  />
-                </div>
-              </div>
+                {/* Location Details */}
+                <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-4 mb-6">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Location Details</h3>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                    Latitude
-                  </label>
-                  <input
-                    type="text"
-                    value={latitude?.toFixed(6) || ''}
-                    readOnly
-                    className={cn(inputStyles(), 'bg-gray-100 text-gray-600 cursor-not-allowed')}
-                    placeholder="37.379010"
-                  />
-                </div>
+                  <div className="mb-3">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                      Street Address <span className="text-red-500">*</span>
+                    </label>
+                    <HerePlacesAutocomplete
+                      value={street}
+                      onChange={setStreet}
+                      onPlaceSelect={handleStreetPlaceSelect}
+                      placeholder="123 Main St"
+                      className={inputStyles()}
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                    Longitude
-                  </label>
-                  <input
-                    type="text"
-                    value={longitude?.toFixed(6) || ''}
-                    readOnly
-                    className={cn(inputStyles(), 'bg-gray-100 text-gray-600 cursor-not-allowed')}
-                    placeholder="-122.071880"
-                  />
-                </div>
-              </div>
-            </div>
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                        City <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        className={inputStyles()}
+                        placeholder="Mountain View"
+                      />
+                    </div>
 
-            {/* Bin Details */}
-            <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-4 mb-6">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Bin Details</h3>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                        ZIP <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={zip}
+                        onChange={(e) => setZip(e.target.value)}
+                        className={inputStyles()}
+                        placeholder="94040"
+                      />
+                    </div>
+                  </div>
 
-              <div className="mb-3">
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                  Bin Number <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={binNumber}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9]/g, '');
-                    setBinNumber(value ? parseInt(value) : 0);
-                  }}
-                  className={inputStyles()}
-                  placeholder="Enter bin number"
-                />
-              </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                        Latitude
+                      </label>
+                      <input
+                        type="text"
+                        value={latitude?.toFixed(6) || ''}
+                        readOnly
+                        className={cn(inputStyles(), 'bg-gray-100 text-gray-600 cursor-not-allowed')}
+                        placeholder="37.379010"
+                      />
+                    </div>
 
-              <div className="mb-3">
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                  Status <span className="text-red-500">*</span>
-                </label>
-                <Dropdown
-                  label=""
-                  value={status}
-                  options={[
-                    { value: 'active', label: 'Active' },
-                    { value: 'missing', label: 'Missing' },
-                    { value: 'retired', label: 'Retired' },
-                    { value: 'in_storage', label: 'In Storage' },
-                  ]}
-                  onChange={(value) => setStatus(value as BinStatus)}
-                  className="w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                  Fill Percentage
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={fillPercentage ?? ''}
-                    onChange={(e) => setFillPercentage(e.target.value ? parseInt(e.target.value) : null)}
-                    className={cn(inputStyles(), 'pr-10')}
-                    placeholder="0"
-                  />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500 pointer-events-none">
-                    %
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                        Longitude
+                      </label>
+                      <input
+                        type="text"
+                        value={longitude?.toFixed(6) || ''}
+                        readOnly
+                        className={cn(inputStyles(), 'bg-gray-100 text-gray-600 cursor-not-allowed')}
+                        placeholder="-122.071880"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Error Message */}
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-600">{error}</p>
-              </div>
-            )}
+                {/* Bin Details */}
+                <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-4 mb-6">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Bin Details</h3>
 
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-4">
-              <Button
-                onClick={() => onOpenChange(false)}
-                variant="outline"
-                className="flex-1"
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                className="flex-1"
-                disabled={loading || reverseGeocoding}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  'Save Changes'
+                  <div className="mb-3">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                      Bin Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={binNumber}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9]/g, '');
+                        setBinNumber(value ? parseInt(value) : 0);
+                      }}
+                      className={inputStyles()}
+                      placeholder="Enter bin number"
+                    />
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                      Status <span className="text-red-500">*</span>
+                    </label>
+                    <Dropdown
+                      label=""
+                      value={status}
+                      options={[
+                        { value: 'active', label: 'Active' },
+                        { value: 'missing', label: 'Missing' },
+                        { value: 'retired', label: 'Retired' },
+                        { value: 'in_storage', label: 'In Storage' },
+                      ]}
+                      onChange={(value) => setStatus(value as BinStatus)}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                      Fill Percentage
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={fillPercentage ?? ''}
+                        onChange={(e) => setFillPercentage(e.target.value ? parseInt(e.target.value) : null)}
+                        className={cn(inputStyles(), 'pr-10')}
+                        placeholder="0"
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500 pointer-events-none">
+                        %
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Error Message */}
+                {error && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-600">{error}</p>
+                  </div>
                 )}
-              </Button>
-            </div>
+
+                {/* Step 1 Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    onClick={() => onOpenChange(false)}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleNextStep}
+                    className="flex-1"
+                    disabled={reverseGeocoding}
+                  >
+                    Next: Reason
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Step 2 — Reason */}
+                <div className="mb-4 flex items-center gap-2">
+                  <button
+                    onClick={() => { setStep('edit'); setError(''); }}
+                    className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <ChevronLeft className="w-4 h-4 text-gray-500" />
+                  </button>
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">Reason for Change</h3>
+                    <p className="text-xs text-gray-500">Required for all administrative edits</p>
+                  </div>
+                </div>
+
+                {/* Summary of changes */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                  <p className="text-xs font-medium text-blue-800 mb-1">Saving changes to Bin #{bin.bin_number}:</p>
+                  <p className="text-xs text-blue-700">{street}, {city} {zip}</p>
+                  <p className="text-xs text-blue-700">Status: {status} · Fill: {fillPercentage ?? '—'}%</p>
+                </div>
+
+                {/* Reason Category */}
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                    Reason Category <span className="text-red-500">*</span>
+                  </label>
+                  <Dropdown
+                    label=""
+                    value={reasonCategory}
+                    options={REASON_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                    onChange={(value) => {
+                      setReasonCategory(value as BinChangeReasonCategory);
+                      setCreateNoGoZone(false);
+                    }}
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Auto no-go zone notice for incident reasons */}
+                {selectedReasonOption?.autoZone && (
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-700">
+                      A no-go zone will be automatically created at the current bin location to flag this area.
+                    </p>
+                  </div>
+                )}
+
+                {/* Optional no-go zone checkbox for relocation_request */}
+                {reasonCategory === 'relocation_request' && (
+                  <div className="mb-4 flex items-start gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <input
+                      id="create-no-go-zone"
+                      type="checkbox"
+                      checked={createNoGoZone}
+                      onChange={(e) => setCreateNoGoZone(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                    <label htmlFor="create-no-go-zone" className="text-xs text-gray-700 cursor-pointer">
+                      <span className="font-medium">Create no-go zone</span> at current location to avoid re-placing a bin here
+                    </label>
+                  </div>
+                )}
+
+                {/* Notes */}
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                    Notes <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <textarea
+                    value={reasonNotes}
+                    onChange={(e) => setReasonNotes(e.target.value)}
+                    rows={3}
+                    className={cn(inputStyles(), 'resize-none')}
+                    placeholder="Additional context about this change..."
+                  />
+                </div>
+
+                {/* Error Message */}
+                {error && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-600">{error}</p>
+                  </div>
+                )}
+
+                {/* Step 2 Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    onClick={() => { setStep('edit'); setError(''); }}
+                    variant="outline"
+                    className="flex-1"
+                    disabled={loading}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    onClick={handleSubmit}
+                    className="flex-1"
+                    disabled={loading || !reasonCategory}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Changes'
+                    )}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Right Panel - Map */}

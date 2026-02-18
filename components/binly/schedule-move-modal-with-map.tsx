@@ -30,6 +30,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { createMoveRequest, assignMoveToShift, assignMoveToUser } from '@/lib/api/move-requests';
+import { BinChangeReasonCategory } from '@/lib/api/bins';
 import { getShifts, getShiftDetailsByDriverId } from '@/lib/api/shifts';
 import { Shift } from '@/lib/types/shift';
 import { getUsers, User as UserType } from '@/lib/api/users';
@@ -47,6 +48,15 @@ const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 11;
 
 // Per-bin configuration type
+const MOVE_REASON_OPTIONS: { value: BinChangeReasonCategory; label: string; autoZone: boolean }[] = [
+  { value: 'landlord_complaint', label: 'Landlord Complaint', autoZone: true },
+  { value: 'theft', label: 'Theft', autoZone: true },
+  { value: 'vandalism', label: 'Vandalism', autoZone: true },
+  { value: 'missing', label: 'Missing Bin', autoZone: true },
+  { value: 'relocation_request', label: 'Relocation Request', autoZone: false },
+  { value: 'other', label: 'Other', autoZone: false },
+];
+
 interface BinMoveConfig {
   bin: BinWithPriority;
   moveType: 'store' | 'relocation';
@@ -59,6 +69,8 @@ interface BinMoveConfig {
   newLongitude?: number;
   reason?: string;
   notes?: string;
+  reasonCategory?: BinChangeReasonCategory;
+  createNoGoZone?: boolean;
   assignmentType: 'unassigned' | 'user' | 'active_shift' | 'future_shift';
   assignedUserId?: string;
   assignedShiftId?: string;
@@ -424,6 +436,8 @@ export function ScheduleMoveModalWithMap({
           move_type: config.moveType === 'store' ? 'store' : 'relocation',
           reason: config.reason || '',
           notes: config.notes || '',
+          reason_category: config.reasonCategory || undefined,
+          create_no_go_zone: config.reasonCategory === 'relocation_request' ? (config.createNoGoZone ?? false) : undefined,
         };
 
         if (config.moveType === 'relocation') {
@@ -1734,6 +1748,52 @@ export function ScheduleMoveModalWithMap({
                     )}
                   />
                 </div>
+
+                {/* Reason Category */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Reason for Move <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <Dropdown
+                    label=""
+                    value={config.reasonCategory || ''}
+                    options={[
+                      { value: '', label: 'Select a reason...' },
+                      ...MOVE_REASON_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+                    ]}
+                    onChange={(value) => updateBinConfig(bin.id, {
+                      reasonCategory: value ? value as BinChangeReasonCategory : undefined,
+                      createNoGoZone: false,
+                    })}
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Auto no-go zone notice */}
+                {config.reasonCategory && MOVE_REASON_OPTIONS.find((o) => o.value === config.reasonCategory)?.autoZone && (
+                  <div className="flex gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-700">
+                      A no-go zone will be automatically created at the current bin location.
+                    </p>
+                  </div>
+                )}
+
+                {/* Optional no-go zone checkbox for relocation_request */}
+                {config.reasonCategory === 'relocation_request' && (
+                  <div className="flex items-start gap-2 p-2.5 bg-gray-50 border border-gray-200 rounded-lg">
+                    <input
+                      id={`no-go-zone-${bin.id}`}
+                      type="checkbox"
+                      checked={config.createNoGoZone ?? false}
+                      onChange={(e) => updateBinConfig(bin.id, { createNoGoZone: e.target.checked })}
+                      className="mt-0.5 h-4 w-4 rounded border-gray-300"
+                    />
+                    <label htmlFor={`no-go-zone-${bin.id}`} className="text-xs text-gray-700 cursor-pointer">
+                      <span className="font-medium">Create no-go zone</span> at current location
+                    </label>
+                  </div>
+                )}
 
                 {/* Notes */}
                 <div>

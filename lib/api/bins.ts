@@ -105,6 +105,52 @@ export async function getBinById(id: string): Promise<Bin> {
   }
 }
 
+export type BinChangeReasonCategory =
+  | 'landlord_complaint'
+  | 'theft'
+  | 'vandalism'
+  | 'missing'
+  | 'relocation_request'
+  | 'other';
+
+export interface BinChangeLogEntry {
+  id: string;
+  bin_id: string;
+  changed_by_user_id: string;
+  changed_by_name?: string | null;
+  change_type: string;
+  old_values: string; // JSON string
+  new_values: string; // JSON string
+  reason_category?: BinChangeReasonCategory | null;
+  reason_notes?: string | null;
+  no_go_zone_created: boolean;
+  no_go_zone_id?: string | null;
+  created_at: number;
+  created_at_iso: string;
+}
+
+/**
+ * Fetch administrative change log for a bin
+ */
+export async function getBinChangeLog(binId: string): Promise<BinChangeLogEntry[]> {
+  try {
+    const response = await fetch(`${API_URL}/api/bins/${binId}/change-log`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch bin change log: ${response.statusText}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error(`Error fetching change log for bin ${binId}:`, error);
+    throw error;
+  }
+}
+
 /**
  * Update bin details (address, status, fill percentage, coordinates)
  * @param id Bin ID
@@ -124,6 +170,9 @@ export async function updateBin(
     move_requested: boolean;
     latitude?: number | null;
     longitude?: number | null;
+    reason_category?: BinChangeReasonCategory | null;
+    reason_notes?: string | null;
+    create_no_go_zone?: boolean | null;
   }
 ): Promise<Bin> {
   try {

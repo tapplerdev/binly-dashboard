@@ -95,6 +95,8 @@ export interface CreateMoveRequestParams {
   new_longitude?: number;
   reason?: string;
   notes?: string;
+  reason_category?: string; // 'landlord_complaint' | 'theft' | 'vandalism' | 'missing' | 'relocation_request' | 'other'
+  create_no_go_zone?: boolean;
   assign_to_shift_id?: string; // Optional: auto-assign to shift
 }
 

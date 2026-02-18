@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getBinChecks, getBinMoves, getBinIncidents, type BinMove } from '@/lib/api/bins';
+import { getBinChecks, getBinMoves, getBinIncidents, getBinChangeLog, type BinMove, type BinChangeLogEntry } from '@/lib/api/bins';
 import { ZoneIncident, formatIncidentType, getIncidentIcon } from '@/lib/types/zone';
 import { getMoveRequest, getMoveRequests, cancelMoveRequest } from '@/lib/api/move-requests';
 import { BinWithPriority, getMoveRequestUrgency, getMoveRequestBadgeColor, type MoveRequest, type BinCheck } from '@/lib/types/bin';
@@ -29,6 +29,9 @@ import {
   ExternalLink,
   ArrowRight,
   PackageX,
+  History,
+  ShieldAlert,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -43,7 +46,7 @@ interface BinDetailDrawerProps {
 export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinDetailDrawerProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'overview' | 'checks' | 'moves' | 'incidents'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'checks' | 'moves' | 'incidents' | 'history'>('overview');
   const [isClosing, setIsClosing] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedCheck, setSelectedCheck] = useState<BinCheck | null>(null);
@@ -85,6 +88,13 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
     queryKey: ['bin-incidents', bin.id],
     queryFn: () => getBinIncidents(bin.id),
     enabled: activeTab === 'incidents',
+  });
+
+  // Fetch admin change log
+  const { data: changeLog, isLoading: changeLogLoading } = useQuery({
+    queryKey: ['bin-change-log', bin.id],
+    queryFn: () => getBinChangeLog(bin.id),
+    enabled: activeTab === 'history',
   });
 
   // Fetch all move requests for this bin
@@ -307,6 +317,7 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
               { key: 'checks', label: 'Check History' },
               { key: 'moves', label: 'Move History' },
               { key: 'incidents', label: 'Incidents' },
+              { key: 'history', label: 'Admin History' },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -934,6 +945,106 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
                 <div className="text-center py-12">
                   <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-500">No move history available</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Admin History Tab */}
+          {activeTab === 'history' && (
+            <div className="space-y-3">
+              {changeLogLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              ) : !changeLog || changeLog.length === 0 ? (
+                <div className="text-center py-12">
+                  <History className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">No administrative changes recorded</p>
+                  <p className="text-xs text-gray-400 mt-1">Changes made via Edit Bin or Move Requests will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {changeLog.map((entry) => {
+                    const reasonLabels: Record<string, string> = {
+                      landlord_complaint: 'Landlord Complaint',
+                      theft: 'Theft',
+                      vandalism: 'Vandalism',
+                      missing: 'Missing Bin',
+                      relocation_request: 'Relocation Request',
+                      other: 'Other',
+                    };
+                    const changeTypeLabels: Record<string, string> = {
+                      address_change: 'Address Changed',
+                      status_change: 'Status Changed',
+                      fill_override: 'Fill % Overridden',
+                      bin_number_change: 'Bin Number Changed',
+                      coordinates_change: 'Coordinates Updated',
+                    };
+
+                    let oldValues: Record<string, any> = {};
+                    let newValues: Record<string, any> = {};
+                    try { oldValues = JSON.parse(entry.old_values); } catch {}
+                    try { newValues = JSON.parse(entry.new_values); } catch {}
+
+                    return (
+                      <div key={entry.id} className="border border-gray-200 rounded-lg p-4">
+                        {/* Header row */}
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 bg-gray-100 rounded-full flex items-center justify-center">
+                              <History className="w-3.5 h-3.5 text-gray-500" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">
+                                {changeTypeLabels[entry.change_type] || entry.change_type}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                by {entry.changed_by_name || 'Unknown'} · {format(new Date(entry.created_at_iso), 'MMM d, yyyy h:mm a')}
+                              </p>
+                            </div>
+                          </div>
+                          {entry.no_go_zone_created && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">
+                              <ShieldAlert className="w-3 h-3" />
+                              Zone
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Reason */}
+                        {entry.reason_category && (
+                          <div className="mb-2">
+                            <span className="text-xs font-medium text-gray-600">Reason: </span>
+                            <span className="text-xs text-gray-700">{reasonLabels[entry.reason_category] || entry.reason_category}</span>
+                            {entry.reason_notes && (
+                              <p className="text-xs text-gray-500 mt-0.5 italic">{entry.reason_notes}</p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Value diff */}
+                        {Object.keys(newValues).length > 0 && (
+                          <div className="text-xs space-y-1">
+                            {Object.entries(newValues).map(([key, newVal]) => {
+                              const oldVal = oldValues[key];
+                              const label = key.replace(/_/g, ' ');
+                              return (
+                                <div key={key} className="flex items-center gap-2 text-gray-600">
+                                  <span className="font-medium capitalize">{label}:</span>
+                                  {oldVal !== undefined && (
+                                    <span className="line-through text-red-400">{String(oldVal)}</span>
+                                  )}
+                                  <ArrowRight className="w-3 h-3 text-gray-400" />
+                                  <span className="text-green-700 font-medium">{String(newVal)}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
