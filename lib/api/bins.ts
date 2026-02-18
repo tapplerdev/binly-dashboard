@@ -111,6 +111,7 @@ export type BinChangeReasonCategory =
   | 'vandalism'
   | 'missing'
   | 'relocation_request'
+  | 'pulled_from_service'
   | 'other';
 
 export interface BinChangeLogEntry {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
-import { MapPin, X, Loader2, Edit, FileText, Map as MapIcon, AlertTriangle, ChevronLeft } from 'lucide-react';
+import { MapPin, X, Loader2, Edit, FileText, Map as MapIcon, AlertTriangle, ChevronLeft, Warehouse } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dropdown } from '@/components/ui/dropdown';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
@@ -14,14 +14,118 @@ import { Bin, isMappableBin, getBinMarkerColor, BinStatus } from '@/lib/types/bi
 import { updateBin, BinChangeReasonCategory } from '@/lib/api/bins';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-const REASON_OPTIONS: { value: BinChangeReasonCategory; label: string; autoZone: boolean }[] = [
-  { value: 'landlord_complaint', label: 'Landlord Complaint', autoZone: true },
+// ─── Reason options by context ──────────────────────────────────────────────
+
+// Incident reasons — trigger no-go zone automatically
+const INCIDENT_REASONS: { value: BinChangeReasonCategory; label: string; autoZone: boolean }[] = [
+  { value: 'missing', label: 'Missing Bin', autoZone: true },
   { value: 'theft', label: 'Theft', autoZone: true },
   { value: 'vandalism', label: 'Vandalism', autoZone: true },
-  { value: 'missing', label: 'Missing Bin', autoZone: true },
+  { value: 'landlord_complaint', label: 'Landlord Complaint', autoZone: true },
+];
+
+// All manual-select reason options (excluding pulled_from_service which is auto-applied)
+const ALL_REASON_OPTIONS: { value: BinChangeReasonCategory; label: string; autoZone: boolean }[] = [
+  ...INCIDENT_REASONS,
   { value: 'relocation_request', label: 'Relocation Request', autoZone: false },
   { value: 'other', label: 'Other', autoZone: false },
 ];
+
+/**
+ * Determine which reason options to show based on what actually changed.
+ * Returns null if step 2 should be skipped entirely (trivial changes only).
+ */
+function getContextualReasons(
+  bin: Bin,
+  newStatus: BinStatus,
+  newStreet: string,
+  newCity: string,
+  newZip: string,
+  newFill: number | null,
+  newBinNumber: number,
+  newLat: number | null,
+  newLng: number | null,
+): {
+  skipReason: boolean;
+  autoReason: BinChangeReasonCategory | null;
+  availableReasons: { value: BinChangeReasonCategory; label: string; autoZone: boolean }[];
+  defaultReason: BinChangeReasonCategory | null;
+} {
+  const statusChanged = newStatus !== (bin.status as BinStatus);
+  const addressChanged =
+    newStreet.trim() !== bin.current_street ||
+    newCity.trim() !== bin.city ||
+    newZip.trim() !== bin.zip;
+  const coordsChanged =
+    (newLat !== null && newLat !== bin.latitude) ||
+    (newLng !== null && newLng !== bin.longitude);
+  const fillChanged = newFill !== (bin.fill_percentage ?? null);
+  const binNumberChanged = newBinNumber !== bin.bin_number;
+
+  const meaningfulChange = statusChanged || addressChanged || coordsChanged;
+
+  // Only fill/bin-number changed — skip reason step entirely
+  if (!meaningfulChange && (fillChanged || binNumberChanged)) {
+    return { skipReason: true, autoReason: null, availableReasons: [], defaultReason: null };
+  }
+
+  // Status → in_storage: auto-apply pulled_from_service, no dropdown
+  if (statusChanged && newStatus === 'in_storage') {
+    return {
+      skipReason: false,
+      autoReason: 'pulled_from_service',
+      availableReasons: [],
+      defaultReason: null,
+    };
+  }
+
+  // Status → missing: show incident reasons, pre-select missing
+  if (statusChanged && newStatus === 'missing') {
+    return {
+      skipReason: false,
+      autoReason: null,
+      availableReasons: [
+        ...INCIDENT_REASONS,
+        { value: 'other', label: 'Other', autoZone: false },
+      ],
+      defaultReason: 'missing',
+    };
+  }
+
+  // Status → active/retired/needs_check/pending_move (non-incident status change): other only
+  if (statusChanged && !addressChanged && !coordsChanged) {
+    return {
+      skipReason: false,
+      autoReason: null,
+      availableReasons: [{ value: 'other', label: 'Other', autoZone: false }],
+      defaultReason: 'other',
+    };
+  }
+
+  // Address/coords changed, status stays active (relocation): relocation-relevant reasons
+  if ((addressChanged || coordsChanged) && !statusChanged) {
+    return {
+      skipReason: false,
+      autoReason: null,
+      availableReasons: [
+        { value: 'relocation_request', label: 'Relocation Request', autoZone: false },
+        { value: 'landlord_complaint', label: 'Landlord Complaint', autoZone: true },
+        { value: 'other', label: 'Other', autoZone: false },
+      ],
+      defaultReason: 'relocation_request',
+    };
+  }
+
+  // Mixed: status + address both changed — full options
+  return {
+    skipReason: false,
+    autoReason: null,
+    availableReasons: ALL_REASON_OPTIONS,
+    defaultReason: null,
+  };
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
 
 interface EditBinDialogProps {
   open: boolean;
@@ -104,6 +208,14 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
   const [reasonNotes, setReasonNotes] = useState('');
   const [createNoGoZone, setCreateNoGoZone] = useState(false);
 
+  // Context computed during handleNextStep (so it only runs once, not on every render)
+  const [reasonContext, setReasonContext] = useState<{
+    skipReason: boolean;
+    autoReason: BinChangeReasonCategory | null;
+    availableReasons: { value: BinChangeReasonCategory; label: string; autoZone: boolean }[];
+    defaultReason: BinChangeReasonCategory | null;
+  } | null>(null);
+
   // Form state
   const [binNumber, setBinNumber] = useState<number>(0);
   const [street, setStreet] = useState('');
@@ -152,8 +264,42 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
       setReasonCategory('');
       setReasonNotes('');
       setCreateNoGoZone(false);
+      setReasonContext(null);
     }
   }, [open]);
+
+  // When status changes to in_storage, auto-fill warehouse address
+  useEffect(() => {
+    if (status === 'in_storage' && warehouse) {
+      // Parse warehouse address into parts
+      // Warehouse address format: "123 Main St, City, CA 94040" or similar
+      const addr = warehouse.address;
+      // Simple heuristic: everything before first comma is street
+      const parts = addr.split(',').map((p: string) => p.trim());
+      if (parts.length >= 2) {
+        setStreet(parts[0]);
+        // Try to extract city and zip from remaining parts
+        const rest = parts.slice(1).join(', ');
+        // Look for zip pattern
+        const zipMatch = rest.match(/\b(\d{5})\b/);
+        if (zipMatch) {
+          setZip(zipMatch[1]);
+          // City is everything up to the zip
+          const cityPart = rest.replace(/[\s,]*[A-Z]{2}\s*\d{5}[-\d]*/, '').trim().replace(/,$/, '').trim();
+          setCity(cityPart || parts[1]);
+        } else {
+          setCity(parts[1] || '');
+          setZip(parts[2] || '');
+        }
+      } else {
+        setStreet(addr);
+      }
+      setLatitude(warehouse.latitude);
+      setLongitude(warehouse.longitude);
+      setMarkerPosition({ lat: warehouse.latitude, lng: warehouse.longitude });
+      setMapCenter({ lat: warehouse.latitude, lng: warehouse.longitude });
+    }
+  }, [status, warehouse]);
 
   const handlePlaceSelect = useCallback((place: HerePlaceDetails) => {
     setStreet(place.street);
@@ -221,8 +367,10 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
   }, []);
 
   const updateBinMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (overrideReason?: BinChangeReasonCategory) => {
       if (!bin) throw new Error('No bin selected');
+
+      const finalReason = overrideReason ?? (reasonCategory || null);
 
       return updateBin(bin.id, {
         bin_number: binNumber,
@@ -235,7 +383,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
         move_requested: bin.move_requested ?? false,
         latitude,
         longitude,
-        reason_category: reasonCategory || null,
+        reason_category: finalReason as BinChangeReasonCategory | null,
         reason_notes: reasonNotes.trim() || null,
         create_no_go_zone: reasonCategory === 'relocation_request' ? createNoGoZone : null,
       });
@@ -245,14 +393,16 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
       queryClient.invalidateQueries({ queryKey: ['bins-with-priority'] });
       onOpenChange(false);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setError(error.message || 'Failed to update bin');
     },
   });
 
-  // Step 1: validate form → advance to reason step
+  // Step 1: validate form → determine context → advance or skip to step 2
   const handleNextStep = () => {
     setError('');
+    if (!bin) return;
+
     if (!street.trim() || !city.trim() || !zip.trim()) {
       setError('Please fill in all address fields');
       return;
@@ -261,16 +411,53 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
       setError('Please select a location on the map or search for an address');
       return;
     }
+
+    const ctx = getContextualReasons(
+      bin,
+      status,
+      street,
+      city,
+      zip,
+      fillPercentage,
+      binNumber,
+      latitude,
+      longitude,
+    );
+
+    // Trivial change (fill/bin-number only) — submit silently with 'other'
+    if (ctx.skipReason) {
+      setLoading(true);
+      updateBinMutation
+        .mutateAsync('other')
+        .catch(() => {})
+        .finally(() => setLoading(false));
+      return;
+    }
+
+    // Store context, pre-fill default reason if any
+    setReasonContext(ctx);
+    if (ctx.autoReason) {
+      setReasonCategory(ctx.autoReason);
+    } else if (ctx.defaultReason) {
+      setReasonCategory(ctx.defaultReason);
+    } else {
+      setReasonCategory('');
+    }
+    setCreateNoGoZone(false);
     setStep('reason');
   };
 
   // Step 2: validate reason → submit
   const handleSubmit = async () => {
     setError('');
-    if (!reasonCategory) {
+
+    const isAuto = reasonContext?.autoReason != null;
+
+    if (!isAuto && !reasonCategory) {
       setError('Please select a reason for this change');
       return;
     }
+
     setLoading(true);
     try {
       await updateBinMutation.mutateAsync();
@@ -282,11 +469,14 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
   };
 
   // Auto-creates zone for selected reason (for display)
-  const selectedReasonOption = REASON_OPTIONS.find((o) => o.value === reasonCategory);
+  const selectedReasonOption = (reasonContext?.availableReasons ?? ALL_REASON_OPTIONS).find(
+    (o) => o.value === reasonCategory,
+  );
 
   if (!open || !bin) return null;
 
   const mapApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+  const isAutoReason = reasonContext?.autoReason != null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in">
@@ -365,6 +555,16 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                     placeholder="Search for a new address..."
                   />
                 </div>
+
+                {/* in_storage notice */}
+                {status === 'in_storage' && warehouse && (
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex gap-2">
+                    <Warehouse className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-blue-700">
+                      Address auto-set to warehouse location. The bin will be marked as stored.
+                    </p>
+                  </div>
+                )}
 
                 {/* Location Details */}
                 <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-4 mb-6">
@@ -519,9 +719,16 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                   <Button
                     onClick={handleNextStep}
                     className="flex-1"
-                    disabled={reverseGeocoding}
+                    disabled={reverseGeocoding || loading}
                   >
-                    Next: Reason
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Next: Review'
+                    )}
                   </Button>
                 </div>
               </>
@@ -536,8 +743,14 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                     <ChevronLeft className="w-4 h-4 text-gray-500" />
                   </button>
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900">Reason for Change</h3>
-                    <p className="text-xs text-gray-500">Required for all administrative edits</p>
+                    <h3 className="text-sm font-semibold text-gray-900">
+                      {isAutoReason ? 'Confirm Change' : 'Reason for Change'}
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      {isAutoReason
+                        ? 'Review what will happen before saving'
+                        : 'Required for all administrative edits'}
+                    </p>
                   </div>
                 </div>
 
@@ -548,50 +761,77 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                   <p className="text-xs text-blue-700">Status: {status} · Fill: {fillPercentage ?? '—'}%</p>
                 </div>
 
-                {/* Reason Category */}
-                <div className="mb-4">
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                    Reason Category <span className="text-red-500">*</span>
-                  </label>
-                  <Dropdown
-                    label=""
-                    value={reasonCategory}
-                    options={REASON_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-                    onChange={(value) => {
-                      setReasonCategory(value as BinChangeReasonCategory);
-                      setCreateNoGoZone(false);
-                    }}
-                    className="w-full"
-                  />
-                </div>
+                {/* ── PULLED FROM SERVICE: auto-reason, no dropdown ── */}
+                {isAutoReason && reasonContext?.autoReason === 'pulled_from_service' ? (
+                  <div className="mb-4 space-y-3">
+                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg flex gap-2">
+                      <Warehouse className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-medium text-gray-800">Pulled from service</p>
+                        <p className="text-xs text-gray-600 mt-0.5">
+                          Bin will be marked as <strong>In Storage</strong> at the warehouse location. No incident zone will be created — this is an operational pull, not an incident.
+                        </p>
+                      </div>
+                    </div>
 
-                {/* Auto no-go zone notice for incident reasons */}
-                {selectedReasonOption?.autoZone && (
-                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-amber-700">
-                      A no-go zone will be automatically created at the current bin location to flag this area.
-                    </p>
+                    {warehouse && (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <p className="text-xs font-medium text-green-800 mb-0.5">Warehouse address</p>
+                        <p className="text-xs text-green-700">{warehouse.address}</p>
+                      </div>
+                    )}
                   </div>
+                ) : (
+                  <>
+                    {/* ── NORMAL REASON DROPDOWN ── */}
+                    <div className="mb-4">
+                      <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                        Reason Category <span className="text-red-500">*</span>
+                      </label>
+                      <Dropdown
+                        label=""
+                        value={reasonCategory}
+                        options={(reasonContext?.availableReasons ?? ALL_REASON_OPTIONS).map((o) => ({
+                          value: o.value,
+                          label: o.label,
+                        }))}
+                        onChange={(value) => {
+                          setReasonCategory(value as BinChangeReasonCategory);
+                          setCreateNoGoZone(false);
+                        }}
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Auto no-go zone notice for incident reasons */}
+                    {selectedReasonOption?.autoZone && (
+                      <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-700">
+                          A no-go zone will be automatically created at the current bin location to flag this area.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Optional no-go zone checkbox for relocation_request */}
+                    {reasonCategory === 'relocation_request' && (
+                      <div className="mb-4 flex items-start gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                        <input
+                          id="create-no-go-zone"
+                          type="checkbox"
+                          checked={createNoGoZone}
+                          onChange={(e) => setCreateNoGoZone(e.target.checked)}
+                          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <label htmlFor="create-no-go-zone" className="text-xs text-gray-700 cursor-pointer">
+                          <span className="font-medium">Create no-go zone</span> at current location to avoid re-placing a bin here
+                        </label>
+                      </div>
+                    )}
+                  </>
                 )}
 
-                {/* Optional no-go zone checkbox for relocation_request */}
-                {reasonCategory === 'relocation_request' && (
-                  <div className="mb-4 flex items-start gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <input
-                      id="create-no-go-zone"
-                      type="checkbox"
-                      checked={createNoGoZone}
-                      onChange={(e) => setCreateNoGoZone(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                    />
-                    <label htmlFor="create-no-go-zone" className="text-xs text-gray-700 cursor-pointer">
-                      <span className="font-medium">Create no-go zone</span> at current location to avoid re-placing a bin here
-                    </label>
-                  </div>
-                )}
-
-                {/* Notes */}
+                {/* Notes — always available */}
                 <div className="mb-4">
                   <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                     Notes <span className="text-gray-400 font-normal">(optional)</span>
@@ -625,7 +865,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                   <Button
                     onClick={handleSubmit}
                     className="flex-1"
-                    disabled={loading || !reasonCategory}
+                    disabled={loading || (!isAutoReason && !reasonCategory)}
                   >
                     {loading ? (
                       <>
