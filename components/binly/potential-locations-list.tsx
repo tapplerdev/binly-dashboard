@@ -16,7 +16,7 @@ interface PotentialLocationsListProps {
   onCreateNew: () => void;
 }
 
-type SortColumn = 'street' | 'requested_by_name' | 'created_at_iso';
+type SortColumn = 'street' | 'requested_by_name' | 'created_at_iso' | 'converted_at_iso';
 
 export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListProps) {
   const queryClient = useQueryClient();
@@ -53,6 +53,17 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
 
     return unsubscribe;
   }, [isConnected, subscribe]);
+
+  // Reset sort when switching tabs
+  useEffect(() => {
+    if (filter === 'converted') {
+      setSortColumn('converted_at_iso');
+      setSortDirection('desc');
+    } else {
+      setSortColumn('created_at_iso');
+      setSortDirection('desc');
+    }
+  }, [filter]);
 
   // Close menu on click outside
   useEffect(() => {
@@ -119,6 +130,9 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
         break;
       case 'created_at_iso':
         comparison = new Date(a.created_at_iso).getTime() - new Date(b.created_at_iso).getTime();
+        break;
+      case 'converted_at_iso':
+        comparison = new Date(a.converted_at_iso ?? '').getTime() - new Date(b.converted_at_iso ?? '').getTime();
         break;
       default:
         return 0;
@@ -211,15 +225,28 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
               <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th
-                    className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tl-2xl cursor-pointer"
-                    onClick={() => handleSort('created_at_iso')}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>Date Created</span>
-                      <ChevronsUpDown className="w-4 h-4 text-gray-400" />
-                    </div>
-                  </th>
+                  {filter === 'converted' && (
+                    <th
+                      className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tl-2xl cursor-pointer"
+                      onClick={() => handleSort('converted_at_iso')}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Converted On</span>
+                        <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                      </div>
+                    </th>
+                  )}
+                  {filter === 'active' && (
+                    <th
+                      className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tl-2xl cursor-pointer"
+                      onClick={() => handleSort('created_at_iso')}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Date Created</span>
+                        <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                      </div>
+                    </th>
+                  )}
                   <th
                     className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle cursor-pointer"
                     onClick={() => handleSort('street')}
@@ -239,6 +266,17 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                     </div>
                   </th>
                   {filter === 'converted' && (
+                    <th
+                      className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle cursor-pointer"
+                      onClick={() => handleSort('created_at_iso')}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Date Created</span>
+                        <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                      </div>
+                    </th>
+                  )}
+                  {filter === 'converted' && (
                     <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle">
                       Conversion Type
                     </th>
@@ -255,11 +293,20 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                     className="hover:bg-gray-50 cursor-pointer transition-colors"
                     onClick={() => setSelectedLocation(location)}
                   >
-                    <td className="py-4 px-4 align-middle">
-                      <span className="text-sm text-gray-600">
-                        {formatDate(location.created_at_iso)}
-                      </span>
-                    </td>
+                    {filter === 'converted' && (
+                      <td className="py-4 px-4 align-middle">
+                        <span className="text-sm text-gray-600">
+                          {location.converted_at_iso ? formatDate(location.converted_at_iso) : '—'}
+                        </span>
+                      </td>
+                    )}
+                    {filter === 'active' && (
+                      <td className="py-4 px-4 align-middle">
+                        <span className="text-sm text-gray-600">
+                          {formatDate(location.created_at_iso)}
+                        </span>
+                      </td>
+                    )}
                     <td className="py-4 px-4 align-middle">
                       <div className="text-sm">
                         <div className="text-gray-900 font-medium">{location.street}</div>
@@ -273,6 +320,13 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                         {location.requested_by_name}
                       </span>
                     </td>
+                    {filter === 'converted' && (
+                      <td className="py-4 px-4 align-middle">
+                        <span className="text-sm text-gray-600">
+                          {formatDate(location.created_at_iso)}
+                        </span>
+                      </td>
+                    )}
                     {filter === 'converted' && (
                       <td className="py-4 px-4 align-middle">
                         {location.converted_via_shift_id ? (
@@ -408,7 +462,16 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                     </div>
                   </div>
 
-                  {/* Date Created */}
+                  {/* Converted On (converted tab) / Date Created (active tab) */}
+                  {filter === 'converted' && location.converted_at_iso && (
+                    <div className="flex items-center gap-2 mb-1">
+                      <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+                      <div className="text-sm">
+                        <span className="text-gray-500">Converted:</span>{' '}
+                        <span className="text-gray-900">{formatDate(location.converted_at_iso)}</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 mb-3">
                     <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
                     <div className="text-sm">
