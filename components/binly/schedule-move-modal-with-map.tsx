@@ -30,7 +30,8 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { createMoveRequest, assignMoveToShift, assignMoveToUser } from '@/lib/api/move-requests';
-import { getShifts, getShiftDetailsByDriverId, Shift } from '@/lib/api/shifts';
+import { getShifts, getShiftDetailsByDriverId } from '@/lib/api/shifts';
+import { Shift } from '@/lib/types/shift';
 import { getUsers, User as UserType } from '@/lib/api/users';
 import { cn } from '@/lib/utils';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
