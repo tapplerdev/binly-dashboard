@@ -144,6 +144,8 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
     }
   }, []);
 
+  const isRelocation = formData.move_type === 'relocation';
+
   // ── Click anywhere on map to place destination ────────────────────────────
   const handleMapClick = useCallback(async (e: google.maps.MapMouseEvent) => {
     if (!isRelocation) return;
@@ -224,8 +226,6 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
       setIsSubmitting(false);
     }
   };
-
-  const isRelocation = formData.move_type === 'relocation';
 
   return (
     <>
