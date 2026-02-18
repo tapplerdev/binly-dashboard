@@ -22,10 +22,11 @@ import { useActiveDrivers } from '@/lib/hooks/use-active-drivers';
 import { useDrivers } from '@/lib/hooks/use-drivers';
 import { ActiveDriver } from '@/lib/types/active-driver';
 import { LiveOpsMap } from './live-ops-map';
+import { ShiftHistoryView } from './shift-history-view';
 import { useAuthStore } from '@/lib/auth/store';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 
-type ViewMode = 'list' | 'timeline' | 'live';
+type ViewMode = 'list' | 'timeline' | 'live' | 'history';
 
 interface ShiftFilters {
   searchQuery: string;
@@ -63,6 +64,7 @@ export function ShiftsView() {
   const listButtonRef = useRef<HTMLButtonElement>(null);
   const timelineButtonRef = useRef<HTMLButtonElement>(null);
   const liveButtonRef = useRef<HTMLButtonElement>(null);
+  const historyButtonRef = useRef<HTMLButtonElement>(null);
   const [sliderStyle, setSliderStyle] = useState({ left: 0, width: 0 });
 
   const lastWeekRef = useRef<HTMLButtonElement>(null);
@@ -76,6 +78,7 @@ export function ShiftsView() {
       const button =
         viewMode === 'live' ? liveButtonRef.current :
         viewMode === 'list' ? listButtonRef.current :
+        viewMode === 'history' ? historyButtonRef.current :
         timelineButtonRef.current;
       if (button) {
         setSliderStyle({
@@ -300,11 +303,22 @@ export function ShiftsView() {
                 >
                   Timeline
                 </button>
+                <button
+                  ref={historyButtonRef}
+                  onClick={() => setViewMode('history')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-fast relative z-10 ${
+                    viewMode === 'history'
+                      ? 'text-gray-900'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  History
+                </button>
               </div>
             </div>
 
-            {/* Filter Bar - Hidden in Live Ops mode */}
-            {viewMode !== 'live' && (
+            {/* Filter Bar - Hidden in Live Ops and History modes */}
+            {viewMode !== 'live' && viewMode !== 'history' && (
               <FilterBar
                 filters={filters}
                 setFilters={setFilters}
@@ -326,6 +340,8 @@ export function ShiftsView() {
             <div className="flex items-center justify-center py-12">
               <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
+          ) : viewMode === 'history' ? (
+            <ShiftHistoryView />
           ) : viewMode === 'list' ? (
             <div className="max-w-4xl mx-auto">
               <ShiftsListView shifts={filteredShifts} onShiftClick={setSelectedShift} />

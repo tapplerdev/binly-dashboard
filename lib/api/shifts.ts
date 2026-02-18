@@ -356,6 +356,61 @@ export async function clearAllShifts(): Promise<void> {
   }
 }
 
+// ── Shift History ────────────────────────────────────────────────────────────
+
+export interface ShiftHistoryEntry {
+  id: string;
+  driver_id: string;
+  driver_name: string;
+  driver_email: string;
+  route_id: string | null;
+  start_time: number | null;
+  end_time: number | null;
+  created_at: number;
+  ended_at: number;
+  total_pause_seconds: number;
+  total_bins: number;
+  completed_bins: number;
+  completion_rate: number;
+  incidents_reported: number;
+  field_observations: number;
+  end_reason: 'completed' | 'manual_end' | 'manager_ended' | 'manager_cancelled' | 'driver_disconnected' | 'system_timeout';
+  collections_completed: number;
+  collections_skipped: number;
+  placements_completed: number;
+  placements_skipped: number;
+  move_requests_completed: number;
+  total_skipped: number;
+  warehouse_stops: number;
+}
+
+export interface ShiftHistoryResponse {
+  shifts: ShiftHistoryEntry[];
+  total_count: number;
+  limit: number;
+  offset: number;
+}
+
+export async function getShiftHistory(params?: {
+  driver_id?: string;
+  start_date?: number;
+  end_date?: number;
+  limit?: number;
+  offset?: number;
+}): Promise<ShiftHistoryResponse> {
+  const url = new URL(`${API_BASE_URL}/api/manager/shifts/history`);
+  if (params?.driver_id) url.searchParams.set('driver_id', params.driver_id);
+  if (params?.start_date) url.searchParams.set('start_date', String(params.start_date));
+  if (params?.end_date) url.searchParams.set('end_date', String(params.end_date));
+  if (params?.limit) url.searchParams.set('limit', String(params.limit));
+  if (params?.offset) url.searchParams.set('offset', String(params.offset));
+
+  const response = await fetch(url.toString(), { headers: getAuthHeaders() });
+  if (!response.ok) throw new Error(`Failed to fetch shift history: ${response.statusText}`);
+  const data = await response.json();
+  return data.data as ShiftHistoryResponse;
+}
+
 /**
  * Helper: Converts backend driver with shift to frontend Shift format
  */
