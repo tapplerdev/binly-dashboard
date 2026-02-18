@@ -33,6 +33,10 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
   // React Query — replaces raw useState/useEffect/fetchLocations
   const { data: locations = [], isLoading } = usePotentialLocations(filter);
 
+  // Always fetch both counts for metrics (served from cache when tab matches)
+  const { data: activeLocations = [] } = usePotentialLocations('active');
+  const { data: convertedLocations = [] } = usePotentialLocations('converted');
+
   // Centrifugo — UI state only: close the drawer if the currently open location is
   // deleted or converted. All cache updates are handled by GlobalCentrifugoSync in the layout.
   const { subscribe, isConnected } = useCentrifugo();
@@ -168,6 +172,23 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
               <p className="text-xs md:text-sm text-gray-600 mt-1">
                 {filter === 'active' ? 'Active location requests' : 'Converted to bins'}
               </p>
+              {/* Metric badges */}
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-full px-3 py-1 text-xs">
+                  <span className="text-gray-500">Total</span>
+                  <span className="font-bold text-gray-900">{activeLocations.length + convertedLocations.length}</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 text-xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                  <span className="text-blue-600">Active</span>
+                  <span className="font-bold text-blue-700">{activeLocations.length}</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-full px-3 py-1 text-xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                  <span className="text-green-600">Converted</span>
+                  <span className="font-bold text-green-700">{convertedLocations.length}</span>
+                </div>
+              </div>
             </div>
 
             {/* Filter Toggle and Create Button */}
