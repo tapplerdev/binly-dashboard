@@ -972,6 +972,7 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
                       vandalism: 'Vandalism',
                       missing: 'Missing Bin',
                       relocation_request: 'Relocation Request',
+                      pulled_from_service: 'Pulled from Service',
                       other: 'Other',
                     };
                     const changeTypeLabels: Record<string, string> = {
