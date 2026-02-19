@@ -203,6 +203,9 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
   // Step state: 'edit' = form, 'reason' = reason step
   const [step, setStep] = useState<'edit' | 'reason'>('edit');
 
+  // Warehouse shortcut mode: null = normal edit, 'send' = sending to warehouse, 'restore' = restoring to active
+  const [warehouseMode, setWarehouseMode] = useState<null | 'send' | 'restore'>(null);
+
   // Reason step state
   const [reasonCategory, setReasonCategory] = useState<BinChangeReasonCategory | ''>('');
   const [reasonNotes, setReasonNotes] = useState('');
@@ -261,6 +264,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
       setError('');
       setViewMode('form');
       setStep('edit');
+      setWarehouseMode(null);
       setReasonCategory('');
       setReasonNotes('');
       setCreateNoGoZone(false);
@@ -424,6 +428,16 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
       longitude,
     );
 
+    // Restore to active — no reason needed, submit directly
+    if (warehouseMode === 'restore') {
+      setLoading(true);
+      updateBinMutation
+        .mutateAsync('other')
+        .catch(() => {})
+        .finally(() => setLoading(false));
+      return;
+    }
+
     // Trivial change (fill/bin-number only) — submit silently with 'other'
     if (ctx.skipReason) {
       setLoading(true);
@@ -556,13 +570,89 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                   />
                 </div>
 
-                {/* in_storage notice */}
-                {status === 'in_storage' && warehouse && (
-                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex gap-2">
-                    <Warehouse className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-blue-700">
-                      Address auto-set to warehouse location. The bin will be marked as stored.
-                    </p>
+                {/* Warehouse shortcut buttons — shown above the form, contextual to current bin status */}
+                {warehouseMode === null && bin?.status === 'active' && warehouse && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWarehouseMode('send');
+                      setStatus('in_storage');
+                      setFillPercentage(0);
+                      // Parse warehouse address string the same way the existing useEffect does
+                      const addr = warehouse.address;
+                      const parts = addr.split(',').map((p: string) => p.trim());
+                      if (parts.length >= 2) {
+                        setStreet(parts[0]);
+                        const rest = parts.slice(1).join(', ');
+                        const zipMatch = rest.match(/\b(\d{5})\b/);
+                        if (zipMatch) {
+                          setZip(zipMatch[1]);
+                          const cityPart = rest.replace(/[\s,]*[A-Z]{2}\s*\d{5}[-\d]*/, '').trim().replace(/,$/, '').trim();
+                          setCity(cityPart || parts[1]);
+                        } else {
+                          setCity(parts[1] || '');
+                          setZip('');
+                        }
+                      } else {
+                        setStreet(addr);
+                      }
+                      if (warehouse.latitude && warehouse.longitude) {
+                        setLatitude(warehouse.latitude);
+                        setLongitude(warehouse.longitude);
+                        setMarkerPosition({ lat: warehouse.latitude, lng: warehouse.longitude });
+                        setMapCenter({ lat: warehouse.latitude, lng: warehouse.longitude });
+                      }
+                    }}
+                    className="w-full mb-4 flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors text-left"
+                  >
+                    <Warehouse className="w-5 h-5 text-amber-600 shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-amber-800">Send to Warehouse</p>
+                      <p className="text-xs text-amber-600">Sets status to In Warehouse, fills warehouse address, resets fill to 0%</p>
+                    </div>
+                  </button>
+                )}
+                {warehouseMode === null && bin?.status === 'in_storage' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWarehouseMode('restore');
+                      setStatus('active');
+                      setFillPercentage(0);
+                      // Clear address — user must set deployment location
+                      setStreet('');
+                      setCity('');
+                      setZip('');
+                      setLatitude(null);
+                      setLongitude(null);
+                      setMarkerPosition(null);
+                    }}
+                    className="w-full mb-4 flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors text-left"
+                  >
+                    <Warehouse className="w-5 h-5 text-green-600 shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-green-800">Restore to Active</p>
+                      <p className="text-xs text-green-600">Deploy this bin back to the field — enter the new deployment address below</p>
+                    </div>
+                  </button>
+                )}
+                {/* Active warehouse mode banners */}
+                {warehouseMode === 'send' && (
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-start gap-2">
+                    <Warehouse className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-amber-800">Sending to Warehouse</p>
+                      <p className="text-xs text-amber-700 mt-0.5">Status, address and fill % are locked. <button type="button" onClick={() => { setWarehouseMode(null); setStatus(bin?.status as BinStatus || 'active'); setFillPercentage(bin?.fill_percentage ?? null); setStreet(bin?.current_street || ''); setCity(bin?.city || ''); setZip(bin?.zip || ''); }} className="underline font-medium">Cancel</button></p>
+                    </div>
+                  </div>
+                )}
+                {warehouseMode === 'restore' && (
+                  <div className="mb-4 p-3 bg-green-50 border border-green-300 rounded-lg flex items-start gap-2">
+                    <Warehouse className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-green-800">Restoring to Active</p>
+                      <p className="text-xs text-green-700 mt-0.5">Enter the deployment address below. <button type="button" onClick={() => { setWarehouseMode(null); setStatus(bin?.status as BinStatus || 'in_storage'); setStreet(bin?.current_street || ''); setCity(bin?.city || ''); setZip(bin?.zip || ''); }} className="underline font-medium">Cancel</button></p>
+                    </div>
                   </div>
                 )}
 
@@ -665,18 +755,25 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                     <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                       Status <span className="text-red-500">*</span>
                     </label>
-                    <Dropdown
-                      label=""
-                      value={status}
-                      options={[
-                        { value: 'active', label: 'Active' },
-                        { value: 'missing', label: 'Missing' },
-                        { value: 'retired', label: 'Retired' },
-                        { value: 'in_storage', label: 'In Storage' },
-                      ]}
-                      onChange={(value) => setStatus(value as BinStatus)}
-                      className="w-full"
-                    />
+                    {warehouseMode !== null ? (
+                      <div className={cn(inputStyles(), 'bg-gray-100 text-gray-600 cursor-not-allowed flex items-center')}>
+                        {warehouseMode === 'send' ? 'In Warehouse' : 'Active'}
+                        <span className="ml-auto text-xs text-gray-400">locked</span>
+                      </div>
+                    ) : (
+                      <Dropdown
+                        label=""
+                        value={status}
+                        options={[
+                          { value: 'active', label: 'Active' },
+                          { value: 'missing', label: 'Missing' },
+                          { value: 'retired', label: 'Retired' },
+                          { value: 'in_storage', label: 'In Warehouse' },
+                        ]}
+                        onChange={(value) => setStatus(value as BinStatus)}
+                        className="w-full"
+                      />
+                    )}
                   </div>
 
                   <div>
@@ -690,7 +787,8 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                         max="100"
                         value={fillPercentage ?? ''}
                         onChange={(e) => setFillPercentage(e.target.value ? parseInt(e.target.value) : null)}
-                        className={cn(inputStyles(), 'pr-10')}
+                        readOnly={warehouseMode === 'send'}
+                        className={cn(inputStyles(), 'pr-10', warehouseMode === 'send' && 'bg-gray-100 text-gray-600 cursor-not-allowed')}
                         placeholder="0"
                       />
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500 pointer-events-none">
@@ -744,12 +842,16 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                   </button>
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900">
-                      {isAutoReason ? 'Confirm Change' : 'Reason for Change'}
+                      {warehouseMode === 'send'
+                        ? 'Why is this bin being pulled from the field?'
+                        : isAutoReason ? 'Confirm Change' : 'Reason for Change'}
                     </h3>
                     <p className="text-xs text-gray-500">
-                      {isAutoReason
-                        ? 'Review what will happen before saving'
-                        : 'Required for all administrative edits'}
+                      {warehouseMode === 'send'
+                        ? 'Select the reason for sending this bin to the warehouse'
+                        : isAutoReason
+                          ? 'Review what will happen before saving'
+                          : 'Required for all administrative edits'}
                     </p>
                   </div>
                 </div>
