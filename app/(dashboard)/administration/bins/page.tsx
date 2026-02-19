@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
@@ -39,7 +39,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export default function BinsPage() {
+function BinsPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -909,5 +909,13 @@ export default function BinsPage() {
         bin={modalTargetBin}
       />
     </div>
+  );
+}
+
+export default function BinsPage() {
+  return (
+    <Suspense>
+      <BinsPageContent />
+    </Suspense>
   );
 }
