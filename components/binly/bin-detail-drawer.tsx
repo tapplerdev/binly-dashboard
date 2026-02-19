@@ -147,7 +147,7 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onEdit }: BinDet
       case 'pending_move':
         return { label: 'Pending Move', color: 'bg-blue-100 text-blue-700' };
       case 'in_storage':
-        return { label: 'In Warehouse', color: 'bg-amber-100 text-amber-700' };
+        return { label: 'In Warehouse', color: 'bg-purple-100 text-purple-700' };
       default:
         return { label: status, color: 'bg-gray-100 text-gray-600' };
     }

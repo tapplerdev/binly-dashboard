@@ -261,7 +261,7 @@ function BinsPageContent() {
       case 'pending_move':
         return { label: 'Pending Move', color: 'bg-blue-100 text-blue-700' };
       case 'in_storage':
-        return { label: 'In Warehouse', color: 'bg-amber-100 text-amber-700' };
+        return { label: 'In Warehouse', color: 'bg-purple-100 text-purple-700' };
       case 'missing':
         return { label: 'Missing', color: 'bg-red-100 text-red-600' };
       default:
