@@ -557,18 +557,20 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
 
             {step === 'edit' ? (
               <>
-                {/* Address Search */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Search Address
-                  </label>
-                  <HerePlacesAutocomplete
-                    value={searchQuery}
-                    onChange={setSearchQuery}
-                    onPlaceSelect={handlePlaceSelect}
-                    placeholder="Search for a new address..."
-                  />
-                </div>
+                {/* Address Search — hidden when address is locked by warehouse mode */}
+                {warehouseMode !== 'send' && (
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Search Address
+                    </label>
+                    <HerePlacesAutocomplete
+                      value={searchQuery}
+                      onChange={setSearchQuery}
+                      onPlaceSelect={handlePlaceSelect}
+                      placeholder="Search for a new address..."
+                    />
+                  </div>
+                )}
 
                 {/* Warehouse shortcut buttons — shown above the form, contextual to current bin status */}
                 {warehouseMode === null && bin?.status === 'active' && warehouse && (
@@ -657,20 +659,34 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                 )}
 
                 {/* Location Details */}
-                <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-4 mb-6">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Location Details</h3>
+                <div className={cn('bg-gray-50 border-2 rounded-xl p-4 mb-6', warehouseMode === 'send' ? 'border-amber-200 bg-amber-50/40' : 'border-gray-200')}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-gray-700">Location Details</h3>
+                    {warehouseMode === 'send' && (
+                      <span className="text-xs font-medium text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">Locked — Warehouse</span>
+                    )}
+                  </div>
 
                   <div className="mb-3">
                     <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                       Street Address <span className="text-red-500">*</span>
                     </label>
-                    <HerePlacesAutocomplete
-                      value={street}
-                      onChange={setStreet}
-                      onPlaceSelect={handleStreetPlaceSelect}
-                      placeholder="123 Main St"
-                      className={inputStyles()}
-                    />
+                    {warehouseMode === 'send' ? (
+                      <input
+                        type="text"
+                        value={street}
+                        readOnly
+                        className={cn(inputStyles(), 'bg-gray-100 text-gray-600 cursor-not-allowed')}
+                      />
+                    ) : (
+                      <HerePlacesAutocomplete
+                        value={street}
+                        onChange={setStreet}
+                        onPlaceSelect={handleStreetPlaceSelect}
+                        placeholder="123 Main St"
+                        className={inputStyles()}
+                      />
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 mb-3">
@@ -682,7 +698,8 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                         type="text"
                         value={city}
                         onChange={(e) => setCity(e.target.value)}
-                        className={inputStyles()}
+                        readOnly={warehouseMode === 'send'}
+                        className={cn(inputStyles(), warehouseMode === 'send' && 'bg-gray-100 text-gray-600 cursor-not-allowed')}
                         placeholder="Mountain View"
                       />
                     </div>
@@ -695,7 +712,8 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                         type="text"
                         value={zip}
                         onChange={(e) => setZip(e.target.value)}
-                        className={inputStyles()}
+                        readOnly={warehouseMode === 'send'}
+                        className={cn(inputStyles(), warehouseMode === 'send' && 'bg-gray-100 text-gray-600 cursor-not-allowed')}
                         placeholder="94040"
                       />
                     </div>
@@ -860,7 +878,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                   <p className="text-xs font-medium text-blue-800 mb-1">Saving changes to Bin #{bin.bin_number}:</p>
                   <p className="text-xs text-blue-700">{street}, {city} {zip}</p>
-                  <p className="text-xs text-blue-700">Status: {status} · Fill: {fillPercentage ?? '—'}%</p>
+                  <p className="text-xs text-blue-700">Status: {status === 'in_storage' ? 'In Warehouse' : status === 'active' ? 'Active' : status === 'missing' ? 'Missing' : status === 'retired' ? 'Retired' : status} · Fill: {fillPercentage ?? '—'}%</p>
                 </div>
 
                 {/* ── PULLED FROM SERVICE: auto-reason, no dropdown ── */}

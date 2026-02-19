@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
+import { MarkerClusterer, SuperClusterAlgorithm } from '@googlemaps/markerclusterer';
 import { useBins } from '@/lib/hooks/use-bins';
 import { useNoGoZones } from '@/lib/hooks/use-zones';
 import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
@@ -13,6 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useWarehouseLocation, warehouseKeys } from '@/lib/hooks/use-warehouse';
 import {
   Bin,
+  MappableBin,
   isMappableBin,
   getBinMarkerColor,
   getFillLevelCategory,
@@ -172,6 +174,119 @@ function ZoneCircles({
   return null;
 }
 
+// Bin cluster layer — manages MarkerClusterer imperatively inside the Map context
+function BinClusterLayer({
+  bins,
+  onBinClick,
+}: {
+  bins: MappableBin[];
+  onBinClick: (binId: string) => void;
+}) {
+  const map = useMap();
+  const clustererRef = useMemo<{ current: MarkerClusterer | null }>(() => ({ current: null }), []);
+  const markersRef = useMemo<{ current: globalThis.Map<string, google.maps.marker.AdvancedMarkerElement> }>(() => ({ current: new globalThis.Map<string, google.maps.marker.AdvancedMarkerElement>() }), []);
+
+  // Stable click handler to avoid recreating markers on every render
+  const handleClick = useCallback(
+    (binId: string) => onBinClick(binId),
+    [onBinClick]
+  );
+
+  useEffect(() => {
+    if (!map) return;
+
+    // Initialise the clusterer once
+    if (!clustererRef.current) {
+      clustererRef.current = new MarkerClusterer({
+        map,
+        algorithm: new SuperClusterAlgorithm({ radius: 60, maxZoom: 14 }),
+        renderer: {
+          render({ count, position }) {
+            const size = count < 5 ? 36 : count < 20 ? 42 : 50;
+            const color = count < 5 ? '#3B82F6' : count < 20 ? '#F97316' : '#EF4444';
+            const el = document.createElement('div');
+            el.style.cssText = `
+              width:${size}px;height:${size}px;border-radius:50%;
+              background:${color};border:3px solid #fff;
+              box-shadow:0 2px 8px rgba(0,0,0,0.35);
+              display:flex;align-items:center;justify-content:center;
+              color:#fff;font-size:${size < 42 ? 12 : 14}px;font-weight:700;
+              font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+              cursor:pointer;transition:transform .15s;
+            `;
+            el.textContent = String(count);
+            el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.1)'; });
+            el.addEventListener('mouseleave', () => { el.style.transform = ''; });
+            return new google.maps.marker.AdvancedMarkerElement({ position, content: el, zIndex: 5 });
+          },
+        },
+      });
+    }
+
+    const clusterer = clustererRef.current;
+    const prevMarkers = markersRef.current;
+
+    // Determine which bin IDs are new vs removed
+    const newIds = new Set(bins.map((b) => b.id));
+    const toRemove: google.maps.marker.AdvancedMarkerElement[] = [];
+    prevMarkers.forEach((marker, id) => {
+      if (!newIds.has(id)) {
+        toRemove.push(marker);
+        prevMarkers.delete(id);
+      }
+    });
+    if (toRemove.length) clusterer.removeMarkers(toRemove);
+
+    // Add markers for new bins
+    const toAdd: google.maps.marker.AdvancedMarkerElement[] = [];
+    bins.forEach((bin) => {
+      if (prevMarkers.has(bin.id)) return; // already tracked
+
+      const bgColor = getBinMarkerColor(bin.fill_percentage, bin.status as any);
+      const el = document.createElement('div');
+      el.style.cssText = `
+        width:32px;height:32px;border-radius:50%;
+        background:${bgColor};border:2px solid #fff;
+        box-shadow:0 2px 6px rgba(0,0,0,0.4);
+        display:flex;align-items:center;justify-content:center;
+        color:#fff;font-size:11px;font-weight:700;
+        font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+        cursor:pointer;transition:transform .15s;
+      `;
+      el.textContent = String(bin.bin_number);
+      el.title = `Bin #${bin.bin_number} — ${bin.status === 'missing' ? 'MISSING' : `${bin.fill_percentage ?? 0}%`}`;
+      el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.15)'; });
+      el.addEventListener('mouseleave', () => { el.style.transform = ''; });
+
+      const marker = new google.maps.marker.AdvancedMarkerElement({
+        position: { lat: bin.latitude, lng: bin.longitude },
+        content: el,
+        zIndex: 10,
+      });
+      marker.addListener('click', () => handleClick(bin.id));
+      prevMarkers.set(bin.id, marker);
+      toAdd.push(marker);
+    });
+    if (toAdd.length) clusterer.addMarkers(toAdd);
+
+    return () => {
+      // Only full cleanup on unmount (not on every bins change)
+    };
+  }, [map, bins, handleClick, clustererRef, markersRef]);
+
+  // Full cleanup on unmount
+  useEffect(() => {
+    return () => {
+      clustererRef.current?.clearMarkers();
+      clustererRef.current?.setMap(null);
+      clustererRef.current = null;
+      markersRef.current.clear();
+    };
+  }, [clustererRef, markersRef]);
+
+  return null;
+}
+
 export function LiveMapView() {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -305,8 +420,12 @@ export function LiveMapView() {
   const mappableBins = useMemo(() => bins.filter(isMappableBin), [bins]);
 
   // Filter bins by type based on user selections
+  // in_storage bins are excluded — they're at the warehouse and represented by the warehouse marker
   const filteredMappableBins = useMemo(() => {
     return mappableBins.filter((bin) => {
+      // Never show bins that are in the warehouse on the live map
+      if (bin.status === 'in_storage') return false;
+
       // Check if bin is missing
       if (bin.status === 'missing') {
         return showMissingBins;
@@ -344,6 +463,12 @@ export function LiveMapView() {
 
     return driversWithLocation;
   }, [drivers, driverFilter]);
+
+  // Stable bin click handler for the cluster layer
+  const handleBinClick = useCallback((binId: string) => {
+    const bin = bins.find((b) => b.id === binId);
+    if (bin) setSelectedBin(bin);
+  }, [bins]);
 
   // Handle search result selection
   const handleSearchResult = (result: { type: 'bin' | 'zone'; data: Bin | NoGoZone }) => {
@@ -866,28 +991,13 @@ export function LiveMapView() {
             </AdvancedMarker>
           ))}
 
-        {/* Render bin markers */}
-        {showFillLevels &&
-          filteredMappableBins.map((bin) => (
-            <AdvancedMarker
-              key={bin.id}
-              position={{ lat: bin.latitude, lng: bin.longitude }}
-              zIndex={10}
-              onClick={() => setSelectedBin(bin)}
-            >
-              <div
-                className="w-8 h-8 rounded-full border-2 border-white shadow-lg cursor-pointer transition-all duration-300 animate-scale-in"
-                style={{
-                  backgroundColor: getBinMarkerColor(bin.fill_percentage, bin.status),
-                }}
-                title={`Bin #${bin.bin_number} - ${bin.status === 'missing' ? 'MISSING' : `${bin.fill_percentage ?? 0}%`}`}
-              >
-                <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
-                  {bin.bin_number}
-                </div>
-              </div>
-            </AdvancedMarker>
-          ))}
+        {/* Render bin markers with clustering */}
+        {showFillLevels && (
+          <BinClusterLayer
+            bins={filteredMappableBins}
+            onBinClick={handleBinClick}
+          />
+        )}
 
         {/* Render potential location markers */}
         {showPotentialLocations &&

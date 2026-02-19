@@ -72,14 +72,16 @@ export function DeleteConfirmDialog({
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop + centering flex container */}
       <div
-        className="fixed inset-0 bg-black/50 z-50 animate-fade-in"
+        className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center animate-fade-in"
         onClick={() => onOpenChange(false)}
-      />
-
-      {/* Dialog */}
-      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl shadow-2xl z-50 animate-scale-in">
+      >
+      {/* Dialog — click inside must not close */}
+      <div
+        className="w-full max-w-md mx-4 bg-white rounded-2xl shadow-2xl animate-scale-in"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
@@ -169,6 +171,7 @@ export function DeleteConfirmDialog({
             </Button>
           </div>
         </div>
+      </div>
       </div>
     </>
   );
