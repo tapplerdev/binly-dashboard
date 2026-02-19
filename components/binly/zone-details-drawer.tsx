@@ -12,6 +12,8 @@ import {
   ShieldAlert,
   ExternalLink,
   GitMerge,
+  User,
+  Truck,
 } from 'lucide-react';
 import { useZoneIncidents } from '@/lib/hooks/use-zones';
 import {
@@ -49,9 +51,19 @@ export function ZoneDetailsDrawer({ zone, onClose, onNavigateTo }: ZoneDetailsDr
     missing: incidents.filter((i) => i.incident_type === 'missing').length,
   };
 
-  const fieldObservations = incidents.filter((i) => i.is_field_observation).length;
-  const shiftReports = incidents.filter((i) => !!i.shift_id && !i.is_field_observation).length;
-  const managerReports = incidents.filter((i) => i.is_field_observation).length;
+  const shiftReports = incidents.filter((i) => !!i.shift_id).length;
+  const managerReports = incidents.filter((i) => !i.shift_id).length;
+
+  // Only show types that have at least one incident
+  const activeTypes = (
+    [
+      { type: 'vandalism', label: 'Vandalism', count: incidentsByType.vandalism },
+      { type: 'landlord_complaint', label: 'Landlord Complaint', count: incidentsByType.landlord_complaint },
+      { type: 'theft', label: 'Theft', count: incidentsByType.theft },
+      { type: 'relocation_request', label: 'Relocation Request', count: incidentsByType.relocation_request },
+      { type: 'missing', label: 'Missing Bin', count: incidentsByType.missing },
+    ] as const
+  ).filter(({ count }) => count > 0);
 
   const resolvedAt = zone.resolved_at_iso
     ? new Date(zone.resolved_at_iso).toLocaleDateString('en-US', {
@@ -126,49 +138,47 @@ export function ZoneDetailsDrawer({ zone, onClose, onNavigateTo }: ZoneDetailsDr
 
       {/* ── Scrollable Content ── */}
       <div className="flex-1 overflow-y-auto">
-        {/* Stats grid */}
-        <div className="p-5 border-b border-gray-100">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-            Incident Breakdown
-          </h3>
-          <div className="grid grid-cols-2 gap-2">
-            {(
-              [
-                { type: 'vandalism', label: 'Vandalism', count: incidentsByType.vandalism },
-                { type: 'landlord_complaint', label: 'Landlord Complaints', count: incidentsByType.landlord_complaint },
-                { type: 'theft', label: 'Theft', count: incidentsByType.theft },
-                { type: 'relocation_request', label: 'Relocation Requests', count: incidentsByType.relocation_request },
-                { type: 'missing', label: 'Missing Bin', count: incidentsByType.missing },
-              ] as const
-            ).map(({ type, label, count }) => (
-              <div key={type} className="bg-gray-50 rounded-lg p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-base">{getIncidentIcon(type)}</span>
-                  <span className="text-xs text-gray-500 truncate">{label}</span>
-                </div>
-                <p className="text-xl font-bold text-gray-900">{count}</p>
+
+        {/* Incident Breakdown — only non-zero types */}
+        {incidents.length > 0 && (
+          <div className="p-5 border-b border-gray-100">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              Incident Breakdown
+            </h3>
+            {activeTypes.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {activeTypes.map(({ type, label, count }) => (
+                  <div
+                    key={type}
+                    className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2"
+                  >
+                    <span className="text-base">{getIncidentIcon(type)}</span>
+                    <span className="text-xs text-gray-600">{label}</span>
+                    <span className="text-sm font-bold text-gray-900">{count}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            ) : null}
 
-          {/* Source breakdown */}
-          <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-blue-400" />
-              {shiftReports} from shifts
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-purple-400" />
-              {managerReports} manager reports
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-gray-300" />
-              {fieldObservations} field observations
-            </span>
+            {/* Source breakdown */}
+            <div className="mt-3 flex items-center gap-4 text-xs text-gray-400">
+              {shiftReports > 0 && (
+                <span className="flex items-center gap-1">
+                  <Truck className="w-3 h-3" />
+                  {shiftReports} from shifts
+                </span>
+              )}
+              {managerReports > 0 && (
+                <span className="flex items-center gap-1">
+                  <User className="w-3 h-3" />
+                  {managerReports} manager report{managerReports !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Consumed zone banner — shown when this zone was absorbed by another */}
+        {/* Consumed zone banner */}
         {zone.merged_into_zone_id && (
           <div className="mx-5 mt-4 mb-1 p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-start gap-2.5">
             <GitMerge className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
@@ -189,7 +199,7 @@ export function ZoneDetailsDrawer({ zone, onClose, onNavigateTo }: ZoneDetailsDr
           </div>
         )}
 
-        {/* Surviving zone section — shown when this zone absorbed others */}
+        {/* Surviving zone section */}
         {(zone.merged_zone_count ?? 0) > 0 && (
           <div className="mx-5 mt-4 mb-1 p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-start gap-2.5">
             <GitMerge className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
@@ -217,9 +227,7 @@ export function ZoneDetailsDrawer({ zone, onClose, onNavigateTo }: ZoneDetailsDr
         <div className="p-5">
           <div className="flex items-center gap-2 mb-4">
             <FileText className="w-4 h-4 text-gray-500" />
-            <h3 className="text-sm font-semibold text-gray-900">
-              Incident Log
-            </h3>
+            <h3 className="text-sm font-semibold text-gray-900">Incident Log</h3>
             <span className="ml-auto text-xs text-gray-400">{incidents.length} total</span>
           </div>
 
@@ -348,33 +356,39 @@ function IncidentRow({ incident, isLast }: { incident: ZoneIncident; isLast: boo
     year: 'numeric',
   });
 
-  const sourceLabel = incident.shift_id
-    ? 'Driver report'
-    : incident.is_field_observation
-    ? 'Manager report'
-    : 'System';
+  // Source: shift report vs manager report
+  const isShiftReport = !!incident.shift_id;
+  const sourceLine = isShiftReport
+    ? `Driver report${incident.reported_by_name ? ` · ${incident.reported_by_name}` : ''}`
+    : `Manager report${incident.reported_by_name ? ` · ${incident.reported_by_name}` : ''}`;
 
   return (
     <div className="flex gap-3">
-      {/* Timeline line */}
+      {/* Timeline dot */}
       <div className="flex flex-col items-center pt-1 shrink-0">
-        <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-sm relative">
+        <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-sm">
           {getIncidentIcon(incident.incident_type)}
-          {incident.is_field_observation && (
-            <div
-              className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-purple-500 rounded-full border border-white"
-              title="Manager report"
-            />
-          )}
         </div>
         {!isLast && <div className="w-px flex-1 bg-gray-100 mt-1 mb-1 min-h-[12px]" />}
       </div>
 
       {/* Content */}
-      <div className={`flex-1 pb-3 ${isLast ? '' : ''}`}>
-        <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+      <div className="flex-1 pb-4">
+        {/* Top row: date + badges */}
+        <div className="flex flex-wrap items-center gap-1.5 mb-1">
           <span className="text-xs font-semibold text-gray-700">{date}</span>
           <IncidentTypeBadge type={incident.incident_type} />
+          {isShiftReport ? (
+            <span className="inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 font-medium">
+              <Truck className="w-2.5 h-2.5" />
+              On shift
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-600 font-medium">
+              <User className="w-2.5 h-2.5" />
+              Manual
+            </span>
+          )}
           {incident.is_field_observation && !incident.verified_by_user_id && (
             <span className="text-xs px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
               Unverified
@@ -387,32 +401,46 @@ function IncidentRow({ incident, isLast }: { incident: ZoneIncident; isLast: boo
           )}
         </div>
 
-        <p className="text-xs text-gray-500 mb-0.5">
-          {sourceLabel}
-          {incident.reported_by_name ? ` · ${incident.reported_by_name}` : ''}
-          {incident.bin_number ? ` · Bin #${incident.bin_number}` : ''}
-          {incident.shift_id ? (
+        {/* Reporter line */}
+        <p className="text-xs text-gray-500 mb-1.5 flex items-center gap-1 flex-wrap">
+          <span>{sourceLine}</span>
+          {incident.bin_number && (
+            <span className="text-gray-400">· Bin #{incident.bin_number}</span>
+          )}
+          {isShiftReport && incident.shift_id && (
             <a
               href={`/operations/shifts?id=${incident.shift_id}`}
-              className="ml-1 text-blue-500 hover:text-blue-700 inline-flex items-center gap-0.5"
+              className="text-blue-500 hover:text-blue-700 inline-flex items-center gap-0.5"
               onClick={(e) => e.stopPropagation()}
             >
               View shift <ExternalLink className="w-2.5 h-2.5" />
             </a>
-          ) : null}
+          )}
         </p>
 
-        {incident.description && (
-          <p className="text-xs text-gray-600 mt-1 bg-gray-50 rounded px-2 py-1.5">
-            {incident.description}
-          </p>
-        )}
-
-        {incident.verified_by_name && (
-          <p className="text-xs text-green-600 mt-0.5">
-            Verified by {incident.verified_by_name}
-          </p>
-        )}
+        {/* Detail card */}
+        <div className="bg-gray-50 rounded-lg px-3 py-2 space-y-1">
+          <div className="flex items-center gap-4 flex-wrap">
+            <span className="text-xs text-gray-400">
+              Type: <span className="text-gray-700 font-medium">{formatIncidentType(incident.incident_type)}</span>
+            </span>
+            {incident.bin_number && (
+              <span className="text-xs text-gray-400">
+                Bin: <span className="text-gray-700 font-medium">#{incident.bin_number}</span>
+              </span>
+            )}
+            {incident.verified_by_name && (
+              <span className="text-xs text-green-600">
+                Verified by <span className="font-medium">{incident.verified_by_name}</span>
+              </span>
+            )}
+          </div>
+          {incident.description && (
+            <p className="text-xs text-gray-600 pt-0.5 border-t border-gray-100">
+              {incident.description}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
