@@ -200,6 +200,17 @@ function BinClusterLayer({
       clustererRef.current = new MarkerClusterer({
         map,
         algorithm: new SuperClusterAlgorithm({ radius: 60, maxZoom: 14 }),
+        onClusterClick(_event, cluster, clusterMap) {
+          // Zoom in to fit all markers in this cluster — never open a bin drawer
+          const bounds = new google.maps.LatLngBounds();
+          cluster.markers?.forEach((m) => {
+            const pos = (m as google.maps.marker.AdvancedMarkerElement).position;
+            if (pos) bounds.extend(pos);
+          });
+          if (!bounds.isEmpty()) {
+            clusterMap.fitBounds(bounds, /* padding= */ 80);
+          }
+        },
         renderer: {
           render({ count, position }) {
             const size = count < 5 ? 36 : count < 20 ? 42 : 50;
