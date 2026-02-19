@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
-import { MarkerClusterer, SuperClusterAlgorithm } from '@googlemaps/markerclusterer';
+// import { MarkerClusterer, SuperClusterAlgorithm } from '@googlemaps/markerclusterer'; // clustering disabled
 import { useBins } from '@/lib/hooks/use-bins';
 import { useNoGoZones } from '@/lib/hooks/use-zones';
 import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
@@ -174,7 +174,7 @@ function ZoneCircles({
   return null;
 }
 
-// Bin cluster layer — manages MarkerClusterer imperatively inside the Map context
+// Bin marker layer — manages AdvancedMarkerElements imperatively inside the Map context (clustering disabled)
 function BinClusterLayer({
   bins,
   onBinClick,
@@ -183,7 +183,7 @@ function BinClusterLayer({
   onBinClick: (binId: string) => void;
 }) {
   const map = useMap();
-  const clustererRef = useMemo<{ current: MarkerClusterer | null }>(() => ({ current: null }), []);
+  // clustererRef removed — clustering disabled, markers render individually
   const markersRef = useMemo<{ current: globalThis.Map<string, google.maps.marker.AdvancedMarkerElement> }>(() => ({ current: new globalThis.Map<string, google.maps.marker.AdvancedMarkerElement>() }), []);
 
   // Stable click handler to avoid recreating markers on every render
@@ -195,46 +195,9 @@ function BinClusterLayer({
   useEffect(() => {
     if (!map) return;
 
-    // Initialise the clusterer once
-    if (!clustererRef.current) {
-      clustererRef.current = new MarkerClusterer({
-        map,
-        algorithm: new SuperClusterAlgorithm({ radius: 60, maxZoom: 14 }),
-        onClusterClick(_event, cluster, clusterMap) {
-          // Zoom in to fit all markers in this cluster — never open a bin drawer
-          const bounds = new google.maps.LatLngBounds();
-          cluster.markers?.forEach((m) => {
-            const pos = (m as google.maps.marker.AdvancedMarkerElement).position;
-            if (pos) bounds.extend(pos);
-          });
-          if (!bounds.isEmpty()) {
-            clusterMap.fitBounds(bounds, /* padding= */ 80);
-          }
-        },
-        renderer: {
-          render({ count, position }) {
-            const size = count < 5 ? 36 : count < 20 ? 42 : 50;
-            const color = count < 5 ? '#3B82F6' : count < 20 ? '#F97316' : '#EF4444';
-            const el = document.createElement('div');
-            el.style.cssText = `
-              width:${size}px;height:${size}px;border-radius:50%;
-              background:${color};border:3px solid #fff;
-              box-shadow:0 2px 8px rgba(0,0,0,0.35);
-              display:flex;align-items:center;justify-content:center;
-              color:#fff;font-size:${size < 42 ? 12 : 14}px;font-weight:700;
-              font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-              cursor:pointer;transition:transform .15s;
-            `;
-            el.textContent = String(count);
-            el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.1)'; });
-            el.addEventListener('mouseleave', () => { el.style.transform = ''; });
-            return new google.maps.marker.AdvancedMarkerElement({ position, content: el, zIndex: 5 });
-          },
-        },
-      });
-    }
+    // Clustering disabled — markers render individually on the map
+    // (To re-enable clustering, restore MarkerClusterer initialisation here)
 
-    const clusterer = clustererRef.current;
     const prevMarkers = markersRef.current;
 
     // Determine which bin IDs are new vs removed
@@ -246,7 +209,7 @@ function BinClusterLayer({
         prevMarkers.delete(id);
       }
     });
-    if (toRemove.length) clusterer.removeMarkers(toRemove);
+    toRemove.forEach((m) => { m.map = null; });
 
     // Add markers for new bins
     const toAdd: google.maps.marker.AdvancedMarkerElement[] = [];
@@ -270,6 +233,7 @@ function BinClusterLayer({
       el.addEventListener('mouseleave', () => { el.style.transform = ''; });
 
       const marker = new google.maps.marker.AdvancedMarkerElement({
+        map,
         position: { lat: bin.latitude, lng: bin.longitude },
         content: el,
         zIndex: 10,
@@ -278,22 +242,20 @@ function BinClusterLayer({
       prevMarkers.set(bin.id, marker);
       toAdd.push(marker);
     });
-    if (toAdd.length) clusterer.addMarkers(toAdd);
+    // Markers already placed on map via `map` constructor param above
 
     return () => {
       // Only full cleanup on unmount (not on every bins change)
     };
-  }, [map, bins, handleClick, clustererRef, markersRef]);
+  }, [map, bins, handleClick, markersRef]);
 
   // Full cleanup on unmount
   useEffect(() => {
     return () => {
-      clustererRef.current?.clearMarkers();
-      clustererRef.current?.setMap(null);
-      clustererRef.current = null;
+      markersRef.current.forEach((m) => { m.map = null; });
       markersRef.current.clear();
     };
-  }, [clustererRef, markersRef]);
+  }, [markersRef]);
 
   return null;
 }

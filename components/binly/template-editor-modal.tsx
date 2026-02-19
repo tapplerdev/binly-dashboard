@@ -250,6 +250,7 @@ export function TemplateEditorModal({
                 defaultCenter={DEFAULT_CENTER}
                 defaultZoom={DEFAULT_ZOOM}
                 mapId="template-editor-map"
+                mapTypeId="hybrid"
                 gestureHandling="greedy"
                 disableDefaultUI={false}
                 className="w-full h-full"
@@ -293,7 +294,7 @@ export function TemplateEditorModal({
                         style={{ backgroundColor: markerColor }}
                         title={`Bin #${bin.bin_number} - ${bin.location_name || bin.current_street}`}
                       >
-                        {bin.bin_number % 100}
+                        {bin.bin_number}
                       </div>
                     </AdvancedMarker>
                   );
