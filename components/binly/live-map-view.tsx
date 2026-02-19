@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { useBins } from '@/lib/hooks/use-bins';
 import { useNoGoZones } from '@/lib/hooks/use-zones';
@@ -173,6 +174,7 @@ function ZoneCircles({
 
 export function LiveMapView() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const { data: warehouse } = useWarehouseLocation();
 
   // Get auth token from localStorage (Zustand persist storage)
@@ -748,6 +750,14 @@ export function LiveMapView() {
         <BinDetailDrawer
           bin={selectedBin as any}
           onClose={() => setSelectedBin(null)}
+          onEdit={(bin) => {
+            setSelectedBin(null);
+            router.push(`/administration/bins?editBin=${bin.id}`);
+          }}
+          onScheduleMove={(bin) => {
+            setSelectedBin(null);
+            router.push(`/administration/bins?scheduleBin=${bin.id}`);
+          }}
         />
       )}
 

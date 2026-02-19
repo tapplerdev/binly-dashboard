@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   getBinsWithPriority,
   type BinSortOption,
@@ -39,6 +40,9 @@ import {
 import { cn } from '@/lib/utils';
 
 export default function BinsPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   // State for filters and sorting
   const [sortBy, setSortBy] = useState<BinSortOption>('bin_number');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -127,6 +131,32 @@ export default function BinsPage() {
     refetchInterval: 30000,
     staleTime: 10000,
   });
+
+  // Handle deep-link query params: ?editBin=<id> or ?scheduleBin=<id>
+  // Fires once allBins is loaded so we can find the bin object
+  useEffect(() => {
+    if (!allBins) return;
+
+    const editBinId = searchParams.get('editBin');
+    const scheduleBinId = searchParams.get('scheduleBin');
+
+    if (editBinId) {
+      const bin = allBins.find((b) => b.id === editBinId);
+      if (bin) {
+        setModalTargetBin(bin);
+        setShowEditModal(true);
+        // Clear the param without triggering a navigation
+        router.replace('/administration/bins', { scroll: false });
+      }
+    } else if (scheduleBinId) {
+      const bin = allBins.find((b) => b.id === scheduleBinId);
+      if (bin) {
+        setModalTargetBin(bin);
+        setShowScheduleModal(true);
+        router.replace('/administration/bins', { scroll: false });
+      }
+    }
+  }, [allBins, searchParams]);
 
   // Apply client-side filtering for status, filters, search, and sorting
   const bins = allBins
