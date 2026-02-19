@@ -32,6 +32,7 @@ import {
   History,
   ShieldAlert,
   Loader2,
+  ListFilter,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -51,6 +52,7 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onEdit }: BinDet
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedCheck, setSelectedCheck] = useState<BinCheck | null>(null);
   const [isCheckModalOpen, setIsCheckModalOpen] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<string>('all');
 
   const handleClose = () => {
     setIsClosing(true);
@@ -951,105 +953,170 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onEdit }: BinDet
           )}
 
           {/* Admin History Tab */}
-          {activeTab === 'history' && (
-            <div className="space-y-3">
-              {changeLogLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                </div>
-              ) : !changeLog || changeLog.length === 0 ? (
-                <div className="text-center py-12">
-                  <History className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">No administrative changes recorded</p>
-                  <p className="text-xs text-gray-400 mt-1">Changes made via Edit Bin or Move Requests will appear here</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {changeLog.map((entry) => {
-                    const reasonLabels: Record<string, string> = {
-                      landlord_complaint: 'Landlord Complaint',
-                      theft: 'Theft',
-                      vandalism: 'Vandalism',
-                      missing: 'Missing Bin',
-                      relocation_request: 'Relocation Request',
-                      pulled_from_service: 'Pulled from Service',
-                      other: 'Other',
-                    };
-                    const changeTypeLabels: Record<string, string> = {
-                      address_change: 'Address Changed',
-                      status_change: 'Status Changed',
-                      fill_override: 'Fill % Overridden',
-                      bin_number_change: 'Bin Number Changed',
-                      coordinates_change: 'Coordinates Updated',
-                    };
+          {activeTab === 'history' && (() => {
+            const reasonLabels: Record<string, string> = {
+              landlord_complaint: 'Landlord Complaint',
+              theft: 'Theft',
+              vandalism: 'Vandalism',
+              missing: 'Missing Bin',
+              relocation_request: 'Relocation Request',
+              pulled_from_service: 'Pulled from Service',
+              other: 'Other',
+            };
+            const changeTypeLabels: Record<string, string> = {
+              address_change: 'Address Changed',
+              status_change: 'Status Changed',
+              fill_override: 'Fill % Override',
+              bin_number_change: 'Bin # Changed',
+              coordinates_change: 'Coordinates Updated',
+            };
+            const changeTypeBadge: Record<string, { bg: string; text: string }> = {
+              address_change:     { bg: 'bg-blue-100',   text: 'text-blue-700' },
+              status_change:      { bg: 'bg-purple-100', text: 'text-purple-700' },
+              fill_override:      { bg: 'bg-orange-100', text: 'text-orange-700' },
+              bin_number_change:  { bg: 'bg-gray-100',   text: 'text-gray-700' },
+              coordinates_change: { bg: 'bg-teal-100',   text: 'text-teal-700' },
+            };
 
-                    let oldValues: Record<string, any> = {};
-                    let newValues: Record<string, any> = {};
-                    try { oldValues = JSON.parse(entry.old_values); } catch {}
-                    try { newValues = JSON.parse(entry.new_values); } catch {}
+            const filterOptions = [
+              { key: 'all', label: 'All' },
+              { key: 'address_change', label: 'Address' },
+              { key: 'status_change', label: 'Status' },
+              { key: 'fill_override', label: 'Fill %' },
+              { key: 'bin_number_change', label: 'Bin #' },
+            ];
 
-                    return (
-                      <div key={entry.id} className="border border-gray-200 rounded-lg p-4">
-                        {/* Header row */}
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 bg-gray-100 rounded-full flex items-center justify-center">
-                              <History className="w-3.5 h-3.5 text-gray-500" />
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">
-                                {changeTypeLabels[entry.change_type] || entry.change_type}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                by {entry.changed_by_name || 'Unknown'} · {format(new Date(entry.created_at_iso), 'MMM d, yyyy h:mm a')}
-                              </p>
-                            </div>
-                          </div>
-                          {entry.no_go_zone_created && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">
-                              <ShieldAlert className="w-3 h-3" />
-                              Zone
+            const filtered = (changeLog ?? []).filter(
+              (e) => historyFilter === 'all' || e.change_type === historyFilter
+            );
+
+            return (
+              <div className="space-y-3">
+                {changeLogLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : !changeLog || changeLog.length === 0 ? (
+                  <div className="text-center py-12">
+                    <History className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500">No administrative changes recorded</p>
+                    <p className="text-xs text-gray-400 mt-1">Changes made via Edit Bin will appear here</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Filter bar */}
+                    <div className="flex items-center gap-1.5 flex-wrap pb-1">
+                      <ListFilter className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      {filterOptions.map((opt) => (
+                        <button
+                          key={opt.key}
+                          onClick={() => setHistoryFilter(opt.key)}
+                          className={cn(
+                            'px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
+                            historyFilter === opt.key
+                              ? 'bg-primary text-white'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          )}
+                        >
+                          {opt.label}
+                          {opt.key !== 'all' && (
+                            <span className="ml-1 opacity-60">
+                              {changeLog.filter((e) => e.change_type === opt.key).length}
                             </span>
                           )}
-                        </div>
+                        </button>
+                      ))}
+                      <span className="ml-auto text-xs text-gray-400">
+                        {filtered.length} {filtered.length === 1 ? 'entry' : 'entries'}
+                      </span>
+                    </div>
 
-                        {/* Reason */}
-                        {entry.reason_category && (
-                          <div className="mb-2">
-                            <span className="text-xs font-medium text-gray-600">Reason: </span>
-                            <span className="text-xs text-gray-700">{reasonLabels[entry.reason_category] || entry.reason_category}</span>
-                            {entry.reason_notes && (
-                              <p className="text-xs text-gray-500 mt-0.5 italic">{entry.reason_notes}</p>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Value diff */}
-                        {Object.keys(newValues).length > 0 && (
-                          <div className="text-xs space-y-1">
-                            {Object.entries(newValues).map(([key, newVal]) => {
-                              const oldVal = oldValues[key];
-                              const label = key.replace(/_/g, ' ');
-                              return (
-                                <div key={key} className="flex items-center gap-2 text-gray-600">
-                                  <span className="font-medium capitalize">{label}:</span>
-                                  {oldVal !== undefined && (
-                                    <span className="line-through text-red-400">{String(oldVal)}</span>
-                                  )}
-                                  <ArrowRight className="w-3 h-3 text-gray-400" />
-                                  <span className="text-green-700 font-medium">{String(newVal)}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
+                    {/* Entries */}
+                    {filtered.length === 0 ? (
+                      <div className="text-center py-8 text-gray-400 text-sm">
+                        No entries for this filter
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                    ) : (
+                      <div className="space-y-3">
+                        {filtered.map((entry) => {
+                          let oldValues: Record<string, any> = {};
+                          let newValues: Record<string, any> = {};
+                          try { oldValues = typeof entry.old_values === 'string' ? JSON.parse(entry.old_values) : (entry.old_values ?? {}); } catch {}
+                          try { newValues = typeof entry.new_values === 'string' ? JSON.parse(entry.new_values) : (entry.new_values ?? {}); } catch {}
+
+                          const badge = changeTypeBadge[entry.change_type] ?? { bg: 'bg-gray-100', text: 'text-gray-700' };
+                          const typeLabel = changeTypeLabels[entry.change_type] || entry.change_type;
+
+                          return (
+                            <div key={entry.id} className="border border-gray-200 rounded-lg p-4 space-y-2.5">
+                              {/* Header */}
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold', badge.bg, badge.text)}>
+                                    {typeLabel}
+                                  </span>
+                                  {entry.no_go_zone_created && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full font-medium">
+                                      <ShieldAlert className="w-3 h-3" />
+                                      Zone created
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-400 shrink-0 text-right">
+                                  {format(new Date(entry.created_at_iso), 'MMM d, yyyy h:mm a')}
+                                </p>
+                              </div>
+
+                              {/* By */}
+                              <p className="text-xs text-gray-500">
+                                by <span className="font-medium text-gray-700">{entry.changed_by_name || 'Unknown'}</span>
+                              </p>
+
+                              {/* Type + Notes */}
+                              <div className="bg-gray-50 rounded-md px-3 py-2 space-y-1">
+                                <div className="flex items-baseline gap-1.5 text-xs">
+                                  <span className="text-gray-400 shrink-0">Type:</span>
+                                  <span className="font-medium text-gray-700">
+                                    {entry.reason_category ? (reasonLabels[entry.reason_category] || entry.reason_category) : 'Not provided'}
+                                  </span>
+                                </div>
+                                {entry.reason_notes && (
+                                  <div className="flex items-baseline gap-1.5 text-xs">
+                                    <span className="text-gray-400 shrink-0">Notes:</span>
+                                    <span className="text-gray-600 italic">{entry.reason_notes}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Value diff */}
+                              {Object.keys(newValues).length > 0 && (
+                                <div className="text-xs space-y-1">
+                                  {Object.entries(newValues).map(([key, newVal]) => {
+                                    const oldVal = oldValues[key];
+                                    const label = key.replace(/_/g, ' ');
+                                    return (
+                                      <div key={key} className="flex items-center gap-2 text-gray-600">
+                                        <span className="font-medium capitalize text-gray-500">{label}:</span>
+                                        {oldVal !== undefined && oldVal !== null && (
+                                          <span className="line-through text-red-400">{String(oldVal)}</span>
+                                        )}
+                                        <ArrowRight className="w-3 h-3 text-gray-400 shrink-0" />
+                                        <span className="text-green-700 font-medium">{String(newVal)}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
 
