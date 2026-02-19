@@ -21,7 +21,7 @@ import {
   Package,
   Clock,
   AlertTriangle,
-  Trash2,
+  Pencil,
   Image as ImageIcon,
   Truck,
   User,
@@ -40,10 +40,10 @@ interface BinDetailDrawerProps {
   bin: BinWithPriority;
   onClose: () => void;
   onScheduleMove?: (bin: BinWithPriority) => void;
-  onRetire?: (bin: BinWithPriority) => void;
+  onEdit?: (bin: BinWithPriority) => void;
 }
 
-export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinDetailDrawerProps) {
+export function BinDetailDrawer({ bin, onClose, onScheduleMove, onEdit }: BinDetailDrawerProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'overview' | 'checks' | 'moves' | 'incidents' | 'history'>('overview');
@@ -299,12 +299,12 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
               Schedule Move
             </Button>
             <Button
-              onClick={() => onRetire?.(bin)}
+              onClick={() => onEdit?.(bin)}
               variant="outline"
               className="flex-1"
             >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Retire Bin
+              <Pencil className="w-4 h-4 mr-2" />
+              Edit Bin
             </Button>
           </div>
         </div>

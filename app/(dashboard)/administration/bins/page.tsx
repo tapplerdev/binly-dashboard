@@ -822,6 +822,16 @@ export default function BinsPage() {
           bin={selectedBin}
           onClose={() => setSelectedBin(null)}
           onUpdate={() => refetch()}
+          onScheduleMove={(bin) => {
+            setSelectedBin(null);
+            setModalTargetBin(bin);
+            setShowScheduleModal(true);
+          }}
+          onEdit={(bin) => {
+            setSelectedBin(null);
+            setModalTargetBin(bin);
+            setShowEditModal(true);
+          }}
         />
       )}
 
