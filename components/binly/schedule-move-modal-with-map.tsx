@@ -39,6 +39,7 @@ import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete
 import { HerePlaceDetails } from '@/lib/services/geocoding.service';
 import { format, addDays } from 'date-fns';
 import { GroupedDropdown, Dropdown } from '@/components/ui/dropdown';
+import { getNearbyPotentialLocations, NearbyPotentialLocation } from '@/lib/api/potential-locations';
 
 // Google Maps imports
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
@@ -62,6 +63,8 @@ interface BinMoveConfig {
   moveType: 'store' | 'relocation';
   scheduledDate: number; // Unix timestamp
   dateOption: '24h' | '3days' | 'week' | 'custom'; // Quick-pick date option
+  destinationType?: 'custom' | 'potential_location'; // NEW: Choose between custom address or potential location
+  sourcePotentialLocationId?: string; // NEW: Selected potential location ID
   newStreet?: string;
   newCity?: string;
   newZip?: string;
@@ -170,6 +173,10 @@ export function ScheduleMoveModalWithMap({
   const [activeShiftListExpanded, setActiveShiftListExpanded] = useState<Record<string, boolean>>({});
   const [futureShiftListExpanded, setFutureShiftListExpanded] = useState<Record<string, boolean>>({});
 
+  // Nearby potential locations state (NEW)
+  const [nearbyPotentialLocations, setNearbyPotentialLocations] = useState<Record<string, NearbyPotentialLocation[]>>({});
+  const [loadingNearbyLocations, setLoadingNearbyLocations] = useState<Record<string, boolean>>({});
+
   // Fetch all bins for map display and search
   const { data: allBins, isLoading: binsLoading } = useQuery({
     queryKey: ['bins-with-priority'],
@@ -199,6 +206,7 @@ export function ScheduleMoveModalWithMap({
           moveType: 'store',
           scheduledDate: defaultScheduledDate,
           dateOption: '24h',
+          destinationType: 'custom', // NEW: Default to custom address
           assignmentType: 'unassigned',
         };
       } else {
@@ -207,6 +215,26 @@ export function ScheduleMoveModalWithMap({
     });
     setBinConfigs(newConfigs);
   }, [selectedBins]);
+
+  // Auto-fetch nearby potential locations for relocation moves (NEW)
+  useEffect(() => {
+    Object.entries(binConfigs).forEach(([binId, config]) => {
+      if (config.moveType === 'relocation' && !nearbyPotentialLocations[binId] && !loadingNearbyLocations[binId]) {
+        setLoadingNearbyLocations((prev) => ({ ...prev, [binId]: true }));
+        getNearbyPotentialLocations(binId, 500)
+          .then((locations) => {
+            setNearbyPotentialLocations((prev) => ({ ...prev, [binId]: locations }));
+          })
+          .catch((error) => {
+            console.error(`Failed to fetch nearby locations for bin ${binId}:`, error);
+            setNearbyPotentialLocations((prev) => ({ ...prev, [binId]: [] }));
+          })
+          .finally(() => {
+            setLoadingNearbyLocations((prev) => ({ ...prev, [binId]: false }));
+          });
+      }
+    });
+  }, [binConfigs, nearbyPotentialLocations, loadingNearbyLocations]);
 
   // Filter bins for search
   const availableBins = useMemo(() => {
@@ -446,6 +474,10 @@ export function ScheduleMoveModalWithMap({
           payload.new_zip = config.newZip;
           payload.new_latitude = config.newLatitude;
           payload.new_longitude = config.newLongitude;
+          // Include source_potential_location_id if a potential location was selected
+          if (config.sourcePotentialLocationId) {
+            payload.source_potential_location_id = config.sourcePotentialLocationId;
+          }
         }
 
         return createMoveRequest(payload);
@@ -1279,44 +1311,123 @@ export function ScheduleMoveModalWithMap({
                       <MapPin className="w-4 h-4" />
                       New Location
                     </h4>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Street Address *
-                      </label>
-                      <HerePlacesAutocomplete
-                        value={config.newStreet || ''}
-                        onChange={(value) => updateBinConfig(bin.id, { newStreet: value })}
-                        onPlaceSelect={(place) => handlePlaceSelect(bin.id, place)}
-                        placeholder="123 Main Street"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary"
-                      />
+
+                    {/* Radio Buttons: Custom Address vs Potential Location */}
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => updateBinConfig(bin.id, { destinationType: 'custom', sourcePotentialLocationId: undefined })}
+                        className={cn(
+                          'flex-1 p-2 border-2 rounded-lg text-xs font-medium transition-all',
+                          config.destinationType === 'custom'
+                            ? 'border-primary bg-white text-primary'
+                            : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
+                        )}
+                      >
+                        Custom Address
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateBinConfig(bin.id, { destinationType: 'potential_location' })}
+                        className={cn(
+                          'flex-1 p-2 border-2 rounded-lg text-xs font-medium transition-all',
+                          config.destinationType === 'potential_location'
+                            ? 'border-primary bg-white text-primary'
+                            : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
+                        )}
+                      >
+                        Potential Location
+                      </button>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+
+                    {/* Custom Address Fields */}
+                    {config.destinationType === 'custom' && (
+                      <>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Street Address *
+                          </label>
+                          <HerePlacesAutocomplete
+                            value={config.newStreet || ''}
+                            onChange={(value) => updateBinConfig(bin.id, { newStreet: value })}
+                            onPlaceSelect={(place) => handlePlaceSelect(bin.id, place)}
+                            placeholder="123 Main Street"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              City *
+                            </label>
+                            <input
+                              type="text"
+                              value={config.newCity || ''}
+                              onChange={(e) => updateBinConfig(bin.id, { newCity: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                              placeholder="City"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              ZIP *
+                            </label>
+                            <input
+                              type="text"
+                              value={config.newZip || ''}
+                              onChange={(e) => updateBinConfig(bin.id, { newZip: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                              placeholder="ZIP"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Potential Location Dropdown */}
+                    {config.destinationType === 'potential_location' && (
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
-                          City *
+                          Select Nearby Location *
                         </label>
-                        <input
-                          type="text"
-                          value={config.newCity || ''}
-                          onChange={(e) => updateBinConfig(bin.id, { newCity: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          placeholder="City"
-                        />
+                        {loadingNearbyLocations[bin.id] ? (
+                          <div className="flex items-center justify-center py-3 text-xs text-gray-500">
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                            Loading nearby locations...
+                          </div>
+                        ) : nearbyPotentialLocations[bin.id]?.length === 0 ? (
+                          <div className="py-3 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600">
+                            No potential locations found within 500m of this bin.
+                          </div>
+                        ) : (
+                          <select
+                            value={config.sourcePotentialLocationId || ''}
+                            onChange={(e) => {
+                              const locationId = e.target.value;
+                              const location = nearbyPotentialLocations[bin.id]?.find(l => l.id === locationId);
+                              if (location) {
+                                updateBinConfig(bin.id, {
+                                  sourcePotentialLocationId: locationId,
+                                  newStreet: location.street,
+                                  newCity: location.city,
+                                  newZip: location.zip,
+                                  newLatitude: location.latitude,
+                                  newLongitude: location.longitude,
+                                });
+                              }
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary"
+                          >
+                            <option value="">Select a location...</option>
+                            {nearbyPotentialLocations[bin.id]?.map((location) => (
+                              <option key={location.id} value={location.id}>
+                                {location.street}, {location.city} ({Math.round(location.distance_meters)}m away)
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          ZIP *
-                        </label>
-                        <input
-                          type="text"
-                          value={config.newZip || ''}
-                          onChange={(e) => updateBinConfig(bin.id, { newZip: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          placeholder="ZIP"
-                        />
-                      </div>
-                    </div>
+                    )}
                   </div>
                 )}
 

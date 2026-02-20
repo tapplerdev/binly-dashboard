@@ -82,3 +82,41 @@ export async function getPotentialLocationById(
     throw error;
   }
 }
+
+export interface NearbyPotentialLocation extends PotentialLocation {
+  distance_meters: number;
+}
+
+/**
+ * Fetch nearby potential locations for a specific bin
+ * @param binId - Bin ID to find nearby locations for
+ * @param maxDistance - Maximum distance in meters (default: 500m)
+ * @returns Promise<NearbyPotentialLocation[]> Array of nearby potential locations sorted by distance
+ */
+export async function getNearbyPotentialLocations(
+  binId: string,
+  maxDistance: number = 500
+): Promise<NearbyPotentialLocation[]> {
+  try {
+    const response = await fetch(
+      `${API_URL}/api/bins/${binId}/nearby-potential-locations?max_distance=${maxDistance}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store',
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch nearby potential locations: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.results || [];
+  } catch (error) {
+    console.error('Error fetching nearby potential locations:', error);
+    throw error;
+  }
+}
