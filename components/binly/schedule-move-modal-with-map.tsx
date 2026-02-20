@@ -221,7 +221,7 @@ export function ScheduleMoveModalWithMap({
     Object.entries(binConfigs).forEach(([binId, config]) => {
       if (config.moveType === 'relocation' && !nearbyPotentialLocations[binId] && !loadingNearbyLocations[binId]) {
         setLoadingNearbyLocations((prev) => ({ ...prev, [binId]: true }));
-        getNearbyPotentialLocations(binId, 999999) // Large number to get ALL locations
+        getNearbyPotentialLocations(binId) // No max_distance = get ALL locations sorted by distance
           .then((locations) => {
             setNearbyPotentialLocations((prev) => ({ ...prev, [binId]: locations }));
           })

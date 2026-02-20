@@ -124,22 +124,23 @@ export interface NearbyPotentialLocation extends PotentialLocation {
 /**
  * Fetch nearby potential locations for a specific bin
  * @param binId - Bin ID to find nearby locations for
- * @param maxDistance - Maximum distance in meters (default: 500m)
+ * @param maxDistance - Optional maximum distance in meters. If not provided, returns ALL locations sorted by distance.
  * @returns Promise<NearbyPotentialLocation[]> Array of nearby potential locations sorted by distance
  */
 export async function getNearbyPotentialLocations(
   binId: string,
-  maxDistance: number = 500
+  maxDistance?: number
 ): Promise<NearbyPotentialLocation[]> {
   try {
-    const response = await fetch(
-      `${API_URL}/api/bins/${binId}/nearby-potential-locations?max_distance=${maxDistance}`,
-      {
-        method: 'GET',
-        headers: getAuthHeaders(),
-        cache: 'no-store',
-      }
-    );
+    const url = maxDistance
+      ? `${API_URL}/api/bins/${binId}/nearby-potential-locations?max_distance=${maxDistance}`
+      : `${API_URL}/api/bins/${binId}/nearby-potential-locations`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+      cache: 'no-store',
+    });
 
     if (!response.ok) {
       throw new Error(`Failed to fetch nearby potential locations: ${response.statusText}`);
