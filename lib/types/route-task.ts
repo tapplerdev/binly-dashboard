@@ -86,7 +86,8 @@ export function getTaskLabel(task: RouteTask): string {
       return pickupLabel;
 
     case 'dropoff':
-      const dropoffLabel = `Dropoff to ${task.destination_address || 'New Location'}`;
+      const dest = task.destination_address || task.address; // Fallback for old data
+      const dropoffLabel = `Dropoff to ${dest || 'New Location'}`;
       console.log('🔍 [TASK LABEL] Dropoff label:', dropoffLabel);
       return dropoffLabel;
 
@@ -116,7 +117,7 @@ export function getTaskSubtitle(task: RouteTask): string {
       return task.address || 'No address';
 
     case 'dropoff':
-      return task.destination_address || 'No address';
+      return task.destination_address || task.address || 'No address'; // Fallback for old data
 
     case 'warehouse_stop':
       return task.address || 'Warehouse Location';
