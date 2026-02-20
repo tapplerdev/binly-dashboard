@@ -221,7 +221,7 @@ export function ScheduleMoveModalWithMap({
     Object.entries(binConfigs).forEach(([binId, config]) => {
       if (config.moveType === 'relocation' && !nearbyPotentialLocations[binId] && !loadingNearbyLocations[binId]) {
         setLoadingNearbyLocations((prev) => ({ ...prev, [binId]: true }));
-        getNearbyPotentialLocations(binId, 500)
+        getNearbyPotentialLocations(binId, 999999) // Large number to get ALL locations
           .then((locations) => {
             setNearbyPotentialLocations((prev) => ({ ...prev, [binId]: locations }));
           })
@@ -1397,7 +1397,7 @@ export function ScheduleMoveModalWithMap({
                           </div>
                         ) : nearbyPotentialLocations[bin.id]?.length === 0 ? (
                           <div className="py-3 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600">
-                            No potential locations found within 500m of this bin.
+                            No potential locations available.
                           </div>
                         ) : (
                           <select
