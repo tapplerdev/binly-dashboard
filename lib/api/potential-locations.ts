@@ -153,3 +153,59 @@ export async function getNearbyPotentialLocations(
     throw error;
   }
 }
+
+/**
+ * Active shift dependency types
+ */
+export interface AffectedTask {
+  task_id: string;
+  task_type: string;
+  sequence_order: number;
+  address: string;
+  bin_id?: string;
+  move_request_id?: string;
+}
+
+export interface ActiveShiftDependency {
+  shift_id: string;
+  shift_date_iso: string;
+  driver_id: string;
+  driver_name: string;
+  status: string;
+  affected_tasks: AffectedTask[];
+}
+
+/**
+ * Check if a potential location is referenced in any active shifts
+ * @param potentialLocationId Potential location ID
+ * @returns Promise<ActiveShiftDependency[]> Array of active shifts using this potential location
+ */
+export async function checkPotentialLocationDependencies(
+  potentialLocationId: string
+): Promise<ActiveShiftDependency[]> {
+  try {
+    const response = await fetch(
+      `${API_URL}/api/potential-locations/${potentialLocationId}/active-shift-dependencies`,
+      {
+        method: 'GET',
+        headers: getAuthHeaders(),
+        cache: 'no-store',
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to check potential location dependencies: ${response.statusText}`
+      );
+    }
+
+    const dependencies: ActiveShiftDependency[] = await response.json();
+    return dependencies;
+  } catch (error) {
+    console.error(
+      `Error checking dependencies for potential location ${potentialLocationId}:`,
+      error
+    );
+    throw error;
+  }
+}

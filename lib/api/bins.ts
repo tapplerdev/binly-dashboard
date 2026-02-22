@@ -433,3 +433,49 @@ export async function convertPotentialLocationToBin(
     throw error;
   }
 }
+
+/**
+ * Active shift dependency types
+ */
+export interface AffectedTask {
+  task_id: string;
+  task_type: string;
+  sequence_order: number;
+  address: string;
+  bin_id?: string;
+  move_request_id?: string;
+}
+
+export interface ActiveShiftDependency {
+  shift_id: string;
+  shift_date_iso: string;
+  driver_id: string;
+  driver_name: string;
+  status: string;
+  affected_tasks: AffectedTask[];
+}
+
+/**
+ * Check if a bin is referenced in any active shifts
+ * @param binId Bin ID
+ * @returns Promise<ActiveShiftDependency[]> Array of active shifts using this bin
+ */
+export async function checkBinDependencies(binId: string): Promise<ActiveShiftDependency[]> {
+  try {
+    const response = await fetch(`${API_URL}/api/bins/${binId}/active-shift-dependencies`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to check bin dependencies: ${response.statusText}`);
+    }
+
+    const dependencies: ActiveShiftDependency[] = await response.json();
+    return dependencies;
+  } catch (error) {
+    console.error(`Error checking dependencies for bin ${binId}:`, error);
+    throw error;
+  }
+}
