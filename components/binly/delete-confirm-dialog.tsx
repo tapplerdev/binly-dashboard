@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Trash2, X, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { checkPotentialLocationDependencies, ActiveShiftDependency } from '@/lib/api/potential-locations';
+import { ActiveShiftWarningDialog } from './active-shift-warning-dialog';
 
 interface PotentialLocation {
   id: string;
@@ -27,9 +29,40 @@ export function DeleteConfirmDialog({
 }: DeleteConfirmDialogProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [checkingDependencies, setCheckingDependencies] = useState(false);
+  const [dependencies, setDependencies] = useState<ActiveShiftDependency[]>([]);
+  const [showWarningDialog, setShowWarningDialog] = useState(false);
+
+  // Check for dependencies when dialog opens
+  useEffect(() => {
+    if (!open || !location) {
+      setDependencies([]);
+      return;
+    }
+
+    const checkDependencies = async () => {
+      setCheckingDependencies(true);
+      try {
+        const deps = await checkPotentialLocationDependencies(location.id);
+        setDependencies(deps);
+      } catch (error) {
+        console.error('Failed to check potential location dependencies:', error);
+        // Continue anyway if check fails
+      }
+      setCheckingDependencies(false);
+    };
+
+    checkDependencies();
+  }, [open, location]);
 
   const handleDelete = async () => {
     if (!location) return;
+
+    // If there are dependencies, show warning dialog first
+    if (dependencies.length > 0 && !showWarningDialog) {
+      setShowWarningDialog(true);
+      return;
+    }
 
     setError('');
     setLoading(true);
@@ -66,6 +99,12 @@ export function DeleteConfirmDialog({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleWarningConfirm = () => {
+    setShowWarningDialog(false);
+    // Proceed with deletion after warning acknowledged
+    handleDelete();
   };
 
   if (!open || !location) return null;
@@ -116,21 +155,55 @@ export function DeleteConfirmDialog({
             </p>
           </div>
 
-          {/* Warning */}
-          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold text-yellow-900 mb-1">
-                  Permanent Deletion
-                </p>
-                <p className="text-xs text-yellow-700">
-                  This potential location will be permanently removed from the system.
-                  This action cannot be undone.
-                </p>
+          {/* Active Shift Warning */}
+          {checkingDependencies ? (
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+              <div className="flex items-start gap-3">
+                <Loader2 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5 animate-spin" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-900">
+                    Checking Active Shifts
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    Verifying if this location is being used in any active driver shifts...
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          ) : dependencies.length > 0 ? (
+            <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-orange-900 mb-1">
+                    Active Shift Impact
+                  </p>
+                  <p className="text-xs text-orange-700">
+                    This potential location is currently being used in{' '}
+                    <span className="font-semibold">
+                      {dependencies.length} active {dependencies.length === 1 ? 'shift' : 'shifts'}
+                    </span>
+                    . Deleting it will remove the associated placement task(s) from the driver's route.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-yellow-900 mb-1">
+                    Permanent Deletion
+                  </p>
+                  <p className="text-xs text-yellow-700">
+                    This potential location will be permanently removed from the system.
+                    This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (
@@ -155,9 +228,14 @@ export function DeleteConfirmDialog({
               variant="destructive"
               onClick={handleDelete}
               className="flex-1 gap-2"
-              disabled={loading}
+              disabled={loading || checkingDependencies}
             >
-              {loading ? (
+              {checkingDependencies ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Checking...
+                </>
+              ) : loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Deleting...
@@ -173,6 +251,21 @@ export function DeleteConfirmDialog({
         </div>
       </div>
       </div>
+
+      {/* Active Shift Warning Dialog */}
+      {location && (
+        <ActiveShiftWarningDialog
+          open={showWarningDialog}
+          onOpenChange={setShowWarningDialog}
+          onConfirm={handleWarningConfirm}
+          dependencies={dependencies}
+          resourceType="potential location"
+          resourceName={location.street}
+          changeAction="delete"
+          changeDetails={`${location.street}, ${location.city}`}
+          loading={loading}
+        />
+      )}
     </>
   );
 }
