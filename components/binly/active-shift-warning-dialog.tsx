@@ -13,15 +13,14 @@
 
 import { ActiveShiftDependency } from '@/lib/api/bins';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, Navigation, User, MapPin } from 'lucide-react';
 
@@ -136,14 +135,14 @@ export function ActiveShiftWarningDialog({
   );
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <AlertDialogHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-6 w-6 text-orange-500" />
-            <AlertDialogTitle>Active Shift Impact Warning</AlertDialogTitle>
+            <DialogTitle>Active Shift Impact Warning</DialogTitle>
           </div>
-          <AlertDialogDescription className="text-base">
+          <DialogDescription className="text-base">
             <div className="space-y-4 mt-4">
               {/* Summary */}
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
@@ -237,11 +236,13 @@ export function ActiveShiftWarningDialog({
                 </ul>
               </div>
             </div>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+            Cancel
+          </Button>
+          <Button
             onClick={(e) => {
               e.preventDefault();
               onConfirm();
@@ -250,9 +251,9 @@ export function ActiveShiftWarningDialog({
             className="bg-orange-600 hover:bg-orange-700"
           >
             {loading ? 'Updating...' : `Confirm and Update ${dependencies.length} ${dependencies.length === 1 ? 'Shift' : 'Shifts'}`}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
