@@ -11,8 +11,9 @@ import { inputStyles, cn } from '@/lib/utils';
 import { useBins } from '@/lib/hooks/use-bins';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { Bin, isMappableBin, getBinMarkerColor, BinStatus } from '@/lib/types/bin';
-import { updateBin, BinChangeReasonCategory } from '@/lib/api/bins';
+import { updateBin, BinChangeReasonCategory, checkBinDependencies, ActiveShiftDependency } from '@/lib/api/bins';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ActiveShiftWarningDialog } from './active-shift-warning-dialog';
 
 // ─── Reason options by context ──────────────────────────────────────────────
 
@@ -219,6 +220,11 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
     defaultReason: BinChangeReasonCategory | null;
   } | null>(null);
 
+  // Active shift warning state
+  const [showActiveShiftWarning, setShowActiveShiftWarning] = useState(false);
+  const [activeShiftDependencies, setActiveShiftDependencies] = useState<ActiveShiftDependency[]>([]);
+  const [checkingDependencies, setCheckingDependencies] = useState(false);
+
   // Form state
   const [binNumber, setBinNumber] = useState<number>(0);
   const [street, setStreet] = useState('');
@@ -402,8 +408,8 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
     },
   });
 
-  // Step 1: validate form → determine context → advance or skip to step 2
-  const handleNextStep = () => {
+  // Step 1: validate form → check active shifts → determine context → advance or skip to step 2
+  const handleNextStep = async () => {
     setError('');
     if (!bin) return;
 
@@ -428,6 +434,50 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
       longitude,
     );
 
+    // Check if address changed (which would affect active shifts)
+    const addressChanged =
+      street.trim() !== bin.current_street ||
+      city.trim() !== bin.city ||
+      zip.trim() !== bin.zip ||
+      (latitude !== null && latitude !== bin.latitude) ||
+      (longitude !== null && longitude !== bin.longitude);
+
+    // If address changed, check for active shift dependencies
+    if (addressChanged) {
+      setCheckingDependencies(true);
+      try {
+        const dependencies = await checkBinDependencies(bin.id);
+
+        if (dependencies.length > 0) {
+          // Store dependencies and show warning dialog
+          setActiveShiftDependencies(dependencies);
+          setShowActiveShiftWarning(true);
+          setCheckingDependencies(false);
+
+          // Store context for when they confirm
+          setReasonContext(ctx);
+          if (ctx.autoReason) {
+            setReasonCategory(ctx.autoReason);
+          } else if (ctx.defaultReason) {
+            setReasonCategory(ctx.defaultReason);
+          } else {
+            setReasonCategory('');
+          }
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to check bin dependencies:', error);
+        // Continue anyway if dependency check fails
+      }
+      setCheckingDependencies(false);
+    }
+
+    // Proceed with normal flow
+    proceedToReasonStep(ctx);
+  };
+
+  // Helper function to proceed to reason step (called after confirmation or if no dependencies)
+  const proceedToReasonStep = (ctx: ReturnType<typeof getContextualReasons>) => {
     // Restore to active — no reason needed, submit directly
     if (warehouseMode === 'restore') {
       setLoading(true);
@@ -459,6 +509,16 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
     }
     setCreateNoGoZone(false);
     setStep('reason');
+  };
+
+  // Handle active shift warning confirmation
+  const handleActiveShiftWarningConfirm = () => {
+    setShowActiveShiftWarning(false);
+
+    // Proceed with normal flow using stored context
+    if (reasonContext) {
+      proceedToReasonStep(reasonContext);
+    }
   };
 
   // Step 2: validate reason → submit
@@ -835,9 +895,14 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                   <Button
                     onClick={handleNextStep}
                     className="flex-1"
-                    disabled={reverseGeocoding || loading}
+                    disabled={reverseGeocoding || loading || checkingDependencies}
                   >
-                    {loading ? (
+                    {checkingDependencies ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Checking...
+                      </>
+                    ) : loading ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         Saving...
@@ -1101,6 +1166,19 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
           </div>
         </div>
       </div>
+
+      {/* Active Shift Warning Dialog */}
+      <ActiveShiftWarningDialog
+        open={showActiveShiftWarning}
+        onOpenChange={setShowActiveShiftWarning}
+        onConfirm={handleActiveShiftWarningConfirm}
+        dependencies={activeShiftDependencies}
+        resourceType="bin"
+        resourceName={`Bin #${bin?.bin_number}`}
+        changeAction="address_change"
+        changeDetails={`${bin?.current_street} → ${street}`}
+        loading={loading}
+      />
     </div>
   );
 }
