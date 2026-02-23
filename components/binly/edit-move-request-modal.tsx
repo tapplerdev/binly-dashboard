@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { APIProvider, Map as GoogleMap, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { MoveRequest } from '@/lib/types/bin';
-import { updateMoveRequest } from '@/lib/api/move-requests';
+import { updateMoveRequest, checkMoveRequestDependencies, ActiveShiftDependency } from '@/lib/api/move-requests';
 import { hereReverseGeocode, geocodeAddress } from '@/lib/services/geocoding.service';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
 import { HerePlaceDetails } from '@/lib/services/geocoding.service';
 import { X, MapPin, Calendar, Loader2, Building2, FileText, AlertCircle } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { ActiveShiftWarningDialog } from './active-shift-warning-dialog';
 
 // ─── Map auto-fit controller ──────────────────────────────────────────────────
 function MapBoundsController({
@@ -83,6 +84,11 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
   // ── Submit state ───────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Active shift warning state ─────────────────────────────────────────────
+  const [showActiveShiftWarning, setShowActiveShiftWarning] = useState(false);
+  const [activeShiftDependencies, setActiveShiftDependencies] = useState<ActiveShiftDependency[]>([]);
+  const [checkingDependencies, setCheckingDependencies] = useState(false);
 
   // ── Geocode current bin address on mount ───────────────────────────────────
   useEffect(() => {
@@ -194,6 +200,44 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
 
   // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
+    setError(null);
+
+    // Check if address changed or move_type changed
+    const addressChanged =
+      formData.new_street !== (moveRequest.new_street || '') ||
+      formData.new_city !== (moveRequest.new_city || '') ||
+      formData.new_zip !== (moveRequest.new_zip || '') ||
+      (destLat !== null && destLat !== moveRequest.new_latitude) ||
+      (destLng !== null && destLng !== moveRequest.new_longitude);
+
+    const moveTypeChanged = formData.move_type !== moveRequest.move_type;
+
+    // If address or move_type changed, check for active shift dependencies
+    if (addressChanged || moveTypeChanged) {
+      setCheckingDependencies(true);
+      try {
+        const dependencies = await checkMoveRequestDependencies(moveRequest.id);
+
+        if (dependencies.length > 0) {
+          // Store dependencies and show warning dialog
+          setActiveShiftDependencies(dependencies);
+          setShowActiveShiftWarning(true);
+          setCheckingDependencies(false);
+          return; // Wait for user confirmation
+        }
+      } catch (error) {
+        console.error('Failed to check move request dependencies:', error);
+        // Continue anyway if dependency check fails
+      }
+      setCheckingDependencies(false);
+    }
+
+    // Proceed with update
+    await performUpdate();
+  };
+
+  // Helper to perform the actual update (called after confirmation or if no dependencies)
+  const performUpdate = async () => {
     setIsSubmitting(true);
     setError(null);
     try {
@@ -225,6 +269,12 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Handle active shift warning confirmation
+  const handleActiveShiftWarningConfirm = async () => {
+    setShowActiveShiftWarning(false);
+    await performUpdate();
   };
 
   return (
@@ -511,17 +561,38 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={isSubmitting}
+                disabled={isSubmitting || checkingDependencies}
                 className="px-5 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary/90 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2"
               >
-                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                {isSubmitting ? 'Saving...' : 'Save Changes'}
+                {(isSubmitting || checkingDependencies) && <Loader2 className="w-4 h-4 animate-spin" />}
+                {checkingDependencies ? 'Checking...' : isSubmitting ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>
 
         </div>
       </div>
+
+      {/* Active Shift Warning Dialog */}
+      <ActiveShiftWarningDialog
+        open={showActiveShiftWarning}
+        onOpenChange={setShowActiveShiftWarning}
+        onConfirm={handleActiveShiftWarningConfirm}
+        dependencies={activeShiftDependencies}
+        resourceType="move request"
+        resourceName={`Bin #${moveRequest.bin_number} Move Request`}
+        changeAction={
+          formData.move_type !== moveRequest.move_type
+            ? 'move_type_change'
+            : 'address_change'
+        }
+        changeDetails={
+          formData.move_type !== moveRequest.move_type
+            ? `${moveRequest.move_type} → ${formData.move_type}`
+            : `${moveRequest.new_street || '(none)'} → ${formData.new_street}`
+        }
+        loading={isSubmitting}
+      />
     </>
   );
 }
