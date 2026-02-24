@@ -28,6 +28,7 @@ export interface Shift {
   estimatedCompletion?: string; // ISO timestamp for active shifts
   duration?: string; // e.g., "7h 45m" for completed shifts
   truckId?: string;
+  truck_bin_capacity?: number; // Truck capacity for bin collection
   optimization_metadata?: OptimizationMetadata; // Added for HERE Maps optimization data
   total_distance_miles?: number; // Computed field from backend (km * 0.621371)
   estimated_completion_time?: number; // Computed field from backend (Unix timestamp)

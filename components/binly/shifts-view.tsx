@@ -1389,7 +1389,7 @@ function CreateShiftDrawer({
   const queryClient = useQueryClient();
 
   const [driverId, setDriverId] = useState(shift?.driverId || '');
-  const [truckCapacity, setTruckCapacity] = useState('');
+  const [truckCapacity, setTruckCapacity] = useState(shift?.truck_bin_capacity?.toString() || '');
   const [lockRouteOrder, setLockRouteOrder] = useState(false);
   const [tasks, setTasks] = useState<ShiftTask[]>([]);
   const [loadingShiftData, setLoadingShiftData] = useState(false);
@@ -3352,7 +3352,7 @@ function CreateShiftDrawer({
                           ? 'bg-blue-50 border-blue-200'
                           : task.isExisting
                           ? 'bg-gray-50 border-gray-300'
-                          : 'bg-white border-blue-400 border-2'
+                          : 'bg-white'
                       }`}
                     >
                       {/* Checkbox for multi-select (only for deletable tasks) */}
