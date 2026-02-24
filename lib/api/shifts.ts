@@ -338,6 +338,47 @@ export async function cancelShift(shiftId: string): Promise<void> {
 }
 
 /**
+ * Remove tasks from an active shift (bulk operation)
+ * This unassigns tasks without deleting the underlying resources
+ */
+export async function removeTasksFromShift(
+  shiftId: string,
+  taskIds: string[],
+  reason?: string
+): Promise<{ success: boolean; removed_count: number; message: string }> {
+  console.log('🗑️ Removing tasks from shift:', { shiftId, taskIds, reason });
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}/tasks/remove`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        task_ids: taskIds,
+        reason: reason || 'Removed by manager',
+      }),
+    });
+
+    console.log('📡 Remove tasks response status:', response.status);
+
+    if (response.status === 401) {
+      throw new Error('Authentication required');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to remove tasks from shift');
+    }
+
+    const data = await response.json();
+    console.log('✅ Tasks removed successfully:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Failed to remove tasks from shift:', error);
+    throw error;
+  }
+}
+
+/**
  * Clears all shifts (for testing - admin only)
  */
 export async function clearAllShifts(): Promise<void> {

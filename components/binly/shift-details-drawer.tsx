@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, ArrowUp, ArrowDown, Warehouse, SkipForward } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shift';
-import { getShiftById, getShiftTasks, cancelShift } from '@/lib/api/shifts';
+import { getShiftById, getShiftTasks, cancelShift, removeTasksFromShift } from '@/lib/api/shifts';
 import { RouteTask, getTaskLabel, getTaskSubtitle, getTaskColor, getTaskBgColor } from '@/lib/types/route-task';
 import { ShiftRouteMap } from './shift-route-map';
 import { useWebSocket, WebSocketMessage } from '@/lib/hooks/use-websocket';
@@ -48,6 +48,9 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
   const [loading, setLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+  const [isRemovingTasks, setIsRemovingTasks] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
   const { token } = useAuthStore();
 
   // Function to load shift details
@@ -136,6 +139,66 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
       setCancelError(errorMessage);
       setIsCancelling(false);
     }
+  };
+
+  // Handle removing selected tasks from shift
+  const handleRemoveTasks = async () => {
+    if (selectedTaskIds.size === 0) {
+      return;
+    }
+
+    const taskCount = selectedTaskIds.size;
+    const taskWord = taskCount === 1 ? 'task' : 'tasks';
+
+    // Confirmation dialog
+    if (!confirm(
+      `Remove ${taskCount} ${taskWord} from this shift?\n\n` +
+      `The ${taskWord} will be unassigned but kept in the system for future scheduling.\n` +
+      `The driver will be notified and the route will be re-optimized.`
+    )) {
+      return;
+    }
+
+    setIsRemovingTasks(true);
+    setRemoveError(null);
+
+    try {
+      const taskIdsArray = Array.from(selectedTaskIds);
+      const result = await removeTasksFromShift(shift.id, taskIdsArray, 'Removed by manager');
+
+      console.log('✅ Tasks removed successfully:', result);
+
+      // Clear selection
+      setSelectedTaskIds(new Set());
+
+      // Reload shift details
+      await loadShiftDetails();
+
+      // Show success message (optional - could use toast instead)
+      alert(`✅ ${result.removed_count} ${taskWord} removed successfully`);
+    } catch (error) {
+      console.error('❌ Failed to remove tasks:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to remove tasks';
+      setRemoveError(errorMessage);
+    } finally {
+      setIsRemovingTasks(false);
+    }
+  };
+
+  // Toggle task selection
+  const toggleTaskSelection = (taskId: string) => {
+    const newSelection = new Set(selectedTaskIds);
+    if (newSelection.has(taskId)) {
+      newSelection.delete(taskId);
+    } else {
+      newSelection.add(taskId);
+    }
+    setSelectedTaskIds(newSelection);
+  };
+
+  // Clear all selections
+  const clearSelection = () => {
+    setSelectedTaskIds(new Set());
   };
 
   const statusColor = getShiftStatusColor(shift.status);
@@ -366,6 +429,40 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
             )}
           </div>
 
+          {/* Bulk Remove Toolbar (only for active shifts with tasks selected) */}
+          {isActive && usingTasks && selectedTaskIds.size > 0 && (
+            <div className="sticky top-0 z-10 bg-orange-50 border-b border-orange-200 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-gray-900">
+                    {selectedTaskIds.size} task{selectedTaskIds.size !== 1 ? 's' : ''} selected
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={clearSelection}
+                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-fast"
+                  >
+                    Clear Selection
+                  </button>
+                  <button
+                    onClick={handleRemoveTasks}
+                    disabled={isRemovingTasks}
+                    className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-fast disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {isRemovingTasks ? 'Removing...' : 'Remove from Shift'}
+                  </button>
+                </div>
+              </div>
+              {removeError && (
+                <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">
+                  {removeError}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Task/Bin List */}
           <div className="p-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">
@@ -429,6 +526,18 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                             : 'bg-white border-gray-200 hover:bg-gray-50'
                         }`}
                       >
+                        {/* Checkbox (only for active shifts and incomplete tasks) */}
+                        {isActive && !isCompleted && !isSkipped && (
+                          <div className="flex-shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={selectedTaskIds.has(task.id)}
+                              onChange={() => toggleTaskSelection(task.id)}
+                              className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                            />
+                          </div>
+                        )}
+
                         {/* Sequence Number Badge */}
                         <div className="flex-shrink-0">
                           <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center">
@@ -482,6 +591,24 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                             <p className="text-sm font-semibold text-gray-900">
                               {task.updated_fill_percentage ?? task.fill_percentage}% Fill
                             </p>
+                          </div>
+                        )}
+
+                        {/* Individual Remove Button (only for active shifts and incomplete tasks) */}
+                        {isActive && !isCompleted && !isSkipped && (
+                          <div className="flex-shrink-0">
+                            <button
+                              onClick={() => {
+                                if (confirm(`Remove this ${task.task_type} task from the shift?\n\nThe task will be unassigned but kept in the system for future scheduling.`)) {
+                                  setSelectedTaskIds(new Set([task.id]));
+                                  handleRemoveTasks();
+                                }
+                              }}
+                              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-fast"
+                              title="Remove task from shift"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         )}
                       </div>
