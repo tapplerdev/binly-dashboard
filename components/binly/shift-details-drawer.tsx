@@ -142,12 +142,12 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
         loadShiftDetails();
       }
 
-      if (message.type === 'task_removed' && message.data?.shift_id === shift.id) {
-        // Tasks were removed from shift by manager
-        console.log('📡 [WEBSOCKET] ✅ task_removed event received!');
+      if (message.type === 'shift_edited' && message.data?.shift_id === shift.id) {
+        // Shift was edited by manager (tasks added/removed, driver changed, time changed)
+        console.log('📡 [WEBSOCKET] ✅ shift_edited event received!');
         console.log('📡 [WEBSOCKET] Shift ID:', message.data?.shift_id);
-        console.log('📡 [WEBSOCKET] Task IDs removed:', message.data?.task_ids);
-        console.log('📡 [WEBSOCKET] Removed count:', message.data?.removed_count);
+        console.log('📡 [WEBSOCKET] Changes:', message.data?.changes);
+        console.log('📡 [WEBSOCKET] Reason:', message.data?.reason);
         console.log('📡 [WEBSOCKET] Full event data:', JSON.stringify(message.data, null, 2));
         console.log('📡 [WEBSOCKET] Triggering reload of shift details...');
         loadShiftDetails();
