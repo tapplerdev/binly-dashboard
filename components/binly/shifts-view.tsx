@@ -1562,6 +1562,23 @@ function CreateShiftDrawer({
         setExistingTasksCount(activeTasks.length);
         console.log('📋 [EDIT MODE] Set existingTasksCount to:', activeTasks.length);
 
+        // Also fetch the shift details to get truck_bin_capacity
+        const shiftUrl = `${API_URL}/api/manager/shifts/${shift.id}`;
+        console.log('📋 [EDIT MODE] Fetching shift details from:', shiftUrl);
+        const shiftResponse = await fetch(shiftUrl, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+
+        if (shiftResponse.ok) {
+          const shiftData = await shiftResponse.json();
+          console.log('📋 [EDIT MODE] Shift details:', shiftData);
+          const shiftDetails = shiftData.data || shiftData;
+          if (shiftDetails.truck_bin_capacity) {
+            console.log('📋 [EDIT MODE] Setting truck capacity to:', shiftDetails.truck_bin_capacity);
+            setTruckCapacity(String(shiftDetails.truck_bin_capacity));
+          }
+        }
+
         // Convert RouteTask to ShiftTask format for display
         const existingShiftTasks: ShiftTask[] = activeTasks.map((task: RouteTask) => {
           console.log('📋 [EDIT MODE] Converting task:', task.id, task.task_type);
