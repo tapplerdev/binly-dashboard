@@ -214,6 +214,7 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
   const statusLabel = getShiftStatusLabel(shift.status);
   const isActive = shift.status === 'active';
   const isCompleted = shift.status === 'completed';
+  const canRemoveTasks = shift.status === 'active' || shift.status === 'ready';
 
   // Support both task-based and bin-based systems
   const usingTasks = tasks.length > 0;
@@ -438,8 +439,8 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
             )}
           </div>
 
-          {/* Bulk Remove Toolbar (only for active shifts with tasks selected) */}
-          {isActive && usingTasks && selectedTaskIds.size > 0 && (
+          {/* Bulk Remove Toolbar (only for active/ready shifts with tasks selected) */}
+          {canRemoveTasks && usingTasks && selectedTaskIds.size > 0 && (
             <div className="sticky top-0 z-10 bg-orange-50 border-b border-orange-200 p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -633,8 +634,8 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                           </div>
                         )}
 
-                        {/* Individual Remove Button (only for active shifts and incomplete tasks) */}
-                        {isActive && !isCompleted && !isSkipped && (
+                        {/* Individual Remove Button (only for active/ready shifts and incomplete tasks) */}
+                        {canRemoveTasks && !isCompleted && !isSkipped && (
                           <div className="flex-shrink-0">
                             <button
                               onClick={() => {
