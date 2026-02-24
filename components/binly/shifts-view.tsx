@@ -53,6 +53,7 @@ export function ShiftsView() {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
+  const [shiftToEdit, setShiftToEdit] = useState<Shift | null>(null);
   const [filters, setFilters] = useState<ShiftFilters>({
     searchQuery: '',
     dateRange: 'this-week',
@@ -354,16 +355,28 @@ export function ShiftsView() {
         </div>
       </div>
 
-      {/* Create Shift Drawer */}
+      {/* Create/Edit Shift Drawer */}
       {isCreateDrawerOpen && (
         <CreateShiftDrawer
-          onClose={() => setIsCreateDrawerOpen(false)}
+          shift={shiftToEdit}
+          onClose={() => {
+            setIsCreateDrawerOpen(false);
+            setShiftToEdit(null); // Clear edit mode
+          }}
         />
       )}
 
       {/* Shift Details Drawer */}
       {selectedShift && (
-        <ShiftDetailsDrawer shift={selectedShift} onClose={() => setSelectedShift(null)} />
+        <ShiftDetailsDrawer
+          shift={selectedShift}
+          onClose={() => setSelectedShift(null)}
+          onEditShift={() => {
+            setShiftToEdit(selectedShift);
+            setSelectedShift(null); // Close details drawer
+            setIsCreateDrawerOpen(true); // Open edit drawer
+          }}
+        />
       )}
     </div>
   );
@@ -1355,21 +1368,25 @@ interface WarehouseDeploymentItem {
   destination_longitude: number;
 }
 
-// Create Shift Drawer Component
+// Create/Edit Shift Drawer Component
 function CreateShiftDrawer({
+  shift,
   onClose,
 }: {
+  shift?: Shift | null;
   onClose: () => void;
 }) {
+  const isEditMode = !!shift;
   const { data: drivers = [], isLoading: loadingDrivers } = useDrivers();
   const { data: warehouse } = useWarehouseLocation();
   const { token } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const [driverId, setDriverId] = useState('');
+  const [driverId, setDriverId] = useState(shift?.driverid || '');
   const [truckCapacity, setTruckCapacity] = useState('');
   const [lockRouteOrder, setLockRouteOrder] = useState(false);
   const [tasks, setTasks] = useState<ShiftTask[]>([]);
+  const [loadingShiftData, setLoadingShiftData] = useState(false);
   const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -2456,17 +2473,42 @@ function CreateShiftDrawer({
 
       // Call backend directly (not through Next.js API route)
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      const response = await fetch(`${API_URL}/api/manager/shifts/create-with-tasks`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
+
+      let response;
+      if (isEditMode && shift) {
+        // Edit mode: PATCH endpoint with added tasks
+        const editPayload = {
+          driver_id: driverId !== shift.driverId ? driverId : undefined,
+          add_tasks: tasksPayload,
+          reoptimize: true,
+          reason: 'Tasks added via shift editor',
+        };
+
+        console.log('✏️ [SHIFT EDIT] Updating shift:', shift.id);
+        console.log('✏️ [SHIFT EDIT] Payload:', editPayload);
+
+        response = await fetch(`${API_URL}/api/manager/shifts/${shift.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(editPayload),
+        });
+      } else {
+        // Create mode: POST endpoint
+        response = await fetch(`${API_URL}/api/manager/shifts/create-with-tasks`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+      }
 
       if (!response.ok) {
-        let errorMessage = `Failed to create shift (${response.status} ${response.statusText})`;
+        let errorMessage = `Failed to ${isEditMode ? 'update' : 'create'} shift (${response.status} ${response.statusText})`;
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
@@ -2476,8 +2518,8 @@ function CreateShiftDrawer({
         throw new Error(errorMessage);
       }
 
-      // Invalidate shifts cache to trigger refetch and show the new shift immediately
-      console.log('✅ Shift created successfully, invalidating cache...');
+      // Invalidate shifts cache to trigger refetch and show the updated/new shift immediately
+      console.log(`✅ Shift ${isEditMode ? 'updated' : 'created'} successfully, invalidating cache...`);
       queryClient.invalidateQueries({ queryKey: shiftKeys.all });
 
       onClose();
@@ -2497,7 +2539,9 @@ function CreateShiftDrawer({
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Build Custom Shift</h2>
+          <h2 className="text-lg font-semibold text-gray-900">
+            {isEditMode ? 'Edit Shift' : 'Build Custom Shift'}
+          </h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-fast"
@@ -3155,10 +3199,10 @@ function CreateShiftDrawer({
                 {isSubmitting ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Creating...
+                    {isEditMode ? 'Updating...' : 'Creating...'}
                   </>
                 ) : (
-                  'Create Shift'
+                  isEditMode ? 'Update Shift' : 'Create Shift'
                 )}
               </button>
             </div>

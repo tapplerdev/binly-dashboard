@@ -31,9 +31,10 @@ interface ShiftBin {
 interface ShiftDetailsDrawerProps {
   shift: Shift;
   onClose: () => void;
+  onEditShift?: () => void;
 }
 
-export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) {
+export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetailsDrawerProps) {
   console.log('🔍 [SHIFT DRAWER] Received shift prop:', {
     id: shift.id,
     driverName: shift.driverName,
@@ -513,39 +514,6 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
             )}
           </div>
 
-          {/* Bulk Remove Toolbar (only for active/ready shifts with tasks selected) */}
-          {canRemoveTasks && usingTasks && selectedTaskIds.size > 0 && (
-            <div className="sticky top-0 z-10 bg-orange-50 border-b border-orange-200 p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-gray-900">
-                    {selectedTaskIds.size} task{selectedTaskIds.size !== 1 ? 's' : ''} selected
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={clearSelection}
-                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-fast"
-                  >
-                    Clear Selection
-                  </button>
-                  <button
-                    onClick={handleRemoveTasks}
-                    disabled={isRemovingTasks}
-                    className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-fast disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    {isRemovingTasks ? 'Removing...' : 'Remove from Shift'}
-                  </button>
-                </div>
-              </div>
-              {removeError && (
-                <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">
-                  {removeError}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Tab Navigation */}
           {usingTasks && (
@@ -649,18 +617,6 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                             : 'bg-white border-l-4 border-gray-300 hover:bg-gray-50'
                         }`}
                       >
-                        {/* Checkbox (only for active/ready shifts and incomplete tasks) */}
-                        {canRemoveTasks && !isCompleted && !isSkipped && (
-                          <div className="flex-shrink-0">
-                            <input
-                              type="checkbox"
-                              checked={selectedTaskIds.has(task.id)}
-                              onChange={() => toggleTaskSelection(task.id)}
-                              className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
-                            />
-                          </div>
-                        )}
-
                         {/* Sequence Number Badge */}
                         <div className="flex-shrink-0">
                           <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center">
@@ -728,33 +684,6 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                             <p className="text-sm font-semibold text-gray-900">
                               {task.updated_fill_percentage ?? task.fill_percentage}% Fill
                             </p>
-                          </div>
-                        )}
-
-                        {/* Individual Remove Button (only for active/ready shifts and incomplete tasks) */}
-                        {canRemoveTasks && !isCompleted && !isSkipped && (
-                          <div className="flex-shrink-0">
-                            <button
-                              onClick={() => {
-                                if (isInProgress) {
-                                  // Show warning for in-progress tasks
-                                  setInProgressTaskToRemove(task);
-                                  setShowInProgressWarning(true);
-                                } else {
-                                  // Direct confirmation for pending tasks
-                                  setSelectedTaskIds(new Set([task.id]));
-                                  setShowRemoveConfirm(true);
-                                }
-                              }}
-                              className={`p-2 rounded-lg transition-fast ${
-                                isInProgress
-                                  ? 'text-red-500 hover:text-red-700 hover:bg-red-100'
-                                  : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
-                              }`}
-                              title={isInProgress ? "Driver is navigating to this task" : "Remove task from shift"}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
                           </div>
                         )}
                       </div>
@@ -1065,9 +994,14 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
               </div>
             )}
             <div className="flex gap-3">
-              <button className="flex-1 px-4 py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-fast">
-                Contact Driver
-              </button>
+              {onEditShift && (
+                <button
+                  onClick={onEditShift}
+                  className="flex-1 px-4 py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-fast"
+                >
+                  Edit Shift
+                </button>
+              )}
               <button
                 onClick={handleCancelShift}
                 disabled={isCancelling}
