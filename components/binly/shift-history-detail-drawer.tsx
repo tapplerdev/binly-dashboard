@@ -449,14 +449,14 @@ export function ShiftHistoryDetailDrawer({ shift, onClose }: Props) {
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop with fade animation */}
       <div
-        className="fixed inset-0 bg-black/30 z-40 backdrop-blur-[1px]"
+        className="fixed inset-0 bg-black/30 z-40 backdrop-blur-[1px] animate-in fade-in duration-200"
         onClick={onClose}
       />
 
-      {/* Drawer */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl z-50 flex flex-col">
+      {/* Drawer with slide animation */}
+      <div className="fixed right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-200 shrink-0">
           <div className="flex-1 min-w-0">

@@ -7,7 +7,7 @@ import { ShiftHistoryEntry } from '@/lib/api/shifts';
 import { ShiftHistoryDetailDrawer } from './shift-history-detail-drawer';
 import {
   Clock, Package, MapPin, Truck, SkipForward, AlertTriangle,
-  ChevronDown, ChevronUp, CheckCircle2, XCircle, User, Calendar,
+  CheckCircle2, XCircle, User, Calendar,
   ArrowRightLeft, Warehouse, Search, Filter,
 } from 'lucide-react';
 
@@ -151,7 +151,6 @@ function ExpandedRow({ shift }: { shift: ShiftHistoryEntry }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export function ShiftHistoryView() {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [driverFilter, setDriverFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedShift, setSelectedShift] = useState<ShiftHistoryEntry | null>(null);
@@ -304,15 +303,14 @@ export function ShiftHistoryView() {
           {/* Rows */}
           <div className="divide-y divide-gray-100">
             {filtered.map(shift => {
-              const isExpanded = expandedId === shift.id;
               const reason = END_REASON_LABEL[shift.end_reason] ?? { label: shift.end_reason, color: 'text-gray-700', bg: 'bg-gray-100' };
               const duration = formatDuration(shift.start_time, shift.end_time, shift.total_pause_seconds);
 
               return (
                 <div key={shift.id} className="bg-white hover:bg-gray-50/50 transition-colors">
-                  {/* Main row */}
+                  {/* Main row - click to open drawer */}
                   <button
-                    onClick={() => setExpandedId(isExpanded ? null : shift.id)}
+                    onClick={() => setSelectedShift(shift)}
                     className="w-full text-left"
                   >
                     <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_80px_1fr_60px] gap-2 md:gap-4 px-5 py-4 items-center">
@@ -374,41 +372,14 @@ export function ShiftHistoryView() {
                         )}
                       </div>
 
-                      {/* Status + Expand toggle */}
-                      <div className="flex justify-end items-center gap-3">
-                        <div className="hidden sm:flex items-center gap-1.5">
-                          <div className={`w-2 h-2 rounded-full ${
-                            shift.end_reason === 'completed' ? 'bg-green-500' :
-                            shift.end_reason === 'manual_end' ? 'bg-blue-500' :
-                            shift.end_reason === 'manager_cancelled' ? 'bg-red-500' :
-                            shift.end_reason === 'manager_ended' ? 'bg-amber-500' :
-                            shift.end_reason === 'driver_disconnected' ? 'bg-orange-500' :
-                            'bg-gray-500'
-                          }`} />
-                          <span className={`text-xs font-medium ${reason.color}`}>
-                            {reason.label}
-                          </span>
-                        </div>
-                        {isExpanded
-                          ? <ChevronUp className="w-4 h-4 text-gray-400" />
-                          : <ChevronDown className="w-4 h-4 text-gray-400" />
-                        }
+                      {/* Status badge */}
+                      <div className="flex justify-end items-center">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${reason.bg} ${reason.color}`}>
+                          {reason.label}
+                        </span>
                       </div>
                     </div>
                   </button>
-
-                  {/* View details button */}
-                  <div className="px-5 pb-3 flex justify-end">
-                    <button
-                      onClick={e => { e.stopPropagation(); setSelectedShift(shift); }}
-                      className="text-xs text-primary font-medium hover:underline flex items-center gap-1"
-                    >
-                      View task details →
-                    </button>
-                  </div>
-
-                  {/* Expanded details */}
-                  {isExpanded && <ExpandedRow shift={shift} />}
                 </div>
               );
             })}
