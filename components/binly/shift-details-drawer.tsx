@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, ArrowUp, ArrowDown, Warehouse, SkipForward, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, ArrowUp, ArrowDown, Warehouse, SkipForward, AlertTriangle, ChevronDown, ChevronUp, Navigation } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shift';
 import { getShiftById, getShiftTasks, cancelShift, removeTasksFromShift, getShiftTasksWithHistory } from '@/lib/api/shifts';
 import { RouteTask, getTaskLabel, getTaskSubtitle, getTaskColor, getTaskBgColor } from '@/lib/types/route-task';
@@ -55,6 +55,8 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
   const [isRemovingTasks, setIsRemovingTasks] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [showInProgressWarning, setShowInProgressWarning] = useState(false);
+  const [inProgressTaskToRemove, setInProgressTaskToRemove] = useState<RouteTask | null>(null);
   const [activeTab, setActiveTab] = useState<'tasks' | 'timeline'>('tasks');
   const [showRemovedTasks, setShowRemovedTasks] = useState(false);
   const { token } = useAuthStore();
@@ -541,15 +543,21 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                     console.log('🔍 [SHIFT DETAILS RENDER] Tasks data:', JSON.stringify(tasks, null, 2));
                     return null;
                   })()}
-                  {tasks
-                    .sort((a, b) => a.sequence_order - b.sequence_order)
-                    .map((task) => {
+                  {(() => {
+                    // Find first uncompleted task index (this is the in-progress task)
+                    const sortedTasks = tasks.sort((a, b) => a.sequence_order - b.sequence_order);
+                    const firstUncompletedIndex = sortedTasks.findIndex(
+                      t => t.is_completed === 0 && !t.skipped && !t.is_deleted
+                    );
+
+                    return sortedTasks.map((task, index) => {
                     console.log('🔍 [SHIFT DETAILS RENDER] Rendering task:', task.id, 'Type:', task.task_type);
                     console.log('🔍 [SHIFT DETAILS RENDER] Task label:', getTaskLabel(task));
                     console.log('🔍 [SHIFT DETAILS RENDER] Task subtitle:', getTaskSubtitle(task));
 
                     const isCompleted = task.is_completed === 1;
                     const isSkipped = task.skipped === true;
+                    const isInProgress = index === firstUncompletedIndex && !isCompleted && !isSkipped;
                     const completedTime = task.completed_at
                       ? new Date(task.completed_at * 1000).toLocaleTimeString('en-US', {
                           hour: '2-digit',
@@ -572,10 +580,12 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                         key={task.id}
                         className={`flex items-center gap-3 p-3 rounded-lg border transition-fast ${
                           isSkipped
-                            ? 'bg-orange-50 border-orange-200'
+                            ? 'bg-yellow-50 border-l-4 border-yellow-500 opacity-75'
                             : isCompleted
-                            ? 'bg-green-50 border-green-200'
-                            : 'bg-white border-gray-200 hover:bg-gray-50'
+                            ? 'bg-green-50 border-l-4 border-green-500 opacity-75'
+                            : isInProgress
+                            ? 'bg-blue-50 border-l-4 border-blue-600 shadow-lg ring-2 ring-blue-100'
+                            : 'bg-white border-l-4 border-gray-300 hover:bg-gray-50'
                         }`}
                       >
                         {/* Checkbox (only for active shifts and incomplete tasks) */}
@@ -607,12 +617,16 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                         {/* Status Icon */}
                         <div className="flex-shrink-0">
                           {isSkipped ? (
-                            <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
+                            <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center">
                               <SkipForward className="w-4 h-4 text-white" />
                             </div>
                           ) : isCompleted ? (
                             <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
                               <Check className="w-4 h-4 text-white" />
+                            </div>
+                          ) : isInProgress ? (
+                            <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center animate-pulse">
+                              <Navigation className="w-4 h-4 text-white" />
                             </div>
                           ) : (
                             <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
@@ -624,15 +638,25 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                         {/* Task Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
-                            <p className="font-medium text-gray-900">{getTaskLabel(task)}</p>
+                            <p className={`font-medium ${isCompleted || isSkipped ? 'text-gray-600' : isInProgress ? 'text-blue-900 font-semibold' : 'text-gray-900'}`}>
+                              {getTaskLabel(task)}
+                            </p>
+                            {isInProgress && (
+                              <span className="px-2 py-0.5 bg-blue-600 text-white text-xs rounded-full font-medium whitespace-nowrap">
+                                Current Stop
+                              </span>
+                            )}
                             {isSkipped && completedTime && (
-                              <span className="text-xs text-orange-600">@ {completedTime} (Skipped)</span>
+                              <span className="text-xs text-yellow-700 italic">Skipped @ {completedTime}</span>
                             )}
                             {!isSkipped && isCompleted && completedTime && (
-                              <span className="text-xs text-green-600">@ {completedTime}</span>
+                              <span className="text-xs text-green-600">Completed @ {completedTime}</span>
+                            )}
+                            {isInProgress && (
+                              <span className="text-xs text-blue-700 font-medium">Driver en route</span>
                             )}
                           </div>
-                          <p className="text-sm text-gray-500 truncate">
+                          <p className={`text-sm truncate ${isCompleted || isSkipped ? 'text-gray-400' : 'text-gray-600'}`}>
                             {getTaskSubtitle(task)}
                           </p>
                         </div>
@@ -651,11 +675,22 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                           <div className="flex-shrink-0">
                             <button
                               onClick={() => {
-                                setSelectedTaskIds(new Set([task.id]));
-                                setShowRemoveConfirm(true);
+                                if (isInProgress) {
+                                  // Show warning for in-progress tasks
+                                  setInProgressTaskToRemove(task);
+                                  setShowInProgressWarning(true);
+                                } else {
+                                  // Direct confirmation for pending tasks
+                                  setSelectedTaskIds(new Set([task.id]));
+                                  setShowRemoveConfirm(true);
+                                }
                               }}
-                              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-fast"
-                              title="Remove task from shift"
+                              className={`p-2 rounded-lg transition-fast ${
+                                isInProgress
+                                  ? 'text-red-500 hover:text-red-700 hover:bg-red-100'
+                                  : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
+                              }`}
+                              title={isInProgress ? "Driver is navigating to this task" : "Remove task from shift"}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -663,7 +698,8 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                         )}
                       </div>
                     );
-                  })}
+                  });
+                  })()}
 
                   {/* Removed Tasks Collapsible Section */}
                   {(() => {
@@ -982,6 +1018,68 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
           </div>
         )}
       </div>
+
+      {/* In-Progress Task Warning Dialog */}
+      <Dialog open={showInProgressWarning} onOpenChange={setShowInProgressWarning}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                <Navigation className="w-6 h-6 text-blue-600" />
+              </div>
+              <DialogTitle className="text-lg font-semibold">
+                Driver is currently navigating to this task
+              </DialogTitle>
+            </div>
+          </DialogHeader>
+          <DialogDescription className="text-sm text-gray-600 space-y-3">
+            {inProgressTaskToRemove && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="font-medium text-blue-900">{getTaskLabel(inProgressTaskToRemove)}</p>
+                <p className="text-sm text-blue-700 mt-1">{getTaskSubtitle(inProgressTaskToRemove)}</p>
+              </div>
+            )}
+            <p>
+              The driver is currently en route to this location. Removing this task will:
+            </p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Immediately update the driver's navigation</li>
+              <li>Skip this stop in their route</li>
+              <li>Re-optimize the route to the next task</li>
+              <li>Notify the driver in real-time</li>
+            </ul>
+            <p className="font-medium text-gray-900">
+              Are you sure you want to proceed?
+            </p>
+          </DialogDescription>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowInProgressWarning(false);
+                setInProgressTaskToRemove(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (inProgressTaskToRemove) {
+                  setSelectedTaskIds(new Set([inProgressTaskToRemove.id]));
+                  setShowInProgressWarning(false);
+                  setShowRemoveConfirm(true);
+                  setInProgressTaskToRemove(null);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Yes, remove task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Remove Tasks Confirmation Dialog */}
       <Dialog open={showRemoveConfirm} onOpenChange={setShowRemoveConfirm}>
