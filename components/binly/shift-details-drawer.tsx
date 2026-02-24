@@ -115,6 +115,18 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
         console.log('📡 WebSocket: Shift updated, reloading tasks...');
         loadShiftDetails();
       }
+
+      if (message.type === 'task_removed' && message.data?.shift_id === shift.id) {
+        // Tasks were removed from shift by manager
+        console.log('📡 WebSocket: Tasks removed from shift, reloading...');
+        loadShiftDetails();
+      }
+
+      if (message.type === 'route_reoptimized' && message.data?.shift_id === shift.id) {
+        // Route was re-optimized after task removal
+        console.log('📡 WebSocket: Route re-optimized, reloading tasks...');
+        loadShiftDetails();
+      }
     },
   });
 
