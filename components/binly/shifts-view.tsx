@@ -1334,11 +1334,11 @@ function DailyGantt({
 
 // Task type for shift builder
 interface ShiftTask {
-  id: string;
+  id?: string;
   type: 'collection' | 'placement' | 'pickup' | 'dropoff' | 'warehouse_stop';
   // Collection fields
   bin_id?: string;
-  bin_number?: string;
+  bin_number?: number;
   fill_percentage?: number;
   // Placement fields
   potential_location_id?: string;
@@ -1354,6 +1354,11 @@ interface ShiftTask {
   warehouse_action?: 'load' | 'unload';
   bins_to_load?: number;
   auto_inserted?: boolean; // Marks warehouse stops that were automatically inserted
+  // Edit mode fields (for existing tasks)
+  isExisting?: boolean; // True if this task already exists in the shift (read-only)
+  isCompleted?: boolean; // True if task was completed
+  isSkipped?: boolean; // True if task was skipped
+  isInProgress?: boolean; // True if driver is currently on this task
   // Common fields
   latitude: number;
   longitude: number;
@@ -1455,35 +1460,92 @@ function CreateShiftDrawer({
 
   // Fetch and pre-populate shift data when in edit mode
   useEffect(() => {
-    if (!isEditMode || !shift || !token) return;
+    if (!isEditMode || !shift || !token) {
+      console.log('📋 [EDIT MODE] Skipping fetch:', { isEditMode, hasShift: !!shift, hasToken: !!token });
+      return;
+    }
 
     const fetchShiftData = async () => {
+      console.log('📋 [EDIT MODE] Starting fetch for shift:', shift.id);
       setLoadingShiftData(true);
       try {
         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-        const response = await fetch(`${API_URL}/api/manager/shifts/${shift.id}/tasks/history`, {
+        const url = `${API_URL}/api/manager/shifts/${shift.id}/tasks/history`;
+        console.log('📋 [EDIT MODE] Fetching from URL:', url);
+
+        const response = await fetch(url, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
         });
 
+        console.log('📋 [EDIT MODE] Response status:', response.status);
+        console.log('📋 [EDIT MODE] Response ok:', response.ok);
+
         if (!response.ok) throw new Error('Failed to fetch shift tasks');
 
         const data = await response.json();
-        console.log('✏️ [EDIT MODE] Fetched shift data:', data);
+        console.log('📋 [EDIT MODE] Raw response data:', data);
+        console.log('📋 [EDIT MODE] Tasks array:', data.tasks);
+        console.log('📋 [EDIT MODE] Tasks count:', data.tasks?.length || 0);
 
         // Set existing task count for display
         const activeTasks = data.tasks?.filter((t: RouteTask) => !t.is_deleted) || [];
-        setExistingTasksCount(activeTasks.length);
+        console.log('📋 [EDIT MODE] Active tasks (not deleted):', activeTasks.length);
+        console.log('📋 [EDIT MODE] Active tasks data:', activeTasks);
 
-        // Note: We don't pre-populate tasks in edit mode
-        // The modal is for ADDING new tasks only
-        // Task removal is handled separately in the shift details drawer
+        setExistingTasksCount(activeTasks.length);
+        console.log('📋 [EDIT MODE] Set existingTasksCount to:', activeTasks.length);
+
+        // Convert RouteTask to ShiftTask format for display
+        const existingShiftTasks: ShiftTask[] = activeTasks.map((task: RouteTask) => {
+          console.log('📋 [EDIT MODE] Converting task:', task.id, task.task_type);
+
+          const baseTask: ShiftTask = {
+            type: task.task_type as any,
+            address: task.address || '',
+            latitude: task.latitude || 0,
+            longitude: task.longitude || 0,
+            isExisting: true, // Mark as existing (read-only)
+            isCompleted: task.is_completed === 1,
+            isSkipped: task.is_skipped === 1,
+            isInProgress: task.current_task_index === task.sequence_order,
+          };
+
+          // Add task-specific fields
+          if (task.task_type === 'collection' && task.bin_id) {
+            baseTask.bin_id = task.bin_id;
+            baseTask.bin_number = task.bin_number;
+            baseTask.fill_percentage = task.fill_percentage;
+          } else if (task.task_type === 'placement' && task.potential_location_id) {
+            baseTask.potential_location_id = task.potential_location_id;
+          } else if ((task.task_type === 'pickup' || task.task_type === 'dropoff') && task.move_request_id) {
+            baseTask.move_request_id = task.move_request_id;
+            baseTask.bin_id = task.bin_id;
+            baseTask.destination_address = task.destination_address;
+            baseTask.destination_latitude = task.destination_latitude;
+            baseTask.destination_longitude = task.destination_longitude;
+            baseTask.move_type = task.move_type;
+          } else if (task.task_type === 'warehouse_stop') {
+            baseTask.warehouse_action = task.warehouse_action;
+            baseTask.bins_to_load = task.bins_to_load;
+          }
+
+          return baseTask;
+        });
+
+        console.log('📋 [EDIT MODE] Converted existing tasks to ShiftTask format:', existingShiftTasks.length);
+        console.log('📋 [EDIT MODE] Existing ShiftTasks:', existingShiftTasks);
+
+        // Pre-populate with existing tasks (read-only)
+        setTasks(existingShiftTasks);
+        console.log('📋 [EDIT MODE] Set tasks state with existing tasks');
       } catch (err) {
-        console.error('Failed to fetch shift data:', err);
+        console.error('❌ [EDIT MODE] Failed to fetch shift data:', err);
         setError('Failed to load shift data');
       } finally {
         setLoadingShiftData(false);
+        console.log('📋 [EDIT MODE] Finished loading');
       }
     };
 
@@ -3099,18 +3161,43 @@ function CreateShiftDrawer({
 
                     return (
                     <div
-                      key={task.id}
-                      draggable
-                      onDragStart={() => handleDragStart(index)}
-                      onDragOver={(e) => handleDragOver(e, index)}
-                      onDragEnd={handleDragEnd}
-                      className={`flex items-center gap-3 px-4 py-3 border rounded-lg cursor-move hover:shadow-md transition-all ${
+                      key={task.id || index}
+                      draggable={!task.isExisting} // Existing tasks are not draggable
+                      onDragStart={() => !task.isExisting && handleDragStart(index)}
+                      onDragOver={(e) => !task.isExisting && handleDragOver(e, index)}
+                      onDragEnd={!task.isExisting ? handleDragEnd : undefined}
+                      className={`flex items-center gap-3 px-4 py-3 border rounded-lg transition-all ${
+                        task.isExisting ? 'cursor-default' : 'cursor-move hover:shadow-md'
+                      } ${
                         draggedTaskIndex === index ? 'opacity-50' : ''
                       } ${dragOverIndex === index && draggedTaskIndex !== index ? 'border-blue-500 border-2 shadow-lg' : ''} ${
-                        task.auto_inserted ? 'bg-blue-50 border-blue-200' : 'bg-white'
+                        task.isSkipped
+                          ? 'bg-yellow-50 border-l-4 border-yellow-500 opacity-75'
+                          : task.isCompleted
+                          ? 'bg-green-50 border-l-4 border-green-500 opacity-75'
+                          : task.isInProgress
+                          ? 'bg-blue-50 border-l-4 border-blue-600 shadow-lg ring-2 ring-blue-100'
+                          : task.auto_inserted
+                          ? 'bg-blue-50 border-blue-200'
+                          : task.isExisting
+                          ? 'bg-gray-50 border-gray-300'
+                          : 'bg-white'
                       }`}
                     >
-                      <GripVertical className="w-4 h-4 text-gray-400" />
+                      {!task.isExisting && <GripVertical className="w-4 h-4 text-gray-400" />}
+                      {task.isExisting && (
+                        <div className="w-4 h-4 flex items-center justify-center">
+                          {task.isSkipped ? (
+                            <span className="text-xs">⏭️</span>
+                          ) : task.isCompleted ? (
+                            <span className="text-xs">✅</span>
+                          ) : task.isInProgress ? (
+                            <span className="text-xs">🔵</span>
+                          ) : (
+                            <span className="text-xs">⭕</span>
+                          )}
+                        </div>
+                      )}
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs font-semibold text-gray-500">#{index + 1}</span>
@@ -3207,13 +3294,15 @@ function CreateShiftDrawer({
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => removeTask(index)}
-                          className="text-red-500 hover:text-red-700 transition-fast"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {!task.isExisting && (
+                          <button
+                            type="button"
+                            onClick={() => removeTask(index)}
+                            className="text-red-500 hover:text-red-700 transition-fast"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                     );
