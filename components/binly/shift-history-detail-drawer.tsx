@@ -62,26 +62,26 @@ function TaskCard({ task, index }: { task: ShiftHistoryTask; index: number }) {
         {/* Status - show WHO did it */}
         {skipped ? (
           <div className="text-right">
-            <div className="flex items-center gap-1 text-xs font-medium text-orange-600">
+            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
               <SkipForward className="w-3 h-3" /> Skipped by driver
             </div>
             {task.completed_at && (
-              <span className="text-xs text-gray-400">{formatTime(task.completed_at)}</span>
+              <div className="text-xs text-gray-400 mt-1">{formatTime(task.completed_at)}</div>
             )}
           </div>
         ) : completed ? (
           <div className="text-right">
-            <div className="flex items-center gap-1 text-xs font-medium text-green-600">
+            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-700 border border-green-200">
               <CheckCircle2 className="w-3 h-3" /> Completed by driver
             </div>
             {task.completed_at && (
-              <span className="text-xs text-gray-400">{formatTime(task.completed_at)}</span>
+              <div className="text-xs text-gray-400 mt-1">{formatTime(task.completed_at)}</div>
             )}
           </div>
         ) : (
-          <span className="flex items-center gap-1 text-xs font-medium text-gray-400">
+          <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
             <XCircle className="w-3 h-3" /> Incomplete
-          </span>
+          </div>
         )}
       </div>
 
@@ -244,7 +244,7 @@ function TimelineView({ shift, tasks }: { shift: ShiftHistoryEntry; tasks: Shift
   return (
     <div className="relative">
       {/* Timeline Line */}
-      <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200" />
+      <div className="absolute left-6 top-2 bottom-2 w-0.5 bg-gray-200" />
 
       {events.length === 0 ? (
         <div className="bg-gray-50 rounded-lg p-6 text-center border border-gray-200">
@@ -252,7 +252,7 @@ function TimelineView({ shift, tasks }: { shift: ShiftHistoryEntry; tasks: Shift
           <p className="text-sm text-gray-600">No activity recorded</p>
         </div>
       ) : (
-        <div className="space-y-4 pl-8">
+        <div className="space-y-6 pl-14">
           {events.map((event, index) => {
             const eventTime = new Date(event.time * 1000);
             const formattedTime = eventTime.toLocaleString('en-US', {
@@ -266,19 +266,19 @@ function TimelineView({ shift, tasks }: { shift: ShiftHistoryEntry; tasks: Shift
             return (
               <div key={index} className="relative">
                 {/* Timeline Dot */}
-                <div className={`absolute -left-8 w-4 h-4 rounded-full border-2 border-white ${colorClasses[event.color as keyof typeof colorClasses]}`} />
+                <div className={`absolute -left-[40px] top-1 w-4 h-4 rounded-full border-2 border-white shadow-sm ${colorClasses[event.color as keyof typeof colorClasses]}`} />
 
                 {/* Event Card */}
-                <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-shadow">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">{event.label}</p>
+                <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 hover:shadow-md transition-all">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 text-sm">{event.label}</p>
                       {event.subtitle && (
-                        <p className="text-sm text-gray-500 mt-0.5">{event.subtitle}</p>
+                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">{event.subtitle}</p>
                       )}
                     </div>
                     <div className="flex-shrink-0">
-                      <p className="text-xs text-gray-500">{formattedTime}</p>
+                      <p className="text-xs text-gray-500 whitespace-nowrap">{formattedTime}</p>
                     </div>
                   </div>
                 </div>
