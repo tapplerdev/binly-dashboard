@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, ArrowUp, ArrowDown, Warehouse, SkipForward } from 'lucide-react';
+import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, ArrowUp, ArrowDown, Warehouse, SkipForward, AlertTriangle } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shift';
 import { getShiftById, getShiftTasks, cancelShift, removeTasksFromShift } from '@/lib/api/shifts';
 import { RouteTask, getTaskLabel, getTaskSubtitle, getTaskColor, getTaskBgColor } from '@/lib/types/route-task';
 import { ShiftRouteMap } from './shift-route-map';
 import { useWebSocket, WebSocketMessage } from '@/lib/hooks/use-websocket';
 import { useAuthStore } from '@/lib/auth/store';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface ShiftBin {
   id: number;
@@ -51,6 +53,7 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [isRemovingTasks, setIsRemovingTasks] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const { token } = useAuthStore();
 
   // Function to load shift details
@@ -147,20 +150,18 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
       return;
     }
 
-    const taskCount = selectedTaskIds.size;
-    const taskWord = taskCount === 1 ? 'task' : 'tasks';
+    // Show confirmation modal
+    setShowRemoveConfirm(true);
+  };
 
-    // Confirmation dialog
-    if (!confirm(
-      `Remove ${taskCount} ${taskWord} from this shift?\n\n` +
-      `The ${taskWord} will be unassigned but kept in the system for future scheduling.\n` +
-      `The driver will be notified and the route will be re-optimized.`
-    )) {
-      return;
-    }
-
+  // Confirm and execute task removal
+  const confirmRemoveTasks = async () => {
+    setShowRemoveConfirm(false);
     setIsRemovingTasks(true);
     setRemoveError(null);
+
+    const taskCount = selectedTaskIds.size;
+    const taskWord = taskCount === 1 ? 'task' : 'tasks';
 
     try {
       const taskIdsArray = Array.from(selectedTaskIds);
@@ -599,10 +600,8 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                           <div className="flex-shrink-0">
                             <button
                               onClick={() => {
-                                if (confirm(`Remove this ${task.task_type} task from the shift?\n\nThe task will be unassigned but kept in the system for future scheduling.`)) {
-                                  setSelectedTaskIds(new Set([task.id]));
-                                  handleRemoveTasks();
-                                }
+                                setSelectedTaskIds(new Set([task.id]));
+                                setShowRemoveConfirm(true);
                               }}
                               className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-fast"
                               title="Remove task from shift"
@@ -741,6 +740,48 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
           </div>
         )}
       </div>
+
+      {/* Remove Tasks Confirmation Dialog */}
+      <Dialog open={showRemoveConfirm} onOpenChange={setShowRemoveConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-orange-600" />
+              </div>
+              <DialogTitle className="text-lg font-semibold">
+                Remove {selectedTaskIds.size} {selectedTaskIds.size === 1 ? 'task' : 'tasks'} from this shift?
+              </DialogTitle>
+            </div>
+          </DialogHeader>
+          <DialogDescription className="text-sm text-gray-600 space-y-3 pt-4">
+            <p>
+              The {selectedTaskIds.size === 1 ? 'task' : 'tasks'} will be unassigned but kept in the system for future scheduling.
+            </p>
+            <p>
+              The driver will be notified and the route will be re-optimized.
+            </p>
+          </DialogDescription>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowRemoveConfirm(false)}
+              disabled={isRemovingTasks}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={confirmRemoveTasks}
+              disabled={isRemovingTasks}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isRemovingTasks ? 'Removing...' : 'OK'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
