@@ -10,6 +10,7 @@ import { useWebSocket, WebSocketMessage } from '@/lib/hooks/use-websocket';
 import { useAuthStore } from '@/lib/auth/store';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Toast } from '@/components/ui/toast';
 
 interface ShiftBin {
   id: number;
@@ -59,6 +60,9 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
   const [inProgressTaskToRemove, setInProgressTaskToRemove] = useState<RouteTask | null>(null);
   const [activeTab, setActiveTab] = useState<'tasks' | 'timeline'>('tasks');
   const [showRemovedTasks, setShowRemovedTasks] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'warning' | 'info'>('success');
   const { token } = useAuthStore();
 
   // Function to load shift details
@@ -197,8 +201,10 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
       // Reload shift details
       await loadShiftDetails();
 
-      // Show success message (optional - could use toast instead)
-      alert(`✅ ${result.removed_count} ${taskWord} removed successfully`);
+      // Show success toast
+      setToastMessage(`${result.removed_count} ${taskWord} removed successfully`);
+      setToastType('success');
+      setShowToast(true);
     } catch (error) {
       console.error('❌ Failed to remove tasks:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to remove tasks';
@@ -557,7 +563,8 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
 
                     const isCompleted = task.is_completed === 1;
                     const isSkipped = task.skipped === true;
-                    const isInProgress = index === firstUncompletedIndex && !isCompleted && !isSkipped;
+                    // Only show "in-progress" for active shifts (not scheduled/ready)
+                    const isInProgress = shift.status === 'active' && index === firstUncompletedIndex && !isCompleted && !isSkipped;
                     const completedTime = task.completed_at
                       ? new Date(task.completed_at * 1000).toLocaleTimeString('en-US', {
                           hour: '2-digit',
@@ -588,8 +595,8 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                             : 'bg-white border-l-4 border-gray-300 hover:bg-gray-50'
                         }`}
                       >
-                        {/* Checkbox (only for active shifts and incomplete tasks) */}
-                        {isActive && !isCompleted && !isSkipped && (
+                        {/* Checkbox (only for active/ready shifts and incomplete tasks) */}
+                        {canRemoveTasks && !isCompleted && !isSkipped && (
                           <div className="flex-shrink-0">
                             <input
                               type="checkbox"
@@ -1134,6 +1141,15 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Success/Error Toast */}
+      {showToast && (
+        <Toast
+          message={toastMessage}
+          type={toastType}
+          onClose={() => setShowToast(false)}
+        />
+      )}
     </>
   );
 }
