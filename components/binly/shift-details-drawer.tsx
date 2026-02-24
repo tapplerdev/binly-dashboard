@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, ArrowUp, ArrowDown, Warehouse, SkipForward, AlertTriangle } from 'lucide-react';
+import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, ArrowUp, ArrowDown, Warehouse, SkipForward, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shift';
-import { getShiftById, getShiftTasks, cancelShift, removeTasksFromShift } from '@/lib/api/shifts';
+import { getShiftById, getShiftTasks, cancelShift, removeTasksFromShift, getShiftTasksWithHistory } from '@/lib/api/shifts';
 import { RouteTask, getTaskLabel, getTaskSubtitle, getTaskColor, getTaskBgColor } from '@/lib/types/route-task';
 import { ShiftRouteMap } from './shift-route-map';
 import { useWebSocket, WebSocketMessage } from '@/lib/hooks/use-websocket';
@@ -46,6 +46,7 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
 
   const [isClosing, setIsClosing] = useState(false);
   const [tasks, setTasks] = useState<RouteTask[]>([]);
+  const [allTasks, setAllTasks] = useState<RouteTask[]>([]); // Includes deleted tasks
   const [bins, setBins] = useState<ShiftBin[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -54,6 +55,8 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
   const [isRemovingTasks, setIsRemovingTasks] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [activeTab, setActiveTab] = useState<'tasks' | 'timeline'>('tasks');
+  const [showRemovedTasks, setShowRemovedTasks] = useState(false);
   const { token } = useAuthStore();
 
   // Function to load shift details
@@ -68,6 +71,11 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
       console.log('🔍 [SHIFT DETAILS] Raw tasks response:', JSON.stringify(tasksData, null, 2));
       console.log('🔍 [SHIFT DETAILS] Tasks array length:', tasksData?.length || 0);
       console.log('🔍 [SHIFT DETAILS] Tasks array is array?', Array.isArray(tasksData));
+
+      // Also fetch all tasks including deleted ones for history/audit
+      const allTasksData = await getShiftTasksWithHistory(shift.id);
+      console.log('📜 [SHIFT DETAILS] All tasks (with history):', allTasksData.length);
+      setAllTasks(allTasksData);
 
       if (tasksData && tasksData.length > 0) {
         // New task-based system
@@ -464,19 +472,49 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
             </div>
           )}
 
+          {/* Tab Navigation */}
+          {usingTasks && (
+            <div className="border-b border-gray-200">
+              <div className="flex gap-1 px-6">
+                <button
+                  onClick={() => setActiveTab('tasks')}
+                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === 'tasks'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  Tasks
+                </button>
+                <button
+                  onClick={() => setActiveTab('timeline')}
+                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === 'timeline'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  Timeline
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Task/Bin List */}
           <div className="p-6">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">
-              {usingTasks ? `Tasks (${shift.binCount})` : `Bins (${shift.binCount})`}
-              {shift.optimization_metadata && (
-                <span className="ml-2 text-xs text-gray-500 font-normal">- Optimized Order</span>
-              )}
-            </h3>
-            {loading ? (
+            {activeTab === 'tasks' && (
+              <h3 className="text-sm font-semibold text-gray-700 mb-4">
+                {usingTasks ? `Tasks (${shift.binCount})` : `Bins (${shift.binCount})`}
+                {shift.optimization_metadata && (
+                  <span className="ml-2 text-xs text-gray-500 font-normal">- Optimized Order</span>
+                )}
+              </h3>
+            )}
+            {activeTab === 'tasks' && loading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
-            ) : usingTasks ? (
+            ) : activeTab === 'tasks' && usingTasks ? (
               // New task-based rendering
               tasks.length === 0 ? (
                 <div className="bg-gray-50 rounded-lg p-6 text-center border border-gray-200">
@@ -613,9 +651,83 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                       </div>
                     );
                   })}
+
+                  {/* Removed Tasks Collapsible Section */}
+                  {(() => {
+                    const deletedTasks = allTasks.filter(t => t.is_deleted === true);
+                    if (deletedTasks.length === 0) return null;
+
+                    return (
+                      <div className="mt-6">
+                        <button
+                          onClick={() => setShowRemovedTasks(!showRemovedTasks)}
+                          className="flex items-center justify-between w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-fast"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Trash2 className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm font-semibold text-gray-700">
+                              Removed Tasks ({deletedTasks.length})
+                            </span>
+                          </div>
+                          {showRemovedTasks ? (
+                            <ChevronUp className="w-4 h-4 text-gray-500" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-gray-500" />
+                          )}
+                        </button>
+
+                        {showRemovedTasks && (
+                          <div className="mt-3 space-y-2 pl-4">
+                            {deletedTasks
+                              .sort((a, b) => (b.deleted_at || 0) - (a.deleted_at || 0))
+                              .map((task) => {
+                                const deletedTime = task.deleted_at
+                                  ? new Date(task.deleted_at * 1000).toLocaleString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                      hour12: true
+                                    })
+                                  : null;
+
+                                return (
+                                  <div
+                                    key={task.id}
+                                    className="p-3 rounded-lg border border-gray-200 bg-gray-50"
+                                  >
+                                    <div className="flex items-start gap-3">
+                                      <div className="flex-1">
+                                        <p className="font-medium text-gray-700 line-through">
+                                          {getTaskLabel(task)}
+                                        </p>
+                                        <p className="text-sm text-gray-500 mt-0.5">
+                                          {getTaskSubtitle(task)}
+                                        </p>
+                                        {deletedTime && (
+                                          <p className="text-xs text-gray-600 mt-2">
+                                            Removed {deletedTime}
+                                            {task.deleted_by && ` by manager`}
+                                          </p>
+                                        )}
+                                        {task.deletion_reason && (
+                                          <p className="text-xs text-gray-500 mt-1 italic">
+                                            "{task.deletion_reason}"
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )
-            ) : (
+            ) : activeTab === 'tasks' && !usingTasks ? (
               // Old bin-based rendering (fallback)
               bins.length === 0 ? (
                 <div className="bg-gray-50 rounded-lg p-6 text-center border border-gray-200">
@@ -691,7 +803,124 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
                   })}
                 </div>
               )
-            )}
+            ) : activeTab === 'timeline' ? (
+              // Timeline View
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">Activity Timeline</h3>
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : (
+                  <div className="relative">
+                    {/* Timeline Line */}
+                    <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200" />
+
+                    {(() => {
+                      // Create timeline events from all tasks
+                      const events = [];
+
+                      // Add shift start event
+                      if (shift.start_time) {
+                        events.push({
+                          type: 'shift_start',
+                          time: shift.start_time,
+                          label: 'Shift started',
+                          color: 'blue'
+                        });
+                      }
+
+                      // Add task completion events
+                      allTasks.forEach(task => {
+                        if (task.is_completed === 1 && task.completed_at) {
+                          events.push({
+                            type: task.skipped ? 'task_skipped' : 'task_completed',
+                            time: task.completed_at,
+                            label: task.skipped ? `Skipped ${getTaskLabel(task)}` : `Completed ${getTaskLabel(task)}`,
+                            subtitle: getTaskSubtitle(task),
+                            color: task.skipped ? 'orange' : 'green'
+                          });
+                        }
+
+                        // Add task removal events
+                        if (task.is_deleted && task.deleted_at) {
+                          events.push({
+                            type: 'task_removed',
+                            time: task.deleted_at,
+                            label: `Removed ${getTaskLabel(task)}`,
+                            subtitle: task.deletion_reason || 'Removed by manager',
+                            color: 'red'
+                          });
+                        }
+                      });
+
+                      // Add shift end event
+                      if (shift.end_time) {
+                        events.push({
+                          type: 'shift_end',
+                          time: shift.end_time,
+                          label: 'Shift ended',
+                          color: 'gray'
+                        });
+                      }
+
+                      // Sort events by time (most recent first)
+                      events.sort((a, b) => b.time - a.time);
+
+                      return events.length === 0 ? (
+                        <div className="bg-gray-50 rounded-lg p-6 text-center border border-gray-200">
+                          <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                          <p className="text-sm text-gray-600">No activity yet</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4 pl-8">
+                          {events.map((event, index) => {
+                            const eventTime = new Date(event.time * 1000);
+                            const formattedTime = eventTime.toLocaleString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true
+                            });
+
+                            const colorClasses = {
+                              blue: 'bg-blue-500',
+                              green: 'bg-green-500',
+                              orange: 'bg-orange-500',
+                              red: 'bg-red-500',
+                              gray: 'bg-gray-500'
+                            };
+
+                            return (
+                              <div key={index} className="relative">
+                                {/* Timeline Dot */}
+                                <div className={`absolute -left-8 w-4 h-4 rounded-full border-2 border-white ${colorClasses[event.color as keyof typeof colorClasses]}`} />
+
+                                {/* Event Card */}
+                                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1">
+                                      <p className="font-medium text-gray-900">{event.label}</p>
+                                      {event.subtitle && (
+                                        <p className="text-sm text-gray-500 mt-0.5">{event.subtitle}</p>
+                                      )}
+                                    </div>
+                                    <div className="flex-shrink-0">
+                                      <p className="text-xs text-gray-500">{formattedTime}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
         </div>
 
