@@ -244,6 +244,7 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
       const scheduledTs = Math.floor(new Date(formData.scheduled_date + 'T12:00:00').getTime() / 1000);
       await updateMoveRequest(moveRequest.id, {
         scheduled_date: scheduledTs,
+        move_type: formData.move_type, // ← ADDED: Send move type to backend
         reason: formData.reason || undefined,
         notes:  formData.notes  || undefined,
         ...(formData.move_type === 'relocation' && {
