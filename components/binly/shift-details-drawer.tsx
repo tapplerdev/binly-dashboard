@@ -81,11 +81,26 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
       // Also fetch all tasks including deleted ones for history/audit
       const allTasksData = await getShiftTasksWithHistory(shift.id);
       console.log('📜 [SHIFT DETAILS] All tasks (with history):', allTasksData.length);
+      console.log('📜 [SHIFT DETAILS] Active tasks (is_deleted=false):', allTasksData.filter(t => !t.is_deleted).length);
+      console.log('📜 [SHIFT DETAILS] Deleted tasks (is_deleted=true):', allTasksData.filter(t => t.is_deleted).length);
+      console.log('📜 [SHIFT DETAILS] Deleted task details:', allTasksData.filter(t => t.is_deleted).map(t => ({
+        id: t.id,
+        bin: t.bin_number,
+        deleted_at: t.deleted_at,
+        deletion_reason: t.deletion_reason
+      })));
       setAllTasks(allTasksData);
 
       if (tasksData && tasksData.length > 0) {
         // New task-based system
-        console.log('✅ [SHIFT DETAILS] Using task-based system with', tasksData.length, 'tasks');
+        console.log('✅ [SHIFT DETAILS] Using task-based system with', tasksData.length, 'active tasks');
+        console.log('🔍 [SHIFT DETAILS] Active tasks summary:', tasksData.map(t => ({
+          id: t.id,
+          bin: t.bin_number,
+          type: t.task_type,
+          completed: t.is_completed === 1,
+          deleted: t.is_deleted
+        })));
         console.log('🔍 [SHIFT DETAILS] First task sample:', JSON.stringify(tasksData[0], null, 2));
         setTasks(tasksData);
       } else {
@@ -116,21 +131,34 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
   useWebSocket({
     url: wsUrl,
     onMessage: (message: WebSocketMessage) => {
+      console.log('📡 [WEBSOCKET] Received message:', message);
+      console.log('📡 [WEBSOCKET] Message type:', message.type);
+      console.log('📡 [WEBSOCKET] Message data:', message.data);
+
       if (message.type === 'shift_update' && message.data?.shift_id === shift.id) {
         // Shift was updated (e.g., driver started shift and route was optimized)
-        console.log('📡 WebSocket: Shift updated, reloading tasks...');
+        console.log('📡 [WEBSOCKET] ✅ Shift updated event received for shift:', shift.id);
+        console.log('📡 [WEBSOCKET] Reloading shift details...');
         loadShiftDetails();
       }
 
       if (message.type === 'task_removed' && message.data?.shift_id === shift.id) {
         // Tasks were removed from shift by manager
-        console.log('📡 WebSocket: Tasks removed from shift, reloading...');
+        console.log('📡 [WEBSOCKET] ✅ task_removed event received!');
+        console.log('📡 [WEBSOCKET] Shift ID:', message.data?.shift_id);
+        console.log('📡 [WEBSOCKET] Task IDs removed:', message.data?.task_ids);
+        console.log('📡 [WEBSOCKET] Removed count:', message.data?.removed_count);
+        console.log('📡 [WEBSOCKET] Full event data:', JSON.stringify(message.data, null, 2));
+        console.log('📡 [WEBSOCKET] Triggering reload of shift details...');
         loadShiftDetails();
       }
 
       if (message.type === 'route_reoptimized' && message.data?.shift_id === shift.id) {
         // Route was re-optimized after task removal
-        console.log('📡 WebSocket: Route re-optimized, reloading tasks...');
+        console.log('📡 [WEBSOCKET] ✅ route_reoptimized event received!');
+        console.log('📡 [WEBSOCKET] Shift ID:', message.data?.shift_id);
+        console.log('📡 [WEBSOCKET] Full event data:', JSON.stringify(message.data, null, 2));
+        console.log('📡 [WEBSOCKET] Triggering reload of shift details...');
         loadShiftDetails();
       }
     },
@@ -182,6 +210,18 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
 
   // Confirm and execute task removal
   const confirmRemoveTasks = async () => {
+    console.log('🗑️ [TASK REMOVAL] Starting task removal process...');
+    console.log('🗑️ [TASK REMOVAL] Shift ID:', shift.id);
+    console.log('🗑️ [TASK REMOVAL] Selected Task IDs:', Array.from(selectedTaskIds));
+    console.log('🗑️ [TASK REMOVAL] Current tasks count (before removal):', tasks.length);
+    console.log('🗑️ [TASK REMOVAL] Current tasks data:', tasks.map(t => ({
+      id: t.id,
+      label: t.task_type,
+      bin: t.bin_number,
+      is_deleted: t.is_deleted,
+      is_completed: t.is_completed
+    })));
+
     setShowRemoveConfirm(false);
     setIsRemovingTasks(true);
     setRemoveError(null);
@@ -191,26 +231,40 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
 
     try {
       const taskIdsArray = Array.from(selectedTaskIds);
+
+      console.log('🗑️ [TASK REMOVAL] Calling API to remove tasks...');
       const result = await removeTasksFromShift(shift.id, taskIdsArray, 'Removed by manager');
 
-      console.log('✅ Tasks removed successfully:', result);
+      console.log('✅ [TASK REMOVAL] API Response:', result);
+      console.log('✅ [TASK REMOVAL] Removed count:', result.removed_count);
+      console.log('✅ [TASK REMOVAL] Response message:', result.message);
 
       // Clear selection
       setSelectedTaskIds(new Set());
+      console.log('🗑️ [TASK REMOVAL] Cleared selection');
 
       // Reload shift details
+      console.log('🗑️ [TASK REMOVAL] Reloading shift details to get updated task list...');
       await loadShiftDetails();
+      console.log('🗑️ [TASK REMOVAL] Shift details reloaded');
 
       // Show success toast
       setToastMessage(`${result.removed_count} ${taskWord} removed successfully`);
       setToastType('success');
       setShowToast(true);
+      console.log('✅ [TASK REMOVAL] Success toast displayed');
     } catch (error) {
-      console.error('❌ Failed to remove tasks:', error);
+      console.error('❌ [TASK REMOVAL] Error during removal:', error);
+      console.error('❌ [TASK REMOVAL] Error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : 'Failed to remove tasks',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       const errorMessage = error instanceof Error ? error.message : 'Failed to remove tasks';
       setRemoveError(errorMessage);
     } finally {
       setIsRemovingTasks(false);
+      console.log('🗑️ [TASK REMOVAL] Task removal process completed');
     }
   };
 
