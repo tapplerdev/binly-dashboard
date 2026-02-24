@@ -155,6 +155,8 @@ export function ShiftHistoryView() {
   const [driverFilter, setDriverFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedShift, setSelectedShift] = useState<ShiftHistoryEntry | null>(null);
+  // Default to showing only completed and driver-ended shifts (hide cancelled)
+  const [statusFilter, setStatusFilter] = useState<string[]>(['completed', 'manual_end']);
 
   const { data: driversData } = useDrivers();
   const drivers = driversData ?? [];
@@ -166,52 +168,98 @@ export function ShiftHistoryView() {
 
   const shifts = data?.shifts ?? [];
 
-  // Client-side search by driver name
-  const filtered = searchQuery
-    ? shifts.filter(s =>
-        s.driver_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.id.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : shifts;
+  // Apply filters: search + status
+  let filtered = shifts;
+
+  // Filter by status (default: hide cancelled)
+  if (statusFilter.length > 0) {
+    filtered = filtered.filter(s => statusFilter.includes(s.end_reason));
+  }
+
+  // Filter by search query
+  if (searchQuery) {
+    filtered = filtered.filter(s =>
+      s.driver_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.id.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        {/* Search */}
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search driver or shift ID..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-          />
-        </div>
-
-        {/* Driver filter */}
-        <div className="relative">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-          <select
-            value={driverFilter}
-            onChange={e => setDriverFilter(e.target.value)}
-            className="pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary appearance-none bg-white cursor-pointer"
-          >
-            <option value="">All Drivers</option>
-            {drivers.map(d => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Summary badge */}
-        {data && (
-          <div className="flex items-center gap-2 text-sm text-gray-500 ml-auto">
-            <span className="font-semibold text-gray-800">{data.total_count}</span>
-            <span>completed shifts</span>
+      <div className="flex flex-col gap-3">
+        {/* Row 1: Search + Driver filter + Summary */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          {/* Search */}
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search driver or shift ID..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            />
           </div>
-        )}
+
+          {/* Driver filter */}
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <select
+              value={driverFilter}
+              onChange={e => setDriverFilter(e.target.value)}
+              className="pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary appearance-none bg-white cursor-pointer"
+            >
+              <option value="">All Drivers</option>
+              {drivers.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Summary badge */}
+          {data && (
+            <div className="flex items-center gap-2 text-sm text-gray-500 ml-auto">
+              <span className="font-semibold text-gray-800">{filtered.length}</span>
+              <span>of {data.total_count} shifts</span>
+            </div>
+          )}
+        </div>
+
+        {/* Row 2: Status filter pills */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-medium text-gray-500">Status:</span>
+          <button
+            onClick={() => setStatusFilter([])}
+            className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+              statusFilter.length === 0
+                ? 'bg-gray-800 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setStatusFilter(['completed', 'manual_end'])}
+            className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+              statusFilter.length === 2 && statusFilter.includes('completed') && statusFilter.includes('manual_end')
+                ? 'bg-green-100 text-green-700 border border-green-300'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Completed & Ended
+          </button>
+          <button
+            onClick={() => setStatusFilter(['manager_cancelled', 'manager_ended', 'driver_disconnected', 'system_timeout'])}
+            className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+              statusFilter.includes('manager_cancelled') && statusFilter.length > 2
+                ? 'bg-red-100 text-red-700 border border-red-300'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Cancelled & Issues
+          </button>
+        </div>
       </div>
 
       {/* Table */}
@@ -228,13 +276,17 @@ export function ShiftHistoryView() {
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">
           <Clock className="w-12 h-12 text-gray-200" />
-          <p className="text-sm">No completed shifts found</p>
-          {(searchQuery || driverFilter) && (
+          <p className="text-sm">No shifts found</p>
+          {(searchQuery || driverFilter || statusFilter.length > 0) && (
             <button
-              onClick={() => { setSearchQuery(''); setDriverFilter(''); }}
+              onClick={() => {
+                setSearchQuery('');
+                setDriverFilter('');
+                setStatusFilter(['completed', 'manual_end']);
+              }}
               className="text-xs text-primary hover:underline"
             >
-              Clear filters
+              Reset filters
             </button>
           )}
         </div>
@@ -302,27 +354,41 @@ export function ShiftHistoryView() {
                         <span className="text-xs text-gray-500">{shift.completed_bins}/{shift.total_bins}</span>
                       </div>
 
-                      {/* Task chips */}
-                      <div className="flex flex-wrap gap-1.5">
-                        <StatChip icon={Package} label="collections" value={shift.collections_completed} color="text-blue-600" />
-                        <StatChip icon={MapPin} label="placements" value={shift.placements_completed} color="text-orange-500" hide0 />
-                        <StatChip icon={ArrowRightLeft} label="moves" value={shift.move_requests_completed} color="text-purple-600" hide0 />
+                      {/* Compact task summary */}
+                      <div className="flex items-center gap-3">
+                        <div className="text-sm">
+                          <span className="font-semibold text-gray-900">{shift.completed_bins}</span>
+                          <span className="text-gray-500"> / {shift.total_bins} tasks</span>
+                        </div>
                         {shift.total_skipped > 0 && (
-                          <StatChip icon={SkipForward} label="skipped" value={shift.total_skipped} color="text-gray-500" />
+                          <div className="flex items-center gap-1 text-xs text-gray-500">
+                            <SkipForward className="w-3 h-3" />
+                            <span>{shift.total_skipped} skipped</span>
+                          </div>
                         )}
                         {shift.incidents_reported > 0 && (
-                          <StatChip icon={AlertTriangle} label="incidents" value={shift.incidents_reported} color="text-red-500" />
-                        )}
-                        {shift.warehouse_stops > 0 && (
-                          <StatChip icon={Warehouse} label="warehouse" value={shift.warehouse_stops} color="text-teal-600" hide0 />
+                          <div className="flex items-center gap-1 text-xs text-red-500">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>{shift.incidents_reported}</span>
+                          </div>
                         )}
                       </div>
 
-                      {/* Expand toggle */}
-                      <div className="flex justify-end items-center gap-2">
-                        <span className={`hidden sm:inline-block px-2 py-0.5 rounded-full text-xs font-medium ${reason.bg} ${reason.color}`}>
-                          {reason.label}
-                        </span>
+                      {/* Status + Expand toggle */}
+                      <div className="flex justify-end items-center gap-3">
+                        <div className="hidden sm:flex items-center gap-1.5">
+                          <div className={`w-2 h-2 rounded-full ${
+                            shift.end_reason === 'completed' ? 'bg-green-500' :
+                            shift.end_reason === 'manual_end' ? 'bg-blue-500' :
+                            shift.end_reason === 'manager_cancelled' ? 'bg-red-500' :
+                            shift.end_reason === 'manager_ended' ? 'bg-amber-500' :
+                            shift.end_reason === 'driver_disconnected' ? 'bg-orange-500' :
+                            'bg-gray-500'
+                          }`} />
+                          <span className={`text-xs font-medium ${reason.color}`}>
+                            {reason.label}
+                          </span>
+                        </div>
                         {isExpanded
                           ? <ChevronUp className="w-4 h-4 text-gray-400" />
                           : <ChevronDown className="w-4 h-4 text-gray-400" />
