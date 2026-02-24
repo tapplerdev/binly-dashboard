@@ -631,3 +631,29 @@ export async function getShiftTasks(shiftId: string): Promise<any[]> {
     return [];
   }
 }
+
+/**
+ * Get ALL tasks for a shift including deleted ones (for audit/history view)
+ */
+export async function getShiftTasksWithHistory(shiftId: string): Promise<any[]> {
+  try {
+    console.log(`📜 [API] Fetching task history for shift ${shiftId}...`);
+    const url = `${API_BASE_URL}/api/manager/shifts/${shiftId}/tasks/history`;
+
+    const response = await fetch(url, {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      console.warn(`⚠️  [API] Failed to fetch task history: ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    console.log(`✅ [API] Returning ${data.data?.length || 0} tasks (including deleted)`);
+    return data.data || [];
+  } catch (error) {
+    console.error('❌ [API] Error fetching task history:', error);
+    return [];
+  }
+}

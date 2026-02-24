@@ -754,15 +754,25 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
               </DialogTitle>
             </div>
           </DialogHeader>
-          <DialogDescription className="text-sm text-gray-600 space-y-3 pt-4">
+          <DialogDescription className="text-sm text-gray-600 space-y-2 pt-4">
             <p>
-              This will remove the {selectedTaskIds.size === 1 ? 'selected task' : 'selected tasks'} from the driver's current shift.
-              {selectedTaskIds.size === 1 ? ' The bin, move request, or placement' : ' The bins, move requests, or placements'} will
-              be returned to the unassigned pool and can be scheduled for future shifts.
+              <strong>What happens:</strong>
             </p>
-            <p>
-              The driver will be notified and their route will be automatically re-optimized.
-            </p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>
+                {selectedTaskIds.size === 1 ? 'This task is' : 'These tasks are'} removed from this shift
+              </li>
+              <li>
+                {selectedTaskIds.size === 1 ? 'The bin/location/request stays' : 'The bins/locations/requests stay'} in the system
+                and {selectedTaskIds.size === 1 ? 'becomes' : 'become'} available for future shifts
+              </li>
+              <li>
+                The driver is notified in real-time
+              </li>
+              <li>
+                The route is automatically re-optimized
+              </li>
+            </ul>
           </DialogDescription>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
