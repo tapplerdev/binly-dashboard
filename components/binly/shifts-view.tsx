@@ -1573,9 +1573,13 @@ function CreateShiftDrawer({
           const shiftData = await shiftResponse.json();
           console.log('📋 [EDIT MODE] Shift details:', shiftData);
           const shiftDetails = shiftData.data || shiftData;
-          if (shiftDetails.truck_bin_capacity) {
+          console.log('📋 [EDIT MODE] Extracted shiftDetails:', shiftDetails);
+          console.log('📋 [EDIT MODE] truck_bin_capacity value:', shiftDetails.truck_bin_capacity);
+          if (shiftDetails.truck_bin_capacity != null) { // Check for null/undefined
             console.log('📋 [EDIT MODE] Setting truck capacity to:', shiftDetails.truck_bin_capacity);
             setTruckCapacity(String(shiftDetails.truck_bin_capacity));
+          } else {
+            console.log('⚠️ [EDIT MODE] truck_bin_capacity is null/undefined in shift details');
           }
         }
 
