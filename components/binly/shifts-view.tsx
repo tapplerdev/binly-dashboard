@@ -9,6 +9,7 @@ import { MoveRequestSelectionMap } from './move-request-selection-map';
 import { PlacementLocationSelectionMap } from './placement-location-selection-map';
 import { RouteSelectionMap } from './route-selection-map';
 import { Route, getRouteLabel } from '@/lib/types/route';
+import { RouteTask } from '@/lib/types/route-task';
 import { Bin } from '@/lib/types/bin';
 import { getBins } from '@/lib/api/bins';
 import { getShifts, getShiftTasks } from '@/lib/api/shifts';
@@ -1382,11 +1383,12 @@ function CreateShiftDrawer({
   const { token } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const [driverId, setDriverId] = useState(shift?.driverid || '');
+  const [driverId, setDriverId] = useState(shift?.driverId || '');
   const [truckCapacity, setTruckCapacity] = useState('');
   const [lockRouteOrder, setLockRouteOrder] = useState(false);
   const [tasks, setTasks] = useState<ShiftTask[]>([]);
   const [loadingShiftData, setLoadingShiftData] = useState(false);
+  const [existingTasksCount, setExistingTasksCount] = useState(0);
   const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1450,6 +1452,43 @@ function CreateShiftDrawer({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isDriverDropdownOpen]);
+
+  // Fetch and pre-populate shift data when in edit mode
+  useEffect(() => {
+    if (!isEditMode || !shift || !token) return;
+
+    const fetchShiftData = async () => {
+      setLoadingShiftData(true);
+      try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+        const response = await fetch(`${API_URL}/api/manager/shifts/${shift.id}/tasks`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) throw new Error('Failed to fetch shift tasks');
+
+        const data = await response.json();
+        console.log('✏️ [EDIT MODE] Fetched shift data:', data);
+
+        // Set existing task count for display
+        const activeTasks = data.tasks?.filter((t: RouteTask) => !t.is_deleted) || [];
+        setExistingTasksCount(activeTasks.length);
+
+        // Note: We don't pre-populate tasks in edit mode
+        // The modal is for ADDING new tasks only
+        // Task removal is handled separately in the shift details drawer
+      } catch (err) {
+        console.error('Failed to fetch shift data:', err);
+        setError('Failed to load shift data');
+      } finally {
+        setLoadingShiftData(false);
+      }
+    };
+
+    fetchShiftData();
+  }, [isEditMode, shift, token]);
 
   const selectedDriver = drivers.find(d => d.id === driverId);
 
@@ -2549,6 +2588,27 @@ function CreateShiftDrawer({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Edit Mode Info Banner */}
+        {isEditMode && existingTasksCount > 0 && (
+          <div className="px-6 pt-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center mt-0.5">
+                  <span className="text-white text-xs font-bold">{existingTasksCount}</span>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-900">
+                    This shift has {existingTasksCount} existing task{existingTasksCount !== 1 ? 's' : ''}
+                  </p>
+                  <p className="text-xs text-blue-700 mt-1">
+                    Use the form below to add new tasks. The shift will be re-optimized automatically after adding.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">

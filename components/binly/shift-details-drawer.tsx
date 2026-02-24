@@ -986,7 +986,8 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
           </div>
         )}
 
-        {shift.status === 'active' && (
+        {/* Footer Actions - Show for active, ready, and scheduled shifts */}
+        {(shift.status === 'active' || shift.status === 'ready' || shift.status === 'scheduled') && (
           <div className="border-t border-gray-200 p-4 bg-gray-50">
             {cancelError && (
               <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -1002,13 +1003,15 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                   Edit Shift
                 </button>
               )}
-              <button
-                onClick={handleCancelShift}
-                disabled={isCancelling}
-                className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-fast disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isCancelling ? 'Cancelling...' : 'Cancel Shift'}
-              </button>
+              {shift.status === 'active' && (
+                <button
+                  onClick={handleCancelShift}
+                  disabled={isCancelling}
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-fast disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isCancelling ? 'Cancelling...' : 'Cancel Shift'}
+                </button>
+              )}
             </div>
           </div>
         )}
