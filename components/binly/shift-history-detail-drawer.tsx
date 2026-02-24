@@ -1,13 +1,16 @@
 'use client';
 
+import { useState } from 'react';
 import { useShiftHistoryTasks } from '@/lib/hooks/use-shift-history-tasks';
 import { ShiftHistoryEntry } from '@/lib/api/shifts';
 import { ShiftHistoryTask } from '@/lib/api/shifts';
 import {
   X, Package, MapPin, ArrowRightLeft, Warehouse, SkipForward,
   CheckCircle2, XCircle, Clock, ChevronRight, Hash, Loader2,
-  AlertTriangle, MoveRight, ArrowRight,
+  AlertTriangle, MoveRight, ArrowRight, Trash2, ChevronDown, ChevronUp,
 } from 'lucide-react';
+
+type FilterType = 'all' | 'collections' | 'placements' | 'moves' | 'timeline' | 'removed';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -30,12 +33,12 @@ function getSkipReason(taskData: string | null): string | null {
 
 // ── Task type config ────────────────────────────────────────────────────────
 
-const TASK_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string; bg: string; border: string }> = {
-  collection:    { label: 'Collection',    icon: Package,        color: 'text-blue-600',   bg: 'bg-blue-50',   border: 'border-blue-200' },
-  placement:     { label: 'Placement',     icon: MapPin,         color: 'text-orange-500', bg: 'bg-orange-50', border: 'border-orange-200' },
-  pickup:        { label: 'Move Pickup',   icon: ArrowRightLeft, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-200' },
-  dropoff:       { label: 'Move Dropoff',  icon: MoveRight,      color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-200' },
-  warehouse_stop:{ label: 'Warehouse',     icon: Warehouse,      color: 'text-teal-600',   bg: 'bg-teal-50',   border: 'border-teal-200' },
+const TASK_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string; borderColor: string }> = {
+  collection:    { label: 'Collection',    icon: Package,        color: 'text-blue-600',   borderColor: 'border-l-blue-500' },
+  placement:     { label: 'Placement',     icon: MapPin,         color: 'text-orange-500', borderColor: 'border-l-orange-500' },
+  pickup:        { label: 'Move Pickup',   icon: ArrowRightLeft, color: 'text-purple-600', borderColor: 'border-l-purple-500' },
+  dropoff:       { label: 'Move Dropoff',  icon: MoveRight,      color: 'text-violet-600', borderColor: 'border-l-violet-500' },
+  warehouse_stop:{ label: 'Warehouse',     icon: Warehouse,      color: 'text-teal-600',   borderColor: 'border-l-teal-500' },
 };
 
 // ── Task Card ──────────────────────────────────────────────────────────────
@@ -48,31 +51,36 @@ function TaskCard({ task, index }: { task: ShiftHistoryTask; index: number }) {
   const skipReason = getSkipReason(task.task_data);
 
   return (
-    <div className={`rounded-xl border ${cfg.border} ${skipped ? 'opacity-60' : ''} overflow-hidden`}>
+    <div className={`rounded-lg border border-gray-200 border-l-4 ${cfg.borderColor} bg-white overflow-hidden hover:shadow-sm transition-shadow`}>
       {/* Header row */}
-      <div className={`flex items-center gap-3 px-4 py-3 ${cfg.bg}`}>
-        <span className="text-xs font-bold text-gray-400 w-5 text-center">{index + 1}</span>
-        <div className={`w-7 h-7 rounded-full flex items-center justify-center bg-white border ${cfg.border}`}>
-          <Icon className={`w-3.5 h-3.5 ${cfg.color}`} />
+      <div className={`flex items-center gap-3 px-4 py-3 border-b border-gray-100`}>
+        <span className="text-xs font-bold text-gray-400 w-6">{index + 1}</span>
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-gray-50 border border-gray-200`}>
+          <Icon className={`w-4 h-4 ${cfg.color}`} />
         </div>
-        <span className={`text-sm font-semibold ${cfg.color} flex-1`}>{cfg.label}</span>
-        {/* Status badge */}
+        <span className={`text-sm font-semibold text-gray-900 flex-1`}>{cfg.label}</span>
+        {/* Status - show WHO did it */}
         {skipped ? (
-          <span className="flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-            <SkipForward className="w-3 h-3" /> Skipped
-          </span>
+          <div className="text-right">
+            <div className="flex items-center gap-1 text-xs font-medium text-orange-600">
+              <SkipForward className="w-3 h-3" /> Skipped by driver
+            </div>
+            {task.completed_at && (
+              <span className="text-xs text-gray-400">{formatTime(task.completed_at)}</span>
+            )}
+          </div>
         ) : completed ? (
-          <span className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
-            <CheckCircle2 className="w-3 h-3" /> Done
-          </span>
+          <div className="text-right">
+            <div className="flex items-center gap-1 text-xs font-medium text-green-600">
+              <CheckCircle2 className="w-3 h-3" /> Completed by driver
+            </div>
+            {task.completed_at && (
+              <span className="text-xs text-gray-400">{formatTime(task.completed_at)}</span>
+            )}
+          </div>
         ) : (
-          <span className="flex items-center gap-1 text-xs font-medium text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
+          <span className="flex items-center gap-1 text-xs font-medium text-gray-400">
             <XCircle className="w-3 h-3" /> Incomplete
-          </span>
-        )}
-        {task.completed_at && (
-          <span className="text-xs text-gray-400 flex items-center gap-1">
-            <Clock className="w-3 h-3" />{formatTime(task.completed_at)}
           </span>
         )}
       </div>
@@ -161,6 +169,201 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
+// ── Timeline View ──────────────────────────────────────────────────────────
+
+function TimelineView({ shift, tasks }: { shift: ShiftHistoryEntry; tasks: ShiftHistoryTask[] }) {
+  // Create timeline events
+  const events = [];
+
+  // Add shift start event
+  if (shift.start_time) {
+    events.push({
+      type: 'shift_start',
+      time: shift.start_time,
+      label: 'Shift started',
+      color: 'blue'
+    });
+  }
+
+  // Add task completion/skip events
+  tasks.forEach(task => {
+    if (task.is_completed === 1 && task.completed_at) {
+      const taskLabel = task.task_type === 'collection' ? `Bin #${task.bin_number}` :
+                        task.task_type === 'placement' ? `Placement at ${task.address?.substring(0, 30)}` :
+                        task.task_type === 'pickup' ? `Pickup Bin #${task.bin_number}` :
+                        task.task_type === 'dropoff' ? `Dropoff Bin #${task.bin_number}` :
+                        'Warehouse stop';
+
+      events.push({
+        type: task.skipped ? 'task_skipped' : 'task_completed',
+        time: task.completed_at,
+        label: task.skipped ? `Driver skipped ${taskLabel}` : `Driver completed ${taskLabel}`,
+        subtitle: task.skipped ? getSkipReason(task.task_data) : task.address,
+        color: task.skipped ? 'orange' : 'green'
+      });
+    }
+
+    // Add task removal events
+    if (task.is_deleted && task.deleted_at) {
+      const taskLabel = task.task_type === 'collection' ? `Bin #${task.bin_number}` :
+                        task.task_type === 'placement' ? `Placement` :
+                        `Move`;
+
+      events.push({
+        type: 'task_removed',
+        time: task.deleted_at,
+        label: `Manager removed ${taskLabel}`,
+        subtitle: task.deletion_reason || 'Removed by manager',
+        color: 'red'
+      });
+    }
+  });
+
+  // Add shift end event
+  if (shift.end_time) {
+    const endReasonLabel = END_REASON_LABEL[shift.end_reason]?.label || shift.end_reason;
+    events.push({
+      type: 'shift_end',
+      time: shift.end_time,
+      label: `Shift ended (${endReasonLabel})`,
+      color: 'gray'
+    });
+  }
+
+  // Sort by time (most recent first)
+  events.sort((a, b) => b.time - a.time);
+
+  const colorClasses = {
+    blue: 'bg-blue-500',
+    green: 'bg-green-500',
+    orange: 'bg-orange-500',
+    red: 'bg-red-500',
+    gray: 'bg-gray-500'
+  };
+
+  return (
+    <div className="relative">
+      {/* Timeline Line */}
+      <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200" />
+
+      {events.length === 0 ? (
+        <div className="bg-gray-50 rounded-lg p-6 text-center border border-gray-200">
+          <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-sm text-gray-600">No activity recorded</p>
+        </div>
+      ) : (
+        <div className="space-y-4 pl-8">
+          {events.map((event, index) => {
+            const eventTime = new Date(event.time * 1000);
+            const formattedTime = eventTime.toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true
+            });
+
+            return (
+              <div key={index} className="relative">
+                {/* Timeline Dot */}
+                <div className={`absolute -left-8 w-4 h-4 rounded-full border-2 border-white ${colorClasses[event.color as keyof typeof colorClasses]}`} />
+
+                {/* Event Card */}
+                <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-shadow">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{event.label}</p>
+                      {event.subtitle && (
+                        <p className="text-sm text-gray-500 mt-0.5">{event.subtitle}</p>
+                      )}
+                    </div>
+                    <div className="flex-shrink-0">
+                      <p className="text-xs text-gray-500">{formattedTime}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Removed Tasks View ─────────────────────────────────────────────────────
+
+function RemovedTasksView({ deletedTasks }: { deletedTasks: ShiftHistoryTask[] }) {
+  if (deletedTasks.length === 0) {
+    return (
+      <div className="bg-gray-50 rounded-lg p-6 text-center border border-gray-200">
+        <Trash2 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+        <p className="text-sm text-gray-600">No tasks were removed from this shift</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {deletedTasks
+        .sort((a, b) => (b.deleted_at || 0) - (a.deleted_at || 0))
+        .map((task, index) => {
+          const cfg = TASK_CONFIG[task.task_type] ?? TASK_CONFIG.collection;
+          const Icon = cfg.icon;
+          const deletedTime = task.deleted_at
+            ? new Date(task.deleted_at * 1000).toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              })
+            : null;
+
+          const taskLabel = task.task_type === 'collection' ? `Bin #${task.bin_number}` :
+                           task.task_type === 'placement' ? 'Placement' :
+                           task.task_type === 'pickup' ? `Move Pickup Bin #${task.bin_number}` :
+                           task.task_type === 'dropoff' ? `Move Dropoff Bin #${task.bin_number}` :
+                           'Warehouse Stop';
+
+          return (
+            <div
+              key={task.id}
+              className={`rounded-lg border border-gray-200 border-l-4 ${cfg.borderColor} bg-gray-50 overflow-hidden`}
+            >
+              <div className="px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-white border border-gray-200`}>
+                    <Icon className={`w-4 h-4 ${cfg.color}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-700 line-through">
+                      {taskLabel}
+                    </p>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      {task.address}
+                    </p>
+                    {deletedTime && (
+                      <div className="flex items-center gap-1 mt-2 text-xs text-gray-600">
+                        <Trash2 className="w-3 h-3" />
+                        <span>Removed by manager {deletedTime}</span>
+                      </div>
+                    )}
+                    {task.deletion_reason && (
+                      <p className="text-xs text-gray-500 mt-1 italic">
+                        "{task.deletion_reason}"
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+    </div>
+  );
+}
+
 // ── Drawer ─────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -179,14 +382,36 @@ const END_REASON_LABEL: Record<string, { label: string; color: string; bg: strin
 
 export function ShiftHistoryDetailDrawer({ shift, onClose }: Props) {
   const { data: tasks, isLoading } = useShiftHistoryTasks(shift.id);
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [showRemovedExpanded, setShowRemovedExpanded] = useState(false);
   const reason = END_REASON_LABEL[shift.end_reason] ?? { label: shift.end_reason, color: 'text-gray-700', bg: 'bg-gray-100' };
 
-  // Group tasks for summary
-  const collections  = tasks?.filter(t => t.task_type === 'collection') ?? [];
-  const placements   = tasks?.filter(t => t.task_type === 'placement') ?? [];
-  const pickups      = tasks?.filter(t => t.task_type === 'pickup') ?? [];
-  const dropoffs     = tasks?.filter(t => t.task_type === 'dropoff') ?? [];
-  const warehouses   = tasks?.filter(t => t.task_type === 'warehouse_stop') ?? [];
+  // Separate active and deleted tasks
+  const activeTasks = tasks?.filter(t => !t.is_deleted) ?? [];
+  const deletedTasks = tasks?.filter(t => t.is_deleted) ?? [];
+
+  // Group tasks for summary and filtering
+  const collections  = activeTasks.filter(t => t.task_type === 'collection');
+  const placements   = activeTasks.filter(t => t.task_type === 'placement');
+  const pickups      = activeTasks.filter(t => t.task_type === 'pickup');
+  const dropoffs     = activeTasks.filter(t => t.task_type === 'dropoff');
+  const moves        = [...pickups, ...dropoffs].sort((a, b) => a.sequence_order - b.sequence_order);
+  const warehouses   = activeTasks.filter(t => t.task_type === 'warehouse_stop');
+
+  // Get filtered tasks based on active filter
+  const getFilteredTasks = () => {
+    switch (activeFilter) {
+      case 'collections': return collections;
+      case 'placements': return placements;
+      case 'moves': return moves;
+      case 'timeline': return [];  // Timeline is a special view
+      case 'removed': return deletedTasks;
+      case 'all':
+      default: return activeTasks;
+    }
+  };
+
+  const filteredTasks = getFilteredTasks();
 
   return (
     <>
@@ -233,6 +458,59 @@ export function ShiftHistoryDetailDrawer({ shift, onClose }: Props) {
           {shift.incidents_reported > 0 && <Pill label="Incidents" value={String(shift.incidents_reported)} color="text-red-500" />}
         </div>
 
+        {/* Tab Navigation */}
+        <div className="border-b border-gray-200 shrink-0">
+          <div className="flex gap-1 px-5 overflow-x-auto scrollbar-hide">
+            <TabButton
+              active={activeFilter === 'all'}
+              onClick={() => setActiveFilter('all')}
+              count={activeTasks.length}
+            >
+              All
+            </TabButton>
+            <TabButton
+              active={activeFilter === 'collections'}
+              onClick={() => setActiveFilter('collections')}
+              count={collections.length}
+            >
+              Collections
+            </TabButton>
+            {placements.length > 0 && (
+              <TabButton
+                active={activeFilter === 'placements'}
+                onClick={() => setActiveFilter('placements')}
+                count={placements.length}
+              >
+                Placements
+              </TabButton>
+            )}
+            {moves.length > 0 && (
+              <TabButton
+                active={activeFilter === 'moves'}
+                onClick={() => setActiveFilter('moves')}
+                count={moves.length}
+              >
+                Move Requests
+              </TabButton>
+            )}
+            <TabButton
+              active={activeFilter === 'timeline'}
+              onClick={() => setActiveFilter('timeline')}
+            >
+              Timeline
+            </TabButton>
+            {deletedTasks.length > 0 && (
+              <TabButton
+                active={activeFilter === 'removed'}
+                onClick={() => setActiveFilter('removed')}
+                count={deletedTasks.length}
+              >
+                Removed
+              </TabButton>
+            )}
+          </div>
+        </div>
+
         {/* Task list */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           {isLoading ? (
@@ -240,37 +518,27 @@ export function ShiftHistoryDetailDrawer({ shift, onClose }: Props) {
               <Loader2 className="w-5 h-5 animate-spin" />
               Loading tasks...
             </div>
-          ) : !tasks || tasks.length === 0 ? (
+          ) : activeFilter === 'timeline' ? (
+            <TimelineView shift={shift} tasks={tasks ?? []} />
+          ) : activeFilter === 'removed' ? (
+            <RemovedTasksView deletedTasks={deletedTasks} />
+          ) : filteredTasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-2">
               <Package className="w-10 h-10 text-gray-200" />
-              <p className="text-sm">No task records found for this shift</p>
-              <p className="text-xs text-gray-300">Tasks may have been removed when this shift ended</p>
+              <p className="text-sm">No tasks in this category</p>
             </div>
           ) : (
-            <>
-              {/* Section headers when multiple types */}
-              {collections.length > 0 && renderSection('Collections', collections)}
-              {placements.length > 0 && renderSection('Placements', placements)}
-              {(pickups.length > 0 || dropoffs.length > 0) && renderSection('Move Requests', [...pickups, ...dropoffs].sort((a, b) => a.sequence_order - b.sequence_order))}
-              {warehouses.length > 0 && renderSection('Warehouse Stops', warehouses)}
-            </>
+            <div className="space-y-2">
+              {filteredTasks
+                .sort((a, b) => a.sequence_order - b.sequence_order)
+                .map((task, i) => (
+                  <TaskCard key={task.id} task={task} index={i} />
+                ))}
+            </div>
           )}
         </div>
       </div>
     </>
-  );
-}
-
-function renderSection(title: string, tasks: ShiftHistoryTask[]) {
-  return (
-    <div key={title}>
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{title}</p>
-      <div className="space-y-2">
-        {tasks.map((task, i) => (
-          <TaskCard key={task.id} task={task} index={i} />
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -280,5 +548,35 @@ function Pill({ label, value, color }: { label: string; value: string; color: st
       <span className="text-gray-400">{label}</span>
       <span className={`font-bold ${color}`}>{value}</span>
     </div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  count,
+  children
+}: {
+  active: boolean;
+  onClick: () => void;
+  count?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+        active
+          ? 'border-blue-600 text-blue-600'
+          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+      }`}
+    >
+      {children}
+      {count !== undefined && (
+        <span className={`ml-1.5 ${active ? 'text-blue-600' : 'text-gray-400'}`}>
+          ({count})
+        </span>
+      )}
+    </button>
   );
 }
