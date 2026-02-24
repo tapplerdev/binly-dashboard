@@ -1486,11 +1486,11 @@ function CreateShiftDrawer({
 
         const data = await response.json();
         console.log('📋 [EDIT MODE] Raw response data:', data);
-        console.log('📋 [EDIT MODE] Tasks array:', data.tasks);
-        console.log('📋 [EDIT MODE] Tasks count:', data.tasks?.length || 0);
+        console.log('📋 [EDIT MODE] Tasks array:', data.data);
+        console.log('📋 [EDIT MODE] Tasks count:', data.data?.length || 0);
 
         // Set existing task count for display
-        const activeTasks = data.tasks?.filter((t: RouteTask) => !t.is_deleted) || [];
+        const activeTasks = data.data?.filter((t: RouteTask) => !t.is_deleted) || [];
         console.log('📋 [EDIT MODE] Active tasks (not deleted):', activeTasks.length);
         console.log('📋 [EDIT MODE] Active tasks data:', activeTasks);
 
