@@ -743,7 +743,7 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
 
       {/* Remove Tasks Confirmation Dialog */}
       <Dialog open={showRemoveConfirm} onOpenChange={setShowRemoveConfirm}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md transition-all duration-300 ease-out">
           <DialogHeader>
             <div className="flex items-center gap-3">
               <div className="flex-shrink-0 w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
@@ -756,10 +756,12 @@ export function ShiftDetailsDrawer({ shift, onClose }: ShiftDetailsDrawerProps) 
           </DialogHeader>
           <DialogDescription className="text-sm text-gray-600 space-y-3 pt-4">
             <p>
-              The {selectedTaskIds.size === 1 ? 'task' : 'tasks'} will be unassigned but kept in the system for future scheduling.
+              This will remove the {selectedTaskIds.size === 1 ? 'selected task' : 'selected tasks'} from the driver's current shift.
+              {selectedTaskIds.size === 1 ? ' The bin, move request, or placement' : ' The bins, move requests, or placements'} will
+              be returned to the unassigned pool and can be scheduled for future shifts.
             </p>
             <p>
-              The driver will be notified and the route will be re-optimized.
+              The driver will be notified and their route will be automatically re-optimized.
             </p>
           </DialogDescription>
           <DialogFooter className="gap-2 sm:gap-0">
