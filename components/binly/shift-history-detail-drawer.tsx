@@ -219,14 +219,28 @@ function TimelineView({ shift, tasks }: { shift: ShiftHistoryEntry; tasks: Shift
     }
   });
 
-  // Add shift end event
+  // Add shift end event with completion stats
   if (shift.end_time) {
     const endReasonLabel = END_REASON_LABEL[shift.end_reason]?.label || shift.end_reason;
+
+    // Calculate completion stats
+    const activeTasks = tasks.filter(t => !t.is_deleted);
+    const completedTasks = activeTasks.filter(t => t.is_completed === 1 && !t.skipped).length;
+    const skippedTasks = activeTasks.filter(t => t.skipped).length;
+    const totalTasks = activeTasks.length;
+    const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
     events.push({
       type: 'shift_end',
       time: shift.end_time,
       label: `Shift ended (${endReasonLabel})`,
-      color: 'gray'
+      color: 'gray',
+      stats: {
+        completed: completedTasks,
+        skipped: skippedTasks,
+        total: totalTasks,
+        completionRate: completionRate
+      }
     });
   }
 
@@ -275,6 +289,26 @@ function TimelineView({ shift, tasks }: { shift: ShiftHistoryEntry; tasks: Shift
                       <p className="font-semibold text-gray-900 text-sm">{event.label}</p>
                       {event.subtitle && (
                         <p className="text-sm text-gray-600 mt-1 line-clamp-2">{event.subtitle}</p>
+                      )}
+
+                      {/* Show completion stats for shift_end event */}
+                      {event.type === 'shift_end' && (event as any).stats && (
+                        <div className="mt-3 pt-3 border-t border-gray-100">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <div className="flex items-center gap-1.5">
+                              <div className="text-2xl font-bold text-gray-900">
+                                {(event as any).stats.completionRate}%
+                              </div>
+                              <span className="text-xs text-gray-500">completed</span>
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {(event as any).stats.completed}/{(event as any).stats.total} tasks
+                              {(event as any).stats.skipped > 0 && (
+                                <span className="text-gray-500"> · {(event as any).stats.skipped} skipped</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       )}
                     </div>
                     <div className="flex-shrink-0">
