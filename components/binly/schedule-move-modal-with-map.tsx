@@ -598,15 +598,21 @@ export function ScheduleMoveModalWithMap({
   const filteredBinsForList = useMemo(() => {
     if (!allBins) return [];
 
+    console.log('🔍 [FILTER] Total bins:', allBins.length);
+    console.log('🔍 [FILTER] Move mode:', moveMode);
+
     let filtered = [...allBins];
 
     // Filter based on move mode
     if (moveMode === 'warehouse_bins') {
       // Show ONLY warehouse bins (in_storage)
       filtered = filtered.filter((b) => b.status === 'in_storage');
+      console.log('🔍 [FILTER] Warehouse bins (in_storage):', filtered.length);
+      console.log('🔍 [FILTER] Sample statuses:', allBins.slice(0, 10).map(b => ({ id: b.id, num: b.bin_number, status: b.status })));
     } else {
       // Show field bins (NOT in warehouse)
       filtered = filtered.filter((b) => b.status !== 'in_storage');
+      console.log('🔍 [FILTER] Field bins (not in_storage):', filtered.length);
     }
 
     // Apply search filter
