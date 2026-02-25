@@ -40,6 +40,7 @@ import { HerePlaceDetails } from '@/lib/services/geocoding.service';
 import { format, addDays } from 'date-fns';
 import { GroupedDropdown, Dropdown } from '@/components/ui/dropdown';
 import { getNearbyPotentialLocations, NearbyPotentialLocation } from '@/lib/api/potential-locations';
+import { PotentialLocationPickerModal } from './potential-location-picker-modal';
 
 // Google Maps imports
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
@@ -179,6 +180,7 @@ export function ScheduleMoveModalWithMap({
   // Nearby potential locations state (NEW)
   const [nearbyPotentialLocations, setNearbyPotentialLocations] = useState<Record<string, NearbyPotentialLocation[]>>({});
   const [loadingNearbyLocations, setLoadingNearbyLocations] = useState<Record<string, boolean>>({});
+  const [locationPickerBinId, setLocationPickerBinId] = useState<string | null>(null);
 
   // Fetch all bins for map display and search (including warehouse bins)
   const { data: allBins, isLoading: binsLoading } = useQuery({
@@ -1582,11 +1584,11 @@ export function ScheduleMoveModalWithMap({
                       </>
                     )}
 
-                    {/* Potential Location Dropdown */}
+                    {/* Potential Location Selection */}
                     {config.destinationType === 'potential_location' && (
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Select Nearby Location *
+                          Selected Location
                         </label>
                         {loadingNearbyLocations[bin.id] ? (
                           <div className="flex items-center justify-center py-3 text-xs text-gray-500">
@@ -1598,31 +1600,39 @@ export function ScheduleMoveModalWithMap({
                             No potential locations available.
                           </div>
                         ) : (
-                          <select
-                            value={config.sourcePotentialLocationId || ''}
-                            onChange={(e) => {
-                              const locationId = e.target.value;
-                              const location = nearbyPotentialLocations[bin.id]?.find(l => l.id === locationId);
-                              if (location) {
-                                updateBinConfig(bin.id, {
-                                  sourcePotentialLocationId: locationId,
-                                  newStreet: location.street,
-                                  newCity: location.city,
-                                  newZip: location.zip,
-                                  newLatitude: location.latitude,
-                                  newLongitude: location.longitude,
-                                });
-                              }
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary"
-                          >
-                            <option value="">Select a location...</option>
-                            {nearbyPotentialLocations[bin.id]?.map((location) => (
-                              <option key={location.id} value={location.id}>
-                                {location.street}, {location.city} ({Math.round(location.distance_meters)}m away)
-                              </option>
-                            ))}
-                          </select>
+                          <div className="space-y-2">
+                            {config.sourcePotentialLocationId && config.newStreet ? (
+                              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1">
+                                    <div className="text-sm font-medium text-green-900">{config.newStreet}</div>
+                                    <div className="text-xs text-green-700">{config.newCity}, {config.newZip}</div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setLocationPickerBinId(bin.id)}
+                                    className="px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-100 rounded transition-colors"
+                                  >
+                                    Change
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setLocationPickerBinId(bin.id)}
+                                className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary hover:bg-blue-50 transition-all text-center group"
+                              >
+                                <MapPin className="w-6 h-6 text-gray-400 group-hover:text-primary mx-auto mb-2" />
+                                <div className="text-sm font-medium text-gray-700 group-hover:text-primary">
+                                  Click to Select from Map
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {nearbyPotentialLocations[bin.id]?.length || 0} locations available
+                                </div>
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
@@ -2251,6 +2261,36 @@ export function ScheduleMoveModalWithMap({
               </div>
             </Card>
           </div>
+
+          {/* Potential Location Picker Modal */}
+          {locationPickerBinId && (() => {
+            const bin = selectedBins.find(b => b.id === locationPickerBinId);
+            const locations = nearbyPotentialLocations[locationPickerBinId];
+            const config = binConfigs[locationPickerBinId];
+
+            if (!bin || !locations) return null;
+
+            return (
+              <PotentialLocationPickerModal
+                bin={bin}
+                potentialLocations={locations}
+                selectedLocationId={config?.sourcePotentialLocationId}
+                onSelect={(location) => {
+                  updateBinConfig(locationPickerBinId, {
+                    destinationType: 'potential_location',
+                    sourcePotentialLocationId: location.id,
+                    newStreet: location.street,
+                    newCity: location.city,
+                    newZip: location.zip,
+                    newLatitude: location.latitude,
+                    newLongitude: location.longitude,
+                  });
+                  setLocationPickerBinId(null);
+                }}
+                onClose={() => setLocationPickerBinId(null)}
+              />
+            );
+          })()}
         </>,
         document.body
       )
