@@ -1564,7 +1564,17 @@ export function ScheduleMoveModalWithMap({
                     <div className="grid grid-cols-2 gap-3">
                       <button
                         type="button"
-                        onClick={() => updateBinConfig(bin.id, { moveType: 'store' })}
+                        onClick={() => updateBinConfig(bin.id, {
+                          moveType: 'store',
+                          // Wipe all destination data when switching to store
+                          destinationType: 'custom',
+                          sourcePotentialLocationId: null,
+                          newStreet: '',
+                          newCity: '',
+                          newZip: '',
+                          newLatitude: undefined,
+                          newLongitude: undefined,
+                        })}
                         className={cn(
                           'p-3 border-2 rounded-lg text-left transition-colors',
                           config.moveType === 'store'
@@ -1577,7 +1587,17 @@ export function ScheduleMoveModalWithMap({
                       </button>
                       <button
                         type="button"
-                        onClick={() => updateBinConfig(bin.id, { moveType: 'relocation' })}
+                        onClick={() => updateBinConfig(bin.id, {
+                          moveType: 'relocation',
+                          // Wipe all destination data when switching to relocation
+                          destinationType: 'custom',
+                          sourcePotentialLocationId: null,
+                          newStreet: '',
+                          newCity: '',
+                          newZip: '',
+                          newLatitude: undefined,
+                          newLongitude: undefined,
+                        })}
                         className={cn(
                           'p-3 border-2 rounded-lg text-left transition-colors',
                           config.moveType === 'relocation'
@@ -1591,6 +1611,29 @@ export function ScheduleMoveModalWithMap({
                     </div>
                   )}
                 </div>
+
+                {/* Warehouse Storage Info (for store move type) */}
+                {config.moveType === 'store' && (
+                  <div className="p-3 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                    <div className="flex gap-2">
+                      <div className="flex-shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-blue-500 border-2 border-white shadow-sm flex items-center justify-center">
+                          <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-blue-900 mb-1">
+                          Warehouse Storage
+                        </p>
+                        <p className="text-xs text-blue-700">
+                          This bin will be picked up from its current location and stored at the warehouse.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* New Location (for relocation OR redeployment) */}
                 {(config.moveType === 'relocation' || config.moveType === 'redeployment') && (
