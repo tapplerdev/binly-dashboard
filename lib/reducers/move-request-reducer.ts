@@ -159,13 +159,39 @@ export function moveRequestReducer(
     case 'SET_STEP':
       return { ...state, step: action.step };
 
-    case 'SET_MODE':
+    case 'SET_MODE': {
+      // When switching modes, filter bins to keep only compatible ones
+      // field_bins: bins NOT in_storage
+      // warehouse_bins: bins in_storage
+      const compatibleBins = state.selectedBins.filter(bin => {
+        if (action.mode === 'warehouse_bins') {
+          return bin.status === 'in_storage';
+        } else {
+          return bin.status !== 'in_storage';
+        }
+      });
+
+      // Update configurations for remaining bins to match new mode
+      const updatedConfigs: { [binId: string]: BinConfiguration } = {};
+      const defaultMoveType: MoveType = action.mode === 'warehouse_bins' ? 'redeployment' : 'store';
+
+      compatibleBins.forEach(bin => {
+        const existingConfig = state.binConfigurations[bin.id];
+        if (existingConfig) {
+          updatedConfigs[bin.id] = {
+            ...existingConfig,
+            moveType: defaultMoveType,
+          };
+        }
+      });
+
       return {
         ...state,
         mode: action.mode,
-        selectedBins: [], // Clear selection when switching modes
-        binConfigurations: {},
+        selectedBins: compatibleBins,
+        binConfigurations: updatedConfigs,
       };
+    }
 
     // ========================================================================
     // Bin selection
