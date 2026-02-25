@@ -572,8 +572,12 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                     return null;
                   })()}
                   {(() => {
+                    // Filter out warehouse stops (they're backend-generated and shouldn't be shown in UI)
+                    const filteredTasks = tasks.filter(t => t.task_type !== 'warehouse_stop');
+                    console.log(`🔧 [SHIFT DETAILS] Filtered out ${tasks.length - filteredTasks.length} warehouse_stop task(s)`);
+
                     // Find first uncompleted task index (this is the in-progress task)
-                    const sortedTasks = tasks.sort((a, b) => a.sequence_order - b.sequence_order);
+                    const sortedTasks = filteredTasks.sort((a, b) => a.sequence_order - b.sequence_order);
                     const firstUncompletedIndex = sortedTasks.findIndex(
                       t => t.is_completed === 0 && !t.skipped && !t.is_deleted
                     );

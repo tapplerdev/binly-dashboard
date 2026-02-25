@@ -1555,9 +1555,9 @@ function CreateShiftDrawer({
         console.log('📋 [EDIT MODE] Tasks array:', data.data);
         console.log('📋 [EDIT MODE] Tasks count:', data.data?.length || 0);
 
-        // Set existing task count for display
-        const activeTasks = data.data?.filter((t: RouteTask) => !t.is_deleted) || [];
-        console.log('📋 [EDIT MODE] Active tasks (not deleted):', activeTasks.length);
+        // Set existing task count for display (excluding deleted tasks and warehouse stops)
+        const activeTasks = data.data?.filter((t: RouteTask) => !t.is_deleted && t.task_type !== 'warehouse_stop') || [];
+        console.log('📋 [EDIT MODE] Active tasks (not deleted, no warehouse stops):', activeTasks.length);
         console.log('📋 [EDIT MODE] Active tasks data:', activeTasks);
 
         setExistingTasksCount(activeTasks.length);
