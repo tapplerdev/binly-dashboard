@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useReducer } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BinWithPriority, MoveRequest, getBinMarkerColor } from '@/lib/types/bin';
@@ -41,6 +41,7 @@ import { format, addDays } from 'date-fns';
 import { GroupedDropdown, Dropdown } from '@/components/ui/dropdown';
 import { getNearbyPotentialLocations, NearbyPotentialLocation } from '@/lib/api/potential-locations';
 import { PotentialLocationPickerModal } from './potential-location-picker-modal';
+import { moveRequestReducer, createInitialState } from '@/lib/reducers/move-request-reducer';
 
 // Google Maps imports
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
@@ -134,20 +135,64 @@ export function ScheduleMoveModalWithMap({
 }: ScheduleMoveModalWithMapProps) {
   const queryClient = useQueryClient();
 
-  // UI State
-  const [isClosing, setIsClosing] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [wizardStep, setWizardStep] = useState<WizardStep>('selection');
-  const [viewMode, setViewMode] = useState<'form' | 'map'>('form'); // Mobile toggle
+  // Unified state management with reducer
+  const [state, dispatch] = useReducer(
+    moveRequestReducer,
+    createInitialState(bin, bins)
+  );
 
-  // Map State
+  // Helper: Convert reducer state to old BinMoveConfig format for compatibility
+  const binConfigs = useMemo(() => {
+    const configs: Record<string, BinMoveConfig> = {};
+    Object.entries(state.binConfigurations).forEach(([binId, config]) => {
+      configs[binId] = {
+        bin: config.bin,
+        moveType: config.moveType,
+        scheduledDate: config.schedule.date,
+        dateOption: config.schedule.dateOption,
+        destinationType: config.destination.type,
+        sourcePotentialLocationId: config.destination.potentialLocationId,
+        newStreet: config.destination.street,
+        newCity: config.destination.city,
+        newZip: config.destination.zip,
+        newLatitude: config.destination.latitude,
+        newLongitude: config.destination.longitude,
+        reasonCategory: config.reason,
+        notes: config.notes,
+        createNoGoZone: config.createNoGoZone,
+        assignmentType: config.assignment.type,
+        assignedUserId: config.assignment.userId,
+        assignedShiftId: config.assignment.shiftId,
+        insertPosition: config.assignment.insertPosition,
+      };
+    });
+    return configs;
+  }, [state.binConfigurations]);
+
+  // Helper: Get values from state for easy access
+  const selectedBins = state.selectedBins;
+  const wizardStep = state.step;
+  const moveMode = state.mode;
+  const nearbyPotentialLocations = state.nearbyPotentialLocations;
+  const locationPickerBinId = state.ui.locationPickerBinId;
+  const isSubmitting = state.ui.isSubmitting;
+  const isClosing = state.ui.isClosing;
+
+  // Local UI state (not part of move request logic)
+  const [viewMode, setViewMode] = useState<'form' | 'map'>('form'); // Mobile toggle
   const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER);
   const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM);
   const [hoveredBinId, setHoveredBinId] = useState<string | null>(null);
   const [lassoMode, setLassoMode] = useState(false);
   const [isDragMode, setIsDragMode] = useState(false);
+  const [binSearchQuery, setBinSearchQuery] = useState('');
+  const [showBinDropdown, setShowBinDropdown] = useState(false);
+  const [fillLevelFilter, setFillLevelFilter] = useState<'all' | 'low' | 'medium' | 'high' | 'critical' | 'missing'>('all');
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [activeShiftListExpanded, setActiveShiftListExpanded] = useState<Record<string, boolean>>({});
+  const [futureShiftListExpanded, setFutureShiftListExpanded] = useState<Record<string, boolean>>({});
 
-  // Drag-to-Relocate State
+  // Drag-to-Relocate State (separate feature, not part of main reducer)
   const [binRelocations, setBinRelocations] = useState<Record<string, {
     newLat: number;
     newLng: number;
@@ -155,32 +200,6 @@ export function ScheduleMoveModalWithMap({
     newCity?: string;
     newZip?: string;
   }>>({});
-
-  // Bin Selection State
-  const [selectedBins, setSelectedBins] = useState<BinWithPriority[]>(
-    bin ? [bin] : bins || []
-  );
-  const [binSearchQuery, setBinSearchQuery] = useState('');
-  const [showBinDropdown, setShowBinDropdown] = useState(false);
-
-  // Mode State (NEW: Make it clear what type of move we're creating)
-  const [moveMode, setMoveMode] = useState<'field_bins' | 'warehouse_bins'>('field_bins');
-
-  // Filter State
-  const [fillLevelFilter, setFillLevelFilter] = useState<'all' | 'low' | 'medium' | 'high' | 'critical' | 'missing'>('all');
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-
-  // Per-Bin Configuration (Step 2)
-  const [binConfigs, setBinConfigs] = useState<Record<string, BinMoveConfig>>({});
-
-  // Shift list expand/collapse per bin (true = expanded, false = collapsed to selected only)
-  const [activeShiftListExpanded, setActiveShiftListExpanded] = useState<Record<string, boolean>>({});
-  const [futureShiftListExpanded, setFutureShiftListExpanded] = useState<Record<string, boolean>>({});
-
-  // Nearby potential locations state (NEW)
-  const [nearbyPotentialLocations, setNearbyPotentialLocations] = useState<Record<string, NearbyPotentialLocation[]>>({});
-  const [loadingNearbyLocations, setLoadingNearbyLocations] = useState<Record<string, boolean>>({});
-  const [locationPickerBinId, setLocationPickerBinId] = useState<string | null>(null);
 
   // Fetch all bins for map display and search (including warehouse bins)
   const { data: allBins, isLoading: binsLoading } = useQuery({
@@ -202,65 +221,34 @@ export function ScheduleMoveModalWithMap({
 
   // Initialize bin configs when bins are selected
   useEffect(() => {
-    const defaultScheduledDate = addDays(new Date(), 1).getTime();
-
-    // Only update if we have bins that don't have configs yet
-    const needsInitialization = selectedBins.some(b => !binConfigs[b.id]);
-
-    if (needsInitialization) {
-      setBinConfigs(prev => {
-        const newConfigs = { ...prev };
-        selectedBins.forEach((b) => {
-          if (!newConfigs[b.id]) {
-            // Auto-set move type based on mode
-            const defaultMoveType = moveMode === 'warehouse_bins' ? 'redeployment' : 'store';
-
-            newConfigs[b.id] = {
-              bin: b,
-              moveType: defaultMoveType,
-              scheduledDate: defaultScheduledDate,
-              dateOption: '24h',
-              destinationType: 'custom',
-              assignmentType: 'unassigned',
-            };
-          }
-        });
-        return newConfigs;
-      });
-    }
-
-    // Clean up configs for bins that are no longer selected
-    setBinConfigs(prev => {
-      const selectedBinIds = new Set(selectedBins.map(b => b.id));
-      const cleaned: Record<string, BinMoveConfig> = {};
-      Object.entries(prev).forEach(([binId, config]) => {
-        if (selectedBinIds.has(binId)) {
-          cleaned[binId] = config;
-        }
-      });
-      return cleaned;
+    dispatch({
+      type: 'INITIALIZE_CONFIGS',
+      bins: state.selectedBins,
+      mode: state.mode,
     });
-  }, [selectedBins, moveMode]);
+  }, [state.selectedBins, state.mode]);
 
   // Auto-fetch nearby potential locations for relocation and redeployment moves
   useEffect(() => {
-    Object.entries(binConfigs).forEach(([binId, config]) => {
-      if ((config.moveType === 'relocation' || config.moveType === 'redeployment') && !nearbyPotentialLocations[binId] && !loadingNearbyLocations[binId]) {
-        setLoadingNearbyLocations((prev) => ({ ...prev, [binId]: true }));
+    Object.entries(state.binConfigurations).forEach(([binId, config]) => {
+      if ((config.moveType === 'relocation' || config.moveType === 'redeployment') &&
+          !state.nearbyPotentialLocations[binId] &&
+          !state.ui.loadingLocations.has(binId)) {
+        dispatch({ type: 'START_LOADING_LOCATIONS', binId });
         getNearbyPotentialLocations(binId) // No max_distance = get ALL locations sorted by distance
           .then((locations) => {
-            setNearbyPotentialLocations((prev) => ({ ...prev, [binId]: locations }));
+            dispatch({ type: 'SET_POTENTIAL_LOCATIONS', binId, locations });
           })
           .catch((error) => {
             console.error(`Failed to fetch nearby locations for bin ${binId}:`, error);
-            setNearbyPotentialLocations((prev) => ({ ...prev, [binId]: [] }));
+            dispatch({ type: 'SET_POTENTIAL_LOCATIONS', binId, locations: [] });
           })
           .finally(() => {
-            setLoadingNearbyLocations((prev) => ({ ...prev, [binId]: false }));
+            dispatch({ type: 'STOP_LOADING_LOCATIONS', binId });
           });
       }
     });
-  }, [binConfigs, nearbyPotentialLocations, loadingNearbyLocations]);
+  }, [state.binConfigurations, state.nearbyPotentialLocations, state.ui.loadingLocations]);
 
   // Filter bins for search
   const availableBins = useMemo(() => {
@@ -286,7 +274,7 @@ export function ScheduleMoveModalWithMap({
 
   // Handle modal close
   const handleClose = () => {
-    setIsClosing(true);
+    dispatch({ type: 'SET_CLOSING', isClosing: true });
     setTimeout(() => {
       onClose();
     }, 300);
@@ -294,27 +282,26 @@ export function ScheduleMoveModalWithMap({
 
   // Handle bin selection from map click
   const handleBinMarkerClick = useCallback((clickedBin: BinWithPriority) => {
-    const isCurrentlySelected = selectedBins.some((b) => b.id === clickedBin.id);
+    const isCurrentlySelected = state.selectedBins.some((b) => b.id === clickedBin.id);
 
-    setSelectedBins((prev) => {
-      if (isCurrentlySelected) {
-        // Deselect
-        return prev.filter((b) => b.id !== clickedBin.id);
-      } else {
-        // Select
-        return [...prev, clickedBin];
+    if (isCurrentlySelected) {
+      dispatch({ type: 'DESELECT_BIN', binId: clickedBin.id });
+    } else {
+      dispatch({ type: 'SELECT_BIN', bin: clickedBin });
+
+      // If selecting a warehouse bin, ensure it's set to redeployment
+      if (clickedBin.status === 'in_storage') {
+        setTimeout(() => {
+          dispatch({
+            type: 'UPDATE_BIN_CONFIG',
+            binId: clickedBin.id,
+            updates: {
+              moveType: 'redeployment',
+              destination: { type: 'potential_location' }
+            }
+          });
+        }, 0);
       }
-    });
-
-    // If selecting a warehouse bin, ensure it's set to redeployment
-    if (!isCurrentlySelected && clickedBin.status === 'in_storage') {
-      // Use setTimeout to ensure state is updated after selectedBins changes
-      setTimeout(() => {
-        updateBinConfig(clickedBin.id, {
-          moveType: 'redeployment',
-          destinationType: 'potential_location'
-        });
-      }, 0);
     }
 
     // Pan to bin (check both coordinate field options)
@@ -325,15 +312,14 @@ export function ScheduleMoveModalWithMap({
       setMapCenter({ lat, lng });
       setMapZoom(15);
     }
-  }, []);
+  }, [state.selectedBins]);
 
   // Handle bin selection from search
   const handleBinSearchSelect = (clickedBin: BinWithPriority) => {
-    setSelectedBins((prev) => {
-      const isSelected = prev.some((b) => b.id === clickedBin.id);
-      if (isSelected) return prev; // Already selected
-      return [...prev, clickedBin];
-    });
+    const isSelected = state.selectedBins.some((b) => b.id === clickedBin.id);
+    if (!isSelected) {
+      dispatch({ type: 'SELECT_BIN', bin: clickedBin });
+    }
 
     // Pan to bin (check both coordinate field options)
     const lat = clickedBin.current_latitude ?? clickedBin.latitude;
@@ -434,46 +420,31 @@ export function ScheduleMoveModalWithMap({
       return;
     }
 
-    // Initialize bin configs with relocation data for dragged bins
-    const initialConfigs: Record<string, BinMoveConfig> = {};
-    // Default scheduled date to tomorrow
-    const defaultScheduledDate = addDays(new Date(), 1).getTime();
-
+    // Update configs for bins with drag relocations
     selectedBins.forEach((bin) => {
       const relocation = binRelocations[bin.id];
 
       if (relocation) {
-        // Bin was relocated via drag - auto-set to relocation mode
-        initialConfigs[bin.id] = {
-          bin,
-          moveType: 'relocation',
-          scheduledDate: defaultScheduledDate,
-          dateOption: '24h',
-          newStreet: relocation.newAddress || '',
-          newCity: relocation.newCity || '',
-          newZip: relocation.newZip || '',
-          newLatitude: relocation.newLat,
-          newLongitude: relocation.newLng,
-          reason: '',
-          notes: '',
-          assignmentType: 'unassigned',
-        };
-      } else {
-        // Bin not relocated - default to store
-        initialConfigs[bin.id] = {
-          bin,
-          moveType: 'store',
-          scheduledDate: defaultScheduledDate,
-          dateOption: '24h',
-          reason: '',
-          notes: '',
-          assignmentType: 'unassigned',
-        };
+        // Bin was relocated via drag - update to relocation mode with destination
+        dispatch({
+          type: 'UPDATE_BIN_CONFIG',
+          binId: bin.id,
+          updates: {
+            moveType: 'relocation',
+            destination: {
+              type: 'custom',
+              street: relocation.newAddress || '',
+              city: relocation.newCity || '',
+              zip: relocation.newZip || '',
+              latitude: relocation.newLat,
+              longitude: relocation.newLng,
+            },
+          },
+        });
       }
     });
 
-    setBinConfigs(initialConfigs);
-    setWizardStep('configuration');
+    dispatch({ type: 'SET_STEP', step: 'configuration' });
   };
 
   // Handle submission
@@ -483,7 +454,7 @@ export function ScheduleMoveModalWithMap({
       return;
     }
 
-    setIsSubmitting(true);
+    dispatch({ type: 'SET_SUBMITTING', isSubmitting: true });
 
     try {
       console.log('🚀 [BULK CREATE] Starting bulk move request creation...');
@@ -563,7 +534,7 @@ export function ScheduleMoveModalWithMap({
       console.error('❌ [BULK CREATE] Failed:', error);
       alert(`Failed to create move requests. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      setIsSubmitting(false);
+      dispatch({ type: 'SET_SUBMITTING', isSubmitting: false });
     }
   };
 
@@ -1222,10 +1193,69 @@ export function ScheduleMoveModalWithMap({
   // Update a specific bin's configuration
   const updateBinConfig = (binId: string, updates: Partial<BinMoveConfig>) => {
     console.log('📝 [UPDATE CONFIG] Bin:', binId, 'Updates:', updates);
-    setBinConfigs((prev) => ({
-      ...prev,
-      [binId]: { ...prev[binId], ...updates },
-    }));
+
+    // Convert old BinMoveConfig updates to reducer actions
+    const reducerUpdates: any = {};
+
+    if (updates.moveType !== undefined) {
+      dispatch({ type: 'SET_MOVE_TYPE', binId, moveType: updates.moveType });
+    }
+
+    if (updates.destinationType !== undefined || updates.sourcePotentialLocationId !== undefined ||
+        updates.newStreet !== undefined || updates.newCity !== undefined || updates.newZip !== undefined ||
+        updates.newLatitude !== undefined || updates.newLongitude !== undefined) {
+      dispatch({
+        type: 'SET_DESTINATION',
+        binId,
+        destination: {
+          type: updates.destinationType,
+          street: updates.newStreet,
+          city: updates.newCity,
+          zip: updates.newZip,
+          latitude: updates.newLatitude,
+          longitude: updates.newLongitude,
+          potentialLocationId: updates.sourcePotentialLocationId,
+        },
+      });
+    }
+
+    if (updates.assignmentType !== undefined || updates.assignedUserId !== undefined ||
+        updates.assignedShiftId !== undefined || updates.insertPosition !== undefined ||
+        updates.insertAfterBinId !== undefined) {
+      dispatch({
+        type: 'SET_ASSIGNMENT',
+        binId,
+        assignment: {
+          type: updates.assignmentType,
+          userId: updates.assignedUserId,
+          shiftId: updates.assignedShiftId,
+          insertPosition: updates.insertPosition,
+        },
+      });
+    }
+
+    if (updates.scheduledDate !== undefined || updates.dateOption !== undefined) {
+      dispatch({
+        type: 'SET_SCHEDULE',
+        binId,
+        schedule: {
+          date: updates.scheduledDate,
+          dateOption: updates.dateOption,
+        },
+      });
+    }
+
+    if (updates.reasonCategory !== undefined || updates.notes !== undefined || updates.createNoGoZone !== undefined) {
+      dispatch({
+        type: 'SET_METADATA',
+        binId,
+        metadata: {
+          reason: updates.reasonCategory,
+          notes: updates.notes,
+          createNoGoZone: updates.createNoGoZone,
+        },
+      });
+    }
   };
 
   // Bulk actions
@@ -1628,7 +1658,7 @@ export function ScheduleMoveModalWithMap({
                                   </div>
                                   <button
                                     type="button"
-                                    onClick={() => setLocationPickerBinId(bin.id)}
+                                    onClick={() => dispatch({ type: 'OPEN_LOCATION_PICKER', binId: bin.id })}
                                     className="px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-100 rounded transition-colors"
                                   >
                                     Change
@@ -1638,7 +1668,7 @@ export function ScheduleMoveModalWithMap({
                             ) : (
                               <button
                                 type="button"
-                                onClick={() => setLocationPickerBinId(bin.id)}
+                                onClick={() => dispatch({ type: 'OPEN_LOCATION_PICKER', binId: bin.id })}
                                 className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary hover:bg-blue-50 transition-all text-center group"
                               >
                                 <MapPin className="w-6 h-6 text-gray-400 group-hover:text-primary mx-auto mb-2" />
@@ -2157,7 +2187,7 @@ export function ScheduleMoveModalWithMap({
         {/* Footer Actions */}
         <div className="flex gap-4 pt-4 border-t border-gray-200 sticky bottom-0 bg-white">
           <button
-            onClick={() => setWizardStep('selection')}
+            onClick={() => dispatch({ type: 'SET_STEP', step: 'selection' })}
             disabled={isSubmitting}
             className="flex-1 md:flex-none md:px-8 py-3 border-2 border-gray-300 rounded-xl font-semibold hover:bg-gray-50 transition-all disabled:opacity-50"
           >
@@ -2232,9 +2262,7 @@ export function ScheduleMoveModalWithMap({
                   <div className="mt-4 flex gap-2">
                     <button
                       onClick={() => {
-                        setMoveMode('field_bins');
-                        setSelectedBins([]);
-                        setBinConfigs({});
+                        dispatch({ type: 'SET_MODE', mode: 'field_bins' });
                       }}
                       className={cn(
                         'flex-1 px-4 py-3 rounded-lg border-2 font-semibold text-sm transition-all',
@@ -2251,9 +2279,7 @@ export function ScheduleMoveModalWithMap({
                     </button>
                     <button
                       onClick={() => {
-                        setMoveMode('warehouse_bins');
-                        setSelectedBins([]);
-                        setBinConfigs({});
+                        dispatch({ type: 'SET_MODE', mode: 'warehouse_bins' });
                       }}
                       className={cn(
                         'flex-1 px-4 py-3 rounded-lg border-2 font-semibold text-sm transition-all',
@@ -2303,9 +2329,9 @@ export function ScheduleMoveModalWithMap({
                     newLatitude: location.latitude,
                     newLongitude: location.longitude,
                   });
-                  setLocationPickerBinId(null);
+                  dispatch({ type: 'CLOSE_LOCATION_PICKER' });
                 }}
-                onClose={() => setLocationPickerBinId(null)}
+                onClose={() => dispatch({ type: 'CLOSE_LOCATION_PICKER' })}
               />
             );
           })()}
