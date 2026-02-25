@@ -1638,7 +1638,7 @@ export function ScheduleMoveModalWithMap({
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Selected Location
                         </label>
-                        {loadingNearbyLocations[bin.id] ? (
+                        {state.ui.loadingLocations.has(bin.id) ? (
                           <div className="flex items-center justify-center py-3 text-xs text-gray-500">
                             <Loader2 className="w-4 h-4 animate-spin mr-2" />
                             Loading nearby locations...
