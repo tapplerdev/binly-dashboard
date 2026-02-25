@@ -1261,9 +1261,9 @@ export function ScheduleMoveModalWithMap({
   const handlePlaceSelect = (binId: string, place: HerePlaceDetails) => {
     console.log('🏠 [PLACE SELECT] Selected place:', place);
     updateBinConfig(binId, {
-      newStreet: place.address,
+      newStreet: place.street,
       newCity: place.city || '',
-      newZip: place.postalCode || '',
+      newZip: place.zip || '',
       newLatitude: place.latitude,
       newLongitude: place.longitude,
     });
