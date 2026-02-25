@@ -1629,7 +1629,10 @@ export function ScheduleMoveModalWithMap({
                     <div className="flex gap-3">
                       <button
                         type="button"
-                        onClick={() => updateBinConfig(bin.id, { destinationType: 'custom' })}
+                        onClick={() => updateBinConfig(bin.id, {
+                          destinationType: 'custom',
+                          sourcePotentialLocationId: null  // Clear the link to potential location
+                        })}
                         className={cn(
                           'flex-1 p-2 border-2 rounded-lg text-xs font-medium transition-all',
                           config.destinationType === 'custom'
@@ -2324,7 +2327,10 @@ export function ScheduleMoveModalWithMap({
                   <div className="flex gap-3 mb-3">
                     <button
                       type="button"
-                      onClick={() => updateBinConfig(bin.id, { destinationType: 'custom' })}
+                      onClick={() => updateBinConfig(bin.id, {
+                        destinationType: 'custom',
+                        sourcePotentialLocationId: null  // Clear the link to potential location
+                      })}
                       className={cn(
                         'flex-1 p-2 border-2 rounded-lg text-xs font-medium transition-all',
                         config.destinationType === 'custom'
