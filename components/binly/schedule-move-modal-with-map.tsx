@@ -1233,15 +1233,16 @@ export function ScheduleMoveModalWithMap({
         updates.newStreet !== undefined || updates.newCity !== undefined || updates.newZip !== undefined ||
         updates.newLatitude !== undefined || updates.newLongitude !== undefined) {
 
-      const destinationUpdate = {
-        type: updates.destinationType,
-        street: updates.newStreet,
-        city: updates.newCity,
-        zip: updates.newZip,
-        latitude: updates.newLatitude,
-        longitude: updates.newLongitude,
-        potentialLocationId: updates.sourcePotentialLocationId,
-      };
+      // Build destination update object - ONLY include fields that are actually provided
+      const destinationUpdate: any = {};
+
+      if (updates.destinationType !== undefined) destinationUpdate.type = updates.destinationType;
+      if (updates.newStreet !== undefined) destinationUpdate.street = updates.newStreet;
+      if (updates.newCity !== undefined) destinationUpdate.city = updates.newCity;
+      if (updates.newZip !== undefined) destinationUpdate.zip = updates.newZip;
+      if (updates.newLatitude !== undefined) destinationUpdate.latitude = updates.newLatitude;
+      if (updates.newLongitude !== undefined) destinationUpdate.longitude = updates.newLongitude;
+      if (updates.sourcePotentialLocationId !== undefined) destinationUpdate.potentialLocationId = updates.sourcePotentialLocationId;
 
       console.log('🚀 [UPDATE CONFIG] Dispatching SET_DESTINATION with:', {
         binId,
