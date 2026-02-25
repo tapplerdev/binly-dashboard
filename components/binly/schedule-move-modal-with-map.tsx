@@ -601,6 +601,13 @@ export function ScheduleMoveModalWithMap({
     console.log('🔍 [FILTER] Total bins:', allBins.length);
     console.log('🔍 [FILTER] Move mode:', moveMode);
 
+    // Check for ALL possible status values
+    const statusCounts = allBins.reduce((acc, bin) => {
+      acc[bin.status] = (acc[bin.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    console.log('🔍 [FILTER] Status breakdown:', statusCounts);
+
     let filtered = [...allBins];
 
     // Filter based on move mode
@@ -608,7 +615,10 @@ export function ScheduleMoveModalWithMap({
       // Show ONLY warehouse bins (in_storage)
       filtered = filtered.filter((b) => b.status === 'in_storage');
       console.log('🔍 [FILTER] Warehouse bins (in_storage):', filtered.length);
-      console.log('🔍 [FILTER] Sample statuses:', allBins.slice(0, 10).map(b => ({ id: b.id, num: b.bin_number, status: b.status })));
+
+      // Show bins 92, 96, 101 specifically since they show "In Warehouse" in UI
+      const testBins = allBins.filter(b => [92, 96, 101].includes(b.bin_number));
+      console.log('🔍 [FILTER] Bins 92, 96, 101 statuses:', testBins.map(b => ({ num: b.bin_number, status: b.status })));
     } else {
       // Show field bins (NOT in warehouse)
       filtered = filtered.filter((b) => b.status !== 'in_storage');
