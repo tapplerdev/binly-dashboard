@@ -195,6 +195,15 @@ export function ScheduleMoveModalWithMap({
   const fieldBinCount = fieldBins.length;
   const warehouseBinCount = warehouseBins.length;
 
+  // Debug logging for state changes
+  useEffect(() => {
+    console.log('🎯 [COMPONENT STATE] Selected bins changed:', selectedBins.length);
+    console.log('📋 [COMPONENT STATE] Bin configs count:', Object.keys(binConfigs).length);
+    console.log('🏷️ [COMPONENT STATE] Current mode:', moveMode);
+    console.log('📦 [COMPONENT STATE] Field bins:', fieldBinCount, '| Warehouse bins:', warehouseBinCount);
+    console.log('👀 [COMPONENT STATE] Visible bins:', visibleBins.length);
+  }, [selectedBins, binConfigs, moveMode, fieldBinCount, warehouseBinCount, visibleBins]);
+
   // Local UI state (not part of move request logic)
   const [viewMode, setViewMode] = useState<'form' | 'map'>('form'); // Mobile toggle
   const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER);
@@ -300,6 +309,8 @@ export function ScheduleMoveModalWithMap({
   // Handle bin selection from map click
   const handleBinMarkerClick = useCallback((clickedBin: BinWithPriority) => {
     const isCurrentlySelected = state.selectedBins.some((b) => b.id === clickedBin.id);
+
+    console.log('🖱️ [BIN CLICK]', isCurrentlySelected ? 'DESELECTING' : 'SELECTING', 'bin:', clickedBin.bin_number, 'status:', clickedBin.status);
 
     if (isCurrentlySelected) {
       dispatch({ type: 'DESELECT_BIN', binId: clickedBin.id });

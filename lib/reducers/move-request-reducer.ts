@@ -160,6 +160,11 @@ export function moveRequestReducer(
       return { ...state, step: action.step };
 
     case 'SET_MODE': {
+      console.log('🔄 [SET_MODE] Switching mode from', state.mode, 'to', action.mode);
+      console.log('📊 [SET_MODE] Current selected bins:', state.selectedBins.length);
+      console.log('📊 [SET_MODE] Current configs count:', Object.keys(state.binConfigurations).length);
+      console.log('📦 [SET_MODE] Selected bin IDs:', state.selectedBins.map(b => `${b.id} (${b.status})`));
+
       // When switching modes, preserve ALL bins and configurations
       // Only auto-adjust moveType for bins to match their status
       const updatedConfigs: { [binId: string]: BinConfiguration } = {};
@@ -179,11 +184,16 @@ export function moveRequestReducer(
           }
         }
 
+        console.log(`🔧 [SET_MODE] Bin ${binId}: status=${bin.status}, oldMoveType=${config.moveType}, newMoveType=${moveType}`);
+
         updatedConfigs[binId] = {
           ...config,
           moveType,
         };
       });
+
+      console.log('✅ [SET_MODE] After update - selected bins:', state.selectedBins.length);
+      console.log('✅ [SET_MODE] After update - configs count:', Object.keys(updatedConfigs).length);
 
       return {
         ...state,
@@ -434,12 +444,16 @@ export function moveRequestReducer(
     // ========================================================================
 
     case 'INITIALIZE_CONFIGS': {
+      console.log('🎬 [INITIALIZE_CONFIGS] Initializing configs for', action.bins.length, 'bins in mode:', action.mode);
+      console.log('📦 [INITIALIZE_CONFIGS] Existing configs:', Object.keys(state.binConfigurations).length);
+
       const defaultDate = addDays(new Date(), 1).getTime();
       const defaultMoveType: MoveType = action.mode === 'warehouse_bins' ? 'redeployment' : 'store';
       const newConfigs = { ...state.binConfigurations };
 
       action.bins.forEach(bin => {
         if (!newConfigs[bin.id]) {
+          console.log(`➕ [INITIALIZE_CONFIGS] Creating config for bin ${bin.bin_number} (${bin.status})`);
           newConfigs[bin.id] = {
             bin,
             moveType: defaultMoveType,
@@ -454,8 +468,12 @@ export function moveRequestReducer(
               dateOption: '24h',
             },
           };
+        } else {
+          console.log(`✓ [INITIALIZE_CONFIGS] Config already exists for bin ${bin.bin_number}`);
         }
       });
+
+      console.log('✅ [INITIALIZE_CONFIGS] Total configs after init:', Object.keys(newConfigs).length);
 
       return {
         ...state,
