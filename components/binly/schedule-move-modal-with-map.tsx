@@ -162,6 +162,9 @@ export function ScheduleMoveModalWithMap({
   const [binSearchQuery, setBinSearchQuery] = useState('');
   const [showBinDropdown, setShowBinDropdown] = useState(false);
 
+  // Mode State (NEW: Make it clear what type of move we're creating)
+  const [moveMode, setMoveMode] = useState<'field_bins' | 'warehouse_bins'>('field_bins');
+
   // Filter State
   const [fillLevelFilter, setFillLevelFilter] = useState<'all' | 'low' | 'medium' | 'high' | 'critical' | 'missing'>('all');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -201,12 +204,15 @@ export function ScheduleMoveModalWithMap({
     const defaultScheduledDate = addDays(new Date(), 1).getTime();
     selectedBins.forEach((b) => {
       if (!binConfigs[b.id]) {
+        // Auto-set move type based on mode
+        const defaultMoveType = moveMode === 'warehouse_bins' ? 'redeployment' : 'store';
+
         newConfigs[b.id] = {
           bin: b,
-          moveType: 'store',
+          moveType: defaultMoveType,
           scheduledDate: defaultScheduledDate,
           dateOption: '24h',
-          destinationType: 'custom', // NEW: Default to custom address
+          destinationType: 'custom',
           assignmentType: 'unassigned',
         };
       } else {
@@ -214,7 +220,7 @@ export function ScheduleMoveModalWithMap({
       }
     });
     setBinConfigs(newConfigs);
-  }, [selectedBins]);
+  }, [selectedBins, moveMode]);
 
   // Auto-fetch nearby potential locations for relocation and redeployment moves
   useEffect(() => {
@@ -588,21 +594,19 @@ export function ScheduleMoveModalWithMap({
     );
   };
 
-  // Determine if we should show only warehouse bins
-  const showOnlyWarehouseBins = useMemo(() => {
-    // Check if ANY selected bin config has moveType === 'redeployment'
-    return Object.values(binConfigs).some((config) => config.moveType === 'redeployment');
-  }, [binConfigs]);
-
-  // Filter bins for list view
+  // Filter bins for list view based on mode
   const filteredBinsForList = useMemo(() => {
     if (!allBins) return [];
 
     let filtered = [...allBins];
 
-    // Filter to only warehouse bins if redeployment is selected
-    if (showOnlyWarehouseBins) {
+    // Filter based on move mode
+    if (moveMode === 'warehouse_bins') {
+      // Show ONLY warehouse bins (in_storage)
       filtered = filtered.filter((b) => b.status === 'in_storage');
+    } else {
+      // Show field bins (NOT in warehouse)
+      filtered = filtered.filter((b) => b.status !== 'in_storage');
     }
 
     // Apply search filter
@@ -624,7 +628,7 @@ export function ScheduleMoveModalWithMap({
     }
 
     // Apply fill level filter (skip for warehouse bins - they don't have fill levels)
-    if (fillLevelFilter !== 'all' && !showOnlyWarehouseBins) {
+    if (fillLevelFilter !== 'all' && moveMode === 'field_bins') {
       filtered = filtered.filter((b) => {
         // Handle missing bins separately
         if (fillLevelFilter === 'missing') {
@@ -655,7 +659,7 @@ export function ScheduleMoveModalWithMap({
     });
 
     return filtered;
-  }, [allBins, binSearchQuery, fillLevelFilter, showOnlyWarehouseBins]);
+  }, [allBins, binSearchQuery, fillLevelFilter, moveMode]);
 
   // Render Step 1: Selection
   const renderSelectionStep = () => (
@@ -2034,6 +2038,50 @@ export function ScheduleMoveModalWithMap({
                     <X className="w-5 h-5 text-gray-500" />
                   </button>
                 </div>
+
+                {/* Mode Selector - Only show in selection step */}
+                {wizardStep === 'selection' && (
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      onClick={() => {
+                        setMoveMode('field_bins');
+                        setSelectedBins([]);
+                        setBinConfigs({});
+                      }}
+                      className={cn(
+                        'flex-1 px-4 py-3 rounded-lg border-2 font-semibold text-sm transition-all',
+                        moveMode === 'field_bins'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                      )}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <Truck className="w-4 h-4" />
+                        <span>Field Bins</span>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">Store or relocate active bins</p>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMoveMode('warehouse_bins');
+                        setSelectedBins([]);
+                        setBinConfigs({});
+                      }}
+                      className={cn(
+                        'flex-1 px-4 py-3 rounded-lg border-2 font-semibold text-sm transition-all',
+                        moveMode === 'warehouse_bins'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                      )}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <Package className="w-4 h-4" />
+                        <span>Warehouse Bins</span>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">Deploy bins from warehouse to field</p>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Content */}
