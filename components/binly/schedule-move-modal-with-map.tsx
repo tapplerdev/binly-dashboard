@@ -180,10 +180,10 @@ export function ScheduleMoveModalWithMap({
   const [nearbyPotentialLocations, setNearbyPotentialLocations] = useState<Record<string, NearbyPotentialLocation[]>>({});
   const [loadingNearbyLocations, setLoadingNearbyLocations] = useState<Record<string, boolean>>({});
 
-  // Fetch all bins for map display and search
+  // Fetch all bins for map display and search (including warehouse bins)
   const { data: allBins, isLoading: binsLoading } = useQuery({
-    queryKey: ['bins-with-priority'],
-    queryFn: getBinsWithPriority,
+    queryKey: ['bins-with-priority-all'],
+    queryFn: () => getBinsWithPriority({ status: 'all' }), // IMPORTANT: Get ALL bins including in_storage
   });
 
   // Fetch users for assignment
