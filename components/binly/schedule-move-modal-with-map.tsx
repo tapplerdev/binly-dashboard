@@ -2282,14 +2282,14 @@ export function ScheduleMoveModalWithMap({
                   <label className="block text-xs font-medium text-gray-700 mb-2">
                     Deployment Location *
                   </label>
-                  {config.destination.potentialLocationId ? (
+                  {config.destination?.potentialLocationId ? (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start justify-between">
                       <div className="flex-1">
                         <div className="text-sm font-medium text-green-900">
-                          {config.destination.street}
+                          {config.destination?.street}
                         </div>
                         <div className="text-xs text-green-700 mt-0.5">
-                          {config.destination.city}, {config.destination.zip}
+                          {config.destination?.city}, {config.destination?.zip}
                         </div>
                       </div>
                       <button
