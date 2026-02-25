@@ -1394,6 +1394,7 @@ function CreateShiftDrawer({
   const [tasks, setTasks] = useState<ShiftTask[]>([]);
   const [loadingShiftData, setLoadingShiftData] = useState(false);
   const [existingTasksCount, setExistingTasksCount] = useState(0);
+  const [initialExistingTaskIds, setInitialExistingTaskIds] = useState<string[]>([]); // Track original task IDs for deletion detection
   const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1588,6 +1589,7 @@ function CreateShiftDrawer({
           console.log('📋 [EDIT MODE] Converting task:', task.id, task.task_type);
 
           const baseTask: ShiftTask = {
+            id: task.id, // Preserve task ID for tracking
             type: task.task_type as any,
             address: task.address || '',
             latitude: task.latitude || 0,
@@ -1623,9 +1625,18 @@ function CreateShiftDrawer({
         console.log('📋 [EDIT MODE] Converted existing tasks to ShiftTask format:', existingShiftTasks.length);
         console.log('📋 [EDIT MODE] Existing ShiftTasks:', existingShiftTasks);
 
+        // Filter out warehouse stops before loading
+        const filteredExistingTasks = existingShiftTasks.filter(task => task.type !== 'warehouse_stop');
+        console.log(`🔧 [EDIT MODE] Filtered out ${existingShiftTasks.length - filteredExistingTasks.length} warehouse_stop task(s) from existing tasks`);
+
+        // Track initial task IDs for deletion detection
+        const existingIds = filteredExistingTasks.map(t => t.id).filter((id): id is string => id != null);
+        setInitialExistingTaskIds(existingIds);
+        console.log('📋 [EDIT MODE] Tracked initial task IDs:', existingIds);
+
         // Pre-populate with existing tasks (read-only)
-        setTasks(existingShiftTasks);
-        console.log('📋 [EDIT MODE] Set tasks state with existing tasks');
+        setTasks(filteredExistingTasks);
+        console.log('📋 [EDIT MODE] Set tasks state with filtered existing tasks');
       } catch (err) {
         console.error('❌ [EDIT MODE] Failed to fetch shift data:', err);
         setError('Failed to load shift data');
@@ -2664,16 +2675,38 @@ function CreateShiftDrawer({
 
       let response;
       if (isEditMode && shift) {
-        // Edit mode: PATCH endpoint with added tasks
+        // Edit mode: PATCH endpoint with added tasks and removed tasks
         // Filter out warehouse_stop tasks - they will be recreated during optimization
         const filteredTasks = tasksPayload.filter(task => task.task_type !== 'warehouse_stop');
         console.log(`🔧 [SHIFT EDIT] Filtered out ${tasksPayload.length - filteredTasks.length} warehouse_stop task(s)`);
 
+        // Detect deleted tasks: tasks that were in initialExistingTaskIds but no longer in current tasks
+        const currentTaskIds = tasks.filter(t => t.id != null).map(t => t.id!);
+        const deletedTaskIds = initialExistingTaskIds.filter(id => !currentTaskIds.includes(id));
+        console.log(`🗑️ [SHIFT EDIT] Deleted task IDs: ${JSON.stringify(deletedTaskIds)}`);
+
+        // Only send NEW tasks (tasks without an id) in add_tasks
+        const newTasksOnly = filteredTasks.filter(task => {
+          // Find the original task in the tasks array
+          const originalTask = tasks.find(t =>
+            (t.bin_id && t.bin_id === task.bin_id) ||
+            (t.potential_location_id && t.potential_location_id === task.potential_location_id) ||
+            (t.move_request_id && t.move_request_id === task.move_request_id)
+          );
+          // Include only if the task doesn't have an ID (meaning it's new)
+          return !originalTask?.id;
+        });
+        console.log(`➕ [SHIFT EDIT] New tasks to add: ${newTasksOnly.length}`);
+        console.log(`🔧 [SHIFT EDIT] New tasks payload:`, newTasksOnly);
+
         const editPayload = {
           driver_id: driverId !== shift.driverId ? driverId : undefined,
-          add_tasks: filteredTasks,
+          add_tasks: newTasksOnly,
+          remove_task_ids: deletedTaskIds.length > 0 ? deletedTaskIds : undefined,
           reoptimize: true,
-          reason: 'Tasks added via shift editor',
+          reason: deletedTaskIds.length > 0
+            ? `Tasks modified via shift editor (${newTasksOnly.length} added, ${deletedTaskIds.length} removed)`
+            : 'Tasks added via shift editor',
         };
 
         console.log('✏️ [SHIFT EDIT] Updating shift:', shift.id);
