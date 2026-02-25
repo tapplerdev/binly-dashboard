@@ -1645,7 +1645,7 @@ export function ScheduleMoveModalWithMap({
 
                     {/* Custom Address Fields */}
                     {config.destinationType === 'custom' && (
-                      <>
+                      <div onClick={(e) => e.stopPropagation()}>
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">
                             Street Address *
@@ -1684,7 +1684,7 @@ export function ScheduleMoveModalWithMap({
                             />
                           </div>
                         </div>
-                      </>
+                      </div>
                     )}
 
                     {/* Potential Location Selection */}
@@ -1927,7 +1927,8 @@ export function ScheduleMoveModalWithMap({
                             return (
                               <div
                                 key={shift.id}
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   updateBinConfig(bin.id, { assignedShiftId: shift.id });
                                   // Auto-collapse after selection
                                   setActiveShiftListExpanded((prev) => ({ ...prev, [bin.id]: false }));
@@ -2308,30 +2309,108 @@ export function ScheduleMoveModalWithMap({
                   <label className="block text-xs font-medium text-gray-700 mb-2">
                     Deployment Location *
                   </label>
-                  {config.destination?.potentialLocationId ? (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="text-sm font-medium text-green-900">
-                          {config.destination?.street}
+
+                  {/* Toggle Buttons: Custom Address vs Potential Location */}
+                  <div className="flex gap-3 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => updateBinConfig(bin.id, { destinationType: 'custom', sourcePotentialLocationId: undefined })}
+                      className={cn(
+                        'flex-1 p-2 border-2 rounded-lg text-xs font-medium transition-all',
+                        config.destinationType === 'custom'
+                          ? 'border-primary bg-white text-primary'
+                          : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
+                      )}
+                    >
+                      Custom Address
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateBinConfig(bin.id, { destinationType: 'potential_location' })}
+                      className={cn(
+                        'flex-1 p-2 border-2 rounded-lg text-xs font-medium transition-all',
+                        config.destinationType === 'potential_location'
+                          ? 'border-primary bg-white text-primary'
+                          : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
+                      )}
+                    >
+                      Potential Location
+                    </button>
+                  </div>
+
+                  {/* Custom Address Fields */}
+                  {config.destinationType === 'custom' && (
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <div className="mb-2">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Street Address *
+                        </label>
+                        <HerePlacesAutocomplete
+                          value={config.newStreet || ''}
+                          onChange={(value) => updateBinConfig(bin.id, { newStreet: value })}
+                          onPlaceSelect={(place) => handlePlaceSelect(bin.id, place)}
+                          placeholder="123 Main Street"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            City *
+                          </label>
+                          <input
+                            type="text"
+                            value={config.newCity || ''}
+                            onChange={(e) => updateBinConfig(bin.id, { newCity: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            placeholder="City"
+                          />
                         </div>
-                        <div className="text-xs text-green-700 mt-0.5">
-                          {config.destination?.city}, {config.destination?.zip}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            ZIP *
+                          </label>
+                          <input
+                            type="text"
+                            value={config.newZip || ''}
+                            onChange={(e) => updateBinConfig(bin.id, { newZip: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            placeholder="ZIP"
+                          />
                         </div>
                       </div>
-                      <button
-                        onClick={() => dispatch({ type: 'OPEN_LOCATION_PICKER', binId: bin.id })}
-                        className="text-xs text-green-700 hover:text-green-900 font-medium ml-2"
-                      >
-                        Change
-                      </button>
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => dispatch({ type: 'OPEN_LOCATION_PICKER', binId: bin.id })}
-                      className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary hover:bg-primary/5 transition-all text-sm text-gray-600 hover:text-primary font-medium"
-                    >
-                      Select deployment location from map
-                    </button>
+                  )}
+
+                  {/* Potential Location Selection */}
+                  {config.destinationType === 'potential_location' && (
+                    <div>
+                      {config.destination?.potentialLocationId ? (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-green-900">
+                              {config.destination?.street}
+                            </div>
+                            <div className="text-xs text-green-700 mt-0.5">
+                              {config.destination?.city}, {config.destination?.zip}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => dispatch({ type: 'OPEN_LOCATION_PICKER', binId: bin.id })}
+                            className="text-xs text-green-700 hover:text-green-900 font-medium ml-2"
+                          >
+                            Change
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => dispatch({ type: 'OPEN_LOCATION_PICKER', binId: bin.id })}
+                          className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary hover:bg-primary/5 transition-all text-sm text-gray-600 hover:text-primary font-medium"
+                        >
+                          Select deployment location from map
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -2552,11 +2631,27 @@ export function ScheduleMoveModalWithMap({
 
             if (!bin || !locations) return null;
 
+            // Calculate reserved locations (selected by other bins)
+            const reservedLocations = selectedBins
+              .filter(b => b.id !== locationPickerBinId) // Exclude current bin
+              .map(b => {
+                const otherConfig = binConfigs[b.id];
+                if (otherConfig?.sourcePotentialLocationId) {
+                  return {
+                    locationId: otherConfig.sourcePotentialLocationId,
+                    binNumber: b.bin_number,
+                  };
+                }
+                return null;
+              })
+              .filter((r): r is { locationId: string; binNumber: number } => r !== null);
+
             return (
               <PotentialLocationPickerModal
                 bin={bin}
                 potentialLocations={locations}
                 selectedLocationId={config?.sourcePotentialLocationId}
+                reservedLocations={reservedLocations}
                 onSelect={(location) => {
                   updateBinConfig(locationPickerBinId, {
                     destinationType: 'potential_location',

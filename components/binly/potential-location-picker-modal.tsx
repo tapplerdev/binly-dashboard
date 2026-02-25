@@ -11,6 +11,7 @@ interface PotentialLocationPickerModalProps {
   bin: BinWithPriority;
   potentialLocations: NearbyPotentialLocation[];
   selectedLocationId?: string;
+  reservedLocations?: { locationId: string; binNumber: number }[]; // Locations reserved by other bins
   onSelect: (location: NearbyPotentialLocation) => void;
   onClose: () => void;
 }
@@ -19,6 +20,7 @@ export function PotentialLocationPickerModal({
   bin,
   potentialLocations,
   selectedLocationId,
+  reservedLocations = [],
   onSelect,
   onClose,
 }: PotentialLocationPickerModalProps) {
@@ -103,16 +105,25 @@ export function PotentialLocationPickerModal({
 
                 const isSelected = selectedLocationId === location.id;
                 const isHovered = hoveredLocationId === location.id;
+                const reservation = reservedLocations.find((r) => r.locationId === location.id);
+                const isReserved = !!reservation;
 
                 return (
                   <AdvancedMarker
                     key={location.id}
                     position={{ lat: location.latitude, lng: location.longitude }}
-                    zIndex={isSelected ? 90 : isHovered ? 85 : 80}
-                    onClick={() => onSelect(location)}
+                    zIndex={isSelected ? 90 : isHovered ? 85 : isReserved ? 75 : 80}
+                    onClick={() => {
+                      if (!isReserved) {
+                        onSelect(location);
+                      }
+                    }}
                   >
                     <div
-                      className="relative cursor-pointer group"
+                      className={cn(
+                        'relative group',
+                        isReserved ? 'cursor-not-allowed' : 'cursor-pointer'
+                      )}
                       onMouseEnter={() => setHoveredLocationId(location.id)}
                       onMouseLeave={() => setHoveredLocationId(null)}
                     >
@@ -120,31 +131,50 @@ export function PotentialLocationPickerModal({
                       <div
                         className={cn(
                           'w-9 h-9 rounded-full border-3 shadow-xl flex items-center justify-center transition-all',
-                          isSelected
+                          isReserved
+                            ? 'bg-gray-400 border-gray-500 opacity-60'
+                            : isSelected
                             ? 'bg-blue-500 border-blue-600 scale-125'
                             : isHovered
                             ? 'bg-orange-500 border-white scale-110'
                             : 'bg-orange-400 border-white'
                         )}
                       >
-                        <MapPin className="w-5 h-5 text-white fill-white" />
+                        {isReserved ? (
+                          <span className="text-white text-xs font-bold">
+                            {reservation.binNumber}
+                          </span>
+                        ) : (
+                          <MapPin className="w-5 h-5 text-white fill-white" />
+                        )}
                       </div>
 
                       {/* Label */}
                       <div
                         className={cn(
                           'absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-1.5 rounded-lg whitespace-nowrap text-sm font-medium shadow-lg transition-all',
-                          isSelected
+                          isReserved
+                            ? 'bg-gray-600 text-white scale-100 opacity-100'
+                            : isSelected
                             ? 'bg-blue-600 text-white scale-100 opacity-100'
                             : isHovered
                             ? 'bg-orange-500 text-white scale-100 opacity-100'
                             : 'bg-gray-800 text-white scale-95 opacity-0 group-hover:scale-100 group-hover:opacity-100'
                         )}
                       >
-                        <div className="font-semibold">{location.street}</div>
-                        <div className="text-xs opacity-90">
-                          {location.city} • {Math.round(location.distance_meters)}m away
-                        </div>
+                        {isReserved ? (
+                          <>
+                            <div className="font-semibold">Reserved by Bin #{reservation.binNumber}</div>
+                            <div className="text-xs opacity-90">{location.street}</div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="font-semibold">{location.street}</div>
+                            <div className="text-xs opacity-90">
+                              {location.city} • {Math.round(location.distance_meters)}m away
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   </AdvancedMarker>
@@ -161,7 +191,7 @@ export function PotentialLocationPickerModal({
                 <div className="w-6 h-6 rounded-full bg-orange-400 border-2 border-white shadow-md flex items-center justify-center">
                   <MapPin className="w-3.5 h-3.5 text-white" />
                 </div>
-                <span className="text-gray-700">Potential locations</span>
+                <span className="text-gray-700">Available locations</span>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-6 h-6 rounded-full bg-blue-500 border-2 border-blue-600 shadow-md flex items-center justify-center">
@@ -170,13 +200,19 @@ export function PotentialLocationPickerModal({
                 <span className="text-gray-700">Selected location</span>
               </div>
               <div className="flex items-center gap-3">
+                <div className="w-6 h-6 rounded-full bg-gray-400 border-2 border-gray-500 shadow-md flex items-center justify-center text-white text-xs font-bold opacity-60">
+                  #
+                </div>
+                <span className="text-gray-700">Reserved by another bin</span>
+              </div>
+              <div className="flex items-center gap-3">
                 <div
                   className="w-6 h-6 rounded-full border-2 border-white shadow-md flex items-center justify-center text-white text-xs font-bold"
                   style={{ backgroundColor: getBinMarkerColor(bin.fill_percentage, bin.status) }}
                 >
                   {bin.bin_number}
                 </div>
-                <span className="text-gray-700">Bin #{bin.bin_number}</span>
+                <span className="text-gray-700">Current bin location</span>
               </div>
             </div>
           </div>
