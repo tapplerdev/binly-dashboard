@@ -176,6 +176,9 @@ export function ScheduleMoveModalWithMap({
   const [activeShiftListExpanded, setActiveShiftListExpanded] = useState<Record<string, boolean>>({});
   const [futureShiftListExpanded, setFutureShiftListExpanded] = useState<Record<string, boolean>>({});
 
+  // Active bin for configuration (NEW: Only show potential locations for this bin)
+  const [activeBinId, setActiveBinId] = useState<string | null>(null);
+
   // Nearby potential locations state (NEW)
   const [nearbyPotentialLocations, setNearbyPotentialLocations] = useState<Record<string, NearbyPotentialLocation[]>>({});
   const [loadingNearbyLocations, setLoadingNearbyLocations] = useState<Record<string, boolean>>({});
@@ -454,6 +457,11 @@ export function ScheduleMoveModalWithMap({
 
     setBinConfigs(initialConfigs);
     setWizardStep('configuration');
+
+    // Set first bin as active for configuration
+    if (selectedBins.length > 0) {
+      setActiveBinId(selectedBins[0].id);
+    }
   };
 
   // Handle submission
@@ -896,19 +904,19 @@ export function ScheduleMoveModalWithMap({
               );
             })}
 
-            {/* Render potential location markers for redeployment */}
-            {selectedBins.map((bin) => {
-              const config = binConfigs[bin.id];
-              // Only show potential locations when bin is configured for redeployment
+            {/* Render potential location markers for redeployment - ONLY for active bin */}
+            {wizardStep === 'configuration' && activeBinId && (() => {
+              const config = binConfigs[activeBinId];
+              // Only show potential locations when active bin is configured for redeployment
               if (config?.moveType !== 'redeployment') return null;
 
-              const locations = nearbyPotentialLocations[bin.id];
+              const locations = nearbyPotentialLocations[activeBinId];
               if (!locations || locations.length === 0) return null;
 
               return locations.map((location) =>
-                renderPotentialLocationMarker(location, bin.id)
+                renderPotentialLocationMarker(location, activeBinId)
               );
-            })}
+            })()}
           </Map>
         </APIProvider>
 
@@ -1386,41 +1394,101 @@ export function ScheduleMoveModalWithMap({
         </div>
 
         {/* Per-Bin Configuration Cards */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           {selectedBins.map((bin, index) => {
             const config = binConfigs[bin.id];
             if (!config) return null;
 
+            const isActive = activeBinId === bin.id;
+            const isConfigured = config.moveType === 'store' ||
+                                 (config.moveType === 'relocation' && config.newLatitude && config.newLongitude) ||
+                                 (config.moveType === 'redeployment' && config.newLatitude && config.newLongitude);
+
             return (
               <div
                 key={bin.id}
-                className="bg-white border-2 border-gray-200 rounded-xl p-4 space-y-4 hover:border-gray-300 transition-all"
+                className={cn(
+                  'bg-white border-2 rounded-xl transition-all',
+                  isActive
+                    ? 'border-primary shadow-lg'
+                    : 'border-gray-200 hover:border-gray-300 cursor-pointer'
+                )}
+                onClick={() => !isActive && setActiveBinId(bin.id)}
               >
-                {/* Bin Header */}
-                <div className="flex items-center justify-between pb-3 border-b border-gray-200">
+                {/* Bin Header - Always Visible */}
+                <div className={cn(
+                  'flex items-center justify-between p-4',
+                  !isActive && 'hover:bg-gray-50'
+                )}>
                   <div className="flex items-center gap-3">
                     <div
-                      className="w-10 h-10 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-sm font-bold"
+                      className={cn(
+                        'w-10 h-10 rounded-full border-2 shadow-lg flex items-center justify-center text-white text-sm font-bold transition-all',
+                        isActive ? 'border-primary scale-110' : 'border-white'
+                      )}
                       style={{
                         backgroundColor: getBinMarkerColor(bin.fill_percentage, bin.status),
                       }}
                     >
                       {bin.bin_number}
                     </div>
-                    <div>
-                      <div className="font-semibold text-gray-900">Bin #{bin.bin_number}</div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="font-semibold text-gray-900">Bin #{bin.bin_number}</div>
+                        {isConfigured && !isActive && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Configured
+                          </span>
+                        )}
+                        {isActive && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 animate-pulse">
+                            ▶ Active
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-gray-500">{bin.current_street}</div>
+                      {!isActive && config.moveType === 'redeployment' && config.newStreet && (
+                        <div className="text-xs text-green-600 mt-1">
+                          → {config.newStreet}
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      setSelectedBins(selectedBins.filter((b) => b.id !== bin.id));
-                    }}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <X className="w-4 h-4 text-gray-400" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {!isActive && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveBinId(bin.id);
+                        }}
+                        className="px-3 py-1.5 text-xs font-medium text-primary hover:bg-blue-50 rounded-lg transition-colors"
+                      >
+                        Configure
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedBins(selectedBins.filter((b) => b.id !== bin.id));
+                        if (isActive && selectedBins.length > 1) {
+                          // Switch to next bin
+                          const nextBin = selectedBins.find(b => b.id !== bin.id);
+                          if (nextBin) setActiveBinId(nextBin.id);
+                        }
+                      }}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      <X className="w-4 h-4 text-gray-400" />
+                    </button>
+                  </div>
                 </div>
+
+                {/* Expandable Configuration Form - Only Shown When Active */}
+                {isActive && (
+                  <div className="px-4 pb-4 pt-2 space-y-4 border-t border-gray-200"
+                    onClick={(e) => e.stopPropagation()}
+                  >
 
                 {/* Move Type */}
                 <div>
@@ -1498,13 +1566,13 @@ export function ScheduleMoveModalWithMap({
                               💡 Click Orange Pins on Map
                             </p>
                             <p className="text-xs text-orange-700">
-                              Orange markers show potential deployment locations. Click any marker to instantly select it as the destination.
+                              Orange markers show potential deployment locations for <strong>Bin #{bin.bin_number}</strong>. Click any marker to instantly select it as the destination.
                             </p>
                           </div>
                         </div>
                         {nearbyPotentialLocations[bin.id]?.length > 0 && (
                           <div className="text-xs text-gray-600 text-center">
-                            Found {nearbyPotentialLocations[bin.id].length} potential location{nearbyPotentialLocations[bin.id].length !== 1 ? 's' : ''} on map
+                            Found {nearbyPotentialLocations[bin.id].length} potential location{nearbyPotentialLocations[bin.id].length !== 1 ? 's' : ''} on map for Bin #{bin.bin_number}
                           </div>
                         )}
                       </div>
@@ -2121,6 +2189,8 @@ export function ScheduleMoveModalWithMap({
                     placeholder="Additional details..."
                   />
                 </div>
+                  </div>
+                )}
               </div>
             );
           })}
