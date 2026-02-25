@@ -274,9 +274,10 @@ export function ScheduleMoveModalWithMap({
 
   // Handle bin selection from map click
   const handleBinMarkerClick = useCallback((clickedBin: BinWithPriority) => {
+    const isCurrentlySelected = selectedBins.some((b) => b.id === clickedBin.id);
+
     setSelectedBins((prev) => {
-      const isSelected = prev.some((b) => b.id === clickedBin.id);
-      if (isSelected) {
+      if (isCurrentlySelected) {
         // Deselect
         return prev.filter((b) => b.id !== clickedBin.id);
       } else {
@@ -284,6 +285,17 @@ export function ScheduleMoveModalWithMap({
         return [...prev, clickedBin];
       }
     });
+
+    // If selecting a warehouse bin, ensure it's set to redeployment
+    if (!isCurrentlySelected && clickedBin.status === 'in_storage') {
+      // Use setTimeout to ensure state is updated after selectedBins changes
+      setTimeout(() => {
+        updateBinConfig(clickedBin.id, {
+          moveType: 'redeployment',
+          destinationType: 'potential_location'
+        });
+      }, 0);
+    }
 
     // Pan to bin (check both coordinate field options)
     const lat = clickedBin.current_latitude ?? clickedBin.latitude;
@@ -548,6 +560,7 @@ export function ScheduleMoveModalWithMap({
         position={{ lat: location.latitude, lng: location.longitude }}
         zIndex={isSelected ? 25 : 5}
         onClick={() => {
+          console.log('🎯 [POTENTIAL MARKER] Clicked:', location.street);
           // Auto-select this potential location
           updateBinConfig(binId, {
             destinationType: 'potential_location',
@@ -560,18 +573,31 @@ export function ScheduleMoveModalWithMap({
           });
         }}
       >
-        <div className="relative cursor-pointer group">
+        <div className="relative cursor-pointer group pointer-events-auto">
           {/* Marker */}
           <div
             className={cn(
-              'w-7 h-7 rounded-full border-2 shadow-lg flex items-center justify-center text-xs font-bold transition-all',
+              'w-7 h-7 rounded-full border-2 shadow-lg flex items-center justify-center text-xs font-bold transition-all pointer-events-auto',
               isSelected
                 ? 'bg-green-500 border-white scale-110'
                 : 'bg-orange-400 border-white hover:scale-110'
             )}
             title={`${location.street}, ${location.city} (${Math.round(location.distance_meters)}m away)`}
+            onClick={(e) => {
+              e.stopPropagation();
+              console.log('🎯 [POTENTIAL MARKER DIV] Clicked:', location.street);
+              updateBinConfig(binId, {
+                destinationType: 'potential_location',
+                sourcePotentialLocationId: location.id,
+                newStreet: location.street,
+                newCity: location.city,
+                newZip: location.zip,
+                newLatitude: location.latitude,
+                newLongitude: location.longitude,
+              });
+            }}
           >
-            <MapPin className="w-4 h-4 text-white fill-white" />
+            <MapPin className="w-4 h-4 text-white fill-white pointer-events-none" />
           </div>
           {/* Label */}
           <div className={cn(
@@ -1175,6 +1201,7 @@ export function ScheduleMoveModalWithMap({
 
   // Update a specific bin's configuration
   const updateBinConfig = (binId: string, updates: Partial<BinMoveConfig>) => {
+    console.log('📝 [UPDATE CONFIG] Bin:', binId, 'Updates:', updates);
     setBinConfigs((prev) => ({
       ...prev,
       [binId]: { ...prev[binId], ...updates },
@@ -1232,6 +1259,7 @@ export function ScheduleMoveModalWithMap({
 
   // Handle place selection for relocation address
   const handlePlaceSelect = (binId: string, place: HerePlaceDetails) => {
+    console.log('🏠 [PLACE SELECT] Selected place:', place);
     updateBinConfig(binId, {
       newStreet: place.address,
       newCity: place.city || '',
@@ -1458,11 +1486,27 @@ export function ScheduleMoveModalWithMap({
                     </h4>
 
                     {config.moveType === 'redeployment' && (
-                      <div className="flex gap-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
-                        <MapPin className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
-                        <p className="text-xs text-orange-700">
-                          <strong>Click orange markers on map</strong> to select a potential location, or enter a custom address below.
-                        </p>
+                      <div className="space-y-2">
+                        <div className="flex gap-2 p-3 bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-300 rounded-lg shadow-sm">
+                          <div className="flex-shrink-0">
+                            <div className="w-8 h-8 rounded-full bg-orange-400 border-2 border-white shadow-md flex items-center justify-center animate-pulse">
+                              <MapPin className="w-5 h-5 text-white fill-white" />
+                            </div>
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-bold text-orange-900 mb-1">
+                              💡 Click Orange Pins on Map
+                            </p>
+                            <p className="text-xs text-orange-700">
+                              Orange markers show potential deployment locations. Click any marker to instantly select it as the destination.
+                            </p>
+                          </div>
+                        </div>
+                        {nearbyPotentialLocations[bin.id]?.length > 0 && (
+                          <div className="text-xs text-gray-600 text-center">
+                            Found {nearbyPotentialLocations[bin.id].length} potential location{nearbyPotentialLocations[bin.id].length !== 1 ? 's' : ''} on map
+                          </div>
+                        )}
                       </div>
                     )}
 
