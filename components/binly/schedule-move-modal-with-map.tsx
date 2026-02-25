@@ -1474,11 +1474,24 @@ export function ScheduleMoveModalWithMap({
 
           {/* Show ALL selected bins in configuration step, grouped by type */}
           {fieldBinCount > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                <Truck className="w-4 h-4" />
-                Field Bins ({fieldBinCount})
-              </h3>
+            <div className="space-y-4">
+              {/* Enhanced Field Bins Header */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center shadow-md">
+                    <Truck className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-blue-900">
+                      Field Bins ({fieldBinCount})
+                    </h3>
+                    <p className="text-sm text-blue-700">
+                      Bins currently deployed in the field
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {fieldBins.map((bin, index) => {
             const config = binConfigs[bin.id];
             if (!config) return null;
@@ -1486,7 +1499,7 @@ export function ScheduleMoveModalWithMap({
             return (
               <div
                 key={bin.id}
-                className="bg-white border-2 border-gray-200 rounded-xl p-4 space-y-4 hover:border-gray-300 transition-all"
+                className="bg-white border-2 border-gray-200 rounded-xl p-4 space-y-4 hover:border-gray-300 transition-all border-l-4 border-l-blue-500"
               >
                 {/* Bin Header */}
                 <div className="flex items-center justify-between pb-3 border-b border-gray-200">
@@ -1519,8 +1532,8 @@ export function ScheduleMoveModalWithMap({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Move Type *
                   </label>
-                  {moveMode === 'warehouse_bins' ? (
-                    // Warehouse bins mode - only show redeployment
+                  {bin.status === 'in_storage' ? (
+                    // Warehouse bin - only show redeployment
                     <div>
                       <button
                         type="button"
@@ -1537,7 +1550,7 @@ export function ScheduleMoveModalWithMap({
                       </button>
                     </div>
                   ) : (
-                    // Field bins mode - show store and relocate
+                    // Field bin - show store and relocate
                     <div className="grid grid-cols-2 gap-3">
                       <button
                         type="button"
@@ -2229,11 +2242,24 @@ export function ScheduleMoveModalWithMap({
 
           {/* Warehouse Bins Section */}
           {warehouseBinCount > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                <Package className="w-4 h-4" />
-                Warehouse Bins ({warehouseBinCount})
-              </h3>
+            <div className="space-y-4">
+              {/* Enhanced Warehouse Bins Header */}
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-green-600 flex items-center justify-center shadow-md">
+                    <Package className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-green-900">
+                      Warehouse Bins ({warehouseBinCount})
+                    </h3>
+                    <p className="text-sm text-green-700">
+                      Bins currently stored in warehouse
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {warehouseBins.map((bin, index) => {
             const config = binConfigs[bin.id];
             if (!config) return null;
@@ -2241,7 +2267,7 @@ export function ScheduleMoveModalWithMap({
             return (
               <div
                 key={bin.id}
-                className="bg-white border-2 border-gray-200 rounded-xl p-4 space-y-4 hover:border-gray-300 transition-all"
+                className="bg-white border-2 border-gray-200 rounded-xl p-4 space-y-4 hover:border-gray-300 transition-all border-l-4 border-l-green-600"
               >
                 {/* Bin Header */}
                 <div className="flex items-center justify-between pb-3 border-b border-gray-200">
