@@ -1625,35 +1625,31 @@ export function ScheduleMoveModalWithMap({
                       </div>
                     )}
 
-                    {/* Radio Buttons: Custom Address vs Potential Location */}
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        onClick={() => updateBinConfig(bin.id, {
-                          destinationType: 'custom',
-                          sourcePotentialLocationId: null  // Clear the link to potential location
-                        })}
-                        className={cn(
-                          'flex-1 p-2 border-2 rounded-lg text-xs font-medium transition-all',
-                          config.destinationType === 'custom'
-                            ? 'border-primary bg-white text-primary'
-                            : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
-                        )}
-                      >
-                        Custom Address
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateBinConfig(bin.id, { destinationType: 'potential_location' })}
-                        className={cn(
-                          'flex-1 p-2 border-2 rounded-lg text-xs font-medium transition-all',
-                          config.destinationType === 'potential_location'
-                            ? 'border-primary bg-white text-primary'
-                            : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
-                        )}
-                      >
-                        Potential Location
-                      </button>
+                    {/* Destination Type Dropdown */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Location Type
+                      </label>
+                      <Dropdown
+                        label=""
+                        value={config.destinationType || 'custom'}
+                        options={[
+                          { value: 'custom', label: 'Custom Address' },
+                          { value: 'potential_location', label: 'Potential Location' },
+                        ]}
+                        onChange={(value) => {
+                          // Wipe all destination data when switching types
+                          updateBinConfig(bin.id, {
+                            destinationType: value as 'custom' | 'potential_location',
+                            sourcePotentialLocationId: null,
+                            newStreet: '',
+                            newCity: '',
+                            newZip: '',
+                            newLatitude: undefined,
+                            newLongitude: undefined,
+                          });
+                        }}
+                      />
                     </div>
 
                     {/* Custom Address Fields */}
@@ -2323,35 +2319,31 @@ export function ScheduleMoveModalWithMap({
                     Deployment Location *
                   </label>
 
-                  {/* Toggle Buttons: Custom Address vs Potential Location */}
-                  <div className="flex gap-3 mb-3">
-                    <button
-                      type="button"
-                      onClick={() => updateBinConfig(bin.id, {
-                        destinationType: 'custom',
-                        sourcePotentialLocationId: null  // Clear the link to potential location
-                      })}
-                      className={cn(
-                        'flex-1 p-2 border-2 rounded-lg text-xs font-medium transition-all',
-                        config.destinationType === 'custom'
-                          ? 'border-primary bg-white text-primary'
-                          : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
-                      )}
-                    >
-                      Custom Address
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateBinConfig(bin.id, { destinationType: 'potential_location' })}
-                      className={cn(
-                        'flex-1 p-2 border-2 rounded-lg text-xs font-medium transition-all',
-                        config.destinationType === 'potential_location'
-                          ? 'border-primary bg-white text-primary'
-                          : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
-                      )}
-                    >
-                      Potential Location
-                    </button>
+                  {/* Destination Type Dropdown */}
+                  <div className="mb-3">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Location Type
+                    </label>
+                    <Dropdown
+                      label=""
+                      value={config.destinationType || 'potential_location'}
+                      options={[
+                        { value: 'custom', label: 'Custom Address' },
+                        { value: 'potential_location', label: 'Potential Location' },
+                      ]}
+                      onChange={(value) => {
+                        // Wipe all destination data when switching types
+                        updateBinConfig(bin.id, {
+                          destinationType: value as 'custom' | 'potential_location',
+                          sourcePotentialLocationId: null,
+                          newStreet: '',
+                          newCity: '',
+                          newZip: '',
+                          newLatitude: undefined,
+                          newLongitude: undefined,
+                        });
+                      }}
+                    />
                   </div>
 
                   {/* Custom Address Fields */}
