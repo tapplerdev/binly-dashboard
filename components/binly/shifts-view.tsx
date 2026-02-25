@@ -3156,8 +3156,8 @@ function CreateShiftDrawer({
                   </div>
                 </div>
 
-                {/* Capacity Preview */}
-                {truckCapacity && parseInt(truckCapacity) > 0 && (
+                {/* Capacity Preview - Commented out to save space */}
+                {/* {truckCapacity && parseInt(truckCapacity) > 0 && (
                   <div className="mt-3 pt-3 border-t border-blue-200">
                     <h4 className="text-xs font-semibold text-blue-900 mb-2">Truck Capacity Preview</h4>
                     <div className="space-y-1.5">
@@ -3231,7 +3231,7 @@ function CreateShiftDrawer({
                       )}
                     </div>
                   </div>
-                )}
+                )} */}
               </div>
             )}
 
