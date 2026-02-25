@@ -1312,53 +1312,53 @@ export function ScheduleMoveModalWithMap({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Move Type *
                   </label>
-                  <div className="grid grid-cols-3 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => updateBinConfig(bin.id, { moveType: 'store' })}
-                      className={cn(
-                        'p-3 border-2 rounded-lg text-left transition-colors',
-                        config.moveType === 'store'
-                          ? 'border-primary bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      )}
-                    >
-                      <div className="font-semibold text-sm text-gray-900">Store</div>
-                      <div className="text-xs text-gray-600">Pickup and store</div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateBinConfig(bin.id, { moveType: 'relocation' })}
-                      className={cn(
-                        'p-3 border-2 rounded-lg text-left transition-colors',
-                        config.moveType === 'relocation'
-                          ? 'border-primary bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      )}
-                    >
-                      <div className="font-semibold text-sm text-gray-900">Relocate</div>
-                      <div className="text-xs text-gray-600">Move to new address</div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateBinConfig(bin.id, { moveType: 'redeployment', destinationType: 'custom' })}
-                      className={cn(
-                        'p-3 border-2 rounded-lg text-left transition-colors',
-                        config.moveType === 'redeployment'
-                          ? 'border-primary bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300',
-                        bin.status !== 'in_storage' && 'opacity-50 cursor-not-allowed'
-                      )}
-                      disabled={bin.status !== 'in_storage'}
-                    >
-                      <div className="font-semibold text-sm text-gray-900">Redeploy</div>
-                      <div className="text-xs text-gray-600">Deploy from warehouse</div>
-                    </button>
-                  </div>
-                  {bin.status !== 'in_storage' && config.moveType === 'store' && (
-                    <p className="text-xs text-gray-500 mt-2">
-                      💡 <strong>Redeploy</strong> is only available for bins in warehouse (status: in_storage)
-                    </p>
+                  {moveMode === 'warehouse_bins' ? (
+                    // Warehouse bins mode - only show redeployment
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => updateBinConfig(bin.id, { moveType: 'redeployment', destinationType: 'custom' })}
+                        className={cn(
+                          'w-full p-3 border-2 rounded-lg text-left transition-colors',
+                          config.moveType === 'redeployment'
+                            ? 'border-primary bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        )}
+                      >
+                        <div className="font-semibold text-sm text-gray-900">Redeploy</div>
+                        <div className="text-xs text-gray-600">Deploy from warehouse to field</div>
+                      </button>
+                    </div>
+                  ) : (
+                    // Field bins mode - show store and relocate
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => updateBinConfig(bin.id, { moveType: 'store' })}
+                        className={cn(
+                          'p-3 border-2 rounded-lg text-left transition-colors',
+                          config.moveType === 'store'
+                            ? 'border-primary bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        )}
+                      >
+                        <div className="font-semibold text-sm text-gray-900">Store</div>
+                        <div className="text-xs text-gray-600">Pickup and store</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateBinConfig(bin.id, { moveType: 'relocation' })}
+                        className={cn(
+                          'p-3 border-2 rounded-lg text-left transition-colors',
+                          config.moveType === 'relocation'
+                            ? 'border-primary bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        )}
+                      >
+                        <div className="font-semibold text-sm text-gray-900">Relocate</div>
+                        <div className="text-xs text-gray-600">Move to new address</div>
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -1918,50 +1918,54 @@ export function ScheduleMoveModalWithMap({
                   />
                 </div>
 
-                {/* Reason Category */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Reason for Move <span className="text-gray-400 font-normal">(optional)</span>
-                  </label>
-                  <Dropdown
-                    label=""
-                    value={config.reasonCategory || ''}
-                    options={[
-                      { value: '', label: 'Select a reason...' },
-                      ...MOVE_REASON_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
-                    ]}
-                    onChange={(value) => updateBinConfig(bin.id, {
-                      reasonCategory: value ? value as BinChangeReasonCategory : undefined,
-                      createNoGoZone: false,
-                    })}
-                    className="w-full"
-                  />
-                </div>
+                {/* Reason Category - Only show for store and relocation, NOT redeployment */}
+                {config.moveType !== 'redeployment' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Reason for Move <span className="text-gray-400 font-normal">(optional)</span>
+                      </label>
+                      <Dropdown
+                        label=""
+                        value={config.reasonCategory || ''}
+                        options={[
+                          { value: '', label: 'Select a reason...' },
+                          ...MOVE_REASON_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+                        ]}
+                        onChange={(value) => updateBinConfig(bin.id, {
+                          reasonCategory: value ? value as BinChangeReasonCategory : undefined,
+                          createNoGoZone: false,
+                        })}
+                        className="w-full"
+                      />
+                    </div>
 
-                {/* Auto no-go zone notice */}
-                {config.reasonCategory && MOVE_REASON_OPTIONS.find((o) => o.value === config.reasonCategory)?.autoZone && (
-                  <div className="flex gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
-                    <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-amber-700">
-                      A no-go zone will be automatically created at the current bin location.
-                    </p>
-                  </div>
-                )}
+                    {/* Auto no-go zone notice */}
+                    {config.reasonCategory && MOVE_REASON_OPTIONS.find((o) => o.value === config.reasonCategory)?.autoZone && (
+                      <div className="flex gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+                        <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-700">
+                          A no-go zone will be automatically created at the current bin location.
+                        </p>
+                      </div>
+                    )}
 
-                {/* Optional no-go zone checkbox for relocation_request */}
-                {config.reasonCategory === 'relocation_request' && (
-                  <div className="flex items-start gap-2 p-2.5 bg-gray-50 border border-gray-200 rounded-lg">
-                    <input
-                      id={`no-go-zone-${bin.id}`}
-                      type="checkbox"
-                      checked={config.createNoGoZone ?? false}
-                      onChange={(e) => updateBinConfig(bin.id, { createNoGoZone: e.target.checked })}
-                      className="mt-0.5 h-4 w-4 rounded border-gray-300"
-                    />
-                    <label htmlFor={`no-go-zone-${bin.id}`} className="text-xs text-gray-700 cursor-pointer">
-                      <span className="font-medium">Create no-go zone</span> at current location
-                    </label>
-                  </div>
+                    {/* Optional no-go zone checkbox for relocation_request */}
+                    {config.reasonCategory === 'relocation_request' && (
+                      <div className="flex items-start gap-2 p-2.5 bg-gray-50 border border-gray-200 rounded-lg">
+                        <input
+                          id={`no-go-zone-${bin.id}`}
+                          type="checkbox"
+                          checked={config.createNoGoZone ?? false}
+                          onChange={(e) => updateBinConfig(bin.id, { createNoGoZone: e.target.checked })}
+                          className="mt-0.5 h-4 w-4 rounded border-gray-300"
+                        />
+                        <label htmlFor={`no-go-zone-${bin.id}`} className="text-xs text-gray-700 cursor-pointer">
+                          <span className="font-medium">Create no-go zone</span> at current location
+                        </label>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {/* Notes */}
