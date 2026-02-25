@@ -60,11 +60,11 @@ const MOVE_REASON_OPTIONS: { value: BinChangeReasonCategory; label: string; auto
 
 interface BinMoveConfig {
   bin: BinWithPriority;
-  moveType: 'store' | 'relocation';
+  moveType: 'store' | 'relocation' | 'redeployment';
   scheduledDate: number; // Unix timestamp
   dateOption: '24h' | '3days' | 'week' | 'custom'; // Quick-pick date option
-  destinationType?: 'custom' | 'potential_location'; // NEW: Choose between custom address or potential location
-  sourcePotentialLocationId?: string; // NEW: Selected potential location ID
+  destinationType?: 'custom' | 'potential_location'; // Choose between custom address or potential location
+  sourcePotentialLocationId?: string; // Selected potential location ID
   newStreet?: string;
   newCity?: string;
   newZip?: string;
@@ -216,10 +216,10 @@ export function ScheduleMoveModalWithMap({
     setBinConfigs(newConfigs);
   }, [selectedBins]);
 
-  // Auto-fetch nearby potential locations for relocation moves (NEW)
+  // Auto-fetch nearby potential locations for relocation and redeployment moves
   useEffect(() => {
     Object.entries(binConfigs).forEach(([binId, config]) => {
-      if (config.moveType === 'relocation' && !nearbyPotentialLocations[binId] && !loadingNearbyLocations[binId]) {
+      if ((config.moveType === 'relocation' || config.moveType === 'redeployment') && !nearbyPotentialLocations[binId] && !loadingNearbyLocations[binId]) {
         setLoadingNearbyLocations((prev) => ({ ...prev, [binId]: true }));
         getNearbyPotentialLocations(binId) // No max_distance = get ALL locations sorted by distance
           .then((locations) => {
@@ -461,14 +461,15 @@ export function ScheduleMoveModalWithMap({
         const payload: any = {
           bin_id: bin.id,
           scheduled_date: Math.floor(config.scheduledDate / 1000), // Convert to Unix seconds
-          move_type: config.moveType === 'store' ? 'store' : 'relocation',
+          move_type: config.moveType, // 'store', 'relocation', or 'redeployment'
           reason: config.reason || '',
           notes: config.notes || '',
           reason_category: config.reasonCategory || undefined,
           create_no_go_zone: config.reasonCategory === 'relocation_request' ? (config.createNoGoZone ?? false) : undefined,
         };
 
-        if (config.moveType === 'relocation') {
+        // Add destination fields for relocation and redeployment
+        if (config.moveType === 'relocation' || config.moveType === 'redeployment') {
           payload.new_street = config.newStreet;
           payload.new_city = config.newCity;
           payload.new_zip = config.newZip;
@@ -587,11 +588,22 @@ export function ScheduleMoveModalWithMap({
     );
   };
 
+  // Determine if we should show only warehouse bins
+  const showOnlyWarehouseBins = useMemo(() => {
+    // Check if ANY selected bin config has moveType === 'redeployment'
+    return Object.values(binConfigs).some((config) => config.moveType === 'redeployment');
+  }, [binConfigs]);
+
   // Filter bins for list view
   const filteredBinsForList = useMemo(() => {
     if (!allBins) return [];
 
     let filtered = [...allBins];
+
+    // Filter to only warehouse bins if redeployment is selected
+    if (showOnlyWarehouseBins) {
+      filtered = filtered.filter((b) => b.status === 'in_storage');
+    }
 
     // Apply search filter
     const query = binSearchQuery.toLowerCase().trim();
@@ -611,8 +623,8 @@ export function ScheduleMoveModalWithMap({
       });
     }
 
-    // Apply fill level filter
-    if (fillLevelFilter !== 'all') {
+    // Apply fill level filter (skip for warehouse bins - they don't have fill levels)
+    if (fillLevelFilter !== 'all' && !showOnlyWarehouseBins) {
       filtered = filtered.filter((b) => {
         // Handle missing bins separately
         if (fillLevelFilter === 'missing') {
@@ -643,7 +655,7 @@ export function ScheduleMoveModalWithMap({
     });
 
     return filtered;
-  }, [allBins, binSearchQuery, fillLevelFilter]);
+  }, [allBins, binSearchQuery, fillLevelFilter, showOnlyWarehouseBins]);
 
   // Render Step 1: Selection
   const renderSelectionStep = () => (
@@ -1081,12 +1093,18 @@ export function ScheduleMoveModalWithMap({
     setBinConfigs((prev) => ({ ...prev, ...updates }));
   };
 
-  const applyBulkMoveType = (moveType: 'store' | 'relocation') => {
+  const applyBulkMoveType = (moveType: 'store' | 'relocation' | 'redeployment') => {
     const updates: Record<string, BinMoveConfig> = {};
     selectedBins.forEach((bin) => {
+      // Only allow redeployment for in_storage bins
+      if (moveType === 'redeployment' && bin.status !== 'in_storage') {
+        return; // Skip this bin
+      }
       updates[bin.id] = {
         ...binConfigs[bin.id],
         moveType,
+        // Reset destination type when changing move type
+        ...(moveType === 'relocation' || moveType === 'redeployment' ? { destinationType: 'custom' } : {}),
       };
     });
     setBinConfigs((prev) => ({ ...prev, ...updates }));
@@ -1274,7 +1292,7 @@ export function ScheduleMoveModalWithMap({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Move Type *
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <button
                       type="button"
                       onClick={() => updateBinConfig(bin.id, { moveType: 'store' })}
@@ -1301,11 +1319,31 @@ export function ScheduleMoveModalWithMap({
                       <div className="font-semibold text-sm text-gray-900">Relocate</div>
                       <div className="text-xs text-gray-600">Move to new address</div>
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => updateBinConfig(bin.id, { moveType: 'redeployment', destinationType: 'custom' })}
+                      className={cn(
+                        'p-3 border-2 rounded-lg text-left transition-colors',
+                        config.moveType === 'redeployment'
+                          ? 'border-primary bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300',
+                        bin.status !== 'in_storage' && 'opacity-50 cursor-not-allowed'
+                      )}
+                      disabled={bin.status !== 'in_storage'}
+                    >
+                      <div className="font-semibold text-sm text-gray-900">Redeploy</div>
+                      <div className="text-xs text-gray-600">Deploy from warehouse</div>
+                    </button>
                   </div>
+                  {bin.status !== 'in_storage' && config.moveType === 'store' && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      💡 <strong>Redeploy</strong> is only available for bins in warehouse (status: in_storage)
+                    </p>
+                  )}
                 </div>
 
-                {/* New Location (for relocation) */}
-                {config.moveType === 'relocation' && (
+                {/* New Location (for relocation OR redeployment) */}
+                {(config.moveType === 'relocation' || config.moveType === 'redeployment') && (
                   <div className="space-y-3 p-3 bg-blue-50 rounded-lg">
                     <h4 className="font-semibold text-sm text-gray-900 flex items-center gap-2">
                       <MapPin className="w-4 h-4" />
