@@ -1465,28 +1465,21 @@ export function ScheduleMoveModalWithMap({
 
         {/* Per-Bin Configuration Cards */}
         <div className="space-y-4">
-          {visibleBins.length === 0 && (
+          {selectedBins.length === 0 && (
             <div className="text-center py-12 text-gray-500">
-              <p className="font-medium">
-                {moveMode === 'warehouse_bins'
-                  ? 'No warehouse bins selected'
-                  : 'No field bins selected'}
-              </p>
-              <p className="text-sm mt-2">
-                {moveMode === 'warehouse_bins'
-                  ? 'Switch to Field Bins or select warehouse bins from the map'
-                  : 'Select bins from the map to configure moves'}
-              </p>
-              {selectedBins.length > 0 && (
-                <p className="text-sm mt-2 text-blue-600">
-                  You have {moveMode === 'warehouse_bins' ? fieldBinCount : warehouseBinCount} {moveMode === 'warehouse_bins' ? 'field' : 'warehouse'} bins configured.
-                  Switch modes to view them.
-                </p>
-              )}
+              <p className="font-medium">No bins selected</p>
+              <p className="text-sm mt-2">Go back and select bins from the map to configure moves</p>
             </div>
           )}
 
-          {visibleBins.map((bin, index) => {
+          {/* Show ALL selected bins in configuration step, grouped by type */}
+          {fieldBinCount > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Truck className="w-4 h-4" />
+                Field Bins ({fieldBinCount})
+              </h3>
+              {fieldBins.map((bin, index) => {
             const config = binConfigs[bin.id];
             if (!config) return null;
 
@@ -2231,6 +2224,157 @@ export function ScheduleMoveModalWithMap({
               </div>
             );
           })}
+            </div>
+          )}
+
+          {/* Warehouse Bins Section */}
+          {warehouseBinCount > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Package className="w-4 h-4" />
+                Warehouse Bins ({warehouseBinCount})
+              </h3>
+              {warehouseBins.map((bin, index) => {
+            const config = binConfigs[bin.id];
+            if (!config) return null;
+
+            return (
+              <div
+                key={bin.id}
+                className="bg-white border-2 border-gray-200 rounded-xl p-4 space-y-4 hover:border-gray-300 transition-all"
+              >
+                {/* Bin Header */}
+                <div className="flex items-center justify-between pb-3 border-b border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-sm font-bold"
+                      style={{
+                        backgroundColor: getBinMarkerColor(bin.fill_percentage, bin.status),
+                      }}
+                    >
+                      {bin.bin_number}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900">Bin #{bin.bin_number}</div>
+                      <div className="text-xs text-gray-500">{bin.current_street}</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleRemoveBin(bin.id)}
+                    className="p-1.5 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    <X className="w-4 h-4 text-red-500" />
+                  </button>
+                </div>
+
+                {/* Move Type (Warehouse bins are always redeployment) */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-2">
+                    Move Type *
+                  </label>
+                  <div className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded-lg">
+                    Redeployment (Deploy bin from warehouse to field)
+                  </div>
+                </div>
+
+                {/* Destination Selection */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-2">
+                    Deployment Location *
+                  </label>
+                  {config.destination.potentialLocationId ? (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-green-900">
+                          {config.destination.street}
+                        </div>
+                        <div className="text-xs text-green-700 mt-0.5">
+                          {config.destination.city}, {config.destination.zip}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => dispatch({ type: 'OPEN_LOCATION_PICKER', binId: bin.id })}
+                        className="text-xs text-green-700 hover:text-green-900 font-medium ml-2"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => dispatch({ type: 'OPEN_LOCATION_PICKER', binId: bin.id })}
+                      className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary hover:bg-primary/5 transition-all text-sm text-gray-600 hover:text-primary font-medium"
+                    >
+                      Select deployment location from map
+                    </button>
+                  )}
+                </div>
+
+                {/* Assignment */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-2">
+                    Assignment
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        updateBinConfig(bin.id, {
+                          assignmentType: 'unassigned',
+                          assignedUserId: undefined,
+                          assignedShiftId: undefined,
+                        });
+                      }}
+                      className={cn(
+                        'flex-1 px-3 py-2 border rounded-lg text-xs font-medium transition-all',
+                        config.assignment.type === 'unassigned'
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                      )}
+                    >
+                      Leave Unassigned
+                    </button>
+                  </div>
+                </div>
+
+                {/* Scheduled Date */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-2">
+                    Scheduled Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={new Date(config.schedule.date).toISOString().split('T')[0]}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const newDate = new Date(e.target.value).getTime();
+                        updateBinConfig(bin.id, {
+                          scheduledDate: newDate,
+                          dateOption: 'custom',
+                        });
+                      }
+                    }}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Notes (Optional)
+                  </label>
+                  <textarea
+                    value={config.notes || ''}
+                    onChange={(e) => updateBinConfig(bin.id, { notes: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    rows={2}
+                    placeholder="Additional details..."
+                  />
+                </div>
+              </div>
+            );
+          })}
+            </div>
+          )}
         </div>
 
         {/* Footer Actions */}
