@@ -48,11 +48,18 @@ export interface RouteTask {
   completed_at?: number | null;
   skipped: boolean;
   updated_fill_percentage?: number | null;
+  photo_url?: string | null;
 
   // Metadata
   task_data?: any;
   created_at: number;
   updated_at?: number | null;
+
+  // Soft delete tracking (for history/audit)
+  is_deleted?: boolean;
+  deleted_at?: number | null;
+  deleted_by?: string | null;
+  deletion_reason?: string | null;
 }
 
 /**
