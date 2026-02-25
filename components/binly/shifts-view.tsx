@@ -2664,9 +2664,13 @@ function CreateShiftDrawer({
       let response;
       if (isEditMode && shift) {
         // Edit mode: PATCH endpoint with added tasks
+        // Filter out warehouse_stop tasks - they will be recreated during optimization
+        const filteredTasks = tasksPayload.filter(task => task.task_type !== 'warehouse_stop');
+        console.log(`🔧 [SHIFT EDIT] Filtered out ${tasksPayload.length - filteredTasks.length} warehouse_stop task(s)`);
+
         const editPayload = {
           driver_id: driverId !== shift.driverId ? driverId : undefined,
-          add_tasks: tasksPayload,
+          add_tasks: filteredTasks,
           reoptimize: true,
           reason: 'Tasks added via shift editor',
         };
