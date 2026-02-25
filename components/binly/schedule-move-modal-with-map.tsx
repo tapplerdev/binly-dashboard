@@ -535,6 +535,58 @@ export function ScheduleMoveModalWithMap({
     }
   };
 
+  // Render potential location marker for redeployment destination selection
+  const renderPotentialLocationMarker = (location: NearbyPotentialLocation, binId: string) => {
+    if (!location.latitude || !location.longitude) return null;
+
+    const config = binConfigs[binId];
+    const isSelected = config?.sourcePotentialLocationId === location.id;
+
+    return (
+      <AdvancedMarker
+        key={`potential-${location.id}`}
+        position={{ lat: location.latitude, lng: location.longitude }}
+        zIndex={isSelected ? 25 : 5}
+        onClick={() => {
+          // Auto-select this potential location
+          updateBinConfig(binId, {
+            destinationType: 'potential_location',
+            sourcePotentialLocationId: location.id,
+            newStreet: location.street,
+            newCity: location.city,
+            newZip: location.zip,
+            newLatitude: location.latitude,
+            newLongitude: location.longitude,
+          });
+        }}
+      >
+        <div className="relative cursor-pointer group">
+          {/* Marker */}
+          <div
+            className={cn(
+              'w-7 h-7 rounded-full border-2 shadow-lg flex items-center justify-center text-xs font-bold transition-all',
+              isSelected
+                ? 'bg-green-500 border-white scale-110'
+                : 'bg-orange-400 border-white hover:scale-110'
+            )}
+            title={`${location.street}, ${location.city} (${Math.round(location.distance_meters)}m away)`}
+          >
+            <MapPin className="w-4 h-4 text-white fill-white" />
+          </div>
+          {/* Label */}
+          <div className={cn(
+            'absolute top-full left-1/2 transform -translate-x-1/2 mt-1 px-1.5 py-0.5 rounded whitespace-nowrap text-[10px] transition-all',
+            isSelected
+              ? 'bg-green-600 text-white'
+              : 'bg-orange-500 text-white opacity-0 group-hover:opacity-100'
+          )}>
+            {isSelected ? '✓ Selected' : `${Math.round(location.distance_meters)}m`}
+          </div>
+        </div>
+      </AdvancedMarker>
+    );
+  };
+
   // Render bin marker
   const renderBinMarker = (bin: BinWithPriority) => {
     // Check for both current_latitude/current_longitude AND latitude/longitude
@@ -817,13 +869,48 @@ export function ScheduleMoveModalWithMap({
                 </React.Fragment>
               );
             })}
+
+            {/* Render potential location markers for redeployment */}
+            {selectedBins.map((bin) => {
+              const config = binConfigs[bin.id];
+              // Only show potential locations when bin is configured for redeployment
+              if (config?.moveType !== 'redeployment') return null;
+
+              const locations = nearbyPotentialLocations[bin.id];
+              if (!locations || locations.length === 0) return null;
+
+              return locations.map((location) =>
+                renderPotentialLocationMarker(location, bin.id)
+              );
+            })}
           </Map>
         </APIProvider>
 
         {/* Map Legend */}
         <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg border border-gray-200 p-3 text-xs">
-          <div className="font-semibold text-gray-900 mb-2">Click bins to select</div>
+          <div className="font-semibold text-gray-900 mb-2">
+            {selectedBins.some((b) => binConfigs[b.id]?.moveType === 'redeployment')
+              ? 'Map Legend'
+              : 'Click bins to select'}
+          </div>
           <div className="space-y-1.5">
+            {/* Show potential location legend when redeployment is active */}
+            {selectedBins.some((b) => binConfigs[b.id]?.moveType === 'redeployment') && (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full bg-orange-400 border border-white shadow-sm flex items-center justify-center">
+                    <MapPin className="w-2.5 h-2.5 text-white" />
+                  </div>
+                  <span className="text-gray-700">Potential locations</span>
+                </div>
+                <div className="flex items-center gap-2 pb-1.5 border-b border-gray-200">
+                  <div className="w-4 h-4 rounded-full bg-green-500 border border-white shadow-sm flex items-center justify-center">
+                    <MapPin className="w-2.5 h-2.5 text-white" />
+                  </div>
+                  <span className="font-semibold text-gray-900">Selected destination</span>
+                </div>
+              </>
+            )}
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded-full bg-red-500 border border-white shadow-sm"></div>
               <span className="text-gray-700">80-100% full</span>
@@ -842,7 +929,7 @@ export function ScheduleMoveModalWithMap({
             </div>
             <div className="flex items-center gap-2 pt-1.5 border-t border-gray-200">
               <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-blue-600 shadow-sm"></div>
-              <span className="font-semibold text-gray-900">Selected</span>
+              <span className="font-semibold text-gray-900">Selected bin</span>
             </div>
           </div>
         </div>
@@ -1366,9 +1453,18 @@ export function ScheduleMoveModalWithMap({
                 {(config.moveType === 'relocation' || config.moveType === 'redeployment') && (
                   <div className="space-y-3 p-3 bg-blue-50 rounded-lg">
                     <h4 className="font-semibold text-sm text-gray-900 flex items-center gap-2">
-                      <MapPin className="w-4 h-4" />
-                      New Location
+                      <MapIcon className="w-4 h-4" />
+                      {config.moveType === 'redeployment' ? 'Deployment Destination' : 'New Location'}
                     </h4>
+
+                    {config.moveType === 'redeployment' && (
+                      <div className="flex gap-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
+                        <MapPin className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-orange-700">
+                          <strong>Click orange markers on map</strong> to select a potential location, or enter a custom address below.
+                        </p>
+                      </div>
+                    )}
 
                     {/* Radio Buttons: Custom Address vs Potential Location */}
                     <div className="flex gap-3">
