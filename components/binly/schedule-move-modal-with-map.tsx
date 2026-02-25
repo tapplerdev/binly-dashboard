@@ -1232,18 +1232,27 @@ export function ScheduleMoveModalWithMap({
     if (updates.destinationType !== undefined || updates.sourcePotentialLocationId !== undefined ||
         updates.newStreet !== undefined || updates.newCity !== undefined || updates.newZip !== undefined ||
         updates.newLatitude !== undefined || updates.newLongitude !== undefined) {
+
+      const destinationUpdate = {
+        type: updates.destinationType,
+        street: updates.newStreet,
+        city: updates.newCity,
+        zip: updates.newZip,
+        latitude: updates.newLatitude,
+        longitude: updates.newLongitude,
+        potentialLocationId: updates.sourcePotentialLocationId,
+      };
+
+      console.log('🚀 [UPDATE CONFIG] Dispatching SET_DESTINATION with:', {
+        binId,
+        updates,
+        destinationUpdate,
+      });
+
       dispatch({
         type: 'SET_DESTINATION',
         binId,
-        destination: {
-          type: updates.destinationType,
-          street: updates.newStreet,
-          city: updates.newCity,
-          zip: updates.newZip,
-          latitude: updates.newLatitude,
-          longitude: updates.newLongitude,
-          potentialLocationId: updates.sourcePotentialLocationId,
-        },
+        destination: destinationUpdate,
       });
     }
 

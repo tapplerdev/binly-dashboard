@@ -285,16 +285,26 @@ export function moveRequestReducer(
       const config = state.binConfigurations[action.binId];
       if (!config) return state;
 
+      console.log('🔧 [SET_DESTINATION] Before merge:', {
+        binId: action.binId,
+        currentDestination: config.destination,
+        incomingDestination: action.destination,
+      });
+
+      const mergedDestination = {
+        ...config.destination,
+        ...action.destination,
+      };
+
+      console.log('✅ [SET_DESTINATION] After merge:', mergedDestination);
+
       return {
         ...state,
         binConfigurations: {
           ...state.binConfigurations,
           [action.binId]: {
             ...config,
-            destination: {
-              ...config.destination,
-              ...action.destination,
-            },
+            destination: mergedDestination,
           },
         },
       };
