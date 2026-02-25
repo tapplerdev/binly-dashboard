@@ -202,26 +202,44 @@ export function ScheduleMoveModalWithMap({
 
   // Initialize bin configs when bins are selected
   useEffect(() => {
-    const newConfigs: Record<string, BinMoveConfig> = {};
     const defaultScheduledDate = addDays(new Date(), 1).getTime();
-    selectedBins.forEach((b) => {
-      if (!binConfigs[b.id]) {
-        // Auto-set move type based on mode
-        const defaultMoveType = moveMode === 'warehouse_bins' ? 'redeployment' : 'store';
 
-        newConfigs[b.id] = {
-          bin: b,
-          moveType: defaultMoveType,
-          scheduledDate: defaultScheduledDate,
-          dateOption: '24h',
-          destinationType: 'custom',
-          assignmentType: 'unassigned',
-        };
-      } else {
-        newConfigs[b.id] = binConfigs[b.id];
-      }
+    // Only update if we have bins that don't have configs yet
+    const needsInitialization = selectedBins.some(b => !binConfigs[b.id]);
+
+    if (needsInitialization) {
+      setBinConfigs(prev => {
+        const newConfigs = { ...prev };
+        selectedBins.forEach((b) => {
+          if (!newConfigs[b.id]) {
+            // Auto-set move type based on mode
+            const defaultMoveType = moveMode === 'warehouse_bins' ? 'redeployment' : 'store';
+
+            newConfigs[b.id] = {
+              bin: b,
+              moveType: defaultMoveType,
+              scheduledDate: defaultScheduledDate,
+              dateOption: '24h',
+              destinationType: 'custom',
+              assignmentType: 'unassigned',
+            };
+          }
+        });
+        return newConfigs;
+      });
+    }
+
+    // Clean up configs for bins that are no longer selected
+    setBinConfigs(prev => {
+      const selectedBinIds = new Set(selectedBins.map(b => b.id));
+      const cleaned: Record<string, BinMoveConfig> = {};
+      Object.entries(prev).forEach(([binId, config]) => {
+        if (selectedBinIds.has(binId)) {
+          cleaned[binId] = config;
+        }
+      });
+      return cleaned;
     });
-    setBinConfigs(newConfigs);
   }, [selectedBins, moveMode]);
 
   // Auto-fetch nearby potential locations for relocation and redeployment moves

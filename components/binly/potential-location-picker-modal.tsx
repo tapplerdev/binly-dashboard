@@ -121,7 +121,7 @@ export function PotentialLocationPickerModal({
                         className={cn(
                           'w-9 h-9 rounded-full border-3 shadow-xl flex items-center justify-center transition-all',
                           isSelected
-                            ? 'bg-green-500 border-white scale-125'
+                            ? 'bg-blue-500 border-blue-600 scale-125'
                             : isHovered
                             ? 'bg-orange-500 border-white scale-110'
                             : 'bg-orange-400 border-white'
@@ -135,7 +135,7 @@ export function PotentialLocationPickerModal({
                         className={cn(
                           'absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-1.5 rounded-lg whitespace-nowrap text-sm font-medium shadow-lg transition-all',
                           isSelected
-                            ? 'bg-green-600 text-white scale-100 opacity-100'
+                            ? 'bg-blue-600 text-white scale-100 opacity-100'
                             : isHovered
                             ? 'bg-orange-500 text-white scale-100 opacity-100'
                             : 'bg-gray-800 text-white scale-95 opacity-0 group-hover:scale-100 group-hover:opacity-100'
@@ -164,7 +164,7 @@ export function PotentialLocationPickerModal({
                 <span className="text-gray-700">Potential locations</span>
               </div>
               <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-green-500 border-2 border-white shadow-md flex items-center justify-center">
+                <div className="w-6 h-6 rounded-full bg-blue-500 border-2 border-blue-600 shadow-md flex items-center justify-center">
                   <MapPin className="w-3.5 h-3.5 text-white" />
                 </div>
                 <span className="text-gray-700">Selected location</span>
