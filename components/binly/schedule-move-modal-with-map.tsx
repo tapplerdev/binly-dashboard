@@ -1619,7 +1619,7 @@ export function ScheduleMoveModalWithMap({
                     <div className="flex gap-3">
                       <button
                         type="button"
-                        onClick={() => updateBinConfig(bin.id, { destinationType: 'custom', sourcePotentialLocationId: undefined })}
+                        onClick={() => updateBinConfig(bin.id, { destinationType: 'custom' })}
                         className={cn(
                           'flex-1 p-2 border-2 rounded-lg text-xs font-medium transition-all',
                           config.destinationType === 'custom'
@@ -2314,7 +2314,7 @@ export function ScheduleMoveModalWithMap({
                   <div className="flex gap-3 mb-3">
                     <button
                       type="button"
-                      onClick={() => updateBinConfig(bin.id, { destinationType: 'custom', sourcePotentialLocationId: undefined })}
+                      onClick={() => updateBinConfig(bin.id, { destinationType: 'custom' })}
                       className={cn(
                         'flex-1 p-2 border-2 rounded-lg text-xs font-medium transition-all',
                         config.destinationType === 'custom'
@@ -2385,14 +2385,14 @@ export function ScheduleMoveModalWithMap({
                   {/* Potential Location Selection */}
                   {config.destinationType === 'potential_location' && (
                     <div>
-                      {config.destination?.potentialLocationId ? (
+                      {config.sourcePotentialLocationId && config.newStreet ? (
                         <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start justify-between">
                           <div className="flex-1">
                             <div className="text-sm font-medium text-green-900">
-                              {config.destination?.street}
+                              {config.newStreet}
                             </div>
                             <div className="text-xs text-green-700 mt-0.5">
-                              {config.destination?.city}, {config.destination?.zip}
+                              {config.newCity}, {config.newZip}
                             </div>
                           </div>
                           <button

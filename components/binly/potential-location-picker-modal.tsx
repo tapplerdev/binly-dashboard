@@ -132,7 +132,7 @@ export function PotentialLocationPickerModal({
                         className={cn(
                           'w-9 h-9 rounded-full border-3 shadow-xl flex items-center justify-center transition-all',
                           isReserved
-                            ? 'bg-gray-400 border-gray-500 opacity-60'
+                            ? 'bg-red-500 border-red-600 animate-pulse'
                             : isSelected
                             ? 'bg-blue-500 border-blue-600 scale-125'
                             : isHovered
@@ -154,7 +154,7 @@ export function PotentialLocationPickerModal({
                         className={cn(
                           'absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-1.5 rounded-lg whitespace-nowrap text-sm font-medium shadow-lg transition-all',
                           isReserved
-                            ? 'bg-gray-600 text-white scale-100 opacity-100'
+                            ? 'bg-red-600 text-white scale-100 opacity-100'
                             : isSelected
                             ? 'bg-blue-600 text-white scale-100 opacity-100'
                             : isHovered
@@ -200,7 +200,7 @@ export function PotentialLocationPickerModal({
                 <span className="text-gray-700">Selected location</span>
               </div>
               <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-gray-400 border-2 border-gray-500 shadow-md flex items-center justify-center text-white text-xs font-bold opacity-60">
+                <div className="w-6 h-6 rounded-full bg-red-500 border-2 border-red-600 shadow-md flex items-center justify-center text-white text-xs font-bold animate-pulse">
                   #
                 </div>
                 <span className="text-gray-700">Reserved by another bin</span>
