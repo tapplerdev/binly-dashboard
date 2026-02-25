@@ -2325,7 +2325,7 @@ export function ScheduleMoveModalWithMap({
                       }}
                       className={cn(
                         'flex-1 px-3 py-2 border rounded-lg text-xs font-medium transition-all',
-                        config.assignment.type === 'unassigned'
+                        config.assignment?.type === 'unassigned'
                           ? 'border-primary bg-primary/10 text-primary'
                           : 'border-gray-300 text-gray-700 hover:border-gray-400'
                       )}
@@ -2342,7 +2342,7 @@ export function ScheduleMoveModalWithMap({
                   </label>
                   <input
                     type="date"
-                    value={new Date(config.schedule.date).toISOString().split('T')[0]}
+                    value={config.schedule?.date ? new Date(config.schedule.date).toISOString().split('T')[0] : ''}
                     onChange={(e) => {
                       if (e.target.value) {
                         const newDate = new Date(e.target.value).getTime();
