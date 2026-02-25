@@ -178,6 +178,23 @@ export function ScheduleMoveModalWithMap({
   const isSubmitting = state.ui.isSubmitting;
   const isClosing = state.ui.isClosing;
 
+  // Computed properties: Separate bins by status for display
+  const fieldBins = useMemo(() => {
+    return selectedBins.filter(bin => bin.status !== 'in_storage');
+  }, [selectedBins]);
+
+  const warehouseBins = useMemo(() => {
+    return selectedBins.filter(bin => bin.status === 'in_storage');
+  }, [selectedBins]);
+
+  // Determine which bins to show based on current mode
+  const visibleBins = useMemo(() => {
+    return moveMode === 'warehouse_bins' ? warehouseBins : fieldBins;
+  }, [moveMode, fieldBins, warehouseBins]);
+
+  const fieldBinCount = fieldBins.length;
+  const warehouseBinCount = warehouseBins.length;
+
   // Local UI state (not part of move request logic)
   const [viewMode, setViewMode] = useState<'form' | 'map'>('form'); // Mobile toggle
   const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER);
@@ -1437,7 +1454,28 @@ export function ScheduleMoveModalWithMap({
 
         {/* Per-Bin Configuration Cards */}
         <div className="space-y-4">
-          {selectedBins.map((bin, index) => {
+          {visibleBins.length === 0 && (
+            <div className="text-center py-12 text-gray-500">
+              <p className="font-medium">
+                {moveMode === 'warehouse_bins'
+                  ? 'No warehouse bins selected'
+                  : 'No field bins selected'}
+              </p>
+              <p className="text-sm mt-2">
+                {moveMode === 'warehouse_bins'
+                  ? 'Switch to Field Bins or select warehouse bins from the map'
+                  : 'Select bins from the map to configure moves'}
+              </p>
+              {selectedBins.length > 0 && (
+                <p className="text-sm mt-2 text-blue-600">
+                  You have {moveMode === 'warehouse_bins' ? fieldBinCount : warehouseBinCount} {moveMode === 'warehouse_bins' ? 'field' : 'warehouse'} bins configured.
+                  Switch modes to view them.
+                </p>
+              )}
+            </div>
+          )}
+
+          {visibleBins.map((bin, index) => {
             const config = binConfigs[bin.id];
             if (!config) return null;
 
@@ -2202,11 +2240,16 @@ export function ScheduleMoveModalWithMap({
             {isSubmitting ? (
               <>
                 <Loader2 className="w-5 h-5 inline mr-2 animate-spin" />
-                Creating {selectedBins.length} moves...
+                Creating {selectedBins.length} move{selectedBins.length !== 1 ? 's' : ''}...
               </>
             ) : (
               <>
-                Create All {selectedBins.length} Moves
+                Schedule {selectedBins.length} Move{selectedBins.length !== 1 ? 's' : ''}
+                {fieldBinCount > 0 && warehouseBinCount > 0 && (
+                  <span className="text-xs ml-2 opacity-90">
+                    ({fieldBinCount} field, {warehouseBinCount} warehouse)
+                  </span>
+                )}
               </>
             )}
           </button>
@@ -2271,9 +2314,16 @@ export function ScheduleMoveModalWithMap({
                           : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                       )}
                     >
-                      <div className="flex items-center justify-center gap-2">
-                        <Truck className="w-4 h-4" />
-                        <span>Field Bins</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Truck className="w-4 h-4" />
+                          <span>Field Bins</span>
+                        </div>
+                        {fieldBinCount > 0 && (
+                          <Badge variant="secondary" className="ml-2">
+                            {fieldBinCount}
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-xs text-gray-600 mt-1">Store or relocate active bins</p>
                     </button>
@@ -2288,9 +2338,16 @@ export function ScheduleMoveModalWithMap({
                           : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                       )}
                     >
-                      <div className="flex items-center justify-center gap-2">
-                        <Package className="w-4 h-4" />
-                        <span>Warehouse Bins</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Package className="w-4 h-4" />
+                          <span>Warehouse Bins</span>
+                        </div>
+                        {warehouseBinCount > 0 && (
+                          <Badge variant="secondary" className="ml-2">
+                            {warehouseBinCount}
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-xs text-gray-600 mt-1">Deploy bins from warehouse to field</p>
                     </button>

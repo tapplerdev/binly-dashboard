@@ -160,35 +160,37 @@ export function moveRequestReducer(
       return { ...state, step: action.step };
 
     case 'SET_MODE': {
-      // When switching modes, filter bins to keep only compatible ones
-      // field_bins: bins NOT in_storage
-      // warehouse_bins: bins in_storage
-      const compatibleBins = state.selectedBins.filter(bin => {
-        if (action.mode === 'warehouse_bins') {
-          return bin.status === 'in_storage';
-        } else {
-          return bin.status !== 'in_storage';
-        }
-      });
-
-      // Update configurations for remaining bins to match new mode
+      // When switching modes, preserve ALL bins and configurations
+      // Only auto-adjust moveType for bins to match their status
       const updatedConfigs: { [binId: string]: BinConfiguration } = {};
-      const defaultMoveType: MoveType = action.mode === 'warehouse_bins' ? 'redeployment' : 'store';
 
-      compatibleBins.forEach(bin => {
-        const existingConfig = state.binConfigurations[bin.id];
-        if (existingConfig) {
-          updatedConfigs[bin.id] = {
-            ...existingConfig,
-            moveType: defaultMoveType,
-          };
+      Object.entries(state.binConfigurations).forEach(([binId, config]) => {
+        const bin = config.bin;
+
+        // Auto-adjust moveType if it doesn't match the bin's status
+        let moveType = config.moveType;
+        if (bin.status === 'in_storage') {
+          // Warehouse bin should always be 'redeployment'
+          moveType = 'redeployment';
+        } else {
+          // Field bin should be 'store' or 'relocation', never 'redeployment'
+          if (config.moveType === 'redeployment') {
+            moveType = 'store';
+          }
         }
+
+        updatedConfigs[binId] = {
+          ...config,
+          moveType,
+        };
       });
 
       return {
         ...state,
         mode: action.mode,
-        selectedBins: compatibleBins,
+        // ✅ Keep all selected bins regardless of mode
+        selectedBins: state.selectedBins,
+        // ✅ Keep all configurations, just update moveType
         binConfigurations: updatedConfigs,
       };
     }
