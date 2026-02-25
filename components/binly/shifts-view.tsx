@@ -2006,8 +2006,9 @@ function CreateShiftDrawer({
     return result;
   };
 
-  // Auto-insert warehouse stops whenever tasks or capacity changes
-  useEffect(() => {
+  // Auto-insert warehouse stops - DISABLED: Let backend/Mapbox handle warehouse stops during optimization
+  // Frontend capacity math is too simplistic - backend uses real routing and traffic data
+  /* useEffect(() => {
     const capacity = parseInt(truckCapacity);
     if (tasks.length > 0 && capacity > 0) {
       const tasksWithAutoWarehouses = autoInsertWarehouseStops(tasks, capacity);
@@ -2018,7 +2019,7 @@ function CreateShiftDrawer({
         setTasks(tasksWithAutoWarehouses);
       }
     }
-  }, [truckCapacity]); // Only run when capacity changes, not on every task change
+  }, [truckCapacity]); // Only run when capacity changes, not on every task change */
 
   // Calculate shift analysis
   const shiftAnalysis = useMemo(() => {
