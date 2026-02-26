@@ -1490,6 +1490,31 @@ function CreateShiftDrawer({
 
   // Confirm and execute deletion
   const confirmDeletion = () => {
+    // Validation: Check pickup/dropoff pairs
+    const tasksBeingDeleted = tasksToDelete.map(idx => tasks[idx]);
+    const moveRequestTasks = tasksBeingDeleted.filter(t =>
+      (t.type === 'pickup' || t.type === 'dropoff') && t.move_request_id
+    );
+
+    // For each move request task, check if paired task is also being deleted
+    for (const task of moveRequestTasks) {
+      const pairedTasks = tasks.filter(t =>
+        t.move_request_id === task.move_request_id &&
+        t.id !== task.id &&
+        (t.type === 'pickup' || t.type === 'dropoff')
+      );
+
+      for (const paired of pairedTasks) {
+        const pairedIndex = tasks.indexOf(paired);
+        if (!tasksToDelete.includes(pairedIndex)) {
+          // Paired task is NOT being deleted - show error
+          alert(`❌ Cannot remove ${task.type} without also removing the paired ${paired.type} task (Bin #${task.bin_number || '?'}). Please select both tasks and try again.`);
+          return; // Cancel deletion
+        }
+      }
+    }
+
+    // All validation passed - proceed with deletion
     const newTasks = tasks.filter((_, index) => !tasksToDelete.includes(index));
     setTasks(newTasks);
     setSelectedTaskIndices(new Set());
@@ -1610,6 +1635,7 @@ function CreateShiftDrawer({
           } else if ((task.task_type === 'pickup' || task.task_type === 'dropoff') && task.move_request_id) {
             baseTask.move_request_id = task.move_request_id;
             baseTask.bin_id = task.bin_id;
+            baseTask.bin_number = task.bin_number; // Copy bin_number from API response
             baseTask.destination_address = task.destination_address;
             baseTask.destination_latitude = task.destination_latitude;
             baseTask.destination_longitude = task.destination_longitude;
