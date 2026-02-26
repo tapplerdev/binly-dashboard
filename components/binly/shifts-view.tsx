@@ -844,7 +844,7 @@ function ShiftsListView({ shifts, onShiftClick }: { shifts: Shift[]; onShiftClic
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-gray-900">
                 {getDateLabel(date)} · {activeShifts} Active Shift
-                {activeShifts !== 1 ? 's' : ''} · {totalBins} Bins Total
+                {activeShifts !== 1 ? 's' : ''} · {totalBins} Tasks Total
               </h2>
             </div>
 
@@ -903,11 +903,11 @@ function ShiftCard({ shift, onClick }: { shift: Shift; onClick: () => void }) {
           <span className={`text-sm ${isActive ? 'text-white font-medium' : 'text-gray-700'}`}>{shift.driverName}</span>
         </div>
 
-        {/* Bin Count / Progress */}
+        {/* Task Count / Progress */}
         <div className={`flex-shrink-0 text-sm ${isActive ? 'text-white font-medium' : 'text-gray-600'}`}>
           {isActive && shift.binsCollected !== undefined
-            ? `${shift.binsCollected}/${shift.binCount} Bins (${progressPercentage}%)`
-            : `${shift.binCount} Bins`}
+            ? `${shift.binsCollected}/${shift.binCount} Tasks (${progressPercentage}%)`
+            : `${shift.binCount} Tasks`}
         </div>
 
         {/* Status Badge */}

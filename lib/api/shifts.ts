@@ -53,6 +53,7 @@ interface BackendShift {
   pause_start_time: number | null;
   total_bins: number;
   completed_bins: number;
+  active_task_count?: number; // Count of non-deleted tasks from route_tasks
   created_at: number;
   updated_at: number;
 }
@@ -99,6 +100,7 @@ interface BackendDriver {
   start_time: number | null;
   total_bins: number;
   completed_bins: number;
+  active_task_count?: number; // Count of non-deleted tasks from route_tasks
   updated_at: number | null;
   current_location: {
     latitude: number;
@@ -567,7 +569,7 @@ function convertBackendShiftToFrontend(driver: BackendDriver): Shift {
     driverName: driver.driver_name,
     driverPhoto: undefined,
     route: driver.route_id ? `Route ${driver.route_id.slice(0, 8)}` : 'Custom Route',
-    binCount: driver.total_bins,
+    binCount: driver.active_task_count ?? driver.total_bins, // Use active_task_count if available, fall back to total_bins
     binsCollected: driver.completed_bins > 0 ? driver.completed_bins : undefined,
     status,
     estimatedCompletion,
