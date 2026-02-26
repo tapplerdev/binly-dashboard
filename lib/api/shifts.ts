@@ -473,6 +473,7 @@ export interface ShiftHistoryTask {
   updated_fill_percentage: number | null;
   bin_street: string | null;
   bin_city: string | null;
+  photo_url: string | null;
   // Placement
   potential_location_id: string | null;
   new_bin_number: number | null;

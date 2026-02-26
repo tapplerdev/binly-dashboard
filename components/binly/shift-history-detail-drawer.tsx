@@ -95,6 +95,18 @@ function TaskCard({ task, index }: { task: ShiftHistoryTask; index: number }) {
             {task.updated_fill_percentage != null && (
               <Row label="Fill recorded" value={`${task.updated_fill_percentage}%`} />
             )}
+            {/* Collection photo */}
+            {task.photo_url && (
+              <div className="pt-2">
+                <div className="relative w-full h-40 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(task.photo_url!, '_blank')}>
+                  <img
+                    src={task.photo_url}
+                    alt="Collection photo"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -110,7 +122,17 @@ function TaskCard({ task, index }: { task: ShiftHistoryTask; index: number }) {
                 </span>
               </div>
             ) : task.new_bin_number != null && !skipped ? (
-              <Row label="Intended bin #" value={`#${task.new_bin_number} (conversion may have failed)`} />
+              completed ? (
+                <Row label="Intended bin #" value={`#${task.new_bin_number} (conversion may have failed)`} />
+              ) : (
+                <div className="flex items-start gap-2">
+                  <span className="text-gray-400 font-medium w-24 shrink-0">Intended bin #</span>
+                  <div className="text-gray-600 font-medium">
+                    <span>#{task.new_bin_number}</span>
+                    <span className="block text-xs text-gray-500 mt-0.5">Not completed - shift ended before task</span>
+                  </div>
+                </div>
+              )
             ) : null}
           </>
         )}
