@@ -17,6 +17,9 @@ import {
   XCircle,
   History,
   ArrowRight,
+  Warehouse,
+  MapPin,
+  Package,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -159,6 +162,83 @@ export function MoveRequestHistoryTimeline({
                     {event.notes}
                   </div>
                 )}
+
+                {/* Enhanced metadata for "created" events */}
+                {event.action_type === 'created' && event.metadata && (() => {
+                  try {
+                    const metadata = JSON.parse(event.metadata);
+
+                    if (metadata.move_type) {
+                      return (
+                        <div className="mt-2 space-y-1.5">
+                          {/* Move Type Badge */}
+                          {metadata.move_type === 'store' && (
+                            <div className="text-xs bg-blue-50 border border-blue-200 rounded-lg p-3">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Warehouse className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                                <div>
+                                  <p className="font-semibold text-blue-900">Store Move</p>
+                                  <p className="text-blue-700">Pickup → Warehouse Storage</p>
+                                </div>
+                              </div>
+                              {metadata.destination_address && (
+                                <div className="flex items-start gap-2 mt-2 pt-2 border-t border-blue-200">
+                                  <MapPin className="w-3 h-3 text-blue-600 flex-shrink-0 mt-0.5" />
+                                  <p className="text-blue-800">
+                                    {metadata.destination_address}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {metadata.move_type === 'relocation' && (
+                            <div className="text-xs bg-purple-50 border border-purple-200 rounded-lg p-3">
+                              <div className="flex items-center gap-2 mb-2">
+                                <ArrowRight className="w-4 h-4 text-purple-600 flex-shrink-0" />
+                                <div>
+                                  <p className="font-semibold text-purple-900">Relocation</p>
+                                  <p className="text-purple-700">Move to new address</p>
+                                </div>
+                              </div>
+                              {metadata.destination_address && (
+                                <div className="flex items-start gap-2 mt-2 pt-2 border-t border-purple-200">
+                                  <MapPin className="w-3 h-3 text-purple-600 flex-shrink-0 mt-0.5" />
+                                  <p className="text-purple-800">
+                                    {metadata.destination_address}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {metadata.move_type === 'redeployment' && (
+                            <div className="text-xs bg-green-50 border border-green-200 rounded-lg p-3">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Package className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                <div>
+                                  <p className="font-semibold text-green-900">Redeployment</p>
+                                  <p className="text-green-700">Deploy from warehouse to field</p>
+                                </div>
+                              </div>
+                              {metadata.destination_address && (
+                                <div className="flex items-start gap-2 mt-2 pt-2 border-t border-green-200">
+                                  <MapPin className="w-3 h-3 text-green-600 flex-shrink-0 mt-0.5" />
+                                  <p className="text-green-800">
+                                    {metadata.destination_address}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                  } catch (e) {
+                    console.error('Failed to parse created metadata:', e);
+                  }
+                  return null;
+                })()}
 
                 {/* Metadata changes for "updated" events */}
                 {event.action_type === 'updated' && event.metadata && (() => {

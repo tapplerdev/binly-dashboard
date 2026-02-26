@@ -9,6 +9,7 @@ import { getMoveRequest, getMoveRequests, cancelMoveRequest } from '@/lib/api/mo
 import { BinWithPriority, getMoveRequestUrgency, getMoveRequestBadgeColor, type MoveRequest, type BinCheck } from '@/lib/types/bin';
 import { AssignMovesModal } from '@/components/binly/assign-moves-modal';
 import { CheckDetailModal } from '@/components/binly/check-detail-modal';
+import { MoveRequestHistoryDetail } from '@/components/binly/move-request-history-detail';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -53,6 +54,10 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onEdit }: BinDet
   const [selectedCheck, setSelectedCheck] = useState<BinCheck | null>(null);
   const [isCheckModalOpen, setIsCheckModalOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<string>('all');
+
+  // Move history slide view state
+  const [moveHistoryView, setMoveHistoryView] = useState<'list' | 'detail'>('list');
+  const [selectedMoveRequestId, setSelectedMoveRequestId] = useState<string | null>(null);
 
   const handleClose = () => {
     setIsClosing(true);
@@ -791,164 +796,211 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onEdit }: BinDet
           )}
 
           {activeTab === 'moves' && (
-            <div className="space-y-4">
-              {movesLoading || moveRequestsLoading ? (
-                <div className="text-center py-12">
-                  <Calendar className="w-12 h-12 text-gray-300 animate-pulse mx-auto mb-4" />
-                  <p className="text-gray-500">Loading move history...</p>
-                </div>
-              ) : timeline.length > 0 ? (
-                <div className="space-y-3">
-                  {timeline.map((item, index) => {
-                    if (item.type === 'move_request') {
-                      const moveRequest = item.data as MoveRequest;
-                      const statusBadge = getMoveStatusBadge(moveRequest);
-                      const isCompleted = moveRequest.status === 'completed';
-                      const isOverdue = getMoveRequestUrgency(moveRequest.scheduled_date) === 'overdue' && !isCompleted;
+            <div className="relative h-full overflow-x-hidden -mx-4 md:-mx-6">
+              {/* List View Panel */}
+              <div className={cn(
+                "absolute inset-0 px-4 md:px-6 overflow-y-auto transition-transform duration-300 ease-in-out",
+                moveHistoryView === 'list'
+                  ? 'translate-x-0'
+                  : '-translate-x-full'
+              )}>
+                <div className="space-y-4">
+                  {movesLoading || moveRequestsLoading ? (
+                    <div className="text-center py-12">
+                      <Calendar className="w-12 h-12 text-gray-300 animate-pulse mx-auto mb-4" />
+                      <p className="text-gray-500">Loading move history...</p>
+                    </div>
+                  ) : timeline.length > 0 ? (
+                    <div className="space-y-3">
+                      {timeline.map((item, index) => {
+                        if (item.type === 'move_request') {
+                          const moveRequest = item.data as MoveRequest;
+                          const statusBadge = getMoveStatusBadge(moveRequest);
+                          const isCompleted = moveRequest.status === 'completed';
+                          const isOverdue = getMoveRequestUrgency(moveRequest.scheduled_date) === 'overdue' && !isCompleted;
 
-                      return (
-                        <Card key={`request-${moveRequest.id}`} className={cn(
-                          "p-4",
-                          isOverdue && "border-l-4 border-l-red-500"
-                        )}>
-                          <div className="flex items-start gap-3">
-                            <div className={cn(
-                              "p-2 rounded-lg",
-                              isOverdue ? "bg-red-50" : isCompleted ? "bg-green-50" : "bg-blue-50"
-                            )}>
-                              {moveRequest.move_type === 'pickup_only' ? (
-                                <PackageX className={cn(
-                                  "w-5 h-5",
-                                  isOverdue ? "text-red-600" : isCompleted ? "text-green-600" : "text-blue-600"
-                                )} />
-                              ) : (
-                                <ArrowRight className={cn(
-                                  "w-5 h-5",
-                                  isOverdue ? "text-red-600" : isCompleted ? "text-green-600" : "text-blue-600"
-                                )} />
+                          return (
+                            <Card
+                              key={`request-${moveRequest.id}`}
+                              className={cn(
+                                "p-4 cursor-pointer hover:shadow-lg transition-all duration-200 hover:border-primary",
+                                isOverdue && "border-l-4 border-l-red-500"
                               )}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="font-medium text-gray-900">
-                                  {moveRequest.move_type === 'pickup_only' ? 'Pickup Only' : 'Relocation'}
-                                </span>
-                                <Badge className={statusBadge.color}>
-                                  {statusBadge.label}
-                                </Badge>
-                              </div>
-
-                              {/* Scheduled Date */}
-                              <div className="space-y-1 text-sm mb-2">
-                                <div className="flex items-center gap-2">
-                                  <Calendar className="w-4 h-4 text-gray-400" />
-                                  <span className="text-gray-600">
-                                    {isCompleted ? 'Completed:' : 'Scheduled:'}
-                                  </span>
-                                  <span className="text-gray-900">
-                                    {isCompleted && moveRequest.completed_at_iso
-                                      ? format(new Date(moveRequest.completed_at_iso), 'PPp')
-                                      : format(new Date(moveRequest.scheduled_date * 1000), 'PPp')}
-                                  </span>
+                              onClick={() => {
+                                setSelectedMoveRequestId(moveRequest.id);
+                                setMoveHistoryView('detail');
+                              }}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className={cn(
+                                  "p-2 rounded-lg",
+                                  isOverdue ? "bg-red-50" : isCompleted ? "bg-green-50" : "bg-blue-50"
+                                )}>
+                                  {moveRequest.move_type === 'pickup_only' || moveRequest.move_type === 'store' ? (
+                                    <PackageX className={cn(
+                                      "w-5 h-5",
+                                      isOverdue ? "text-red-600" : isCompleted ? "text-green-600" : "text-blue-600"
+                                    )} />
+                                  ) : (
+                                    <ArrowRight className={cn(
+                                      "w-5 h-5",
+                                      isOverdue ? "text-red-600" : isCompleted ? "text-green-600" : "text-blue-600"
+                                    )} />
+                                  )}
                                 </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="font-medium text-gray-900">
+                                      {moveRequest.move_type === 'pickup_only'
+                                        ? 'Pickup Only'
+                                        : moveRequest.move_type === 'store'
+                                        ? 'Store'
+                                        : moveRequest.move_type === 'redeployment'
+                                        ? 'Redeployment'
+                                        : 'Relocation'}
+                                    </span>
+                                    <Badge className={statusBadge.color}>
+                                      {statusBadge.label}
+                                    </Badge>
+                                  </div>
 
-                                {/* Assignment Status */}
-                                {!isCompleted && (
-                                  <div className="flex items-center gap-2">
-                                    {moveRequest.assigned_shift_id ? (
-                                      <>
-                                        <User className="w-4 h-4 text-gray-400" />
-                                        <span className="text-gray-600">Assigned to:</span>
-                                        <span className="text-gray-900">
-                                          {moveRequest.assigned_driver_name || 'Driver'}
-                                        </span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <AlertTriangle className="w-4 h-4 text-orange-500" />
-                                        <span className="text-orange-600">Unassigned</span>
-                                      </>
+                                  {/* Scheduled Date */}
+                                  <div className="space-y-1 text-sm mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <Calendar className="w-4 h-4 text-gray-400" />
+                                      <span className="text-gray-600">
+                                        {isCompleted ? 'Completed:' : 'Scheduled:'}
+                                      </span>
+                                      <span className="text-gray-900">
+                                        {isCompleted && moveRequest.completed_at_iso
+                                          ? format(new Date(moveRequest.completed_at_iso), 'PPp')
+                                          : format(new Date(moveRequest.scheduled_date * 1000), 'PPp')}
+                                      </span>
+                                    </div>
+
+                                    {/* Assignment Status */}
+                                    {!isCompleted && (
+                                      <div className="flex items-center gap-2">
+                                        {moveRequest.assigned_shift_id ? (
+                                          <>
+                                            <User className="w-4 h-4 text-gray-400" />
+                                            <span className="text-gray-600">Assigned to:</span>
+                                            <span className="text-gray-900">
+                                              {moveRequest.assigned_driver_name || 'Driver'}
+                                            </span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <AlertTriangle className="w-4 h-4 text-orange-500" />
+                                            <span className="text-orange-600">Unassigned</span>
+                                          </>
+                                        )}
+                                      </div>
                                     )}
                                   </div>
-                                )}
-                              </div>
 
-                              {/* New Location for Relocation */}
-                              {moveRequest.move_type === 'relocation' && moveRequest.new_street && (
-                                <div className="text-sm">
-                                  <div className="flex items-center gap-2">
-                                    <MapPin className="w-4 h-4 text-gray-400" />
-                                    <span className="text-gray-600">New Location:</span>
+                                  {/* New Location for Relocation/Store */}
+                                  {(moveRequest.move_type === 'relocation' || moveRequest.move_type === 'store' || moveRequest.move_type === 'redeployment') && moveRequest.new_address && (
+                                    <div className="text-sm">
+                                      <div className="flex items-center gap-2">
+                                        <MapPin className="w-4 h-4 text-gray-400" />
+                                        <span className="text-gray-600">
+                                          {moveRequest.move_type === 'store' ? 'Warehouse:' : 'New Location:'}
+                                        </span>
+                                      </div>
+                                      <div className="ml-6 text-gray-900">
+                                        {moveRequest.new_address}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Disposal Action for Pickup */}
+                                  {moveRequest.move_type === 'pickup_only' && moveRequest.disposal_action && (
+                                    <div className="text-sm">
+                                      <span className="text-gray-600">Action: </span>
+                                      <span className="text-gray-900 capitalize">{moveRequest.disposal_action}</span>
+                                    </div>
+                                  )}
+
+                                  {/* Reason/Notes */}
+                                  {(moveRequest.reason || moveRequest.notes) && (
+                                    <div className="text-sm mt-2 text-gray-600">
+                                      {moveRequest.reason || moveRequest.notes}
+                                    </div>
+                                  )}
+
+                                  {/* Click hint */}
+                                  <div className="text-xs text-primary mt-2 flex items-center gap-1">
+                                    <span>Click to view history</span>
+                                    <ArrowRight className="w-3 h-3" />
                                   </div>
-                                  <div className="ml-6 text-gray-900">
-                                    {moveRequest.new_street}
-                                    {moveRequest.new_city && `, ${moveRequest.new_city}`}
-                                    {moveRequest.new_zip && ` ${moveRequest.new_zip}`}
+                                </div>
+                              </div>
+                            </Card>
+                          );
+                        } else {
+                          // Completed Move (historical location change)
+                          const move = item.data as BinMove;
+                          return (
+                            <Card key={`move-${move.id}`} className="p-4 bg-gray-50">
+                              <div className="flex items-start gap-3">
+                                <div className="p-2 bg-gray-200 rounded-lg">
+                                  <MapPin className="w-5 h-5 text-gray-600" />
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="font-medium text-gray-900">Location Change</span>
+                                    <Badge className="bg-gray-100 text-gray-700">Historical</Badge>
+                                  </div>
+                                  <div className="space-y-1 text-sm">
+                                    <div className="flex items-center gap-2">
+                                      <Calendar className="w-4 h-4 text-gray-400" />
+                                      <span className="text-gray-600">
+                                        {format(new Date(move.movedOnIso), 'PPp')}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-600">From:</span>
+                                      <span className="ml-2 text-gray-900">{move.movedFrom}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-600">To:</span>
+                                      <span className="ml-2 text-gray-900">{move.movedTo}</span>
+                                    </div>
                                   </div>
                                 </div>
-                              )}
-
-                              {/* Disposal Action for Pickup */}
-                              {moveRequest.move_type === 'pickup_only' && moveRequest.disposal_action && (
-                                <div className="text-sm">
-                                  <span className="text-gray-600">Action: </span>
-                                  <span className="text-gray-900 capitalize">{moveRequest.disposal_action}</span>
-                                </div>
-                              )}
-
-                              {/* Reason/Notes */}
-                              {(moveRequest.reason || moveRequest.notes) && (
-                                <div className="text-sm mt-2 text-gray-600">
-                                  {moveRequest.reason || moveRequest.notes}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </Card>
-                      );
-                    } else {
-                      // Completed Move (historical location change)
-                      const move = item.data as BinMove;
-                      return (
-                        <Card key={`move-${move.id}`} className="p-4 bg-gray-50">
-                          <div className="flex items-start gap-3">
-                            <div className="p-2 bg-gray-200 rounded-lg">
-                              <MapPin className="w-5 h-5 text-gray-600" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="font-medium text-gray-900">Location Change</span>
-                                <Badge className="bg-gray-100 text-gray-700">Historical</Badge>
                               </div>
-                              <div className="space-y-1 text-sm">
-                                <div className="flex items-center gap-2">
-                                  <Calendar className="w-4 h-4 text-gray-400" />
-                                  <span className="text-gray-600">
-                                    {format(new Date(move.movedOnIso), 'PPp')}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600">From:</span>
-                                  <span className="ml-2 text-gray-900">{move.movedFrom}</span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600">To:</span>
-                                  <span className="ml-2 text-gray-900">{move.movedTo}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </Card>
-                      );
-                    }
-                  })}
+                            </Card>
+                          );
+                        }
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <p className="text-gray-500">No move history available</p>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="text-center py-12">
-                  <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">No move history available</p>
-                </div>
-              )}
+              </div>
+
+              {/* Detail View Panel */}
+              <div className={cn(
+                "absolute inset-0 px-4 md:px-6 overflow-y-auto transition-transform duration-300 ease-in-out bg-white",
+                moveHistoryView === 'detail'
+                  ? 'translate-x-0'
+                  : 'translate-x-full'
+              )}>
+                {selectedMoveRequestId && (
+                  <MoveRequestHistoryDetail
+                    moveRequestId={selectedMoveRequestId}
+                    onBack={() => {
+                      setMoveHistoryView('list');
+                      setTimeout(() => setSelectedMoveRequestId(null), 300); // Clear after animation
+                    }}
+                  />
+                )}
+              </div>
             </div>
           )}
 
