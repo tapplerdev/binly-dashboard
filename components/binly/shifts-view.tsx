@@ -2706,10 +2706,26 @@ function CreateShiftDrawer({
         const filteredTasks = tasksPayload.filter(task => task.task_type !== 'warehouse_stop');
         console.log(`🔧 [SHIFT EDIT] Filtered out ${tasksPayload.length - filteredTasks.length} warehouse_stop task(s)`);
 
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 📋 TASK CHANGE DETECTION LOGIC
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('📋 [TASK CHANGE DETECTION] Starting analysis...');
+        console.log(`📋 [TASK CHANGE DETECTION] Initial existing task IDs (from load): ${JSON.stringify(initialExistingTaskIds)}`);
+        console.log(`📋 [TASK CHANGE DETECTION] Total tasks in UI now: ${tasks.length}`);
+
+        // Log all current tasks with their IDs
+        tasks.forEach((task, index) => {
+          console.log(`   Task ${index + 1}: type=${task.type}, id=${task.id || 'NO_ID'}, bin_id=${task.bin_id || 'N/A'}, potential_location_id=${task.potential_location_id || 'N/A'}`);
+        });
+
         // Detect deleted tasks: tasks that were in initialExistingTaskIds but no longer in current tasks
         const currentTaskIds = tasks.filter(t => t.id != null).map(t => t.id!);
+        console.log(`📋 [TASK CHANGE DETECTION] Current task IDs (tasks with IDs): ${JSON.stringify(currentTaskIds)}`);
+
         const deletedTaskIds = initialExistingTaskIds.filter(id => !currentTaskIds.includes(id));
-        console.log(`🗑️ [SHIFT EDIT] Deleted task IDs: ${JSON.stringify(deletedTaskIds)}`);
+        console.log(`🗑️ [SHIFT EDIT] Deleted task IDs (in initial but not in current): ${JSON.stringify(deletedTaskIds)}`);
+        console.log(`🗑️ [SHIFT EDIT] Deleted count: ${deletedTaskIds.length}`);
 
         // Only send NEW tasks (tasks without an id) in add_tasks
         const newTasksOnly = filteredTasks.filter(task => {
@@ -2719,11 +2735,18 @@ function CreateShiftDrawer({
             (t.potential_location_id && t.potential_location_id === task.potential_location_id) ||
             (t.move_request_id && t.move_request_id === task.move_request_id)
           );
+
+          const isNew = !originalTask?.id;
+
+          console.log(`🔍 [NEW TASK CHECK] ${task.task_type} - bin_id=${task.bin_id || 'N/A'}, potential_location_id=${task.potential_location_id || 'N/A'}, originalTask.id=${originalTask?.id || 'NO_ID'}, isNew=${isNew}`);
+
           // Include only if the task doesn't have an ID (meaning it's new)
-          return !originalTask?.id;
+          return isNew;
         });
+
         console.log(`➕ [SHIFT EDIT] New tasks to add: ${newTasksOnly.length}`);
-        console.log(`🔧 [SHIFT EDIT] New tasks payload:`, newTasksOnly);
+        console.log(`🔧 [SHIFT EDIT] New tasks payload:`, JSON.stringify(newTasksOnly, null, 2));
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
         const editPayload = {
           driver_id: driverId !== shift.driverId ? driverId : undefined,
