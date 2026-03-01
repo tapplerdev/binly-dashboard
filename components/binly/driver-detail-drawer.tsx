@@ -54,7 +54,6 @@ export function DriverDetailDrawer({ driver, onClose }: DriverDetailDrawerProps)
   const { data: shifts, isLoading: shiftsLoading } = useQuery({
     queryKey: ['driver-shifts', driver.driver_id],
     queryFn: () => getDriverShiftHistory(driver.driver_id, token),
-    enabled: activeTab === 'history',
   });
 
   // Calculate stats from shifts
