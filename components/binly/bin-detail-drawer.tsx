@@ -379,6 +379,60 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onEdit }: BinDet
                 </Card>
               </div>
 
+              {/* Bin Creation Info */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Bin Origin</h3>
+                {bin.placement_photo_url ? (
+                  <Card className="p-4 bg-blue-50 border-l-4 border-l-blue-600">
+                    <div className="flex gap-4">
+                      {/* Placement Photo Thumbnail */}
+                      <div className="flex-shrink-0">
+                        <div
+                          className="w-20 h-20 rounded-lg overflow-hidden bg-gray-200 border border-gray-300 cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => window.open(bin.placement_photo_url!, '_blank')}
+                        >
+                          <img
+                            src={bin.placement_photo_url}
+                            alt="Placement photo"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Placement Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                          <p className="text-sm font-semibold text-blue-900 uppercase tracking-wide">
+                            Driver Placement
+                          </p>
+                        </div>
+                        <p className="text-sm text-blue-800 mb-1">
+                          Converted from potential location by driver
+                        </p>
+                        <p className="text-xs text-blue-700">
+                          Click photo to enlarge
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+                ) : (
+                  <Card className="p-4 bg-gray-50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                          Created Manually
+                        </p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Created on dashboard
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+              </div>
+
               {/* Active Move Request */}
               {bin.has_pending_move && activeMoveRequest && (
                 <div>
