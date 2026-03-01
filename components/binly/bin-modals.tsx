@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { X, Calendar, Trash2, Loader2, MapPin, Search, AlertTriangle, Truck, User, ChevronDown, ChevronRight, Route } from 'lucide-react';
 import { createMoveRequest, updateMoveRequest, assignMoveToShift, assignMoveToUser } from '@/lib/api/move-requests';
 import { getShifts, getShiftDetailsByDriverId } from '@/lib/api/shifts';
-import { getUsers, User as UserType } from '@/lib/api/users';
+import { getAllUsers, User as UserType } from '@/lib/api/users';
 import { cn } from '@/lib/utils';
 // OLD: Google Places Autocomplete (commented out for rollback)
 // import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';

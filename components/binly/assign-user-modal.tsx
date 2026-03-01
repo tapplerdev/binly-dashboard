@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { assignMoveToUser } from '@/lib/api/move-requests';
-import { getUsers, User as UserType } from '@/lib/api/users';
+import { getAllUsers, User as UserType } from '@/lib/api/users';
 import { MoveRequest } from '@/lib/types/bin';
 import { Button } from '@/components/ui/button';
 import { X, User, AlertCircle, Loader2 } from 'lucide-react';

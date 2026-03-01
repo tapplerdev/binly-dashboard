@@ -36,9 +36,6 @@ export async function getAllUsers(token: string): Promise<User[]> {
   return data.users || [];
 }
 
-// Alias for backward compatibility
-export const getUsers = getAllUsers;
-
 export async function createUser(request: CreateUserRequest, token: string): Promise<CreateUserResponse> {
   const response = await fetch(`${API_URL}/api/manager/users`, {
     method: 'POST',

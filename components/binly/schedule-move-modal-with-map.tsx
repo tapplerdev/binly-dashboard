@@ -33,7 +33,7 @@ import { createMoveRequest, assignMoveToShift, assignMoveToUser } from '@/lib/ap
 import { BinChangeReasonCategory } from '@/lib/api/bins';
 import { getShifts, getShiftDetailsByDriverId } from '@/lib/api/shifts';
 import { Shift } from '@/lib/types/shift';
-import { getUsers, User as UserType } from '@/lib/api/users';
+import { getAllUsers, User as UserType } from '@/lib/api/users';
 import { cn } from '@/lib/utils';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
 import { HerePlaceDetails } from '@/lib/services/geocoding.service';
