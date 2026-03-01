@@ -461,7 +461,7 @@ export function LiveMapView() {
   };
 
   return (
-    <div className="relative h-[calc(100vh-64px)] lg:h-[calc(100vh-80px)] w-full">
+    <div className="relative h-full w-full">
       {/* Mobile Drag Handle - Top of screen for scrolling */}
       <div className="lg:hidden absolute top-0 left-0 right-0 h-20 z-20 pointer-events-auto">
         <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1 bg-gray-400/50 rounded-full" />
