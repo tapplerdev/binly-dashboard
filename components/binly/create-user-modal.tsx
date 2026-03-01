@@ -50,7 +50,7 @@ export function CreateUserModal({ defaultRole, onClose }: CreateUserModalProps) 
     setIsClosing(true);
     setTimeout(() => {
       onClose();
-    }, 300);
+    }, 200);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -62,14 +62,16 @@ export function CreateUserModal({ defaultRole, onClose }: CreateUserModalProps) 
     <>
       {/* Backdrop */}
       <div
-        className={'fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-all duration-300 ease-in-out ' + (isClosing ? 'opacity-0' : 'opacity-100')}
+        className={'fixed inset-0 bg-black/50 z-40 ' + (isClosing ? 'animate-fade-out' : 'animate-fade-in')}
         onClick={handleClose}
       />
 
       {/* Modal */}
-      <div
-        className={'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-white rounded-2xl shadow-2xl z-50 transition-all duration-300 ease-in-out ' + (isClosing ? 'scale-95 opacity-0' : 'scale-100 opacity-100')}
-      >
+      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+        <div
+          className={'w-full max-w-lg bg-white rounded-2xl shadow-2xl pointer-events-auto m-4 ' + (isClosing ? 'animate-scale-out' : 'animate-scale-in')}
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Header */}
         <div className="px-8 py-6 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-primary/5 to-transparent">
           <div>
@@ -187,6 +189,7 @@ export function CreateUserModal({ defaultRole, onClose }: CreateUserModalProps) 
             </button>
           </div>
         </form>
+        </div>
       </div>
     </>
   );
