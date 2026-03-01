@@ -1,5 +1,7 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
+import { getShifts } from '@/lib/api/shifts';
 import { KpiCard } from '@/components/binly/kpi-card';
 import { IntelligenceCard } from '@/components/binly/intelligence-card';
 import { TacticalMap } from '@/components/binly/tactical-map';
@@ -28,61 +30,15 @@ export default function PulsePage() {
   // Sample data for charts (in production, this would come from API)
   const harvestTrend = [850, 920, 1050, 980, 1100, 1150, 1240];
 
-  // Sample active shifts data (in production, this would come from API with React Query)
-  const activeShifts: Shift[] = [
-    {
-      id: '1',
-      date: new Date().toISOString().split('T')[0],
-      startTime: '08:00',
-      endTime: '16:00',
-      driverId: 'driver-1',
-      driverName: 'Omar Hassan',
-      route: 'Route 4 - North Sector',
-      binCount: 12,
-      binsCollected: 6,
-      status: 'active',
-      estimatedCompletion: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours from now
-    },
-    {
-      id: '2',
-      date: new Date().toISOString().split('T')[0],
-      startTime: '08:30',
-      endTime: '16:30',
-      driverId: 'driver-2',
-      driverName: 'Ariel Rodriguez',
-      route: 'Route 3 - East Side',
-      binCount: 15,
-      binsCollected: 9,
-      status: 'active',
-      estimatedCompletion: new Date(Date.now() + 2.25 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '3',
-      date: new Date().toISOString().split('T')[0],
-      startTime: '09:00',
-      endTime: '17:00',
-      driverId: 'driver-3',
-      driverName: 'Sarah Chen',
-      route: 'Route 1 - Central',
-      binCount: 10,
-      binsCollected: 8,
-      status: 'active',
-      estimatedCompletion: new Date(Date.now() + 1.5 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '4',
-      date: new Date().toISOString().split('T')[0],
-      startTime: '07:30',
-      endTime: '15:30',
-      driverId: 'driver-4',
-      driverName: 'Mike Johnson',
-      route: 'Route 2 - West End',
-      binCount: 14,
-      binsCollected: 3,
-      status: 'active',
-      estimatedCompletion: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
-    },
-  ];
+  // Fetch real shifts data from API
+  const { data: shifts = [], isLoading } = useQuery({
+    queryKey: ['shifts'],
+    queryFn: getShifts,
+    refetchInterval: 10000, // Refresh every 10 seconds
+  });
+
+  // Filter to only show active shifts
+  const activeShifts = shifts.filter((shift) => shift.status === 'active');
 
   return (
     <div className="min-h-screen bg-background p-3 md:p-6">
