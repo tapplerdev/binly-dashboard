@@ -126,6 +126,57 @@ export function BinDetailsDrawer({ bin, onClose }: BinDetailsDrawerProps) {
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
+        {/* Bin Creation Info */}
+        {bin.placement_photo_url ? (
+          <div className="px-4 py-3 border-b border-gray-200 bg-blue-50">
+            <div className="flex gap-3">
+              {/* Placement Photo Thumbnail */}
+              <div className="flex-shrink-0">
+                <div
+                  className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 border border-gray-300 cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => window.open(bin.placement_photo_url!, '_blank')}
+                >
+                  <img
+                    src={bin.placement_photo_url}
+                    alt="Placement photo"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+
+              {/* Placement Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                  <p className="text-xs font-semibold text-blue-900 uppercase tracking-wide">
+                    Driver Placement
+                  </p>
+                </div>
+                <p className="text-sm text-blue-800 mb-1">
+                  Converted from potential location
+                </p>
+                {bin.created_by_user_id && (
+                  <p className="text-xs text-blue-700">
+                    Placed by driver
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                Created Manually
+              </p>
+            </div>
+            <p className="text-sm text-gray-700 mt-1">
+              Created on dashboard
+            </p>
+          </div>
+        )}
+
         {/* Location - Compact */}
         <div className="px-4 py-3 border-b border-gray-100">
           <div className="flex items-start gap-2">

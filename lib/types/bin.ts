@@ -23,6 +23,7 @@ export interface Bin {
   location_name?: string | null; // Optional formatted location name
   photo_url?: string | null; // Latest check photo URL
   created_by_user_id?: string | null;
+  placement_photo_url?: string | null; // Photo taken when bin was placed by driver
   retiredAtIso?: string | null;
   retired_by_user_id?: string | null;
 }
