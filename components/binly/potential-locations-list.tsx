@@ -1,59 +1,74 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MapPin, User, Calendar, Check, Trash2, Loader2, MoreVertical, Eye, ChevronsUpDown } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { MapPin, User, Calendar, Check, Trash2, Loader2, MoreVertical, Eye, ChevronsUpDown, Truck, UserCog, Search, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PotentialLocationDetailsDrawer } from './potential-location-details-drawer';
 import { ConvertToBinDialog } from './convert-to-bin-dialog';
 import { DeleteConfirmDialog } from './delete-confirm-dialog';
-import { cn } from '@/lib/utils';
-
-interface PotentialLocation {
-  id: string;
-  address: string;
-  street: string;
-  city: string;
-  zip: string;
-  latitude?: number;
-  longitude?: number;
-  requested_by_user_id: string;
-  requested_by_name: string;
-  notes?: string;
-  created_at_iso: string;
-  converted_to_bin_id?: string;
-  converted_at_iso?: string;
-  converted_by_user_id?: string;
-  bin_number?: number;
-}
+import { usePotentialLocations, potentialLocationKeys } from '@/lib/hooks/use-potential-locations';
+import { PotentialLocation, PotentialLocationStatus } from '@/lib/api/potential-locations';
+import { useCentrifugo } from '@/lib/hooks/use-centrifugo';
 
 interface PotentialLocationsListProps {
   onCreateNew: () => void;
 }
 
-type SortColumn = 'street' | 'requested_by_name' | 'created_at_iso';
+type SortColumn = 'street' | 'requested_by_name' | 'created_at_iso' | 'converted_at_iso';
 
 export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListProps) {
-  const [locations, setLocations] = useState<PotentialLocation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'active' | 'converted'>('active');
+  const queryClient = useQueryClient();
+  const [filter, setFilter] = useState<PotentialLocationStatus>('active');
   const [selectedLocation, setSelectedLocation] = useState<PotentialLocation | null>(null);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [locationToDelete, setLocationToDelete] = useState<PotentialLocation | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>('created_at_iso');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [search, setSearch] = useState('');
+
+  // React Query — replaces raw useState/useEffect/fetchLocations
+  const { data: locations = [], isLoading } = usePotentialLocations(filter);
+
+  // Always fetch both counts for metrics (served from cache when tab matches)
+  const { data: activeLocations = [] } = usePotentialLocations('active');
+  const { data: convertedLocations = [] } = usePotentialLocations('converted');
+
+  // Centrifugo — UI state only: close the drawer if the currently open location is
+  // deleted or converted. All cache updates are handled by GlobalCentrifugoSync in the layout.
+  const { subscribe, isConnected } = useCentrifugo();
 
   useEffect(() => {
-    fetchLocations();
-  }, [filter]);
+    if (!isConnected) return;
 
+    const unsubscribe = subscribe('company:events', (raw: unknown) => {
+      const event = raw as { type: string; data: unknown };
+
+      if (
+        event.type === 'potential_location_deleted' ||
+        event.type === 'potential_location_converted'
+      ) {
+        const d = event.data as { location_id: string };
+        setSelectedLocation((cur) => (cur?.id === d.location_id ? null : cur));
+      }
+    });
+
+    return unsubscribe;
+  }, [isConnected, subscribe]);
+
+  // Reset sort + search when switching tabs
   useEffect(() => {
-    // Listen for create events to refresh the list
-    const handleRefresh = () => fetchLocations();
-    window.addEventListener('potential-location-created', handleRefresh);
-    return () => window.removeEventListener('potential-location-created', handleRefresh);
+    setSearch('');
+    if (filter === 'converted') {
+      setSortColumn('converted_at_iso');
+      setSortDirection('desc');
+    } else {
+      setSortColumn('created_at_iso');
+      setSortDirection('desc');
+    }
   }, [filter]);
 
   // Close menu on click outside
@@ -64,21 +79,6 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
       return () => document.removeEventListener('click', handleClickOutside);
     }
   }, [openMenuId]);
-
-  const fetchLocations = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(
-        `https://ropacal-backend-production.up.railway.app/api/potential-locations?status=${filter === 'converted' ? 'converted' : 'active'}`
-      );
-      const data = await response.json();
-      setLocations(data || []);
-    } catch (error) {
-      console.error('Error fetching potential locations:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleConvert = (location: PotentialLocation) => {
     setSelectedLocation(location);
@@ -93,13 +93,15 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
   const handleConvertSuccess = () => {
     setConvertDialogOpen(false);
     setSelectedLocation(null);
-    fetchLocations();
+    // Invalidate both lists — active loses the row, converted gains it
+    queryClient.invalidateQueries({ queryKey: potentialLocationKeys.list('active') });
+    queryClient.invalidateQueries({ queryKey: potentialLocationKeys.list('converted') });
   };
 
   const handleDeleteSuccess = () => {
     setDeleteDialogOpen(false);
     setLocationToDelete(null);
-    fetchLocations();
+    queryClient.invalidateQueries({ queryKey: potentialLocationKeys.list(filter) });
   };
 
   // Handle column sorting
@@ -135,12 +137,27 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
       case 'created_at_iso':
         comparison = new Date(a.created_at_iso).getTime() - new Date(b.created_at_iso).getTime();
         break;
+      case 'converted_at_iso':
+        comparison = new Date(a.converted_at_iso ?? '').getTime() - new Date(b.converted_at_iso ?? '').getTime();
+        break;
       default:
         return 0;
     }
 
     return sortDirection === 'asc' ? comparison : -comparison;
   });
+
+  // Search filter — applied on top of sorting
+  const q = search.trim().toLowerCase();
+  const displayedLocations = q
+    ? sortedLocations.filter(
+        (loc) =>
+          loc.street.toLowerCase().includes(q) ||
+          loc.city.toLowerCase().includes(q) ||
+          loc.zip.toLowerCase().includes(q) ||
+          (loc.bin_number != null && String(loc.bin_number).includes(q))
+      )
+    : sortedLocations;
 
   return (
     <>
@@ -155,6 +172,23 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
               <p className="text-xs md:text-sm text-gray-600 mt-1">
                 {filter === 'active' ? 'Active location requests' : 'Converted to bins'}
               </p>
+              {/* Metric badges */}
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-full px-3 py-1 text-xs">
+                  <span className="text-gray-500">Total</span>
+                  <span className="font-bold text-gray-900">{activeLocations.length + convertedLocations.length}</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 text-xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                  <span className="text-blue-600">Active</span>
+                  <span className="font-bold text-blue-700">{activeLocations.length}</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-full px-3 py-1 text-xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                  <span className="text-green-600">Converted</span>
+                  <span className="font-bold text-green-700">{convertedLocations.length}</span>
+                </div>
+              </div>
             </div>
 
             {/* Filter Toggle and Create Button */}
@@ -194,10 +228,30 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
               </Button>
             </div>
           </div>
+
+          {/* Search Bar */}
+          <div className="relative mt-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by address, city, zip, or bin #…"
+              className="w-full pl-9 pr-9 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Loading & Empty States */}
-        {loading ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 text-primary animate-spin" />
           </div>
@@ -226,8 +280,30 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
               <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
+                  {filter === 'converted' && (
+                    <th
+                      className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tl-2xl cursor-pointer"
+                      onClick={() => handleSort('converted_at_iso')}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Converted On</span>
+                        <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                      </div>
+                    </th>
+                  )}
+                  {filter === 'active' && (
+                    <th
+                      className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tl-2xl cursor-pointer"
+                      onClick={() => handleSort('created_at_iso')}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Date Created</span>
+                        <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                      </div>
+                    </th>
+                  )}
                   <th
-                    className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tl-2xl cursor-pointer"
+                    className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle cursor-pointer"
                     onClick={() => handleSort('street')}
                   >
                     <div className="flex items-center gap-1.5">
@@ -244,27 +320,48 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                       <ChevronsUpDown className="w-4 h-4 text-gray-400" />
                     </div>
                   </th>
-                  <th
-                    className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle cursor-pointer"
-                    onClick={() => handleSort('created_at_iso')}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>Date Created</span>
-                      <ChevronsUpDown className="w-4 h-4 text-gray-400" />
-                    </div>
-                  </th>
+                  {filter === 'converted' && (
+                    <th
+                      className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle cursor-pointer"
+                      onClick={() => handleSort('created_at_iso')}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Date Created</span>
+                        <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                      </div>
+                    </th>
+                  )}
+                  {filter === 'converted' && (
+                    <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle">
+                      Conversion Type
+                    </th>
+                  )}
                   <th className="text-center py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tr-2xl">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {sortedLocations.map((location) => (
+                {displayedLocations.map((location) => (
                   <tr
                     key={location.id}
                     className="hover:bg-gray-50 cursor-pointer transition-colors"
                     onClick={() => setSelectedLocation(location)}
                   >
+                    {filter === 'converted' && (
+                      <td className="py-4 px-4 align-middle">
+                        <span className="text-sm text-gray-600">
+                          {location.converted_at_iso ? formatDate(location.converted_at_iso) : '—'}
+                        </span>
+                      </td>
+                    )}
+                    {filter === 'active' && (
+                      <td className="py-4 px-4 align-middle">
+                        <span className="text-sm text-gray-600">
+                          {formatDate(location.created_at_iso)}
+                        </span>
+                      </td>
+                    )}
                     <td className="py-4 px-4 align-middle">
                       <div className="text-sm">
                         <div className="text-gray-900 font-medium">{location.street}</div>
@@ -278,11 +375,28 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                         {location.requested_by_name}
                       </span>
                     </td>
-                    <td className="py-4 px-4 align-middle">
-                      <span className="text-sm text-gray-600">
-                        {formatDate(location.created_at_iso)}
-                      </span>
-                    </td>
+                    {filter === 'converted' && (
+                      <td className="py-4 px-4 align-middle">
+                        <span className="text-sm text-gray-600">
+                          {formatDate(location.created_at_iso)}
+                        </span>
+                      </td>
+                    )}
+                    {filter === 'converted' && (
+                      <td className="py-4 px-4 align-middle">
+                        {location.converted_via_shift_id ? (
+                          <Badge variant="secondary" className="gap-1 bg-blue-100 text-blue-700 hover:bg-blue-200">
+                            <Truck className="w-3 h-3" />
+                            Driver Placement
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="gap-1 bg-purple-100 text-purple-700 hover:bg-purple-200">
+                            <UserCog className="w-3 h-3" />
+                            Manager Conversion
+                          </Badge>
+                        )}
+                      </td>
+                    )}
                     <td className="py-4 px-4 align-middle">
                       <div className="flex items-center justify-center gap-2">
                         {filter === 'active' ? (
@@ -353,9 +467,23 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
               </table>
             </div>
 
+            {/* No search results */}
+            {q && displayedLocations.length === 0 && (
+              <div className="text-center py-10">
+                <Search className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                <p className="text-sm font-medium text-gray-500">No results for &quot;{search}&quot;</p>
+                <button
+                  onClick={() => setSearch('')}
+                  className="mt-2 text-xs text-primary hover:underline"
+                >
+                  Clear search
+                </button>
+              </div>
+            )}
+
             {/* Mobile Card View */}
             <div className="lg:hidden p-3 space-y-3">
-              {sortedLocations.map((location) => (
+              {displayedLocations.map((location) => (
                 <div
                   key={location.id}
                   onClick={() => setSelectedLocation(location)}
@@ -372,10 +500,23 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                       </div>
                     </div>
                     {filter === 'converted' && (
-                      <Badge variant="default" className="gap-1 shrink-0 ml-2">
-                        <Check className="w-3 h-3" />
-                        Bin #{location.bin_number}
-                      </Badge>
+                      <div className="flex flex-col gap-2 shrink-0 ml-2">
+                        <Badge variant="default" className="gap-1">
+                          <Check className="w-3 h-3" />
+                          Bin #{location.bin_number}
+                        </Badge>
+                        {location.converted_via_shift_id ? (
+                          <Badge variant="secondary" className="gap-1 bg-blue-100 text-blue-700 hover:bg-blue-200">
+                            <Truck className="w-3 h-3" />
+                            Driver
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="gap-1 bg-purple-100 text-purple-700 hover:bg-purple-200">
+                            <UserCog className="w-3 h-3" />
+                            Manager
+                          </Badge>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -390,7 +531,16 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                     </div>
                   </div>
 
-                  {/* Date Created */}
+                  {/* Converted On (converted tab) / Date Created (active tab) */}
+                  {filter === 'converted' && location.converted_at_iso && (
+                    <div className="flex items-center gap-2 mb-1">
+                      <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+                      <div className="text-sm">
+                        <span className="text-gray-500">Converted:</span>{' '}
+                        <span className="text-gray-900">{formatDate(location.converted_at_iso)}</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 mb-3">
                     <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
                     <div className="text-sm">

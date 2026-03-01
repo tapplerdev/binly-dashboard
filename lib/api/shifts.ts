@@ -53,6 +53,7 @@ interface BackendShift {
   pause_start_time: number | null;
   total_bins: number;
   completed_bins: number;
+  active_task_count?: number; // Count of non-deleted tasks from route_tasks
   created_at: number;
   updated_at: number;
 }
@@ -76,9 +77,16 @@ interface BackendBinInShift {
 }
 
 interface BackendShiftDetails extends BackendShift {
-  bins: BackendBinInShift[];
   driver_name?: string;
   driver_email?: string;
+}
+
+interface BackendOptimizationMetadata {
+  total_distance_km: number;
+  total_duration_seconds: number;
+  total_duration_formatted: string;
+  optimized_at: string;
+  estimated_completion: string;
 }
 
 interface BackendDriver {
@@ -91,11 +99,15 @@ interface BackendDriver {
   start_time: number | null;
   total_bins: number;
   completed_bins: number;
+  active_task_count?: number; // Count of non-deleted tasks from route_tasks
   updated_at: number | null;
   current_location: {
     latitude: number;
     longitude: number;
   } | null;
+  optimization_metadata?: BackendOptimizationMetadata;
+  total_distance_miles?: number;
+  estimated_completion_time?: number;
 }
 
 /**
@@ -125,17 +137,45 @@ export async function getShifts(): Promise<Shift[]> {
 
     const driversData = await driversResponse.json();
     console.log('📦 Drivers data received:', driversData);
+    console.log('📦 RAW RESPONSE DATA:', JSON.stringify(driversData, null, 2));
 
     const drivers: BackendDriver[] = driversData.data || [];
     console.log(`👥 Found ${drivers.length} drivers total`);
+
+    // Log each driver's optimization metadata
+    drivers.forEach((driver, idx) => {
+      if (driver.shift_id) {
+        console.log(`🔍 [RAW DRIVER ${idx}] ${driver.driver_name}:`, {
+          shift_id: driver.shift_id,
+          optimization_metadata: driver.optimization_metadata,
+          total_distance_miles: driver.total_distance_miles,
+          estimated_completion_time: driver.estimated_completion_time,
+        });
+      }
+    });
 
     // Filter drivers with shifts and convert to frontend Shift format
     const driversWithShifts = drivers.filter(driver => driver.shift_id);
     console.log(`✅ ${driversWithShifts.length} drivers have active shifts`);
 
     const shifts: Shift[] = driversWithShifts.map(driver => {
+      console.log(`🔍 [SHIFTS API] Converting driver ${driver.driver_name}:`, {
+        shift_id: driver.shift_id,
+        status: driver.status,
+        total_bins: driver.total_bins,
+        has_optimization_metadata: !!driver.optimization_metadata,
+        optimization_metadata: driver.optimization_metadata,
+        total_distance_miles: driver.total_distance_miles,
+        estimated_completion_time: driver.estimated_completion_time,
+      });
       const shift = convertBackendShiftToFrontend(driver);
-      console.log(`   - ${driver.driver_name}: ${driver.status} (${driver.total_bins} bins)`);
+      console.log(`✅ [SHIFTS API] Converted shift for ${driver.driver_name}:`, {
+        id: shift.id,
+        has_optimization_metadata: !!shift.optimization_metadata,
+        optimization_metadata: shift.optimization_metadata,
+        total_distance_miles: shift.total_distance_miles,
+        estimated_completion_time: shift.estimated_completion_time,
+      });
       return shift;
     });
 
@@ -299,6 +339,47 @@ export async function cancelShift(shiftId: string): Promise<void> {
 }
 
 /**
+ * Remove tasks from an active shift (bulk operation)
+ * This unassigns tasks without deleting the underlying resources
+ */
+export async function removeTasksFromShift(
+  shiftId: string,
+  taskIds: string[],
+  reason?: string
+): Promise<{ success: boolean; removed_count: number; message: string }> {
+  console.log('🗑️ Removing tasks from shift:', { shiftId, taskIds, reason });
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}/tasks/remove`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        task_ids: taskIds,
+        reason: reason || 'Removed by manager',
+      }),
+    });
+
+    console.log('📡 Remove tasks response status:', response.status);
+
+    if (response.status === 401) {
+      throw new Error('Authentication required');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to remove tasks from shift');
+    }
+
+    const data = await response.json();
+    console.log('✅ Tasks removed successfully:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Failed to remove tasks from shift:', error);
+    throw error;
+  }
+}
+
+/**
  * Clears all shifts (for testing - admin only)
  */
 export async function clearAllShifts(): Promise<void> {
@@ -315,6 +396,106 @@ export async function clearAllShifts(): Promise<void> {
     console.error('Error clearing shifts:', error);
     throw error;
   }
+}
+
+// ── Shift History ────────────────────────────────────────────────────────────
+
+export interface ShiftHistoryEntry {
+  id: string;
+  driver_id: string;
+  driver_name: string;
+  driver_email: string;
+  route_id: string | null;
+  start_time: number | null;
+  end_time: number | null;
+  created_at: number;
+  ended_at: number;
+  total_pause_seconds: number;
+  total_bins: number;
+  completed_bins: number;
+  completion_rate: number;
+  incidents_reported: number;
+  field_observations: number;
+  end_reason: 'completed' | 'manual_end' | 'manager_ended' | 'manager_cancelled' | 'driver_disconnected' | 'system_timeout';
+  collections_completed: number;
+  collections_skipped: number;
+  placements_completed: number;
+  placements_skipped: number;
+  move_requests_completed: number;
+  total_skipped: number;
+  warehouse_stops: number;
+}
+
+export interface ShiftHistoryResponse {
+  shifts: ShiftHistoryEntry[];
+  total_count: number;
+  limit: number;
+  offset: number;
+}
+
+export async function getShiftHistory(params?: {
+  driver_id?: string;
+  start_date?: number;
+  end_date?: number;
+  limit?: number;
+  offset?: number;
+}): Promise<ShiftHistoryResponse> {
+  const url = new URL(`${API_BASE_URL}/api/manager/shifts/history`);
+  if (params?.driver_id) url.searchParams.set('driver_id', params.driver_id);
+  if (params?.start_date) url.searchParams.set('start_date', String(params.start_date));
+  if (params?.end_date) url.searchParams.set('end_date', String(params.end_date));
+  if (params?.limit) url.searchParams.set('limit', String(params.limit));
+  if (params?.offset) url.searchParams.set('offset', String(params.offset));
+
+  const response = await fetch(url.toString(), { headers: getAuthHeaders() });
+  if (!response.ok) throw new Error(`Failed to fetch shift history: ${response.statusText}`);
+  const data = await response.json();
+  return data.data as ShiftHistoryResponse;
+}
+
+// ── Shift History Task Types ───────────────────────────────────────────────
+
+export interface ShiftHistoryTask {
+  id: string;
+  sequence_order: number;
+  task_type: 'collection' | 'placement' | 'pickup' | 'dropoff' | 'warehouse_stop';
+  is_completed: number; // 0 | 1
+  skipped: boolean;
+  completed_at: number | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  task_data: string | null; // JSON string — contains skip_reason etc.
+  // Collection/bin
+  bin_id: string | null;
+  bin_number: number | null;
+  updated_fill_percentage: number | null;
+  bin_street: string | null;
+  bin_city: string | null;
+  photo_url: string | null;
+  // Placement
+  potential_location_id: string | null;
+  new_bin_number: number | null;
+  placement_address: string | null;
+  placement_created_bin_id: string | null;
+  placement_created_bin_number: number | null;
+  // Move request
+  move_request_id: string | null;
+  move_type: string | null;
+  destination_address: string | null;
+  // Warehouse
+  warehouse_action: string | null;
+  bins_to_load: number | null;
+}
+
+export async function getShiftHistoryTasks(shiftId: string): Promise<ShiftHistoryTask[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/manager/shifts/history/${shiftId}/tasks`,
+    { headers: getAuthHeaders() }
+  );
+  if (!response.ok) throw new Error(`Failed to fetch shift tasks: ${response.statusText}`);
+  const data = await response.json();
+  return data.data as ShiftHistoryTask[];
 }
 
 /**
@@ -388,10 +569,13 @@ function convertBackendShiftToFrontend(driver: BackendDriver): Shift {
     driverName: driver.driver_name,
     driverPhoto: undefined,
     route: driver.route_id ? `Route ${driver.route_id.slice(0, 8)}` : 'Custom Route',
-    binCount: driver.total_bins,
+    binCount: driver.active_task_count ?? driver.total_bins, // Use active_task_count if available, fall back to total_bins
     binsCollected: driver.completed_bins > 0 ? driver.completed_bins : undefined,
     status,
     estimatedCompletion,
+    optimization_metadata: driver.optimization_metadata,
+    total_distance_miles: driver.total_distance_miles,
+    estimated_completion_time: driver.estimated_completion_time,
   };
 }
 
@@ -409,22 +593,108 @@ export function formatTimestamp(timestamp: number | null): string {
  */
 export async function getShiftTasks(shiftId: string): Promise<any[]> {
   try {
-    console.log(`📥 Fetching tasks for shift ${shiftId}...`);
+    console.log(`🔍 [API] Fetching tasks for shift ${shiftId}...`);
+    const url = `${API_BASE_URL}/api/shifts/${shiftId}/tasks/detailed`;
+    console.log(`🔍 [API] Request URL:`, url);
+    console.log(`🔍 [API] Auth headers:`, JSON.stringify(getAuthHeaders(), null, 2));
 
-    const response = await fetch(`${API_BASE_URL}/api/shifts/${shiftId}/tasks/detailed`, {
+    const response = await fetch(url, {
+      headers: getAuthHeaders(),
+    });
+
+    console.log(`🔍 [API] Response status:`, response.status);
+    console.log(`🔍 [API] Response ok:`, response.ok);
+
+    if (!response.ok) {
+      console.warn(`⚠️  [API] Failed to fetch shift tasks: ${response.statusText}`);
+      const responseText = await response.text();
+      console.log(`🔍 [API] Error response body:`, responseText);
+      return [];
+    }
+
+    const responseText = await response.text();
+    console.log(`🔍 [API] Raw response text:`, responseText);
+
+    const data = JSON.parse(responseText);
+    console.log(`🔍 [API] Parsed response:`, JSON.stringify(data, null, 2));
+    console.log(`🔍 [API] Data.data type:`, typeof data.data);
+    console.log(`🔍 [API] Data.data is array:`, Array.isArray(data.data));
+    console.log(`🔍 [API] Data.data length:`, data.data?.length || 0);
+
+    if (data.data && data.data.length > 0) {
+      console.log(`🔍 [API] First task sample:`, JSON.stringify(data.data[0], null, 2));
+    }
+
+    console.log(`✅ [API] Returning ${data.data?.length || 0} tasks`);
+    return data.data || [];
+  } catch (error) {
+    console.error('❌ [API] Error fetching shift tasks:', error);
+    console.error('❌ [API] Error details:', error instanceof Error ? error.message : String(error));
+    return [];
+  }
+}
+
+/**
+ * Get ALL tasks for a shift including deleted ones (for audit/history view)
+ */
+export async function getShiftTasksWithHistory(shiftId: string): Promise<any[]> {
+  try {
+    console.log(`📜 [API] Fetching task history for shift ${shiftId}...`);
+    const url = `${API_BASE_URL}/api/manager/shifts/${shiftId}/tasks/history`;
+
+    const response = await fetch(url, {
       headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
-      console.warn(`⚠️  Failed to fetch shift tasks: ${response.statusText}`);
+      console.warn(`⚠️  [API] Failed to fetch task history: ${response.statusText}`);
       return [];
     }
 
     const data = await response.json();
-    console.log(`✅ Fetched ${data.data?.length || 0} tasks`);
+    console.log(`✅ [API] Returning ${data.data?.length || 0} tasks (including deleted)`);
     return data.data || [];
   } catch (error) {
-    console.error('❌ Error fetching shift tasks:', error);
+    console.error('❌ [API] Error fetching task history:', error);
     return [];
+  }
+}
+
+/**
+ * Driver proximity response from backend
+ */
+export interface ShiftDriverProximity {
+  is_nearby: boolean;
+  driver_distance_miles?: number;
+  location_age_seconds?: number;
+  current_task_id?: string;
+  current_task_address?: string;
+  current_task_bin_number?: number;
+  driver_name?: string;
+}
+
+/**
+ * Check if a shift's driver is currently nearby their current task
+ * @param shiftId Shift ID
+ * @returns Promise<ShiftDriverProximity> Proximity information
+ */
+export async function checkShiftDriverProximity(shiftId: string): Promise<ShiftDriverProximity> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}/driver-proximity`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to check driver proximity: ${response.statusText}`);
+    }
+
+    const proximity: ShiftDriverProximity = await response.json();
+    return proximity;
+  } catch (error) {
+    console.error(`Error checking driver proximity for shift ${shiftId}:`, error);
+    // Return safe default on error
+    return { is_nearby: false };
   }
 }

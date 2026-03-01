@@ -67,10 +67,10 @@ export function PlacesAutocomplete({
     }
   }
 
-  // Debug: Log loading state
-  useEffect(() => {
-    console.log('🗺️ PlacesAutocomplete mounted! Loading state:', { isLoaded, loadError });
-  }, [isLoaded, loadError]);
+  // Debug: Log loading state (COMMENTED OUT - Using HERE Maps now)
+  // useEffect(() => {
+  //   console.log('🗺️ PlacesAutocomplete mounted! Loading state:', { isLoaded, loadError });
+  // }, [isLoaded, loadError]);
 
   // Initialize services
   useEffect(() => {
@@ -84,12 +84,12 @@ export function PlacesAutocomplete({
         const div = document.createElement('div');
         placesServiceRef.current = new google.maps.places.PlacesService(div);
 
-        console.log('✅ Google Places services initialized');
+        // console.log('✅ Google Places services initialized'); // COMMENTED - Using HERE Maps
       } else {
-        console.error('❌ Google Places API not available');
+        // console.error('❌ Google Places API not available'); // COMMENTED - Using HERE Maps
       }
     } catch (error) {
-      console.error('❌ Error initializing Places services:', error);
+      // console.error('❌ Error initializing Places services:', error); // COMMENTED - Using HERE Maps
     }
   }, [isLoaded, disabled]);
 
@@ -144,15 +144,15 @@ export function PlacesAutocomplete({
     }
 
     if (!value || value.length < 3 || !autocompleteServiceRef.current || disabled) {
-      if (value && value.length < 3) {
-        console.log('⏳ Waiting for 3+ characters...');
-      }
+      // if (value && value.length < 3) {
+      //   console.log('⏳ Waiting for 3+ characters...'); // COMMENTED - Using HERE Maps
+      // }
       setSuggestions([]);
       setIsOpen(false);
       return;
     }
 
-    console.log('🔍 Fetching suggestions for:', value);
+    // console.log('🔍 Fetching suggestions for:', value); // COMMENTED - Using HERE Maps
     setIsFetching(true);
 
     const timer = setTimeout(() => {
@@ -163,7 +163,7 @@ export function PlacesAutocomplete({
           componentRestrictions: { country: ['us', 'co'] },
         },
         (predictions, status) => {
-          console.log('📍 Places API response:', status, predictions?.length || 0, 'results');
+          // console.log('📍 Places API response:', status, predictions?.length || 0, 'results'); // COMMENTED - Using HERE Maps
           setIsFetching(false);
 
           if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
@@ -173,12 +173,12 @@ export function PlacesAutocomplete({
               mainText: p.structured_formatting.main_text,
               secondaryText: p.structured_formatting.secondary_text,
             }));
-            console.log('✅ Showing', formatted.length, 'suggestions');
+            // console.log('✅ Showing', formatted.length, 'suggestions'); // COMMENTED - Using HERE Maps
             setSuggestions(formatted);
             setIsOpen(true);
             setSelectedIndex(-1);
           } else {
-            console.warn('❌ No predictions:', status);
+            // console.warn('❌ No predictions:', status); // COMMENTED - Using HERE Maps
             setSuggestions([]);
             setIsOpen(false);
           }
@@ -297,7 +297,7 @@ export function PlacesAutocomplete({
           type="text"
           value={value}
           onChange={(e) => {
-            console.log('📝 Input changed:', e.target.value);
+            // console.log('📝 Input changed:', e.target.value); // COMMENTED - Using HERE Maps
             userHasTypedRef.current = true; // Mark that user has typed
             onChange(e.target.value);
           }}

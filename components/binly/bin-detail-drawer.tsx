@@ -3,11 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getBinChecks, getBinMoves, type BinMove } from '@/lib/api/bins';
+import { getBinChecks, getBinMoves, getBinIncidents, getBinChangeLog, type BinMove, type BinChangeLogEntry } from '@/lib/api/bins';
+import { ZoneIncident, formatIncidentType, getIncidentIcon } from '@/lib/types/zone';
 import { getMoveRequest, getMoveRequests, cancelMoveRequest } from '@/lib/api/move-requests';
 import { BinWithPriority, getMoveRequestUrgency, getMoveRequestBadgeColor, type MoveRequest, type BinCheck } from '@/lib/types/bin';
 import { AssignMovesModal } from '@/components/binly/assign-moves-modal';
 import { CheckDetailModal } from '@/components/binly/check-detail-modal';
+import { MoveRequestHistoryDetail } from '@/components/binly/move-request-history-detail';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,7 +22,7 @@ import {
   Package,
   Clock,
   AlertTriangle,
-  Trash2,
+  Pencil,
   Image as ImageIcon,
   Truck,
   User,
@@ -28,6 +30,10 @@ import {
   ExternalLink,
   ArrowRight,
   PackageX,
+  History,
+  ShieldAlert,
+  Loader2,
+  ListFilter,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -36,17 +42,22 @@ interface BinDetailDrawerProps {
   bin: BinWithPriority;
   onClose: () => void;
   onScheduleMove?: (bin: BinWithPriority) => void;
-  onRetire?: (bin: BinWithPriority) => void;
+  onEdit?: (bin: BinWithPriority) => void;
 }
 
-export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinDetailDrawerProps) {
+export function BinDetailDrawer({ bin, onClose, onScheduleMove, onEdit }: BinDetailDrawerProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'overview' | 'checks' | 'moves'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'checks' | 'moves' | 'incidents' | 'history'>('overview');
   const [isClosing, setIsClosing] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedCheck, setSelectedCheck] = useState<BinCheck | null>(null);
   const [isCheckModalOpen, setIsCheckModalOpen] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<string>('all');
+
+  // Move history slide view state
+  const [moveHistoryView, setMoveHistoryView] = useState<'list' | 'detail'>('list');
+  const [selectedMoveRequestId, setSelectedMoveRequestId] = useState<string | null>(null);
 
   const handleClose = () => {
     setIsClosing(true);
@@ -77,6 +88,20 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
     queryKey: ['bin-moves', bin.id],
     queryFn: () => getBinMoves(bin.id),
     enabled: activeTab === 'moves',
+  });
+
+  // Fetch incident history
+  const { data: incidents, isLoading: incidentsLoading } = useQuery({
+    queryKey: ['bin-incidents', bin.id],
+    queryFn: () => getBinIncidents(bin.id),
+    enabled: activeTab === 'incidents',
+  });
+
+  // Fetch admin change log
+  const { data: changeLog, isLoading: changeLogLoading } = useQuery({
+    queryKey: ['bin-change-log', bin.id],
+    queryFn: () => getBinChangeLog(bin.id),
+    enabled: activeTab === 'history',
   });
 
   // Fetch all move requests for this bin
@@ -127,7 +152,7 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
       case 'pending_move':
         return { label: 'Pending Move', color: 'bg-blue-100 text-blue-700' };
       case 'in_storage':
-        return { label: 'In Storage', color: 'bg-purple-100 text-purple-700' };
+        return { label: 'In Warehouse', color: 'bg-purple-100 text-purple-700' };
       default:
         return { label: status, color: 'bg-gray-100 text-gray-600' };
     }
@@ -281,12 +306,12 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
               Schedule Move
             </Button>
             <Button
-              onClick={() => onRetire?.(bin)}
+              onClick={() => onEdit?.(bin)}
               variant="outline"
               className="flex-1"
             >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Retire Bin
+              <Pencil className="w-4 h-4 mr-2" />
+              Edit Bin
             </Button>
           </div>
         </div>
@@ -298,6 +323,8 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
               { key: 'overview', label: 'Overview' },
               { key: 'checks', label: 'Check History' },
               { key: 'moves', label: 'Move History' },
+              { key: 'incidents', label: 'Incidents' },
+              { key: 'history', label: 'Admin History' },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -350,6 +377,60 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
                     </div>
                   </div>
                 </Card>
+              </div>
+
+              {/* Bin Creation Info */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Bin Origin</h3>
+                {bin.placement_photo_url ? (
+                  <Card className="p-4 bg-blue-50 border-l-4 border-l-blue-600">
+                    <div className="flex gap-4">
+                      {/* Placement Photo Thumbnail */}
+                      <div className="flex-shrink-0">
+                        <div
+                          className="w-20 h-20 rounded-lg overflow-hidden bg-gray-200 border border-gray-300 cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => window.open(bin.placement_photo_url!, '_blank')}
+                        >
+                          <img
+                            src={bin.placement_photo_url}
+                            alt="Placement photo"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Placement Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                          <p className="text-sm font-semibold text-blue-900 uppercase tracking-wide">
+                            Driver Placement
+                          </p>
+                        </div>
+                        <p className="text-sm text-blue-800 mb-1">
+                          Converted from potential location by driver
+                        </p>
+                        <p className="text-xs text-blue-700">
+                          Click photo to enlarge
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+                ) : (
+                  <Card className="p-4 bg-gray-50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                          Created Manually
+                        </p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Created on dashboard
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
               </div>
 
               {/* Active Move Request */}
@@ -717,167 +798,431 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onRetire }: BinD
             </div>
           )}
 
-          {activeTab === 'moves' && (
+          {activeTab === 'incidents' && (
             <div className="space-y-4">
-              {movesLoading || moveRequestsLoading ? (
+              {incidentsLoading ? (
                 <div className="text-center py-12">
-                  <Calendar className="w-12 h-12 text-gray-300 animate-pulse mx-auto mb-4" />
-                  <p className="text-gray-500">Loading move history...</p>
+                  <AlertTriangle className="w-12 h-12 text-gray-300 animate-pulse mx-auto mb-4" />
+                  <p className="text-gray-500">Loading incidents...</p>
                 </div>
-              ) : timeline.length > 0 ? (
+              ) : incidents && incidents.length > 0 ? (
                 <div className="space-y-3">
-                  {timeline.map((item, index) => {
-                    if (item.type === 'move_request') {
-                      const moveRequest = item.data as MoveRequest;
-                      const statusBadge = getMoveStatusBadge(moveRequest);
-                      const isCompleted = moveRequest.status === 'completed';
-                      const isOverdue = getMoveRequestUrgency(moveRequest.scheduled_date) === 'overdue' && !isCompleted;
-
-                      return (
-                        <Card key={`request-${moveRequest.id}`} className={cn(
-                          "p-4",
-                          isOverdue && "border-l-4 border-l-red-500"
-                        )}>
-                          <div className="flex items-start gap-3">
-                            <div className={cn(
-                              "p-2 rounded-lg",
-                              isOverdue ? "bg-red-50" : isCompleted ? "bg-green-50" : "bg-blue-50"
-                            )}>
-                              {moveRequest.move_type === 'pickup_only' ? (
-                                <PackageX className={cn(
-                                  "w-5 h-5",
-                                  isOverdue ? "text-red-600" : isCompleted ? "text-green-600" : "text-blue-600"
-                                )} />
-                              ) : (
-                                <ArrowRight className={cn(
-                                  "w-5 h-5",
-                                  isOverdue ? "text-red-600" : isCompleted ? "text-green-600" : "text-blue-600"
-                                )} />
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="font-medium text-gray-900">
-                                  {moveRequest.move_type === 'pickup_only' ? 'Pickup Only' : 'Relocation'}
-                                </span>
-                                <Badge className={statusBadge.color}>
-                                  {statusBadge.label}
-                                </Badge>
-                              </div>
-
-                              {/* Scheduled Date */}
-                              <div className="space-y-1 text-sm mb-2">
-                                <div className="flex items-center gap-2">
-                                  <Calendar className="w-4 h-4 text-gray-400" />
-                                  <span className="text-gray-600">
-                                    {isCompleted ? 'Completed:' : 'Scheduled:'}
-                                  </span>
-                                  <span className="text-gray-900">
-                                    {isCompleted && moveRequest.completed_at_iso
-                                      ? format(new Date(moveRequest.completed_at_iso), 'PPp')
-                                      : format(new Date(moveRequest.scheduled_date * 1000), 'PPp')}
-                                  </span>
-                                </div>
-
-                                {/* Assignment Status */}
-                                {!isCompleted && (
-                                  <div className="flex items-center gap-2">
-                                    {moveRequest.assigned_shift_id ? (
-                                      <>
-                                        <User className="w-4 h-4 text-gray-400" />
-                                        <span className="text-gray-600">Assigned to:</span>
-                                        <span className="text-gray-900">
-                                          {moveRequest.assigned_driver_name || 'Driver'}
-                                        </span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <AlertTriangle className="w-4 h-4 text-orange-500" />
-                                        <span className="text-orange-600">Unassigned</span>
-                                      </>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* New Location for Relocation */}
-                              {moveRequest.move_type === 'relocation' && moveRequest.new_street && (
-                                <div className="text-sm">
-                                  <div className="flex items-center gap-2">
-                                    <MapPin className="w-4 h-4 text-gray-400" />
-                                    <span className="text-gray-600">New Location:</span>
-                                  </div>
-                                  <div className="ml-6 text-gray-900">
-                                    {moveRequest.new_street}
-                                    {moveRequest.new_city && `, ${moveRequest.new_city}`}
-                                    {moveRequest.new_zip && ` ${moveRequest.new_zip}`}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Disposal Action for Pickup */}
-                              {moveRequest.move_type === 'pickup_only' && moveRequest.disposal_action && (
-                                <div className="text-sm">
-                                  <span className="text-gray-600">Action: </span>
-                                  <span className="text-gray-900 capitalize">{moveRequest.disposal_action}</span>
-                                </div>
-                              )}
-
-                              {/* Reason/Notes */}
-                              {(moveRequest.reason || moveRequest.notes) && (
-                                <div className="text-sm mt-2 text-gray-600">
-                                  {moveRequest.reason || moveRequest.notes}
-                                </div>
-                              )}
-                            </div>
+                  {incidents.map((incident) => (
+                    <Card key={incident.id} className="p-4">
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl leading-none mt-0.5">{getIncidentIcon(incident.incident_type)}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="font-medium text-gray-900">{formatIncidentType(incident.incident_type)}</span>
+                            {incident.is_field_observation && (
+                              <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Manager</span>
+                            )}
+                            {incident.shift_id && !incident.is_field_observation && (
+                              <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">Shift</span>
+                            )}
                           </div>
-                        </Card>
-                      );
-                    } else {
-                      // Completed Move (historical location change)
-                      const move = item.data as BinMove;
-                      return (
-                        <Card key={`move-${move.id}`} className="p-4 bg-gray-50">
-                          <div className="flex items-start gap-3">
-                            <div className="p-2 bg-gray-200 rounded-lg">
-                              <MapPin className="w-5 h-5 text-gray-600" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="font-medium text-gray-900">Location Change</span>
-                                <Badge className="bg-gray-100 text-gray-700">Historical</Badge>
-                              </div>
-                              <div className="space-y-1 text-sm">
-                                <div className="flex items-center gap-2">
-                                  <Calendar className="w-4 h-4 text-gray-400" />
-                                  <span className="text-gray-600">
-                                    {format(new Date(move.movedOnIso), 'PPp')}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600">From:</span>
-                                  <span className="ml-2 text-gray-900">{move.movedFrom}</span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600">To:</span>
-                                  <span className="ml-2 text-gray-900">{move.movedTo}</span>
-                                </div>
-                              </div>
-                            </div>
+                          {incident.description && (
+                            <p className="text-sm text-gray-600 mb-1">{incident.description}</p>
+                          )}
+                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                            {incident.reported_by_name && (
+                              <span>{incident.reported_by_name}</span>
+                            )}
+                            {incident.reported_by_name && incident.reported_at_iso && (
+                              <span>·</span>
+                            )}
+                            {incident.reported_at_iso && (
+                              <span>{format(new Date(incident.reported_at_iso), 'PPp')}</span>
+                            )}
                           </div>
-                        </Card>
-                      );
-                    }
-                  })}
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
                 </div>
               ) : (
                 <div className="text-center py-12">
-                  <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">No move history available</p>
+                  <AlertTriangle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">No incidents reported for this bin</p>
                 </div>
               )}
             </div>
           )}
+
+          {activeTab === 'moves' && (
+            <div className="relative h-full overflow-x-hidden -mx-4 md:-mx-6">
+              {/* List View Panel */}
+              <div className={cn(
+                "absolute inset-0 px-4 md:px-6 overflow-y-auto transition-transform duration-300 ease-in-out",
+                moveHistoryView === 'list'
+                  ? 'translate-x-0'
+                  : '-translate-x-full'
+              )}>
+                <div className="space-y-4">
+                  {movesLoading || moveRequestsLoading ? (
+                    <div className="text-center py-12">
+                      <Calendar className="w-12 h-12 text-gray-300 animate-pulse mx-auto mb-4" />
+                      <p className="text-gray-500">Loading move history...</p>
+                    </div>
+                  ) : timeline.length > 0 ? (
+                    <div className="space-y-3">
+                      {timeline.map((item, index) => {
+                        if (item.type === 'move_request') {
+                          const moveRequest = item.data as MoveRequest;
+                          const statusBadge = getMoveStatusBadge(moveRequest);
+                          const isCompleted = moveRequest.status === 'completed';
+                          const isOverdue = getMoveRequestUrgency(moveRequest.scheduled_date) === 'overdue' && !isCompleted;
+
+                          return (
+                            <Card
+                              key={`request-${moveRequest.id}`}
+                              className={cn(
+                                "p-4 cursor-pointer hover:shadow-lg transition-all duration-200 hover:border-primary",
+                                isOverdue && "border-l-4 border-l-red-500"
+                              )}
+                              onClick={() => {
+                                setSelectedMoveRequestId(moveRequest.id);
+                                setMoveHistoryView('detail');
+                              }}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className={cn(
+                                  "p-2 rounded-lg",
+                                  isOverdue ? "bg-red-50" : isCompleted ? "bg-green-50" : "bg-blue-50"
+                                )}>
+                                  {moveRequest.move_type === 'pickup_only' || moveRequest.move_type === 'store' ? (
+                                    <PackageX className={cn(
+                                      "w-5 h-5",
+                                      isOverdue ? "text-red-600" : isCompleted ? "text-green-600" : "text-blue-600"
+                                    )} />
+                                  ) : (
+                                    <ArrowRight className={cn(
+                                      "w-5 h-5",
+                                      isOverdue ? "text-red-600" : isCompleted ? "text-green-600" : "text-blue-600"
+                                    )} />
+                                  )}
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="font-medium text-gray-900">
+                                      {moveRequest.move_type === 'pickup_only'
+                                        ? 'Pickup Only'
+                                        : moveRequest.move_type === 'store'
+                                        ? 'Store'
+                                        : moveRequest.move_type === 'redeployment'
+                                        ? 'Redeployment'
+                                        : 'Relocation'}
+                                    </span>
+                                    <Badge className={statusBadge.color}>
+                                      {statusBadge.label}
+                                    </Badge>
+                                  </div>
+
+                                  {/* Scheduled Date */}
+                                  <div className="space-y-1 text-sm mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <Calendar className="w-4 h-4 text-gray-400" />
+                                      <span className="text-gray-600">
+                                        {isCompleted ? 'Completed:' : 'Scheduled:'}
+                                      </span>
+                                      <span className="text-gray-900">
+                                        {isCompleted && moveRequest.completed_at_iso
+                                          ? format(new Date(moveRequest.completed_at_iso), 'PPp')
+                                          : format(new Date(moveRequest.scheduled_date * 1000), 'PPp')}
+                                      </span>
+                                    </div>
+
+                                    {/* Assignment Status */}
+                                    {!isCompleted && (
+                                      <div className="flex items-center gap-2">
+                                        {moveRequest.assigned_shift_id ? (
+                                          <>
+                                            <User className="w-4 h-4 text-gray-400" />
+                                            <span className="text-gray-600">Assigned to:</span>
+                                            <span className="text-gray-900">
+                                              {moveRequest.assigned_driver_name || 'Driver'}
+                                            </span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <AlertTriangle className="w-4 h-4 text-orange-500" />
+                                            <span className="text-orange-600">Unassigned</span>
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* New Location for Relocation/Store */}
+                                  {(moveRequest.move_type === 'relocation' || moveRequest.move_type === 'store' || moveRequest.move_type === 'redeployment') && moveRequest.new_address && (
+                                    <div className="text-sm">
+                                      <div className="flex items-center gap-2">
+                                        <MapPin className="w-4 h-4 text-gray-400" />
+                                        <span className="text-gray-600">
+                                          {moveRequest.move_type === 'store' ? 'Warehouse:' : 'New Location:'}
+                                        </span>
+                                      </div>
+                                      <div className="ml-6 text-gray-900">
+                                        {moveRequest.new_address}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Disposal Action for Pickup */}
+                                  {moveRequest.move_type === 'pickup_only' && moveRequest.disposal_action && (
+                                    <div className="text-sm">
+                                      <span className="text-gray-600">Action: </span>
+                                      <span className="text-gray-900 capitalize">{moveRequest.disposal_action}</span>
+                                    </div>
+                                  )}
+
+                                  {/* Reason/Notes */}
+                                  {(moveRequest.reason || moveRequest.notes) && (
+                                    <div className="text-sm mt-2 text-gray-600">
+                                      {moveRequest.reason || moveRequest.notes}
+                                    </div>
+                                  )}
+
+                                  {/* Click hint */}
+                                  <div className="text-xs text-primary mt-2 flex items-center gap-1">
+                                    <span>Click to view history</span>
+                                    <ArrowRight className="w-3 h-3" />
+                                  </div>
+                                </div>
+                              </div>
+                            </Card>
+                          );
+                        } else {
+                          // Completed Move (historical location change)
+                          const move = item.data as BinMove;
+                          return (
+                            <Card key={`move-${move.id}`} className="p-4 bg-gray-50">
+                              <div className="flex items-start gap-3">
+                                <div className="p-2 bg-gray-200 rounded-lg">
+                                  <MapPin className="w-5 h-5 text-gray-600" />
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="font-medium text-gray-900">Location Change</span>
+                                    <Badge className="bg-gray-100 text-gray-700">Historical</Badge>
+                                  </div>
+                                  <div className="space-y-1 text-sm">
+                                    <div className="flex items-center gap-2">
+                                      <Calendar className="w-4 h-4 text-gray-400" />
+                                      <span className="text-gray-600">
+                                        {format(new Date(move.movedOnIso), 'PPp')}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-600">From:</span>
+                                      <span className="ml-2 text-gray-900">{move.movedFrom}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-600">To:</span>
+                                      <span className="ml-2 text-gray-900">{move.movedTo}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </Card>
+                          );
+                        }
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <p className="text-gray-500">No move history available</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Detail View Panel */}
+              <div className={cn(
+                "absolute inset-0 px-4 md:px-6 overflow-y-auto transition-transform duration-300 ease-in-out bg-white",
+                moveHistoryView === 'detail'
+                  ? 'translate-x-0'
+                  : 'translate-x-full'
+              )}>
+                {selectedMoveRequestId && (
+                  <MoveRequestHistoryDetail
+                    moveRequestId={selectedMoveRequestId}
+                    onBack={() => {
+                      setMoveHistoryView('list');
+                      setTimeout(() => setSelectedMoveRequestId(null), 300); // Clear after animation
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Admin History Tab */}
+          {activeTab === 'history' && (() => {
+            const reasonLabels: Record<string, string> = {
+              landlord_complaint: 'Landlord Complaint',
+              theft: 'Theft',
+              vandalism: 'Vandalism',
+              missing: 'Missing Bin',
+              relocation_request: 'Relocation Request',
+              pulled_from_service: 'Pulled from Service',
+              other: 'Other',
+            };
+            const changeTypeLabels: Record<string, string> = {
+              address_change: 'Address Changed',
+              status_change: 'Status Changed',
+              fill_override: 'Fill % Override',
+              bin_number_change: 'Bin # Changed',
+              coordinates_change: 'Coordinates Updated',
+            };
+            const changeTypeBadge: Record<string, { bg: string; text: string }> = {
+              address_change:     { bg: 'bg-blue-100',   text: 'text-blue-700' },
+              status_change:      { bg: 'bg-purple-100', text: 'text-purple-700' },
+              fill_override:      { bg: 'bg-orange-100', text: 'text-orange-700' },
+              bin_number_change:  { bg: 'bg-gray-100',   text: 'text-gray-700' },
+              coordinates_change: { bg: 'bg-teal-100',   text: 'text-teal-700' },
+            };
+
+            const filterOptions = [
+              { key: 'all', label: 'All' },
+              { key: 'address_change', label: 'Address' },
+              { key: 'status_change', label: 'Status' },
+              { key: 'fill_override', label: 'Fill %' },
+              { key: 'bin_number_change', label: 'Bin #' },
+            ];
+
+            const filtered = (changeLog ?? []).filter(
+              (e) => historyFilter === 'all' || e.change_type === historyFilter
+            );
+
+            return (
+              <div className="space-y-3">
+                {changeLogLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : !changeLog || changeLog.length === 0 ? (
+                  <div className="text-center py-12">
+                    <History className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500">No administrative changes recorded</p>
+                    <p className="text-xs text-gray-400 mt-1">Changes made via Edit Bin will appear here</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Filter bar */}
+                    <div className="flex items-center gap-1.5 flex-wrap pb-1">
+                      <ListFilter className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      {filterOptions.map((opt) => (
+                        <button
+                          key={opt.key}
+                          onClick={() => setHistoryFilter(opt.key)}
+                          className={cn(
+                            'px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
+                            historyFilter === opt.key
+                              ? 'bg-primary text-white'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          )}
+                        >
+                          {opt.label}
+                          {opt.key !== 'all' && (
+                            <span className="ml-1 opacity-60">
+                              {changeLog.filter((e) => e.change_type === opt.key).length}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                      <span className="ml-auto text-xs text-gray-400">
+                        {filtered.length} {filtered.length === 1 ? 'entry' : 'entries'}
+                      </span>
+                    </div>
+
+                    {/* Entries */}
+                    {filtered.length === 0 ? (
+                      <div className="text-center py-8 text-gray-400 text-sm">
+                        No entries for this filter
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {filtered.map((entry) => {
+                          let oldValues: Record<string, any> = {};
+                          let newValues: Record<string, any> = {};
+                          try { oldValues = typeof entry.old_values === 'string' ? JSON.parse(entry.old_values) : (entry.old_values ?? {}); } catch {}
+                          try { newValues = typeof entry.new_values === 'string' ? JSON.parse(entry.new_values) : (entry.new_values ?? {}); } catch {}
+
+                          const badge = changeTypeBadge[entry.change_type] ?? { bg: 'bg-gray-100', text: 'text-gray-700' };
+                          const typeLabel = changeTypeLabels[entry.change_type] || entry.change_type;
+
+                          return (
+                            <div key={entry.id} className="border border-gray-200 rounded-lg p-4 space-y-2.5">
+                              {/* Header */}
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold', badge.bg, badge.text)}>
+                                    {typeLabel}
+                                  </span>
+                                  {entry.no_go_zone_created && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full font-medium">
+                                      <ShieldAlert className="w-3 h-3" />
+                                      Zone created
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-400 shrink-0 text-right">
+                                  {format(new Date(entry.created_at_iso), 'MMM d, yyyy h:mm a')}
+                                </p>
+                              </div>
+
+                              {/* By */}
+                              <p className="text-xs text-gray-500">
+                                by <span className="font-medium text-gray-700">{entry.changed_by_name || 'Unknown'}</span>
+                              </p>
+
+                              {/* Type + Notes */}
+                              <div className="bg-gray-50 rounded-md px-3 py-2 space-y-1">
+                                <div className="flex items-baseline gap-1.5 text-xs">
+                                  <span className="text-gray-400 shrink-0">Type:</span>
+                                  <span className="font-medium text-gray-700">
+                                    {entry.reason_category ? (reasonLabels[entry.reason_category] || entry.reason_category) : 'Not provided'}
+                                  </span>
+                                </div>
+                                {entry.reason_notes && (
+                                  <div className="flex items-baseline gap-1.5 text-xs">
+                                    <span className="text-gray-400 shrink-0">Notes:</span>
+                                    <span className="text-gray-600 italic">{entry.reason_notes}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Value diff */}
+                              {Object.keys(newValues).length > 0 && (
+                                <div className="text-xs space-y-1">
+                                  {Object.entries(newValues).map(([key, newVal]) => {
+                                    const oldVal = oldValues[key];
+                                    const label = key.replace(/_/g, ' ');
+                                    return (
+                                      <div key={key} className="flex items-center gap-2 text-gray-600">
+                                        <span className="font-medium capitalize text-gray-500">{label}:</span>
+                                        {oldVal !== undefined && oldVal !== null && (
+                                          <span className="line-through text-red-400">{String(oldVal)}</span>
+                                        )}
+                                        <ArrowRight className="w-3 h-3 text-gray-400 shrink-0" />
+                                        <span className="text-green-700 font-medium">{String(newVal)}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
 

@@ -3,8 +3,10 @@
  */
 
 export type ZoneStatus = 'active' | 'monitoring' | 'resolved';
-export type IncidentType = 'vandalism' | 'landlord_complaint' | 'theft' | 'relocation_request';
+export type IncidentType = 'vandalism' | 'landlord_complaint' | 'theft' | 'relocation_request' | 'missing';
 export type IncidentStatus = 'open' | 'resolved' | 'investigating';
+
+export type ZoneResolutionType = 'merged' | 'manual_resolution';
 
 export interface NoGoZone {
   id: string;
@@ -20,12 +22,16 @@ export interface NoGoZone {
   resolved_by_user_id?: string;
   resolved_at_iso?: string;
   resolution_notes?: string;
+  // Merge fields (present when zone was consumed by or consumed another zone)
+  resolution_type?: ZoneResolutionType;
+  merged_into_zone_id?: string;  // set on the consumed zone
+  merged_zone_count?: number;    // count of zones this zone has absorbed
 }
 
 export interface ZoneIncident {
   id: string;
   zone_id: string;
-  bin_id: string;
+  bin_id?: string; // nil for address-only manager reports
   bin_number?: number;
   incident_type: IncidentType;
   reported_by_user_id?: string;
@@ -95,11 +101,11 @@ export function getZoneColorRgba(score: number, alpha: number = 0.4): string {
 export function getZoneOpacity(status: ZoneStatus): number {
   switch (status) {
     case 'active':
-      return 0.4;
+      return 0.45;
     case 'monitoring':
-      return 0.25;
+      return 0.35;
     case 'resolved':
-      return 0.1;
+      return 0.15;
   }
 }
 
@@ -116,6 +122,8 @@ export function formatIncidentType(type: IncidentType): string {
       return 'Theft';
     case 'relocation_request':
       return 'Relocation Request';
+    case 'missing':
+      return 'Missing Bin';
   }
 }
 
@@ -132,5 +140,34 @@ export function getIncidentIcon(type: IncidentType): string {
       return '🚨';
     case 'relocation_request':
       return '📦';
+    case 'missing':
+      return '❓';
+  }
+}
+
+/**
+ * Request body for POST /manager/incident-report
+ */
+export interface CreateManagerIncidentRequest {
+  // Mode 1: bin-linked (bin_id provided → coordinates looked up automatically)
+  bin_id?: string;
+  // Mode 2: address-only (no bin, manager geocoded the address)
+  latitude?: number;
+  longitude?: number;
+  address?: string;
+  // Common fields
+  incident_type: IncidentType;
+  description: string;
+}
+
+/**
+ * Get severity label
+ */
+export function getSeverityLabel(severity: 'low' | 'medium' | 'high' | 'critical'): string {
+  switch (severity) {
+    case 'low': return 'Low';
+    case 'medium': return 'Medium';
+    case 'high': return 'High';
+    case 'critical': return 'Critical';
   }
 }

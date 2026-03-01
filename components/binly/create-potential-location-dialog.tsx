@@ -1,13 +1,20 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
-import { MapPin, X, Loader2, Search, Plus, Layers } from 'lucide-react';
+import { APIProvider, Map as GoogleMap, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
+import { MapPin, X, Loader2, Search, Plus, Layers, FileText, Map as MapIcon, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
+// OLD: Google Places Autocomplete (commented out for rollback)
+// import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
+// NEW: HERE Maps Autocomplete
+import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
+import { HerePlaceDetails, hereReverseGeocode } from '@/lib/services/geocoding.service';
 import { inputStyles, cn } from '@/lib/utils';
 import { useBins } from '@/lib/hooks/use-bins';
+import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
+import { useNoGoZones } from '@/lib/hooks/use-zones';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
+import { getZoneColor } from '@/lib/types/zone';
 
 interface QueuedLocation {
   street: string;
@@ -83,6 +90,8 @@ export function CreatePotentialLocationDialog({
   onOpenChange,
 }: CreatePotentialLocationDialogProps) {
   const { data: bins = [] } = useBins();
+  const { data: warehouse } = useWarehouseLocation();
+  const { data: activeZones = [] } = useNoGoZones('active');
   const mappableBins = bins.filter(isMappableBin);
 
   const [loading, setLoading] = useState(false);
@@ -94,6 +103,7 @@ export function CreatePotentialLocationDialog({
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [locationQueue, setLocationQueue] = useState<QueuedLocation[]>([]);
   const [hasInteractedWithMap, setHasInteractedWithMap] = useState(false);
+  const [viewMode, setViewMode] = useState<'form' | 'map'>('form');
   const [formData, setFormData] = useState({
     street: '',
     city: '',
@@ -135,6 +145,7 @@ export function CreatePotentialLocationDialog({
       setLocationQueue([]);
       setHasInteractedWithMap(false);
       setIsGeocodingCoordinates(false);
+      setViewMode('form');
       // Clear debounce timer if modal closes
       if (coordinateTimerRef.current) {
         clearTimeout(coordinateTimerRef.current);
@@ -143,38 +154,19 @@ export function CreatePotentialLocationDialog({
     }
   }, [open]);
 
-  // Reverse geocode coordinates to address (for map clicks)
+  // Reverse geocode coordinates to address (for map clicks) - using HERE Maps
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     setReverseGeocoding(true);
     try {
-      const geocoder = new google.maps.Geocoder();
-      const result = await geocoder.geocode({ location: { lat, lng } });
+      const result = await hereReverseGeocode(lat, lng);
 
-      if (result.results && result.results[0]) {
-        const place = result.results[0];
-        let street = '';
-        let city = '';
-        let zip = '';
-
-        place.address_components.forEach((component) => {
-          if (component.types.includes('street_number')) {
-            street = component.long_name + ' ';
-          }
-          if (component.types.includes('route')) {
-            street += component.long_name;
-          }
-          if (component.types.includes('locality')) {
-            city = component.long_name;
-          }
-          if (component.types.includes('postal_code')) {
-            zip = component.long_name;
-          }
-        });
+      if (result) {
+        console.log('✅ POTENTIAL LOCATION: Reverse geocoding from map click successful');
 
         setFormData({
-          street: street.trim() || place.formatted_address,
-          city: city,
-          zip: zip,
+          street: result.street,
+          city: result.city,
+          zip: result.zip,
           latitude: lat.toString(),
           longitude: lng.toString(),
           notes: '',
@@ -185,9 +177,12 @@ export function CreatePotentialLocationDialog({
           zip: true,
           coordinates: false, // Coordinates were set from map click, not auto-filled
         });
+      } else {
+        console.warn('⚠️ POTENTIAL LOCATION: No address found for map click');
+        setError('No address found for this location');
       }
     } catch (error) {
-      console.error('Reverse geocoding error:', error);
+      console.error('❌ POTENTIAL LOCATION: Reverse geocoding error:', error);
       setError('Failed to get address from location');
     } finally {
       setReverseGeocoding(false);
@@ -206,62 +201,100 @@ export function CreatePotentialLocationDialog({
   );
 
   // Handle place selection from autocomplete - only pan/zoom, no marker
+  // OLD: Google Places version (commented out for rollback)
+  // const handlePlaceSelect = useCallback(
+  //   (place: google.maps.places.PlaceResult) => {
+  //     if (!place.geometry?.location) return;
+  //
+  //     const lat = place.geometry.location.lat();
+  //     const lng = place.geometry.location.lng();
+  //
+  //     // Only pan the map, don't create marker or fill form
+  //     setMapCenter({ lat, lng });
+  //     setSearchQuery('');
+  //   },
+  //   []
+  // );
+
+  // NEW: HERE Maps version
   const handlePlaceSelect = useCallback(
-    (place: google.maps.places.PlaceResult) => {
-      if (!place.geometry?.location) return;
-
-      const lat = place.geometry.location.lat();
-      const lng = place.geometry.location.lng();
-
+    (place: HerePlaceDetails) => {
       // Only pan the map, don't create marker or fill form
-      setMapCenter({ lat, lng });
+      setMapCenter({ lat: place.latitude, lng: place.longitude });
       setSearchQuery('');
     },
     []
   );
 
-  // Handle Google Places autocomplete selection for street address
-  const handleStreetPlaceSelect = useCallback((place: google.maps.places.PlaceResult) => {
-    if (!place.address_components || !place.geometry) return;
+  // Handle autocomplete selection for street address
+  // OLD: Google Places version (commented out for rollback)
+  // const handleStreetPlaceSelect = useCallback((place: google.maps.places.PlaceResult) => {
+  //   if (!place.address_components || !place.geometry) return;
+  //
+  //   // Parse address components
+  //   let street = '';
+  //   let city = '';
+  //   let zip = '';
+  //
+  //   place.address_components.forEach((component) => {
+  //     const types = component.types;
+  //
+  //     if (types.includes('street_number')) {
+  //       street = component.long_name;
+  //     }
+  //     if (types.includes('route')) {
+  //       street = street ? `${street} ${component.long_name}` : component.long_name;
+  //     }
+  //     if (types.includes('locality')) {
+  //       city = component.long_name;
+  //     }
+  //     if (!city && types.includes('sublocality_level_1')) {
+  //       city = component.long_name;
+  //     }
+  //     if (types.includes('postal_code')) {
+  //       zip = component.long_name;
+  //     }
+  //   });
+  //
+  //   const lat = place.geometry.location?.lat();
+  //   const lng = place.geometry.location?.lng();
+  //
+  //   if (!lat || !lng) return;
+  //
+  //   // Update all fields with auto-filled data
+  //   setFormData({
+  //     ...formData,
+  //     street: street.trim(),
+  //     city: city.trim(),
+  //     zip: zip.trim(),
+  //     latitude: lat.toString(),
+  //     longitude: lng.toString(),
+  //   });
+  //
+  //   // Mark fields as auto-filled
+  //   setAutoFilled({
+  //     street: false, // User typed this (from autocomplete)
+  //     city: true,
+  //     zip: true,
+  //     coordinates: true,
+  //   });
+  //
+  //   // Create marker and pan map to location
+  //   setMarkerPosition({ lat, lng });
+  //   setMapCenter({ lat, lng });
+  //   setHasInteractedWithMap(true);
+  // }, [formData]);
 
-    // Parse address components
-    let street = '';
-    let city = '';
-    let zip = '';
-
-    place.address_components.forEach((component) => {
-      const types = component.types;
-
-      if (types.includes('street_number')) {
-        street = component.long_name;
-      }
-      if (types.includes('route')) {
-        street = street ? `${street} ${component.long_name}` : component.long_name;
-      }
-      if (types.includes('locality')) {
-        city = component.long_name;
-      }
-      if (!city && types.includes('sublocality_level_1')) {
-        city = component.long_name;
-      }
-      if (types.includes('postal_code')) {
-        zip = component.long_name;
-      }
-    });
-
-    const lat = place.geometry.location?.lat();
-    const lng = place.geometry.location?.lng();
-
-    if (!lat || !lng) return;
-
-    // Update all fields with auto-filled data
+  // NEW: HERE Maps version
+  const handleStreetPlaceSelect = useCallback((place: HerePlaceDetails) => {
+    // Update all fields with data from HERE Maps
     setFormData({
       ...formData,
-      street: street.trim(),
-      city: city.trim(),
-      zip: zip.trim(),
-      latitude: lat.toString(),
-      longitude: lng.toString(),
+      street: place.street.trim(),
+      city: place.city.trim(),
+      zip: place.zip.trim(),
+      latitude: place.latitude.toString(),
+      longitude: place.longitude.toString(),
     });
 
     // Mark fields as auto-filled
@@ -273,8 +306,8 @@ export function CreatePotentialLocationDialog({
     });
 
     // Create marker and pan map to location
-    setMarkerPosition({ lat, lng });
-    setMapCenter({ lat, lng });
+    setMarkerPosition({ lat: place.latitude, lng: place.longitude });
+    setMapCenter({ lat: place.latitude, lng: place.longitude });
     setHasInteractedWithMap(true);
   }, [formData]);
 
@@ -325,35 +358,17 @@ export function CreatePotentialLocationDialog({
       setIsGeocodingCoordinates(true);
 
       try {
-        const geocoder = new google.maps.Geocoder();
-        const result = await geocoder.geocode({ location: { lat: latNum, lng: lngNum } });
+        // Use HERE Maps reverse geocoding instead of Google
+        const result = await hereReverseGeocode(latNum, lngNum);
 
-        if (result.results && result.results[0]) {
-          const place = result.results[0];
-          let street = '';
-          let city = '';
-          let zip = '';
-
-          place.address_components.forEach((component) => {
-            if (component.types.includes('street_number')) {
-              street = component.long_name + ' ';
-            }
-            if (component.types.includes('route')) {
-              street += component.long_name;
-            }
-            if (component.types.includes('locality')) {
-              city = component.long_name;
-            }
-            if (component.types.includes('postal_code')) {
-              zip = component.long_name;
-            }
-          });
+        if (result) {
+          console.log('✅ POTENTIAL LOCATION: Reverse geocoding from typed coordinates successful');
 
           setFormData((prev) => ({
             ...prev,
-            street: street.trim() || place.formatted_address,
-            city: city,
-            zip: zip,
+            street: result.street,
+            city: result.city,
+            zip: result.zip,
           }));
 
           setAutoFilled({
@@ -367,9 +382,11 @@ export function CreatePotentialLocationDialog({
           setMarkerPosition({ lat: latNum, lng: lngNum });
           setMapCenter({ lat: latNum, lng: lngNum });
           setHasInteractedWithMap(true);
+        } else {
+          console.warn('⚠️ POTENTIAL LOCATION: No address found for typed coordinates');
         }
       } catch (error) {
-        console.error('Reverse geocoding from coordinates error:', error);
+        console.error('❌ POTENTIAL LOCATION: Reverse geocoding from coordinates error:', error);
       } finally {
         setIsGeocodingCoordinates(false);
       }
@@ -378,45 +395,78 @@ export function CreatePotentialLocationDialog({
     }, 1500); // 1.5 second debounce
   }, [formData.latitude, formData.longitude]);
 
-  // Forward geocode address from form fields
-  const forwardGeocodeAddress = useCallback(async () => {
-    if (!formData.street || !formData.city || !formData.zip) return;
+  // Handle marker drag (reverse geocode with HERE Maps)
+  const handleMarkerDrag = useCallback(async (lat: number, lng: number) => {
+    console.log('🗺️ POTENTIAL LOCATION: Marker dragged to', lat, lng);
+
+    // Update coordinates and marker position immediately
+    setFormData((prev) => ({
+      ...prev,
+      latitude: lat.toFixed(6),
+      longitude: lng.toFixed(6),
+    }));
+
+    setMarkerPosition({ lat, lng });
+
+    // Mark coordinates as manually changed (not auto-filled)
+    setAutoFilled((prev) => ({
+      ...prev,
+      coordinates: false,
+    }));
+
+    // Start reverse geocoding
+    setIsGeocodingCoordinates(true);
 
     try {
-      const geocoder = new google.maps.Geocoder();
-      const address = `${formData.street}, ${formData.city}, ${formData.zip}`;
+      const result = await hereReverseGeocode(lat, lng);
 
-      const result = await geocoder.geocode({ address });
+      if (result) {
+        console.log('✅ POTENTIAL LOCATION: Reverse geocoding successful');
 
-      if (result.results && result.results[0]?.geometry?.location) {
-        const location = result.results[0].geometry.location;
-        const lat = location.lat();
-        const lng = location.lng();
-
-        setMarkerPosition({ lat, lng });
-        setMapCenter({ lat, lng });
         setFormData((prev) => ({
           ...prev,
-          latitude: lat.toString(),
-          longitude: lng.toString(),
+          street: result.street,
+          city: result.city,
+          zip: result.zip,
         }));
+
+        setAutoFilled({
+          street: true,
+          city: true,
+          zip: true,
+          coordinates: false, // Coordinates were manually dragged
+        });
+      } else {
+        console.warn('⚠️ POTENTIAL LOCATION: No address found for coordinates');
       }
     } catch (error) {
-      console.error('Forward geocoding error:', error);
-      // Silently fail - user can still click on map
+      console.error('❌ POTENTIAL LOCATION: Reverse geocoding error:', error);
+    } finally {
+      setIsGeocodingCoordinates(false);
     }
-  }, [formData.street, formData.city, formData.zip]);
+  }, []);
 
-  // Debounced forward geocoding when address fields change
-  useEffect(() => {
-    if (!formData.street || !formData.city || !formData.zip) return;
+  // Forward geocode address from form fields (DISABLED - use autocomplete or map click instead)
+  // Users should use HERE Maps autocomplete for address entry
+  // If they type manually without autocomplete, they can:
+  //   1. Use the autocomplete dropdown
+  //   2. Click on the map
+  //   3. Manually type coordinates
+  // Keeping this code commented for potential future HERE Maps /geocode endpoint integration
+  // const forwardGeocodeAddress = useCallback(async () => {
+  //   if (!formData.street || !formData.city || !formData.zip) return;
+  //   // TODO: Implement HERE Maps forward geocoding if needed
+  //   // For now, users must use autocomplete, map click, or manual coordinates
+  // }, [formData.street, formData.city, formData.zip]);
 
-    const timeoutId = setTimeout(() => {
-      forwardGeocodeAddress();
-    }, 1000); // Debounce 1 second
-
-    return () => clearTimeout(timeoutId);
-  }, [formData.street, formData.city, formData.zip, forwardGeocodeAddress]);
+  // Debounced forward geocoding when address fields change (DISABLED)
+  // useEffect(() => {
+  //   if (!formData.street || !formData.city || !formData.zip) return;
+  //   const timeoutId = setTimeout(() => {
+  //     forwardGeocodeAddress();
+  //   }, 1000); // Debounce 1 second
+  //   return () => clearTimeout(timeoutId);
+  // }, [formData.street, formData.city, formData.zip, forwardGeocodeAddress]);
 
   // Add current location to queue
   const handleAddToQueue = useCallback(() => {
@@ -628,15 +678,15 @@ export function CreatePotentialLocationDialog({
           onClick={(e) => e.stopPropagation()}
         >
         {/* Header */}
-        <div className="p-6 border-b border-gray-200 flex-shrink-0">
-          <div className="flex items-center justify-between">
+        <div className="px-4 md:px-6 py-4 border-b border-gray-200 flex-shrink-0">
+          <div className="flex items-center justify-between mb-3 md:mb-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center">
                 <MapPin className="w-5 h-5 text-orange-600" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">New Potential Location</h2>
-                <p className="text-sm text-gray-600">
+                <h2 className="text-lg md:text-xl font-bold text-gray-900">New Potential Location</h2>
+                <p className="text-xs md:text-sm text-gray-600 hidden md:block">
                   {markerPosition
                     ? 'Fine-tune the location or add notes'
                     : 'Search for an address or click on the map'}
@@ -650,12 +700,42 @@ export function CreatePotentialLocationDialog({
               <X className="w-5 h-5 text-gray-600" />
             </button>
           </div>
+
+          {/* Mobile View Toggle */}
+          <div className="flex md:hidden gap-2 mt-2">
+            <button
+              onClick={() => setViewMode('form')}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                viewMode === 'form'
+                  ? 'bg-orange-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <FileText className="w-4 h-4" />
+                <span>Form</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setViewMode('map')}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                viewMode === 'map'
+                  ? 'bg-orange-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <MapIcon className="w-4 h-4" />
+                <span>Map</span>
+              </div>
+            </button>
+          </div>
         </div>
 
         {/* Split View Content */}
         <div className="flex-1 flex overflow-hidden">
           {/* Left Side - Form */}
-          <div className="w-[35%] p-6 overflow-y-auto border-r border-gray-200">
+          <div className={`w-full md:w-[35%] p-4 md:p-6 overflow-y-auto border-r border-gray-200 ${viewMode === 'map' ? 'hidden md:block' : 'block'}`}>
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Error Message */}
               {error && (
@@ -681,7 +761,22 @@ export function CreatePotentialLocationDialog({
                   <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                     Street Address <span className="text-red-500">*</span>
                   </label>
-                  <PlacesAutocomplete
+                  {/* OLD: Google Places Autocomplete (commented for rollback) */}
+                  {/* <PlacesAutocomplete
+                    value={formData.street}
+                    onChange={(value) => {
+                      setFormData({ ...formData, street: value });
+                      setAutoFilled((prev) => ({ ...prev, street: false }));
+                    }}
+                    onPlaceSelect={handleStreetPlaceSelect}
+                    disabled={isGeocodingCoordinates}
+                    isAutoFilled={autoFilled.street}
+                    isLoading={isGeocodingCoordinates}
+                    placeholder="123 Main St"
+                    className={inputStyles()}
+                  /> */}
+                  {/* NEW: HERE Maps Autocomplete */}
+                  <HerePlacesAutocomplete
                     value={formData.street}
                     onChange={(value) => {
                       setFormData({ ...formData, street: value });
@@ -960,14 +1055,15 @@ export function CreatePotentialLocationDialog({
           </div>
 
           {/* Right Side - Map */}
-          <div className="w-[65%] relative">
+          <div className={`w-full md:w-[65%] relative ${viewMode === 'form' ? 'hidden md:flex' : 'flex'} flex-col`}>
             <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
-              <Map
+              <GoogleMap
                 mapId="potential-location-map"
                 defaultCenter={DEFAULT_CENTER}
                 defaultZoom={11}
                 minZoom={3}
                 maxZoom={20}
+                mapTypeId="hybrid"
                 gestureHandling="greedy"
                 disableDefaultUI={false}
                 zoomControl={true}
@@ -979,7 +1075,7 @@ export function CreatePotentialLocationDialog({
                 <MapClickHandler onMapClick={handleMapClick} />
                 <MapCenterController center={mapCenter} onComplete={() => setMapCenter(null)} />
 
-                {/* Render existing bins (gray markers) */}
+                {/* Render existing bins */}
                 {mappableBins.map((bin) => (
                   <AdvancedMarker
                     key={bin.id}
@@ -987,12 +1083,40 @@ export function CreatePotentialLocationDialog({
                     zIndex={1}
                   >
                     <div
-                      className="w-6 h-6 rounded-full border-2 border-white shadow-md"
-                      style={{ backgroundColor: getBinMarkerColor(bin.fill_percentage) }}
-                      title={`Bin #${bin.bin_number}`}
-                    />
+                      className="w-8 h-8 rounded-full border-2 border-white shadow-lg cursor-pointer transition-all duration-300 animate-scale-in"
+                      style={{
+                        backgroundColor: getBinMarkerColor(bin.fill_percentage),
+                      }}
+                      title={`Bin #${bin.bin_number} - ${bin.fill_percentage ?? 0}%`}
+                    >
+                      <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
+                        {bin.bin_number}
+                      </div>
+                    </div>
                   </AdvancedMarker>
                 ))}
+
+                {/* Warehouse marker - Home icon */}
+                {warehouse && (
+                  <AdvancedMarker
+                    position={{ lat: warehouse.latitude, lng: warehouse.longitude }}
+                    zIndex={2}
+                    title={warehouse.address || "Warehouse - Base of Operations"}
+                  >
+                    <div className="relative">
+                      {/* Home icon container */}
+                      <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center shadow-xl border-4 border-white cursor-pointer transition-all duration-300 hover:scale-110">
+                        <svg
+                          className="w-7 h-7 text-white"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                        </svg>
+                      </div>
+                    </div>
+                  </AdvancedMarker>
+                )}
 
                 {/* Queued location markers (green) */}
                 {locationQueue.map((location, index) => (
@@ -1010,22 +1134,77 @@ export function CreatePotentialLocationDialog({
                   </AdvancedMarker>
                 ))}
 
-                {/* Current potential location marker (orange, bouncing) */}
+                {/* Current potential location marker (orange, bouncing, draggable) */}
                 {markerPosition && (
-                  <AdvancedMarker position={markerPosition} zIndex={10}>
+                  <AdvancedMarker
+                    position={markerPosition}
+                    zIndex={10}
+                    draggable={true}
+                    onDragEnd={(e) => {
+                      if (e.latLng) {
+                        handleMarkerDrag(e.latLng.lat(), e.latLng.lng());
+                      }
+                    }}
+                  >
                     <div className="relative animate-bounce">
-                      <div className="w-10 h-10 rounded-full bg-orange-500 border-4 border-white shadow-xl" />
+                      <div className="w-10 h-10 rounded-full bg-orange-500 border-4 border-white shadow-xl cursor-move" />
                       <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-r-[8px] border-t-[12px] border-l-transparent border-r-transparent border-t-orange-500" />
                     </div>
                   </AdvancedMarker>
                 )}
-              </Map>
+
+                {/* No-Go Zone markers — warn when placing near a problem area */}
+                {activeZones.map((zone) => {
+                  const color = getZoneColor(zone.conflict_score);
+                  return (
+                    <AdvancedMarker
+                      key={`zone-${zone.id}`}
+                      position={{ lat: zone.center_latitude, lng: zone.center_longitude }}
+                      zIndex={3}
+                    >
+                      <div className="flex flex-col items-center">
+                        <div
+                          className="rounded-full flex items-center justify-center animate-pulse"
+                          style={{
+                            width: 30,
+                            height: 30,
+                            backgroundColor: color + '99',
+                            border: '2px solid white',
+                            boxShadow: `0 0 0 2px ${color}, 0 2px 8px rgba(0,0,0,0.6)`,
+                          }}
+                        >
+                          <ShieldAlert className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        <div
+                          className="mt-0.5 px-1.5 py-0 rounded text-xs font-bold text-white whitespace-nowrap"
+                          style={{
+                            backgroundColor: color,
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.6)',
+                            fontSize: '10px',
+                          }}
+                        >
+                          {zone.name}
+                        </div>
+                      </div>
+                    </AdvancedMarker>
+                  );
+                })}
+              </GoogleMap>
             </APIProvider>
 
             {/* Search Bar Overlay */}
             <div className="absolute top-4 left-1/2 -translate-x-1/2 w-full max-w-md px-4 z-10">
               <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-2">
-                <PlacesAutocomplete
+                {/* OLD: Google Places Autocomplete (commented for rollback) */}
+                {/* <PlacesAutocomplete
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  onPlaceSelect={handlePlaceSelect}
+                  placeholder="Search for an address..."
+                  className="border-0 focus:ring-0"
+                /> */}
+                {/* NEW: HERE Maps Autocomplete */}
+                <HerePlacesAutocomplete
                   value={searchQuery}
                   onChange={setSearchQuery}
                   onPlaceSelect={handlePlaceSelect}

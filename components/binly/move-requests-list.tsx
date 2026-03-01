@@ -4,7 +4,6 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getMoveRequests, updateMoveRequest, bulkCancelMoves, cancelMoveRequest, clearMoveAssignment } from '@/lib/api/move-requests';
-import { useWebSocket, WebSocketMessage } from '@/lib/hooks/use-websocket';
 import {
   MoveRequest,
   MoveRequestStatus,
@@ -18,7 +17,9 @@ import { KpiCard } from '@/components/binly/kpi-card';
 import { MultiSelectDropdown } from '@/components/ui/dropdown';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { AssignMovesModal } from '@/components/binly/assign-moves-modal';
-import { ScheduleMoveModal } from '@/components/binly/bin-modals';
+import { ScheduleMoveModal } from '@/components/binly/bin-modals'; // For editing (legacy fallback)
+import { EditMoveRequestModal } from '@/components/binly/edit-move-request-modal'; // New edit modal with satellite map
+import { ScheduleMoveModalWithMap } from '@/components/binly/schedule-move-modal-with-map'; // For creating
 import { MoveRequestDetailDrawer } from '@/components/binly/move-request-detail-drawer';
 import { AssignUserModal } from '@/components/binly/assign-user-modal';
 import {
@@ -59,30 +60,14 @@ function getAuthToken(): string | null {
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-const WS_URL = API_URL.replace(/^https/, 'wss').replace(/^http/, 'ws');
 
 export function MoveRequestsList() {
   // State
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<MoveFilterOption[]>([]);
 
-  // WebSocket connection for real-time updates
-  const token = getAuthToken();
-  const wsUrl = token ? `${WS_URL}/ws?token=${token}` : `${WS_URL}/ws`;
-
-  useWebSocket({
-    url: wsUrl,
-    onMessage: (message: WebSocketMessage) => {
-      if (message.type === 'move_request_status_updated') {
-        console.log('📡 Received move request status update:', message.data);
-        // Invalidate and refetch move requests to show updated status
-        queryClient.invalidateQueries({ queryKey: ['move-requests'] });
-      }
-    },
-    autoReconnect: true,
-    reconnectInterval: 3000,
-    reconnectAttempts: 5,
-  });
+  // Real-time updates are now handled by GlobalCentrifugoSync via company:events
+  // (move_request_created, move_request_updated, move_request_cancelled)
   const [assignedFilter, setAssignedFilter] = useState<'all' | 'assigned' | 'unassigned'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMoves, setSelectedMoves] = useState<Set<string>>(new Set());
@@ -95,7 +80,9 @@ export function MoveRequestsList() {
   // Modal state
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showAssignUserModal, setShowAssignUserModal] = useState(false);
-  const [showScheduleMoveModal, setShowScheduleMoveModal] = useState(false);
+  const [showScheduleMoveModal, setShowScheduleMoveModal] = useState(false); // Legacy edit modal
+  const [showEditMoveModal, setShowEditMoveModal] = useState(false); // New satellite-map edit modal
+  const [showCreateMoveModal, setShowCreateMoveModal] = useState(false); // For creating new with map
   const [showBulkEditDateModal, setShowBulkEditDateModal] = useState(false);
   const [showBulkCancelModal, setShowBulkCancelModal] = useState(false);
   const [showSingleCancelModal, setShowSingleCancelModal] = useState(false);
@@ -426,7 +413,7 @@ export function MoveRequestsList() {
   // Handlers for individual row menu actions
   const handleEditDetails = (move: MoveRequest) => {
     setMoveToEdit(move);
-    setShowScheduleMoveModal(true);
+    setShowEditMoveModal(true); // Open new satellite-map edit modal
     setOpenMenuId(null);
     setMenuPosition(null);
   };
@@ -672,7 +659,7 @@ export function MoveRequestsList() {
           {/* Create Button */}
           <Button
             className="whitespace-nowrap w-full lg:w-auto"
-            onClick={() => setShowScheduleMoveModal(true)}
+            onClick={() => setShowCreateMoveModal(true)}
           >
             <Plus className="h-4 w-4 mr-2" />
             New Move Request
@@ -1244,10 +1231,26 @@ export function MoveRequestsList() {
         </>
       )}
 
-      {/* Schedule Move Modal */}
+      {/* New Edit Move Request Modal — satellite map + drag-to-relocate */}
+      {showEditMoveModal && moveToEdit && (
+        <EditMoveRequestModal
+          moveRequest={moveToEdit}
+          onClose={() => {
+            setShowEditMoveModal(false);
+            setMoveToEdit(null);
+          }}
+          onSuccess={() => {
+            refetch();
+            setShowEditMoveModal(false);
+            setMoveToEdit(null);
+          }}
+        />
+      )}
+
+      {/* Legacy Schedule Move Modal (kept as fallback, no longer triggered by three-dot menu) */}
       {showScheduleMoveModal && (
         <ScheduleMoveModal
-          moveRequest={moveToEdit}
+          moveRequest={moveToEdit ?? undefined}
           onClose={() => {
             setShowScheduleMoveModal(false);
             setMoveToEdit(null);
@@ -1256,6 +1259,17 @@ export function MoveRequestsList() {
             refetch();
             setShowScheduleMoveModal(false);
             setMoveToEdit(null);
+          }}
+        />
+      )}
+
+      {/* Create Move Modal with Map (for creating new) */}
+      {showCreateMoveModal && (
+        <ScheduleMoveModalWithMap
+          onClose={() => setShowCreateMoveModal(false)}
+          onSuccess={() => {
+            refetch();
+            setShowCreateMoveModal(false);
           }}
         />
       )}
@@ -1428,7 +1442,7 @@ export function MoveRequestsList() {
           onEdit={(move) => {
             setShowDetailDrawer(false);
             setMoveToEdit(move);
-            setShowScheduleMoveModal(true);
+            setShowEditMoveModal(true);
           }}
           onCancel={(move) => {
             setShowDetailDrawer(false);

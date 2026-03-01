@@ -10,6 +10,7 @@ import {
   Package,
   Calendar,
   Users,
+  ShieldAlert,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -66,6 +67,13 @@ export const sidebarNavItems: NavItem[] = [
         key: 'issues',
         title: 'Issues & Alerts',
         icon: <AlertCircle className="w-5 h-5" />,
+        children: [],
+      },
+      {
+        path: '/operations/no-go-zones',
+        key: 'no-go-zones',
+        title: 'No-Go Zones',
+        icon: <ShieldAlert className="w-5 h-5" />,
         children: [],
       },
     ],

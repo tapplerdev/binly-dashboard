@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { Check, X, Loader2, Package } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Check, X, Loader2, Package, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { inputStyles } from '@/lib/utils';
+import { checkPotentialLocationDependencies, ActiveShiftDependency } from '@/lib/api/potential-locations';
+import { ActiveShiftWarningDialog } from './active-shift-warning-dialog';
 
 interface PotentialLocation {
   id: string;
@@ -28,10 +30,41 @@ export function ConvertToBinDialog({
 }: ConvertToBinDialogProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [binNumber, setBinNumber] = useState('');
   const [fillPercentage, setFillPercentage] = useState('');
+  const [checkingDependencies, setCheckingDependencies] = useState(false);
+  const [dependencies, setDependencies] = useState<ActiveShiftDependency[]>([]);
+  const [showWarningDialog, setShowWarningDialog] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Check for dependencies when dialog opens
+  useEffect(() => {
+    if (!open || !location) {
+      setDependencies([]);
+      return;
+    }
+
+    const checkDependencies = async () => {
+      setCheckingDependencies(true);
+      try {
+        const deps = await checkPotentialLocationDependencies(location.id);
+        setDependencies(deps);
+      } catch (error) {
+        console.error('Failed to check potential location dependencies:', error);
+        // Continue anyway if check fails
+      }
+      setCheckingDependencies(false);
+    };
+
+    checkDependencies();
+  }, [open, location]);
+
+  const handleWarningConfirm = () => {
+    setShowWarningDialog(false);
+    // Proceed with conversion after warning acknowledged
+    handleConvert();
+  };
+
+  const handleConvert = async () => {
     if (!location) return;
 
     setError('');
@@ -47,10 +80,15 @@ export function ConvertToBinDialog({
         return;
       }
 
-      // Always send fill_percentage, default to 0 if empty
+      // Build payload with optional bin_number and fill_percentage
       const payload: any = {
         fill_percentage: fillPercentage ? parseInt(fillPercentage, 10) : 0,
       };
+
+      // Only include bin_number if provided
+      if (binNumber && parseInt(binNumber, 10) > 0) {
+        payload.bin_number = parseInt(binNumber, 10);
+      }
 
       const response = await fetch(
         `https://ropacal-backend-production.up.railway.app/api/potential-locations/${location.id}/convert`,
@@ -70,6 +108,7 @@ export function ConvertToBinDialog({
       }
 
       // Success
+      setBinNumber('');
       setFillPercentage('');
       onSuccess();
     } catch (err) {
@@ -77,6 +116,20 @@ export function ConvertToBinDialog({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!location) return;
+
+    // If there are dependencies, show warning dialog first
+    if (dependencies.length > 0 && !showWarningDialog) {
+      setShowWarningDialog(true);
+      return;
+    }
+
+    // No dependencies or already confirmed - proceed with conversion
+    handleConvert();
   };
 
   if (!open || !location) return null;
@@ -134,6 +187,62 @@ export function ConvertToBinDialog({
             </div>
           )}
 
+          {/* Active Shift Warning */}
+          {checkingDependencies ? (
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+              <div className="flex items-start gap-3">
+                <Loader2 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5 animate-spin" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-900">
+                    Checking Active Shifts
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    Verifying if this location is being used in any active driver shifts...
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : dependencies.length > 0 ? (
+            <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-orange-900 mb-1">
+                    Active Shift Impact
+                  </p>
+                  <p className="text-xs text-orange-700">
+                    This potential location is currently being used in{' '}
+                    <span className="font-semibold">
+                      {dependencies.length} active {dependencies.length === 1 ? 'shift' : 'shifts'}
+                    </span>
+                    . Converting it will remove the associated placement task(s) from the driver's route.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Bin Number (Optional) */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Bin Number <span className="text-gray-400 text-xs">(Optional)</span>
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={binNumber}
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^0-9]/g, '');
+                setBinNumber(value);
+              }}
+              placeholder="Auto-assigned if left empty"
+              className={inputStyles()}
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              Leave empty for auto-assignment
+            </p>
+          </div>
+
           {/* Fill Percentage (Optional) */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -166,7 +275,7 @@ export function ConvertToBinDialog({
                 <p className="text-sm font-semibold text-gray-900 mb-1">What happens next?</p>
                 <ul className="text-xs text-gray-600 space-y-1">
                   <li>• A new bin will be created at this location</li>
-                  <li>• Bin number will be auto-assigned</li>
+                  <li>• Bin number auto-assigned if not specified</li>
                   <li>• This potential location will be archived</li>
                   <li>• The bin will be marked as "active"</li>
                 </ul>
@@ -188,9 +297,14 @@ export function ConvertToBinDialog({
             <Button
               type="submit"
               className="flex-1 gap-2 bg-green-600 hover:bg-green-700"
-              disabled={loading}
+              disabled={loading || checkingDependencies}
             >
-              {loading ? (
+              {checkingDependencies ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Checking...
+                </>
+              ) : loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Converting...
@@ -206,6 +320,21 @@ export function ConvertToBinDialog({
         </form>
         </div>
       </div>
+
+      {/* Active Shift Warning Dialog */}
+      {location && (
+        <ActiveShiftWarningDialog
+          open={showWarningDialog}
+          onOpenChange={setShowWarningDialog}
+          onConfirm={handleWarningConfirm}
+          dependencies={dependencies}
+          resourceType="potential location"
+          resourceName={location.street}
+          changeAction="delete"
+          changeDetails={`Converting ${location.street} to a bin will remove placement tasks`}
+          loading={loading}
+        />
+      )}
     </>
   );
 }

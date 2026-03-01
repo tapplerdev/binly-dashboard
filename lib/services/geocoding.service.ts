@@ -184,62 +184,63 @@ export async function geocodeAddress(
 }
 
 // ============================================================================
-// REVERSE GEOCODING
+// GOOGLE MAPS REVERSE GEOCODING (DEPRECATED - KEPT FOR ROLLBACK)
 // ============================================================================
-
-/**
- * Convert coordinates to address
- *
- * @example
- * const result = await reverseGeocode(45.5234, -122.6762);
- * // { street: '123 Main St', city: 'Portland', zip: '97201', ... }
- */
-export async function reverseGeocode(
-  latitude: number,
-  longitude: number
-): Promise<ReverseGeocodingResult | null> {
-  if (!GOOGLE_MAPS_API_KEY) {
-    console.error('Google Maps API key not configured');
-    return null;
-  }
-
-  if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude)) {
-    return null;
-  }
-
-  try {
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`
-    );
-
-    const data = await response.json();
-
-    if (data.status === 'OK' && data.results && data.results[0]) {
-      const result = data.results[0];
-      const parsed = parseAddressComponents(result.address_components);
-
-      return {
-        street: parsed.street,
-        city: parsed.city,
-        zip: parsed.zip,
-        state: parsed.state,
-        country: parsed.country,
-        formattedAddress: result.formatted_address,
-      };
-    }
-
-    if (data.status === 'ZERO_RESULTS') {
-      console.warn('Reverse geocoding: No results found for', latitude, longitude);
-      return null;
-    }
-
-    console.error('Reverse geocoding error:', data.status, data.error_message);
-    return null;
-  } catch (error) {
-    console.error('Reverse geocoding fetch error:', error);
-    return null;
-  }
-}
+// Replaced by hereReverseGeocode() - see HERE MAPS REVERSE GEOCODING section
+//
+// /**
+//  * Convert coordinates to address
+//  *
+//  * @example
+//  * const result = await reverseGeocode(45.5234, -122.6762);
+//  * // { street: '123 Main St', city: 'Portland', zip: '97201', ... }
+//  */
+// export async function reverseGeocode(
+//   latitude: number,
+//   longitude: number
+// ): Promise<ReverseGeocodingResult | null> {
+//   if (!GOOGLE_MAPS_API_KEY) {
+//     console.error('Google Maps API key not configured');
+//     return null;
+//   }
+//
+//   if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude)) {
+//     return null;
+//   }
+//
+//   try {
+//     const response = await fetch(
+//       `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`
+//     );
+//
+//     const data = await response.json();
+//
+//     if (data.status === 'OK' && data.results && data.results[0]) {
+//       const result = data.results[0];
+//       const parsed = parseAddressComponents(result.address_components);
+//
+//       return {
+//         street: parsed.street,
+//         city: parsed.city,
+//         zip: parsed.zip,
+//         state: parsed.state,
+//         country: parsed.country,
+//         formattedAddress: result.formatted_address,
+//       };
+//     }
+//
+//     if (data.status === 'ZERO_RESULTS') {
+//       console.warn('Reverse geocoding: No results found for', latitude, longitude);
+//       return null;
+//     }
+//
+//     console.error('Reverse geocoding error:', data.status, data.error_message);
+//     return null;
+//   } catch (error) {
+//     console.error('Reverse geocoding fetch error:', error);
+//     return null;
+//   }
+// }
 
 // ============================================================================
 // PLACES API
@@ -331,6 +332,7 @@ export async function batchGeocode(
 
 /**
  * Reverse geocode multiple coordinates in parallel (with rate limiting)
+ * Now uses HERE Maps reverse geocoding
  */
 export async function batchReverseGeocode(
   coordinates: Array<{ latitude: number; longitude: number }>
@@ -339,7 +341,7 @@ export async function batchReverseGeocode(
 
   for (let i = 0; i < coordinates.length; i++) {
     const { latitude, longitude } = coordinates[i];
-    const result = await reverseGeocode(latitude, longitude);
+    const result = await hereReverseGeocode(latitude, longitude);
     results.push(result);
 
     // Add small delay between requests
@@ -349,4 +351,290 @@ export async function batchReverseGeocode(
   }
 
   return results;
+}
+
+// ============================================================================
+// HERE MAPS AUTOCOMPLETE (NEW)
+// ============================================================================
+
+const HERE_API_KEY = process.env.NEXT_PUBLIC_HERE_API_KEY;
+
+if (!HERE_API_KEY) {
+  console.warn('⚠️ NEXT_PUBLIC_HERE_API_KEY is not set');
+}
+
+/**
+ * HERE Maps autosuggest suggestion item
+ */
+export interface HereSuggestion {
+  id: string;
+  title: string;
+  resultType: string;
+  address?: {
+    label: string;
+  };
+}
+
+/**
+ * HERE Maps place details (from lookup endpoint)
+ */
+export interface HerePlaceDetails {
+  street: string;
+  city: string;
+  zip: string;
+  state?: string;
+  country?: string;
+  latitude: number;
+  longitude: number;
+  formattedAddress: string;
+}
+
+/**
+ * Get autocomplete suggestions from HERE Maps
+ *
+ * @example
+ * const suggestions = await hereAutosuggest('123 Main', { lat: 37.7749, lng: -122.4194 });
+ * // Returns array of suggestions with id, title, address
+ */
+export async function hereAutosuggest(
+  query: string,
+  userLocation?: { lat: number; lng: number },
+  limit: number = 5
+): Promise<HereSuggestion[]> {
+  if (!HERE_API_KEY) {
+    console.error('🚨 HERE MAPS SERVICE: API key not configured!');
+    return [];
+  }
+
+  if (!query || query.length < 3) {
+    return [];
+  }
+
+  console.log('🌍 HERE MAPS SERVICE: Calling autosuggest API...');
+  console.log('   Query:', query);
+  console.log('   Limit:', limit);
+
+  try {
+    // Use provided location or default to US center (Kansas City, MO)
+    const location = userLocation || { lat: 39.0997, lng: -94.5786 };
+
+    const params = new URLSearchParams({
+      q: query,
+      at: `${location.lat},${location.lng}`, // Required: location context
+      limit: limit.toString(),
+      lang: 'en',
+      apiKey: HERE_API_KEY,
+    });
+
+    console.log('   Location:', location);
+
+    const url = `https://autosuggest.search.hereapi.com/v1/autosuggest?${params.toString()}`;
+    console.log('   API URL:', url.replace(HERE_API_KEY, 'API_KEY_HIDDEN'));
+
+    const response = await fetch(url);
+
+    console.log('   Response status:', response.status, response.statusText);
+
+    if (!response.ok) {
+      // Get the error details from HERE API
+      const errorText = await response.text();
+      console.error('❌ HERE MAPS SERVICE: Autosuggest error:', response.status, response.statusText);
+      console.error('   Error details:', errorText);
+      return [];
+    }
+
+    const data = await response.json();
+
+    if (data.items && Array.isArray(data.items)) {
+      console.log('✅ HERE MAPS SERVICE: Got', data.items.length, 'suggestions');
+      return data.items.map((item: any) => ({
+        id: item.id,
+        title: item.title,
+        resultType: item.resultType,
+        address: item.address,
+      }));
+    }
+
+    console.warn('⚠️ HERE MAPS SERVICE: No items in response');
+    return [];
+  } catch (error) {
+    console.error('❌ HERE MAPS SERVICE: Fetch error:', error);
+    return [];
+  }
+}
+
+/**
+ * Get full place details from HERE Maps by ID
+ *
+ * @example
+ * const details = await hereLookup('here:pds:place:...');
+ * // Returns { street, city, zip, latitude, longitude, ... }
+ */
+export async function hereLookup(hereId: string): Promise<HerePlaceDetails | null> {
+  if (!HERE_API_KEY) {
+    console.error('🚨 HERE MAPS SERVICE: API key not configured!');
+    return null;
+  }
+
+  if (!hereId) {
+    console.warn('⚠️ HERE MAPS SERVICE: No place ID provided');
+    return null;
+  }
+
+  console.log('🔍 HERE MAPS SERVICE: Looking up place details...');
+  console.log('   Place ID:', hereId);
+
+  try {
+    const params = new URLSearchParams({
+      id: hereId,
+      apiKey: HERE_API_KEY,
+    });
+
+    const url = `https://lookup.search.hereapi.com/v1/lookup?${params.toString()}`;
+    console.log('   API URL:', url.replace(HERE_API_KEY, 'API_KEY_HIDDEN'));
+
+    const response = await fetch(url);
+
+    console.log('   Response status:', response.status, response.statusText);
+
+    if (!response.ok) {
+      // Get the error details from HERE API
+      const errorText = await response.text();
+      console.error('❌ HERE MAPS SERVICE: Lookup error:', response.status, response.statusText);
+      console.error('   Error details:', errorText);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log('   Response data:', data);
+
+    if (data && data.address && data.position) {
+      // Parse address components from HERE response
+      const address = data.address;
+
+      // Extract street (combine street number and street name if available)
+      let street = '';
+      if (address.houseNumber && address.street) {
+        street = `${address.houseNumber} ${address.street}`;
+      } else if (address.street) {
+        street = address.street;
+      }
+
+      const result = {
+        street: street.trim(),
+        city: address.city || '',
+        zip: address.postalCode || '',
+        state: address.stateCode || address.state || '',
+        country: address.countryCode || address.countryName || '',
+        latitude: data.position.lat,
+        longitude: data.position.lng,
+        formattedAddress: address.label || '',
+      };
+
+      console.log('✅ HERE MAPS SERVICE: Place details retrieved successfully');
+      console.log('   Street:', result.street);
+      console.log('   City:', result.city);
+      console.log('   ZIP:', result.zip);
+      console.log('   Coordinates:', result.latitude, result.longitude);
+
+      return result;
+    }
+
+    console.warn('⚠️ HERE MAPS SERVICE: Invalid response format');
+    return null;
+  } catch (error) {
+    console.error('❌ HERE MAPS SERVICE: Fetch error:', error);
+    return null;
+  }
+}
+
+// ============================================================================
+// HERE MAPS REVERSE GEOCODING
+// ============================================================================
+
+/**
+ * Reverse geocode coordinates to address using HERE Maps
+ *
+ * @example
+ * const result = await hereReverseGeocode(37.7749, -122.4194);
+ * // Returns: { street: '..', city: 'San Francisco', zip: '94102', ... }
+ */
+export async function hereReverseGeocode(
+  latitude: number,
+  longitude: number
+): Promise<ReverseGeocodingResult | null> {
+  if (!HERE_API_KEY) {
+    console.error('🚨 HERE MAPS SERVICE: API key not configured!');
+    return null;
+  }
+
+  if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude)) {
+    console.warn('⚠️ HERE MAPS SERVICE: Invalid coordinates provided');
+    return null;
+  }
+
+  console.log('🔄 HERE MAPS SERVICE: Calling revgeocode API...');
+  console.log('   Coordinates:', latitude, longitude);
+
+  try {
+    const params = new URLSearchParams({
+      at: `${latitude},${longitude}`,
+      lang: 'en',
+      limit: '1',
+      apiKey: HERE_API_KEY,
+    });
+
+    const url = `https://revgeocode.search.hereapi.com/v1/revgeocode?${params.toString()}`;
+    console.log('   API URL:', url.replace(HERE_API_KEY, 'API_KEY_HIDDEN'));
+
+    const response = await fetch(url);
+
+    console.log('   Response status:', response.status, response.statusText);
+
+    if (!response.ok) {
+      // Get the error details from HERE API
+      const errorText = await response.text();
+      console.error('❌ HERE MAPS SERVICE: Revgeocode error:', response.status, response.statusText);
+      console.error('   Error details:', errorText);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log('   Response data:', data);
+
+    if (data && data.items && data.items.length > 0) {
+      const item = data.items[0];
+      const address = item.address;
+
+      // Parse address components from HERE response
+      let street = '';
+      if (address.houseNumber && address.street) {
+        street = `${address.houseNumber} ${address.street}`;
+      } else if (address.street) {
+        street = address.street;
+      }
+
+      const result = {
+        street: street.trim(),
+        city: address.city || '',
+        zip: address.postalCode || '',
+        state: address.stateCode || address.state || '',
+        country: address.countryCode || address.countryName || '',
+        formattedAddress: address.label || '',
+      };
+
+      console.log('✅ HERE MAPS SERVICE: Reverse geocoding successful');
+      console.log('   Street:', result.street);
+      console.log('   City:', result.city);
+      console.log('   ZIP:', result.zip);
+
+      return result;
+    }
+
+    console.warn('⚠️ HERE MAPS SERVICE: No results found for coordinates');
+    return null;
+  } catch (error) {
+    console.error('❌ HERE MAPS SERVICE: Fetch error:', error);
+    return null;
+  }
 }

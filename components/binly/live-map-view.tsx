@@ -1,24 +1,28 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
+// import { MarkerClusterer, SuperClusterAlgorithm } from '@googlemaps/markerclusterer'; // clustering disabled
 import { useBins } from '@/lib/hooks/use-bins';
 import { useNoGoZones } from '@/lib/hooks/use-zones';
-import { usePotentialLocations, potentialLocationKeys } from '@/lib/hooks/use-potential-locations';
+import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
 import { useActiveDrivers } from '@/lib/hooks/use-active-drivers';
 import { useWebSocket, WebSocketMessage } from '@/lib/hooks/use-websocket';
-import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
+import { useCentrifugo } from '@/lib/hooks/use-centrifugo';
+import { useQueryClient } from '@tanstack/react-query';
+import { useWarehouseLocation, warehouseKeys } from '@/lib/hooks/use-warehouse';
 import {
   Bin,
+  MappableBin,
   isMappableBin,
   getBinMarkerColor,
   getFillLevelCategory,
 } from '@/lib/types/bin';
-import { NoGoZone, getZoneColor, getZoneColorRgba, getZoneOpacity } from '@/lib/types/zone';
+import { NoGoZone, getZoneColor, getZoneColorRgba, getZoneOpacity, getZoneSeverity } from '@/lib/types/zone';
 import { PotentialLocation } from '@/lib/api/potential-locations';
 import { Card } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Filter, ChevronDown, ShieldAlert } from 'lucide-react';
 import { ZoneDetailsDrawer } from './zone-details-drawer';
 import { BinDetailDrawer } from './bin-detail-drawer';
 import { PotentialLocationDetailsDrawer } from './potential-location-details-drawer';
@@ -139,9 +143,9 @@ function ZoneCircles({
         });
 
         const circle = new google.maps.Circle({
-          strokeColor: getZoneColor(zone.conflict_score),
-          strokeOpacity: 0.8,
-          strokeWeight: 2,
+          strokeColor: '#FFFFFF',
+          strokeOpacity: 0.9,
+          strokeWeight: 4,
           fillColor: getZoneColor(zone.conflict_score),
           fillOpacity: getZoneOpacity(zone.status),
           map,
@@ -170,8 +174,95 @@ function ZoneCircles({
   return null;
 }
 
+// Bin marker layer — manages AdvancedMarkerElements imperatively inside the Map context (clustering disabled)
+function BinClusterLayer({
+  bins,
+  onBinClick,
+}: {
+  bins: MappableBin[];
+  onBinClick: (binId: string) => void;
+}) {
+  const map = useMap();
+  // clustererRef removed — clustering disabled, markers render individually
+  const markersRef = useMemo<{ current: globalThis.Map<string, google.maps.marker.AdvancedMarkerElement> }>(() => ({ current: new globalThis.Map<string, google.maps.marker.AdvancedMarkerElement>() }), []);
+
+  // Stable click handler to avoid recreating markers on every render
+  const handleClick = useCallback(
+    (binId: string) => onBinClick(binId),
+    [onBinClick]
+  );
+
+  useEffect(() => {
+    if (!map) return;
+
+    // Clustering disabled — markers render individually on the map
+    // (To re-enable clustering, restore MarkerClusterer initialisation here)
+
+    const prevMarkers = markersRef.current;
+
+    // Determine which bin IDs are new vs removed
+    const newIds = new Set(bins.map((b) => b.id));
+    const toRemove: google.maps.marker.AdvancedMarkerElement[] = [];
+    prevMarkers.forEach((marker, id) => {
+      if (!newIds.has(id)) {
+        toRemove.push(marker);
+        prevMarkers.delete(id);
+      }
+    });
+    toRemove.forEach((m) => { m.map = null; });
+
+    // Add markers for new bins
+    const toAdd: google.maps.marker.AdvancedMarkerElement[] = [];
+    bins.forEach((bin) => {
+      if (prevMarkers.has(bin.id)) return; // already tracked
+
+      const bgColor = getBinMarkerColor(bin.fill_percentage, bin.status as any);
+      const el = document.createElement('div');
+      el.style.cssText = `
+        width:32px;height:32px;border-radius:50%;
+        background:${bgColor};border:2px solid #fff;
+        box-shadow:0 2px 6px rgba(0,0,0,0.4);
+        display:flex;align-items:center;justify-content:center;
+        color:#fff;font-size:11px;font-weight:700;
+        font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+        cursor:pointer;transition:transform .15s;
+      `;
+      el.textContent = String(bin.bin_number);
+      el.title = `Bin #${bin.bin_number} — ${bin.status === 'missing' ? 'MISSING' : `${bin.fill_percentage ?? 0}%`}`;
+      el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.15)'; });
+      el.addEventListener('mouseleave', () => { el.style.transform = ''; });
+
+      const marker = new google.maps.marker.AdvancedMarkerElement({
+        map,
+        position: { lat: bin.latitude, lng: bin.longitude },
+        content: el,
+        zIndex: 10,
+      });
+      marker.addListener('click', () => handleClick(bin.id));
+      prevMarkers.set(bin.id, marker);
+      toAdd.push(marker);
+    });
+    // Markers already placed on map via `map` constructor param above
+
+    return () => {
+      // Only full cleanup on unmount (not on every bins change)
+    };
+  }, [map, bins, handleClick, markersRef]);
+
+  // Full cleanup on unmount
+  useEffect(() => {
+    return () => {
+      markersRef.current.forEach((m) => { m.map = null; });
+      markersRef.current.clear();
+    };
+  }, [markersRef]);
+
+  return null;
+}
+
 export function LiveMapView() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const { data: warehouse } = useWarehouseLocation();
 
   // Get auth token from localStorage (Zustand persist storage)
@@ -194,7 +285,7 @@ export function LiveMapView() {
   const { data: bins = [], isLoading: loadingBins, error: binsError } = useBins();
   const { data: zones = [], isLoading: loadingZones, error: zonesError } = useNoGoZones('active');
   const { data: potentialLocations = [], isLoading: loadingLocations, error: locationsError } = usePotentialLocations('active');
-  const { drivers = [], isLoading: loadingDrivers } = useActiveDrivers({ token: token || undefined });
+  const { drivers = [], isLoading: loadingDrivers } = useActiveDrivers();
 
   const [selectedBin, setSelectedBin] = useState<Bin | null>(null);
   const [selectedZone, setSelectedZone] = useState<NoGoZone | null>(null);
@@ -203,53 +294,50 @@ export function LiveMapView() {
   const [showNoGoZones, setShowNoGoZones] = useState(true);
   const [showPotentialLocations, setShowPotentialLocations] = useState(true);
   const [showDrivers, setShowDrivers] = useState(true);
+  const [driverFilter, setDriverFilter] = useState<'all' | 'on_shift'>('all');
   const [currentZoom, setCurrentZoom] = useState(DEFAULT_ZOOM);
   const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
   const [showLegend, setShowLegend] = useState(false);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+
+  // Bin filters by type
+  const [showMissingBins, setShowMissingBins] = useState(true);
+  const [showCriticalBins, setShowCriticalBins] = useState(true);
+  const [showHighFillBins, setShowHighFillBins] = useState(true);
+  const [showMediumFillBins, setShowMediumFillBins] = useState(true);
+  const [showLowFillBins, setShowLowFillBins] = useState(true);
 
   const wsUrl = token ? `${WS_URL}/ws?token=${token}` : `${WS_URL}/ws`;
 
-  // WebSocket connection for real-time updates
+  // Centrifugo — UI state only: close the potential-location drawer if the open location is
+  // deleted or converted. All cache updates are handled by GlobalCentrifugoSync in the layout.
+  const { subscribe, isConnected } = useCentrifugo();
+
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const unsubscribe = subscribe('company:events', (raw: unknown) => {
+      const event = raw as { type: string; data: unknown };
+
+      if (
+        event.type === 'potential_location_deleted' ||
+        event.type === 'potential_location_converted'
+      ) {
+        const d = event.data as { location_id: string };
+        setSelectedPotentialLocation((cur) => (cur?.id === d.location_id ? null : cur));
+      }
+    });
+
+    return unsubscribe;
+  }, [isConnected, subscribe]);
+
+  // WebSocket — kept only for warehouse_location_updated (still uses WebSocket Hub)
   const { status: wsStatus } = useWebSocket({
     url: wsUrl,
     onMessage: (message: WebSocketMessage) => {
-      switch (message.type) {
-        case 'potential_location_created':
-          // Invalidate and refetch to get the new location
-          queryClient.invalidateQueries({ queryKey: potentialLocationKeys.list('active') });
-          break;
-
-        case 'potential_location_deleted':
-          // Remove from cache immediately for instant UI update
-          const deleteData = message.data as { location_id: string };
-          queryClient.setQueryData<PotentialLocation[]>(
-            potentialLocationKeys.list('active'),
-            (old) => old?.filter((loc) => loc.id !== deleteData.location_id) || []
-          );
-          // Close drawer if it's the deleted location
-          setSelectedPotentialLocation((current) =>
-            current?.id === deleteData.location_id ? null : current
-          );
-          break;
-
-        case 'potential_location_converted':
-          // Remove from potential locations list
-          const convertData = message.data as { location_id: string; bin: unknown };
-          queryClient.setQueryData<PotentialLocation[]>(
-            potentialLocationKeys.list('active'),
-            (old) => old?.filter((loc) => loc.id !== convertData.location_id) || []
-          );
-          // Close drawer if it's the converted location
-          setSelectedPotentialLocation((current) =>
-            current?.id === convertData.location_id ? null : current
-          );
-          // Refetch bins to show the new bin on the map
-          queryClient.invalidateQueries({ queryKey: ['bins'] });
-          break;
-
-        default:
-          // Ignore other message types
-          break;
+      if (message.type === 'warehouse_location_updated') {
+        console.log('📍 Warehouse location updated via WebSocket, invalidating cache...');
+        queryClient.invalidateQueries({ queryKey: warehouseKeys.location });
       }
     },
     autoReconnect: true,
@@ -304,11 +392,56 @@ export function LiveMapView() {
   // Memoize filtered bins to prevent recalculation on every render
   const mappableBins = useMemo(() => bins.filter(isMappableBin), [bins]);
 
+  // Filter bins by type based on user selections
+  // in_storage bins are excluded — they're at the warehouse and represented by the warehouse marker
+  const filteredMappableBins = useMemo(() => {
+    return mappableBins.filter((bin) => {
+      // Never show bins that are in the warehouse on the live map
+      if (bin.status === 'in_storage') return false;
+
+      // Check if bin is missing
+      if (bin.status === 'missing') {
+        return showMissingBins;
+      }
+
+      // Get fill percentage
+      const fillPercentage = bin.fill_percentage ?? 0;
+
+      // Check fill level categories
+      if (fillPercentage >= 80) {
+        return showCriticalBins; // Critical (80%+)
+      } else if (fillPercentage >= 50) {
+        return showHighFillBins; // High (50-79%)
+      } else if (fillPercentage >= 25) {
+        return showMediumFillBins; // Medium (25-49%)
+      } else {
+        return showLowFillBins; // Low (0-24%)
+      }
+    });
+  }, [mappableBins, showMissingBins, showCriticalBins, showHighFillBins, showMediumFillBins, showLowFillBins]);
+
   // Memoize potential locations with valid coordinates
   const mappablePotentialLocations = useMemo(
     () => potentialLocations.filter((loc) => loc.latitude != null && loc.longitude != null),
     [potentialLocations]
   );
+
+  // Memoize filtered drivers based on filter mode
+  const filteredDrivers = useMemo(() => {
+    const driversWithLocation = drivers.filter((d) => d.currentLocation);
+
+    if (driverFilter === 'on_shift') {
+      return driversWithLocation.filter((d) => d.shiftId != null);
+    }
+
+    return driversWithLocation;
+  }, [drivers, driverFilter]);
+
+  // Stable bin click handler for the cluster layer
+  const handleBinClick = useCallback((binId: string) => {
+    const bin = bins.find((b) => b.id === binId);
+    if (bin) setSelectedBin(bin);
+  }, [bins]);
 
   // Handle search result selection
   const handleSearchResult = (result: { type: 'bin' | 'zone'; data: Bin | NoGoZone }) => {
@@ -328,7 +461,7 @@ export function LiveMapView() {
   };
 
   return (
-    <div className="relative h-[calc(100vh-64px)] lg:h-[calc(100vh-80px)] w-full">
+    <div className="relative h-full w-full">
       {/* Mobile Drag Handle - Top of screen for scrolling */}
       <div className="lg:hidden absolute top-0 left-0 right-0 h-20 z-20 pointer-events-auto">
         <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1 bg-gray-400/50 rounded-full" />
@@ -353,24 +486,308 @@ export function LiveMapView() {
         </div>
       )}
 
-      {/* Search Bar (Desktop) and Navigation Tabs (All) - Top Center */}
+      {/* Search Bar and Filter Button - Top */}
       {!loading && (
-        <div className="absolute top-4 lg:top-8 left-1/2 -translate-x-1/2 z-10 w-full max-w-2xl px-3 lg:px-4 pointer-events-auto">
-          <div className="flex flex-col gap-3">
-            {/* Search Bar - Desktop only */}
-            <div className="hidden lg:block">
-              <MapSearchBar
-                bins={bins}
-                zones={zones}
-                onSelectResult={handleSearchResult}
-              />
+        <>
+          {/* Search Bar - All screens */}
+          <div className="absolute top-4 lg:top-8 left-4 right-[72px] lg:left-1/2 lg:right-auto lg:-translate-x-1/2 z-10 w-auto lg:w-full lg:max-w-2xl pointer-events-auto">
+            <MapSearchBar
+              bins={bins}
+              zones={zones}
+              onSelectResult={handleSearchResult}
+            />
+          </div>
+
+          {/* Filter/Stats Button - Top Right */}
+          <div className="absolute top-4 lg:top-8 right-4 lg:right-6 z-20 pointer-events-auto">
+            <div className="relative">
+              <button
+                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                className="bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-gray-200 px-4 py-2.5 flex items-center gap-2 hover:bg-gray-50 transition-all group"
+              >
+                <Filter className="w-4 h-4 text-gray-700" />
+                <span className="font-semibold text-sm text-gray-900 hidden sm:inline">Filters</span>
+                <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${showFilterDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Dropdown Panel */}
+              {showFilterDropdown && (
+                <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden max-h-[80vh] overflow-y-auto">
+                  {/* Stats Section */}
+                  <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-b border-gray-200 sticky top-0 z-10">
+                    <h3 className="text-sm font-bold text-gray-900 mb-3">Map Overview</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-white/80 backdrop-blur rounded-lg px-3 py-2">
+                        <div className="text-xs text-gray-600 mb-0.5">Total Bins</div>
+                        <div className="text-2xl font-bold text-gray-900">{bins.length}</div>
+                      </div>
+                      <div className="bg-white/80 backdrop-blur rounded-lg px-3 py-2">
+                        <div className="text-xs text-gray-600 mb-0.5">Critical</div>
+                        <div className="text-2xl font-bold text-red-600">
+                          {bins.filter((b) => (b.fill_percentage ?? 0) >= 80).length}
+                        </div>
+                      </div>
+                      {bins.filter((b) => b.status === 'missing').length > 0 && (
+                        <div className="bg-white/80 backdrop-blur rounded-lg px-3 py-2">
+                          <div className="text-xs text-gray-600 mb-0.5">Missing</div>
+                          <div className="text-2xl font-bold text-gray-600">
+                            {bins.filter((b) => b.status === 'missing').length}
+                          </div>
+                        </div>
+                      )}
+                      {zones.length > 0 && (
+                        <div className="bg-white/80 backdrop-blur rounded-lg px-3 py-2">
+                          <div className="text-xs text-gray-600 mb-0.5">No-Go Zones</div>
+                          <div className="text-2xl font-bold text-red-600">{zones.length}</div>
+                        </div>
+                      )}
+                      {potentialLocations.length > 0 && (
+                        <div className="bg-white/80 backdrop-blur rounded-lg px-3 py-2">
+                          <div className="text-xs text-gray-600 mb-0.5">Potential</div>
+                          <div className="text-2xl font-bold text-orange-600">{potentialLocations.length}</div>
+                        </div>
+                      )}
+                      {drivers.filter(d => d.currentLocation).length > 0 && (
+                        <div className="bg-white/80 backdrop-blur rounded-lg px-3 py-2 col-span-2">
+                          <div className="text-xs text-gray-600 mb-2">Active Drivers</div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setDriverFilter('all')}
+                              className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                driverFilter === 'all'
+                                  ? 'bg-green-600 text-white shadow-md'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                            >
+                              All ({drivers.filter(d => d.currentLocation).length})
+                            </button>
+                            <button
+                              onClick={() => setDriverFilter('on_shift')}
+                              className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                driverFilter === 'on_shift'
+                                  ? 'bg-green-600 text-white shadow-md'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                            >
+                              On Shift ({drivers.filter(d => d.currentLocation && d.shiftId).length})
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Filter Section */}
+                  <div className="p-4">
+                    <h3 className="text-sm font-bold text-gray-900 mb-3">Toggle Layers</h3>
+                    <div className="space-y-2">
+                      <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                        <span className="text-sm text-gray-700">Bin Fill Levels</span>
+                        <input
+                          type="checkbox"
+                          checked={showFillLevels}
+                          onChange={(e) => setShowFillLevels(e.target.checked)}
+                          className="w-4 h-4 text-primary rounded focus:ring-2 focus:ring-primary/20"
+                        />
+                      </label>
+                      {showFillLevels && (
+                        <div className="ml-4 space-y-1.5 pt-1 border-l-2 border-gray-200 pl-3">
+                          <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-gray-500" />
+                              <span className="text-xs text-gray-700">Missing</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={showMissingBins}
+                              onChange={(e) => setShowMissingBins(e.target.checked)}
+                              className="w-3.5 h-3.5 text-gray-600 rounded focus:ring-2 focus:ring-gray-400/20"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-red-500" />
+                              <span className="text-xs text-gray-700">Critical (80%+)</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={showCriticalBins}
+                              onChange={(e) => setShowCriticalBins(e.target.checked)}
+                              className="w-3.5 h-3.5 text-red-600 rounded focus:ring-2 focus:ring-red-500/20"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-orange-500" />
+                              <span className="text-xs text-gray-700">High (50-79%)</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={showHighFillBins}
+                              onChange={(e) => setShowHighFillBins(e.target.checked)}
+                              className="w-3.5 h-3.5 text-orange-600 rounded focus:ring-2 focus:ring-orange-500/20"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-amber-500" />
+                              <span className="text-xs text-gray-700">Medium (25-49%)</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={showMediumFillBins}
+                              onChange={(e) => setShowMediumFillBins(e.target.checked)}
+                              className="w-3.5 h-3.5 text-amber-600 rounded focus:ring-2 focus:ring-amber-500/20"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-green-500" />
+                              <span className="text-xs text-gray-700">Low (0-24%)</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={showLowFillBins}
+                              onChange={(e) => setShowLowFillBins(e.target.checked)}
+                              className="w-3.5 h-3.5 text-green-600 rounded focus:ring-2 focus:ring-green-500/20"
+                            />
+                          </label>
+                        </div>
+                      )}
+                      {zones.length > 0 && (
+                        <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                          <span className="text-sm text-gray-700">No-Go Zones</span>
+                          <input
+                            type="checkbox"
+                            checked={showNoGoZones}
+                            onChange={(e) => setShowNoGoZones(e.target.checked)}
+                            className="w-4 h-4 text-primary rounded focus:ring-2 focus:ring-primary/20"
+                          />
+                        </label>
+                      )}
+                      {potentialLocations.length > 0 && (
+                        <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                          <span className="text-sm text-gray-700">Potential Locations</span>
+                          <input
+                            type="checkbox"
+                            checked={showPotentialLocations}
+                            onChange={(e) => setShowPotentialLocations(e.target.checked)}
+                            className="w-4 h-4 text-primary rounded focus:ring-2 focus:ring-primary/20"
+                          />
+                        </label>
+                      )}
+                      {drivers.filter(d => d.currentLocation).length > 0 && (
+                        <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                          <span className="text-sm text-gray-700">Driver Locations</span>
+                          <input
+                            type="checkbox"
+                            checked={showDrivers}
+                            onChange={(e) => setShowDrivers(e.target.checked)}
+                            className="w-4 h-4 text-primary rounded focus:ring-2 focus:ring-primary/20"
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Active Drivers List */}
+                  {filteredDrivers.length > 0 && (
+                    <div className="p-4 border-t border-gray-200">
+                      <h3 className="text-sm font-bold text-gray-900 mb-3">Active Drivers</h3>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {filteredDrivers.map((driver) => {
+                          const initials = driver.driverName.split(' ').map(n => n[0]).join('').toUpperCase();
+                          const statusColor =
+                            driver.status === 'active'
+                              ? '#10B981' // Green for active
+                              : driver.status === 'paused'
+                              ? '#F59E0B' // Orange for paused
+                              : '#6B7280'; // Gray for inactive/ended
+                          const statusLabel =
+                            driver.status === 'active'
+                              ? 'Active'
+                              : driver.status === 'paused'
+                              ? 'Paused'
+                              : 'Inactive';
+
+                          return (
+                            <button
+                              key={driver.driverId}
+                              onClick={() => {
+                                if (driver.currentLocation) {
+                                  setTargetLocation({
+                                    lat: driver.currentLocation.latitude,
+                                    lng: driver.currentLocation.longitude,
+                                    zoom: 16,
+                                  });
+                                  setShowFilterDropdown(false);
+                                }
+                              }}
+                              className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-all cursor-pointer text-left group"
+                            >
+                              {/* Driver Avatar */}
+                              <div
+                                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 group-hover:scale-110 transition-transform"
+                                style={{ backgroundColor: statusColor }}
+                              >
+                                {initials}
+                              </div>
+
+                              {/* Driver Info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-semibold text-gray-900 truncate">
+                                  {driver.driverName}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-gray-600">
+                                  <span
+                                    className="w-2 h-2 rounded-full"
+                                    style={{ backgroundColor: statusColor }}
+                                  />
+                                  <span>{statusLabel}</span>
+                                  {driver.shiftId && (
+                                    <>
+                                      <span>•</span>
+                                      <span>On Shift</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Location Icon */}
+                              <svg
+                                className="w-5 h-5 text-gray-400 group-hover:text-primary transition-colors"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                                />
+                              </svg>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
-        </div>
+        </>
       )}
 
-      {/* Legend/Info Button - Bottom Right (Floating) */}
-      {!loading && (
+      {/* Legend/Info Button - Bottom Right (Floating) - HIDDEN */}
+      {/* {!loading && (
         <button
           onClick={() => setShowLegend(!showLegend)}
           className="fixed bottom-28 lg:bottom-20 right-4 z-20 w-12 h-12 bg-primary text-white rounded-full shadow-xl flex items-center justify-center hover:bg-primary/90 transition-all duration-200 group"
@@ -393,92 +810,52 @@ export function LiveMapView() {
             <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
           )}
         </button>
-      )}
+      )} */}
 
-      {/* Collapsible Legend Panel - Bottom Right (Above button) */}
-      {showLegend && (
+      {/* Collapsible Legend Panel - Bottom Right (Above button) - HIDDEN */}
+      {/* {showLegend && (
         <div className="fixed bottom-44 lg:bottom-36 right-3 lg:right-4 z-20 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-3 lg:p-4 w-72 max-h-[60vh] overflow-y-auto animate-scale-in">
-          {/* Fill Levels Legend */}
-          {showFillLevels && (
-            <div className="mb-4">
-              <p className="text-xs font-semibold text-gray-700 mb-2">
-                Fill Level Legend
-              </p>
-              <div className="space-y-1.5">
-                <LegendItem color="#10B981" label="Low (0-25%)" />
-                <LegendItem color="#F59E0B" label="Medium (25-50%)" />
-                <LegendItem color="#F97316" label="High (50-80%)" />
-                <LegendItem color="#EF4444" label="Critical (80%+)" />
-                <LegendItem color="#9CA3AF" label="Unknown" />
-              </div>
+          <div className="mb-4">
+            <p className="text-xs font-semibold text-gray-700 mb-2">
+              Fill Level Legend
+            </p>
+            <div className="space-y-1.5">
+              <LegendItem color="#10B981" label="Low (0-25%)" />
+              <LegendItem color="#F59E0B" label="Medium (25-50%)" />
+              <LegendItem color="#F97316" label="High (50-80%)" />
+              <LegendItem color="#EF4444" label="Critical (80%+)" />
+              <LegendItem color="#9CA3AF" label="Unknown" />
             </div>
-          )}
-
-          {/* No-Go Zones Legend */}
-          {showNoGoZones && (
-            <div className="pt-3 border-t border-gray-200">
-              <p className="text-xs font-semibold text-gray-700 mb-2">
-                Zone Severity Legend
-              </p>
-              <div className="space-y-1.5">
-                <LegendItem color="#F59E0B" label="Low (0-15)" />
-                <LegendItem color="#F97316" label="Medium (16-30)" />
-                <LegendItem color="#EF4444" label="High (31-50)" />
-                <LegendItem color="#DC2626" label="Critical (51+)" />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Bottom Stats Bar - Glassmorphism */}
-      {!loading && (
-        <div className="absolute bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 z-10 w-[calc(100%-2rem)] lg:w-auto max-w-full">
-          <div className="bg-white/90 backdrop-blur-md rounded-full shadow-xl border border-gray-100 px-3 lg:px-6 py-2 lg:py-3 overflow-x-auto scrollbar-hide">
-            <div className="flex items-center gap-2 lg:gap-4 min-w-max">
-          {/* Stats */}
-          <div className="flex items-center gap-2 lg:gap-4 text-xs lg:text-sm">
-            <div className="flex items-center gap-1.5">
-              <span className="text-gray-600">Total:</span>
-              <span className="font-bold text-gray-900">{bins.length}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-gray-600">Critical:</span>
-              <span className="font-bold text-red-600">
-                {bins.filter((b) => (b.fill_percentage ?? 0) >= 80).length}
-              </span>
-            </div>
-            {zones.length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-gray-600">No-Go:</span>
-                <span className="font-bold text-red-600">{zones.length}</span>
-              </div>
-            )}
-            {potentialLocations.length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-gray-600">Potential:</span>
-                <span className="font-bold text-orange-600">{potentialLocations.length}</span>
-              </div>
-            )}
-            {drivers.filter(d => d.currentLocation).length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-gray-600">Drivers:</span>
-                <span className="font-bold text-green-600">
-                  {drivers.filter(d => d.currentLocation).length}
-                </span>
-              </div>
-            )}
           </div>
+
+          <div className="pt-3 border-t border-gray-200">
+            <p className="text-xs font-semibold text-gray-700 mb-2">
+              Zone Severity Legend
+            </p>
+            <div className="space-y-1.5">
+              <LegendItem color="#F59E0B" label="Low (0-15)" />
+              <LegendItem color="#F97316" label="Medium (16-30)" />
+              <LegendItem color="#EF4444" label="High (31-50)" />
+              <LegendItem color="#DC2626" label="Critical (51+)" />
             </div>
           </div>
         </div>
-      )}
+      )} */}
+
 
       {/* Bin Details Drawer - Right Side */}
       {selectedBin && (
         <BinDetailDrawer
           bin={selectedBin as any}
           onClose={() => setSelectedBin(null)}
+          onEdit={(bin) => {
+            setSelectedBin(null);
+            router.push(`/administration/bins?editBin=${bin.id}`);
+          }}
+          onScheduleMove={(bin) => {
+            setSelectedBin(null);
+            router.push(`/administration/bins?scheduleBin=${bin.id}`);
+          }}
         />
       )}
 
@@ -509,6 +886,7 @@ export function LiveMapView() {
           defaultZoom={DEFAULT_ZOOM}
           minZoom={3}
           maxZoom={20}
+          mapTypeId="hybrid"
           gestureHandling="greedy"
           disableDefaultUI={true}
           restriction={{
@@ -556,39 +934,43 @@ export function LiveMapView() {
               }}
             >
               <div
-                className="rounded-full shadow-lg cursor-pointer transition-all duration-300 hover:scale-110 animate-scale-in"
-                style={{
-                  width: '48px',
-                  height: '48px',
-                  backgroundColor: getZoneColorRgba(zone.conflict_score, 0.4),
-                }}
-                title={`${zone.name} - Score: ${zone.conflict_score}`}
-              />
-            </AdvancedMarker>
-          ))}
-
-        {/* Render bin markers */}
-        {showFillLevels &&
-          mappableBins.map((bin) => (
-            <AdvancedMarker
-              key={bin.id}
-              position={{ lat: bin.latitude, lng: bin.longitude }}
-              zIndex={10}
-              onClick={() => setSelectedBin(bin)}
-            >
-              <div
-                className="w-8 h-8 rounded-full border-2 border-white shadow-lg cursor-pointer transition-all duration-300 animate-scale-in"
-                style={{
-                  backgroundColor: getBinMarkerColor(bin.fill_percentage),
-                }}
-                title={`Bin #${bin.bin_number} - ${bin.fill_percentage ?? 0}%`}
+                className="flex flex-col items-center cursor-pointer"
+                title={`${zone.name} · Score: ${zone.conflict_score}`}
               >
-                <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
-                  {bin.bin_number}
+                {/* White ring + colored ring = high contrast on satellite */}
+                <div
+                  className="rounded-full flex items-center justify-center hover:scale-110 transition-transform animate-pulse"
+                  style={{
+                    width: 36,
+                    height: 36,
+                    backgroundColor: getZoneColor(zone.conflict_score) + '99',
+                    border: '2px solid white',
+                    boxShadow: `0 0 0 2px ${getZoneColor(zone.conflict_score)}, 0 2px 10px rgba(0,0,0,0.7)`,
+                  }}
+                >
+                  <ShieldAlert className="w-4 h-4 text-white drop-shadow" />
+                </div>
+                {/* Always-visible label */}
+                <div
+                  className="mt-1 px-2 py-0.5 rounded text-xs font-bold text-white whitespace-nowrap"
+                  style={{
+                    backgroundColor: getZoneColor(zone.conflict_score),
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.7)',
+                  }}
+                >
+                  {zone.name}
                 </div>
               </div>
             </AdvancedMarker>
           ))}
+
+        {/* Render bin markers with clustering */}
+        {showFillLevels && (
+          <BinClusterLayer
+            bins={filteredMappableBins}
+            onBinClick={handleBinClick}
+          />
+        )}
 
         {/* Render potential location markers */}
         {showPotentialLocations &&
@@ -610,9 +992,7 @@ export function LiveMapView() {
 
         {/* Render driver markers with initials */}
         {showDrivers &&
-          drivers
-            .filter((driver) => driver.currentLocation)
-            .map((driver) => {
+          filteredDrivers.map((driver) => {
               const initials = driver.driverName.split(' ').map(n => n[0]).join('').toUpperCase();
               const statusColor =
                 driver.status === 'active'

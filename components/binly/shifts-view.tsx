@@ -9,21 +9,25 @@ import { MoveRequestSelectionMap } from './move-request-selection-map';
 import { PlacementLocationSelectionMap } from './placement-location-selection-map';
 import { RouteSelectionMap } from './route-selection-map';
 import { Route, getRouteLabel } from '@/lib/types/route';
+import { RouteTask } from '@/lib/types/route-task';
 import { Bin } from '@/lib/types/bin';
 import { getBins } from '@/lib/api/bins';
-import { getShifts, getShiftTasks } from '@/lib/api/shifts';
-import { PotentialLocation, getPotentialLocations } from '@/lib/api/potential-locations';
+import { getShifts, getShiftTasks, checkShiftDriverProximity, ShiftDriverProximity } from '@/lib/api/shifts';
+import { PotentialLocation } from '@/lib/api/potential-locations';
+import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
 import { MoveRequest, getMoveRequests } from '@/lib/api/move-requests';
-import { useShifts, useAssignRoute } from '@/lib/hooks/use-shifts';
+import { useShifts, useAssignRoute, shiftKeys } from '@/lib/hooks/use-shifts';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRoutes } from '@/lib/hooks/use-routes';
 import { useActiveDrivers } from '@/lib/hooks/use-active-drivers';
 import { useDrivers } from '@/lib/hooks/use-drivers';
 import { ActiveDriver } from '@/lib/types/active-driver';
 import { LiveOpsMap } from './live-ops-map';
+import { ShiftHistoryView } from './shift-history-view';
 import { useAuthStore } from '@/lib/auth/store';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 
-type ViewMode = 'list' | 'timeline' | 'live';
+type ViewMode = 'list' | 'timeline' | 'live' | 'history';
 
 interface ShiftFilters {
   searchQuery: string;
@@ -50,6 +54,7 @@ export function ShiftsView() {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
+  const [shiftToEdit, setShiftToEdit] = useState<Shift | null>(null);
   const [filters, setFilters] = useState<ShiftFilters>({
     searchQuery: '',
     dateRange: 'this-week',
@@ -61,6 +66,7 @@ export function ShiftsView() {
   const listButtonRef = useRef<HTMLButtonElement>(null);
   const timelineButtonRef = useRef<HTMLButtonElement>(null);
   const liveButtonRef = useRef<HTMLButtonElement>(null);
+  const historyButtonRef = useRef<HTMLButtonElement>(null);
   const [sliderStyle, setSliderStyle] = useState({ left: 0, width: 0 });
 
   const lastWeekRef = useRef<HTMLButtonElement>(null);
@@ -74,6 +80,7 @@ export function ShiftsView() {
       const button =
         viewMode === 'live' ? liveButtonRef.current :
         viewMode === 'list' ? listButtonRef.current :
+        viewMode === 'history' ? historyButtonRef.current :
         timelineButtonRef.current;
       if (button) {
         setSliderStyle({
@@ -110,12 +117,13 @@ export function ShiftsView() {
   // Helper function to get week range for date filtering
   const getWeekRange = (dateRange: 'this-week' | 'next-week' | 'last-week' | 'all') => {
     const today = new Date(); // Current date
+    today.setHours(0, 0, 0, 0); // Set to midnight local time
     const currentDay = today.getDay();
     const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
 
     const thisWeekMonday = new Date(today);
     thisWeekMonday.setDate(today.getDate() + mondayOffset);
-    thisWeekMonday.setHours(0, 0, 0, 0); // Strip time component
+    thisWeekMonday.setHours(0, 0, 0, 0); // Ensure midnight
 
     const thisWeekSunday = new Date(thisWeekMonday);
     thisWeekSunday.setDate(thisWeekMonday.getDate() + 6);
@@ -145,16 +153,30 @@ export function ShiftsView() {
 
   // Filter shifts based on active filters
   const filteredShifts = useMemo(() => {
-    return shifts.filter(shift => {
+    console.log('🔍 [FILTER DEBUG] Starting filter process');
+    console.log('📊 [FILTER DEBUG] Raw shifts count:', shifts.length);
+    console.log('📊 [FILTER DEBUG] Raw shifts data:', shifts);
+    console.log('🎯 [FILTER DEBUG] Current filters:', filters);
+
+    const filtered = shifts.filter(shift => {
+      console.log(`\n🔎 [FILTER DEBUG] Checking shift: ${shift.driverName} (${shift.status}) - ${shift.date}`);
+
       // Date range filter
       if (filters.dateRange !== 'all') {
         const weekRange = getWeekRange(filters.dateRange);
         if (weekRange) {
-          const shiftDate = new Date(shift.date);
-          shiftDate.setHours(0, 0, 0, 0); // Normalize to midnight for date-only comparison
+          // Parse date in local time to avoid timezone issues
+          // shift.date format: "YYYY-MM-DD"
+          const [year, month, day] = shift.date.split('-').map(Number);
+          const shiftDate = new Date(year, month - 1, day); // month is 0-indexed
+          console.log(`   📅 Date filter: shift=${shift.date}, weekStart=${weekRange.start.toISOString()}, weekEnd=${weekRange.end.toISOString()}`);
+          console.log(`   📅 Parsed shift date (local):`, shiftDate);
+          console.log(`   📅 Comparison: shiftDate < start? ${shiftDate < weekRange.start}, shiftDate > end? ${shiftDate > weekRange.end}`);
           if (shiftDate < weekRange.start || shiftDate > weekRange.end) {
+            console.log(`   ❌ FILTERED OUT by date range`);
             return false;
           }
+          console.log(`   ✅ Passed date filter`);
         }
       }
 
@@ -165,26 +187,38 @@ export function ShiftsView() {
           shift.driverName.toLowerCase().includes(query) ||
           shift.route.toLowerCase().includes(query) ||
           shift.binCount.toString().includes(query);
-        if (!matchesSearch) return false;
+        if (!matchesSearch) {
+          console.log(`   ❌ FILTERED OUT by search query`);
+          return false;
+        }
+        console.log(`   ✅ Passed search filter`);
       }
 
       // Driver filter
       if (filters.drivers.length > 0 && !filters.drivers.includes(shift.driverName)) {
+        console.log(`   ❌ FILTERED OUT by driver filter`);
         return false;
       }
 
       // Status filter
       if (filters.statuses.length > 0 && !filters.statuses.includes(shift.status)) {
+        console.log(`   ❌ FILTERED OUT by status filter`);
         return false;
       }
 
       // Route filter
       if (filters.routes.length > 0 && !filters.routes.includes(shift.route)) {
+        console.log(`   ❌ FILTERED OUT by route filter`);
         return false;
       }
 
+      console.log(`   ✅ SHIFT PASSED ALL FILTERS`);
       return true;
     });
+
+    console.log('\n📊 [FILTER DEBUG] Filtered shifts count:', filtered.length);
+    console.log('📊 [FILTER DEBUG] Filtered shifts data:', filtered);
+    return filtered;
   }, [shifts, filters]);
 
   // Count active filters
@@ -271,11 +305,22 @@ export function ShiftsView() {
                 >
                   Timeline
                 </button>
+                <button
+                  ref={historyButtonRef}
+                  onClick={() => setViewMode('history')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-fast relative z-10 ${
+                    viewMode === 'history'
+                      ? 'text-gray-900'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  History
+                </button>
               </div>
             </div>
 
-            {/* Filter Bar - Hidden in Live Ops mode */}
-            {viewMode !== 'live' && (
+            {/* Filter Bar - Hidden in Live Ops and History modes */}
+            {viewMode !== 'live' && viewMode !== 'history' && (
               <FilterBar
                 filters={filters}
                 setFilters={setFilters}
@@ -297,6 +342,8 @@ export function ShiftsView() {
             <div className="flex items-center justify-center py-12">
               <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
+          ) : viewMode === 'history' ? (
+            <ShiftHistoryView />
           ) : viewMode === 'list' ? (
             <div className="max-w-4xl mx-auto">
               <ShiftsListView shifts={filteredShifts} onShiftClick={setSelectedShift} />
@@ -309,16 +356,28 @@ export function ShiftsView() {
         </div>
       </div>
 
-      {/* Create Shift Drawer */}
+      {/* Create/Edit Shift Drawer */}
       {isCreateDrawerOpen && (
         <CreateShiftDrawer
-          onClose={() => setIsCreateDrawerOpen(false)}
+          shift={shiftToEdit}
+          onClose={() => {
+            setIsCreateDrawerOpen(false);
+            setShiftToEdit(null); // Clear edit mode
+          }}
         />
       )}
 
       {/* Shift Details Drawer */}
       {selectedShift && (
-        <ShiftDetailsDrawer shift={selectedShift} onClose={() => setSelectedShift(null)} />
+        <ShiftDetailsDrawer
+          shift={selectedShift}
+          onClose={() => setSelectedShift(null)}
+          onEditShift={() => {
+            setShiftToEdit(selectedShift);
+            setSelectedShift(null); // Close details drawer
+            setIsCreateDrawerOpen(true); // Open edit drawer
+          }}
+        />
       )}
     </div>
   );
@@ -785,7 +844,7 @@ function ShiftsListView({ shifts, onShiftClick }: { shifts: Shift[]; onShiftClic
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-gray-900">
                 {getDateLabel(date)} · {activeShifts} Active Shift
-                {activeShifts !== 1 ? 's' : ''} · {totalBins} Bins Total
+                {activeShifts !== 1 ? 's' : ''} · {totalBins} Tasks Total
               </h2>
             </div>
 
@@ -844,11 +903,11 @@ function ShiftCard({ shift, onClick }: { shift: Shift; onClick: () => void }) {
           <span className={`text-sm ${isActive ? 'text-white font-medium' : 'text-gray-700'}`}>{shift.driverName}</span>
         </div>
 
-        {/* Bin Count / Progress */}
+        {/* Task Count / Progress */}
         <div className={`flex-shrink-0 text-sm ${isActive ? 'text-white font-medium' : 'text-gray-600'}`}>
           {isActive && shift.binsCollected !== undefined
-            ? `${shift.binsCollected}/${shift.binCount} Bins (${progressPercentage}%)`
-            : `${shift.binCount} Bins`}
+            ? `${shift.binsCollected}/${shift.binCount} Tasks (${progressPercentage}%)`
+            : `${shift.binCount} Tasks`}
         </div>
 
         {/* Status Badge */}
@@ -1275,15 +1334,16 @@ function DailyGantt({
 
 // Task type for shift builder
 interface ShiftTask {
-  id: string;
+  id?: string;
   type: 'collection' | 'placement' | 'pickup' | 'dropoff' | 'warehouse_stop';
   // Collection fields
   bin_id?: string;
-  bin_number?: string;
+  bin_number?: number;
   fill_percentage?: number;
   // Placement fields
   potential_location_id?: string;
-  new_bin_number?: string;
+  new_bin_number?: number;
+  placement_source?: 'potential_location' | 'warehouse';
   // Move request fields
   move_request_id?: string;
   destination_latitude?: number;
@@ -1294,29 +1354,60 @@ interface ShiftTask {
   warehouse_action?: 'load' | 'unload';
   bins_to_load?: number;
   auto_inserted?: boolean; // Marks warehouse stops that were automatically inserted
+  // Edit mode fields (for existing tasks)
+  isExisting?: boolean; // True if this task already exists in the shift (read-only)
+  isCompleted?: boolean; // True if task was completed
+  isSkipped?: boolean; // True if task was skipped
+  isInProgress?: boolean; // True if driver is currently on this task
   // Common fields
   latitude: number;
   longitude: number;
   address: string;
 }
 
-// Create Shift Drawer Component
+// Warehouse deployment item — redeploy an in_storage bin to a new field address
+interface WarehouseDeploymentItem {
+  bin_id: string;
+  bin_number: number;
+  destination_address: string;
+  destination_latitude: number;
+  destination_longitude: number;
+}
+
+// Create/Edit Shift Drawer Component
 function CreateShiftDrawer({
+  shift,
   onClose,
 }: {
+  shift?: Shift | null;
   onClose: () => void;
 }) {
+  const isEditMode = !!shift;
   const { data: drivers = [], isLoading: loadingDrivers } = useDrivers();
   const { data: warehouse } = useWarehouseLocation();
   const { token } = useAuthStore();
+  const queryClient = useQueryClient();
 
-  const [driverId, setDriverId] = useState('');
-  const [truckCapacity, setTruckCapacity] = useState('');
+  const [driverId, setDriverId] = useState(shift?.driverId || '');
+  const [truckCapacity, setTruckCapacity] = useState(shift?.truck_bin_capacity?.toString() || '');
+  const [lockRouteOrder, setLockRouteOrder] = useState(false);
   const [tasks, setTasks] = useState<ShiftTask[]>([]);
+  const [loadingShiftData, setLoadingShiftData] = useState(false);
+  const [existingTasksCount, setExistingTasksCount] = useState(0);
+  const [initialExistingTaskIds, setInitialExistingTaskIds] = useState<string[]>([]); // Track original task IDs for deletion detection
   const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [taskTypeFilter, setTaskTypeFilter] = useState<string>('all');
+
+  // Multi-select and deletion state
+  const [selectedTaskIndices, setSelectedTaskIndices] = useState<Set<number>>(new Set());
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [tasksToDelete, setTasksToDelete] = useState<number[]>([]);
   const [isDriverDropdownOpen, setIsDriverDropdownOpen] = useState(false);
   const [isDriverClosing, setIsDriverClosing] = useState(false);
   const [showBinSelection, setShowBinSelection] = useState(false);
@@ -1325,9 +1416,38 @@ function CreateShiftDrawer({
   const [editingTaskIndex, setEditingTaskIndex] = useState<number | null>(null);
   const [editingTask, setEditingTask] = useState<ShiftTask | null>(null);
   const [showPlacementSelection, setShowPlacementSelection] = useState(false);
-  const [potentialLocations, setPotentialLocations] = useState<PotentialLocation[]>([]);
+  const { data: potentialLocations = [] } = usePotentialLocations('active');
   const [showMoveRequestSelection, setShowMoveRequestSelection] = useState(false);
-  const [moveRequests, setMoveRequests] = useState<MoveRequest[]>([]);
+  const [warehouseDeployments, setWarehouseDeployments] = useState<WarehouseDeploymentItem[]>([]);
+  const [showWarehouseDeployment, setShowWarehouseDeployment] = useState(false);
+  const [warehouseBins, setWarehouseBins] = useState<Bin[]>([]);
+  const [selectedDeployBinId, setSelectedDeployBinId] = useState('');
+  const [deployAddress, setDeployAddress] = useState('');
+  const [deployLat, setDeployLat] = useState('');
+  const [deployLon, setDeployLon] = useState('');
+
+  // Proximity warning state
+  const [showProximityWarning, setShowProximityWarning] = useState(false);
+  const [proximityData, setProximityData] = useState<ShiftDriverProximity | null>(null);
+  const [pendingSubmitData, setPendingSubmitData] = useState<any>(null);
+  const [changeSummary, setChangeSummary] = useState({ added: 0, removed: 0 });
+
+  // React Query — automatically refetches when GlobalCentrifugoSync invalidates ['move-requests']
+  const { data: moveRequests = [], isFetching: moveRequestsFetching } = useQuery<MoveRequest[]>({
+    queryKey: ['move-requests', 'pending-unassigned'],
+    queryFn: () => {
+      console.log('🔃 [CreateShiftDrawer] fetching pending-unassigned move requests...');
+      return getMoveRequests({ status: 'pending', assigned: 'unassigned' });
+    },
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+  });
+
+  // Debug: log whenever the move request list changes
+  useEffect(() => {
+    console.log(`📋 [CreateShiftDrawer] moveRequests updated: ${moveRequests.length} items, fetching=${moveRequestsFetching}`);
+  }, [moveRequests, moveRequestsFetching]);
+  const [moveRequestFocusBinId, setMoveRequestFocusBinId] = useState<string | null>(null);
   const driverDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown with animation
@@ -1337,6 +1457,87 @@ function CreateShiftDrawer({
       setIsDriverDropdownOpen(false);
       setIsDriverClosing(false);
     }, 150);
+  };
+
+  // Filter tasks based on search and type filter
+  const filteredTasks = tasks.filter(task => {
+    // Search filter - search by address
+    const matchesSearch = !searchQuery ||
+      task.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (task.destination_address && task.destination_address.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    // Type filter
+    const matchesType = taskTypeFilter === 'all' || task.type === taskTypeFilter;
+
+    return matchesSearch && matchesType;
+  });
+
+  // Toggle task selection
+  const toggleTaskSelection = (index: number) => {
+    const newSelected = new Set(selectedTaskIndices);
+    if (newSelected.has(index)) {
+      newSelected.delete(index);
+    } else {
+      newSelected.add(index);
+    }
+    setSelectedTaskIndices(newSelected);
+  };
+
+  // Handle single task deletion
+  const handleDeleteSingleTask = (index: number) => {
+    setTasksToDelete([index]);
+    setShowDeleteConfirmModal(true);
+  };
+
+  // Handle multi-task deletion
+  const handleDeleteSelectedTasks = () => {
+    setTasksToDelete(Array.from(selectedTaskIndices));
+    setShowDeleteConfirmModal(true);
+  };
+
+  // Confirm and execute deletion
+  const confirmDeletion = () => {
+    // Validation: Check pickup/dropoff pairs
+    const tasksBeingDeleted = tasksToDelete.map(idx => tasks[idx]);
+    const moveRequestTasks = tasksBeingDeleted.filter(t =>
+      (t.type === 'pickup' || t.type === 'dropoff') && t.move_request_id
+    );
+
+    // For each move request task, check if paired task is also being deleted
+    for (const task of moveRequestTasks) {
+      const pairedTasks = tasks.filter(t =>
+        t.move_request_id === task.move_request_id &&
+        t.id !== task.id &&
+        (t.type === 'pickup' || t.type === 'dropoff')
+      );
+
+      for (const paired of pairedTasks) {
+        const pairedIndex = tasks.indexOf(paired);
+        if (!tasksToDelete.includes(pairedIndex)) {
+          // Paired task is NOT being deleted - show error
+          alert(`❌ Cannot remove ${task.type} without also removing the paired ${paired.type} task (Bin #${task.bin_number || '?'}). Please select both tasks and try again.`);
+          return; // Cancel deletion
+        }
+      }
+    }
+
+    // All validation passed - proceed with deletion
+    const newTasks = tasks.filter((_, index) => !tasksToDelete.includes(index));
+    setTasks(newTasks);
+    setSelectedTaskIndices(new Set());
+    setTasksToDelete([]);
+    setShowDeleteConfirmModal(false);
+  };
+
+  // Cancel deletion
+  const cancelDeletion = () => {
+    setTasksToDelete([]);
+    setShowDeleteConfirmModal(false);
+  };
+
+  // Check if task can be deleted (not completed or skipped)
+  const canDeleteTask = (task: ShiftTask) => {
+    return !task.isCompleted && !task.isSkipped;
   };
 
   // Click outside to close dropdown
@@ -1354,6 +1555,132 @@ function CreateShiftDrawer({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isDriverDropdownOpen]);
+
+  // Fetch and pre-populate shift data when in edit mode
+  useEffect(() => {
+    if (!isEditMode || !shift || !token) {
+      console.log('📋 [EDIT MODE] Skipping fetch:', { isEditMode, hasShift: !!shift, hasToken: !!token });
+      return;
+    }
+
+    const fetchShiftData = async () => {
+      console.log('📋 [EDIT MODE] Starting fetch for shift:', shift.id);
+      setLoadingShiftData(true);
+      try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+        const url = `${API_URL}/api/manager/shifts/${shift.id}/tasks/history`;
+        console.log('📋 [EDIT MODE] Fetching from URL:', url);
+
+        const response = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        console.log('📋 [EDIT MODE] Response status:', response.status);
+        console.log('📋 [EDIT MODE] Response ok:', response.ok);
+
+        if (!response.ok) throw new Error('Failed to fetch shift tasks');
+
+        const data = await response.json();
+        console.log('📋 [EDIT MODE] Raw response data:', data);
+        console.log('📋 [EDIT MODE] Tasks array:', data.data);
+        console.log('📋 [EDIT MODE] Tasks count:', data.data?.length || 0);
+
+        // Set existing task count for display (excluding deleted tasks and warehouse stops)
+        const activeTasks = data.data?.filter((t: RouteTask) => !t.is_deleted && t.task_type !== 'warehouse_stop') || [];
+        console.log('📋 [EDIT MODE] Active tasks (not deleted, no warehouse stops):', activeTasks.length);
+        console.log('📋 [EDIT MODE] Active tasks data:', activeTasks);
+
+        setExistingTasksCount(activeTasks.length);
+        console.log('📋 [EDIT MODE] Set existingTasksCount to:', activeTasks.length);
+
+        // Also fetch the shift details to get truck_bin_capacity
+        const shiftUrl = `${API_URL}/api/manager/shifts/${shift.id}`;
+        console.log('📋 [EDIT MODE] Fetching shift details from:', shiftUrl);
+        const shiftResponse = await fetch(shiftUrl, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+
+        if (shiftResponse.ok) {
+          const shiftData = await shiftResponse.json();
+          console.log('📋 [EDIT MODE] Shift details:', shiftData);
+          const shiftDetails = shiftData.data || shiftData;
+          console.log('📋 [EDIT MODE] Extracted shiftDetails:', shiftDetails);
+          console.log('📋 [EDIT MODE] truck_bin_capacity value:', shiftDetails.truck_bin_capacity);
+          if (shiftDetails.truck_bin_capacity != null) { // Check for null/undefined
+            console.log('📋 [EDIT MODE] Setting truck capacity to:', shiftDetails.truck_bin_capacity);
+            setTruckCapacity(String(shiftDetails.truck_bin_capacity));
+          } else {
+            console.log('⚠️ [EDIT MODE] truck_bin_capacity is null/undefined in shift details');
+          }
+        }
+
+        // Convert RouteTask to ShiftTask format for display
+        const existingShiftTasks: ShiftTask[] = activeTasks.map((task: RouteTask) => {
+          console.log('📋 [EDIT MODE] Converting task:', task.id, task.task_type);
+
+          const baseTask: ShiftTask = {
+            id: task.id, // Preserve task ID for tracking
+            type: task.task_type as any,
+            address: task.address || '',
+            latitude: task.latitude || 0,
+            longitude: task.longitude || 0,
+            isExisting: true, // Mark as existing (read-only)
+            isCompleted: task.is_completed === 1,
+            isSkipped: task.is_skipped === 1,
+            isInProgress: task.current_task_index === task.sequence_order,
+          };
+
+          // Add task-specific fields
+          if (task.task_type === 'collection' && task.bin_id) {
+            baseTask.bin_id = task.bin_id;
+            baseTask.bin_number = task.bin_number;
+            baseTask.fill_percentage = task.fill_percentage;
+          } else if (task.task_type === 'placement' && task.potential_location_id) {
+            baseTask.potential_location_id = task.potential_location_id;
+          } else if ((task.task_type === 'pickup' || task.task_type === 'dropoff') && task.move_request_id) {
+            baseTask.move_request_id = task.move_request_id;
+            baseTask.bin_id = task.bin_id;
+            baseTask.bin_number = task.bin_number; // Copy bin_number from API response
+            baseTask.destination_address = task.destination_address;
+            baseTask.destination_latitude = task.destination_latitude;
+            baseTask.destination_longitude = task.destination_longitude;
+            baseTask.move_type = task.move_type;
+          } else if (task.task_type === 'warehouse_stop') {
+            baseTask.warehouse_action = task.warehouse_action;
+            baseTask.bins_to_load = task.bins_to_load;
+          }
+
+          return baseTask;
+        });
+
+        console.log('📋 [EDIT MODE] Converted existing tasks to ShiftTask format:', existingShiftTasks.length);
+        console.log('📋 [EDIT MODE] Existing ShiftTasks:', existingShiftTasks);
+
+        // Filter out warehouse stops before loading
+        const filteredExistingTasks = existingShiftTasks.filter(task => task.type !== 'warehouse_stop');
+        console.log(`🔧 [EDIT MODE] Filtered out ${existingShiftTasks.length - filteredExistingTasks.length} warehouse_stop task(s) from existing tasks`);
+
+        // Track initial task IDs for deletion detection
+        const existingIds = filteredExistingTasks.map(t => t.id).filter((id): id is string => id != null);
+        setInitialExistingTaskIds(existingIds);
+        console.log('📋 [EDIT MODE] Tracked initial task IDs:', existingIds);
+
+        // Pre-populate with existing tasks (read-only)
+        setTasks(filteredExistingTasks);
+        console.log('📋 [EDIT MODE] Set tasks state with filtered existing tasks');
+      } catch (err) {
+        console.error('❌ [EDIT MODE] Failed to fetch shift data:', err);
+        setError('Failed to load shift data');
+      } finally {
+        setLoadingShiftData(false);
+        console.log('📋 [EDIT MODE] Finished loading');
+      }
+    };
+
+    fetchShiftData();
+  }, [isEditMode, shift, token]);
 
   const selectedDriver = drivers.find(d => d.id === driverId);
 
@@ -1409,11 +1736,9 @@ function CreateShiftDrawer({
 
   const openBinSelection = async () => {
     try {
-      // Fetch bins if not already loaded
-      if (allBins.length === 0) {
-        const bins = await getBins();
-        setAllBins(bins);
-      }
+      // Always fetch all bins to ensure we have the complete set (not just route-merged bins)
+      const bins = await getBins();
+      setAllBins(bins);
       setShowBinSelection(true);
     } catch (error) {
       console.error('Failed to fetch bins:', error);
@@ -1421,11 +1746,17 @@ function CreateShiftDrawer({
     }
   };
 
-  const handleBinSelectionConfirm = (selectedBinIds: string[]) => {
-    // Convert selected bin IDs to collection tasks
-    const selectedBins = allBins.filter(bin => selectedBinIds.includes(bin.id));
+  const handleBinSelectionConfirm = (newBinIds: string[], removedBinIds: string[]) => {
+    // Remove unchecked bins from the task list
+    const removedSet = new Set(removedBinIds);
+    const tasksAfterRemoval = tasks.filter(t => !(t.type === 'collection' && t.bin_id && removedSet.has(t.bin_id)));
 
-    const collectionTasks: ShiftTask[] = selectedBins.map(bin => ({
+    // Add newly selected bins (safety net dedup against remaining tasks)
+    const remainingBinIds = new Set(tasksAfterRemoval.filter(t => t.type === 'collection' && t.bin_id).map(t => t.bin_id!));
+    const trulyNewBinIds = newBinIds.filter(id => !remainingBinIds.has(id));
+    const newBins = allBins.filter(bin => trulyNewBinIds.includes(bin.id));
+
+    const collectionTasks: ShiftTask[] = newBins.map(bin => ({
       id: `temp-${Date.now()}-${bin.id}`,
       type: 'collection',
       bin_id: bin.id,
@@ -1436,8 +1767,7 @@ function CreateShiftDrawer({
       address: bin.current_street || 'Unknown',
     }));
 
-    // Add collection tasks to the task list
-    setTasks([...tasks, ...collectionTasks]);
+    setTasks([...tasksAfterRemoval, ...collectionTasks]);
     setShowBinSelection(false);
   };
 
@@ -1450,8 +1780,8 @@ function CreateShiftDrawer({
     console.log('📋 [ROUTE IMPORT] Selected route:', selectedRoute.name);
     console.log('📍 [ROUTE IMPORT] Route has', routeBins.length, 'bins');
 
-    // Convert route bins to shift tasks (collection tasks)
-    const newTasks: ShiftTask[] = routeBins.map((bin, index) => ({
+    // Convert route bins to shift tasks (collection tasks) directly
+    const newTasks: ShiftTask[] = routeBins.map((bin) => ({
       id: `route-bin-${bin.id}`,
       type: 'collection',
       bin_id: bin.id,
@@ -1464,10 +1794,15 @@ function CreateShiftDrawer({
 
     console.log('✅ [ROUTE IMPORT] Created', newTasks.length, 'collection tasks');
 
-    // Add tasks to shift
     setTasks([...tasks, ...newTasks]);
 
-    // Close modal
+    // Merge route bins into allBins so lock detection works in the task list
+    setAllBins(prev => {
+      const existingIds = new Set(prev.map(b => b.id));
+      const newBins = routeBins.filter(b => !existingIds.has(b.id));
+      return newBins.length > 0 ? [...prev, ...newBins] : prev;
+    });
+
     setShowRouteImport(false);
   };
 
@@ -1497,17 +1832,8 @@ function CreateShiftDrawer({
     setEditingTask(null);
   };
 
-  const openPlacementSelection = async () => {
-    try {
-      if (potentialLocations.length === 0) {
-        const locations = await getPotentialLocations('active');
-        setPotentialLocations(locations);
-      }
-      setShowPlacementSelection(true);
-    } catch (error) {
-      console.error('Failed to fetch potential locations:', error);
-      setError('Failed to load potential locations. Please try again.');
-    }
+  const openPlacementSelection = () => {
+    setShowPlacementSelection(true);
   };
 
   const handlePlacementSelectionConfirm = (selectedLocationIds: string[]) => {
@@ -1515,11 +1841,10 @@ function CreateShiftDrawer({
       selectedLocationIds.includes(loc.id)
     );
 
-    const placementTasks: ShiftTask[] = selectedLocations.map(location => ({
+    const placementTasks: ShiftTask[] = selectedLocations.map((location) => ({
       id: `temp-${Date.now()}-${location.id}`,
       type: 'placement',
       potential_location_id: location.id,
-      new_bin_number: '', // Manager can edit this later
       latitude: location.latitude || 0,
       longitude: location.longitude || 0,
       address: location.address || location.street,
@@ -1529,17 +1854,52 @@ function CreateShiftDrawer({
     setShowPlacementSelection(false);
   };
 
-  const openMoveRequestSelection = async () => {
+  const openMoveRequestSelection = () => {
+    console.log(`🗺️ [CreateShiftDrawer] opening move request modal with ${moveRequests.length} requests`);
+    setMoveRequestFocusBinId(null);
+    setShowMoveRequestSelection(true);
+  };
+
+  const openMoveRequestSelectionForBin = (binId: string) => {
+    setMoveRequestFocusBinId(binId);
+    setShowMoveRequestSelection(true);
+  };
+
+  const openWarehouseDeployment = async () => {
+    // Load in_storage bins on open
     try {
-      if (moveRequests.length === 0) {
-        const requests = await getMoveRequests({ status: 'pending', assigned: 'unassigned' });
-        setMoveRequests(requests);
-      }
-      setShowMoveRequestSelection(true);
-    } catch (error) {
-      console.error('Failed to fetch move requests:', error);
-      setError('Failed to load move requests. Please try again.');
+      const all = await getBins();
+      setWarehouseBins(all.filter(b => b.status === 'in_storage'));
+    } catch {
+      setWarehouseBins([]);
     }
+    setSelectedDeployBinId('');
+    setDeployAddress('');
+    setDeployLat('');
+    setDeployLon('');
+    setShowWarehouseDeployment(true);
+  };
+
+  const handleAddDeployment = () => {
+    const bin = warehouseBins.find(b => b.id === selectedDeployBinId);
+    if (!bin || !deployAddress.trim()) return;
+    const lat = parseFloat(deployLat);
+    const lon = parseFloat(deployLon);
+    if (isNaN(lat) || isNaN(lon)) return;
+    // Prevent duplicates
+    if (warehouseDeployments.some(d => d.bin_id === bin.id)) return;
+    setWarehouseDeployments(prev => [
+      ...prev,
+      { bin_id: bin.id, bin_number: bin.bin_number, destination_address: deployAddress.trim(), destination_latitude: lat, destination_longitude: lon },
+    ]);
+    setSelectedDeployBinId('');
+    setDeployAddress('');
+    setDeployLat('');
+    setDeployLon('');
+  };
+
+  const removeDeployment = (binId: string) => {
+    setWarehouseDeployments(prev => prev.filter(d => d.bin_id !== binId));
   };
 
   const handleMoveRequestSelectionConfirm = (selectedRequestIds: string[]) => {
@@ -1564,8 +1924,8 @@ function CreateShiftDrawer({
         destination_address: request.move_type === 'store'
           ? 'Warehouse Storage'
           : `${request.new_street || ''}, ${request.new_city || ''} ${request.new_zip || ''}`.trim(),
-        latitude: 0, // Will be populated from bin data on backend
-        longitude: 0, // Will be populated from bin data on backend
+        latitude: request.original_latitude, // Use original location from move request
+        longitude: request.original_longitude, // Use original location from move request
         address: `${request.current_street}, ${request.city} ${request.zip}`,
       };
 
@@ -1576,7 +1936,7 @@ function CreateShiftDrawer({
         bin_id: pickupTask.bin_id,
         latitude: pickupTask.latitude,
         longitude: pickupTask.longitude,
-        message: 'Sending to backend with 0,0 - expects backend to populate from bin'
+        message: 'Using original_latitude/longitude from move request'
       });
 
       // 2. Dropoff task at destination
@@ -1690,8 +2050,9 @@ function CreateShiftDrawer({
     return result;
   };
 
-  // Auto-insert warehouse stops whenever tasks or capacity changes
-  useEffect(() => {
+  // Auto-insert warehouse stops - DISABLED: Let backend/Mapbox handle warehouse stops during optimization
+  // Frontend capacity math is too simplistic - backend uses real routing and traffic data
+  /* useEffect(() => {
     const capacity = parseInt(truckCapacity);
     if (tasks.length > 0 && capacity > 0) {
       const tasksWithAutoWarehouses = autoInsertWarehouseStops(tasks, capacity);
@@ -1702,7 +2063,7 @@ function CreateShiftDrawer({
         setTasks(tasksWithAutoWarehouses);
       }
     }
-  }, [truckCapacity]); // Only run when capacity changes, not on every task change
+  }, [truckCapacity]); // Only run when capacity changes, not on every task change */
 
   // Calculate shift analysis
   const shiftAnalysis = useMemo(() => {
@@ -2257,6 +2618,50 @@ function CreateShiftDrawer({
     return sorted.slice(0, 5); // Return top 5
   }, [tasks, capacityFlow, truckCapacity]);
 
+  // Handle confirmed submission after proximity warning
+  const handleProximityWarningConfirm = async () => {
+    setShowProximityWarning(false);
+    setIsSubmitting(true);
+
+    try {
+      const { editPayload, shift, API_URL, token } = pendingSubmitData;
+
+      console.log('✅ [PROXIMITY WARNING] User confirmed - proceeding with shift update');
+
+      const response = await fetch(`${API_URL}/api/manager/shifts/${shift.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(editPayload),
+      });
+
+      if (!response.ok) {
+        let errorMessage = `Failed to update shift (${response.status} ${response.statusText})`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // Response is not JSON, use status text
+        }
+        throw new Error(errorMessage);
+      }
+
+      // Invalidate shifts cache to trigger refetch
+      console.log('✅ Shift updated successfully, invalidating cache...');
+      queryClient.invalidateQueries({ queryKey: shiftKeys.all });
+
+      onClose();
+    } catch (err) {
+      console.error('Failed to update shift:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update shift. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+      setPendingSubmitData(null);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -2288,7 +2693,6 @@ function CreateShiftDrawer({
           baseTask.fill_percentage = task.fill_percentage;
         } else if (task.type === 'placement') {
           baseTask.potential_location_id = task.potential_location_id;
-          baseTask.new_bin_number = task.new_bin_number;
         } else if (task.type === 'pickup' || task.type === 'dropoff') {
           // Pickup/dropoff tasks from move requests
           baseTask.move_request_id = task.move_request_id;
@@ -2318,7 +2722,9 @@ function CreateShiftDrawer({
         warehouse_latitude: warehouse?.latitude || 0,
         warehouse_longitude: warehouse?.longitude || 0,
         warehouse_address: warehouse?.address || 'Warehouse',
+        lock_route_order: lockRouteOrder,
         tasks: tasksPayload,
+        warehouse_deployments: warehouseDeployments.length > 0 ? warehouseDeployments : undefined,
       };
 
       // Log the complete shift object before creating
@@ -2343,17 +2749,118 @@ function CreateShiftDrawer({
 
       // Call backend directly (not through Next.js API route)
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      const response = await fetch(`${API_URL}/api/manager/shifts/create-with-tasks`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
+
+      let response;
+      if (isEditMode && shift) {
+        // Edit mode: PATCH endpoint with added tasks and removed tasks
+        // Filter out warehouse_stop tasks - they will be recreated during optimization
+        const filteredTasks = tasksPayload.filter(task => task.task_type !== 'warehouse_stop');
+        console.log(`🔧 [SHIFT EDIT] Filtered out ${tasksPayload.length - filteredTasks.length} warehouse_stop task(s)`);
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 📋 TASK CHANGE DETECTION LOGIC
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('📋 [TASK CHANGE DETECTION] Starting analysis...');
+        console.log(`📋 [TASK CHANGE DETECTION] Initial existing task IDs (from load): ${JSON.stringify(initialExistingTaskIds)}`);
+        console.log(`📋 [TASK CHANGE DETECTION] Total tasks in UI now: ${tasks.length}`);
+
+        // Log all current tasks with their IDs
+        tasks.forEach((task, index) => {
+          console.log(`   Task ${index + 1}: type=${task.type}, id=${task.id || 'NO_ID'}, bin_id=${task.bin_id || 'N/A'}, potential_location_id=${task.potential_location_id || 'N/A'}`);
+        });
+
+        // Detect deleted tasks: tasks that were in initialExistingTaskIds but no longer in current tasks
+        const currentTaskIds = tasks.filter(t => t.id != null).map(t => t.id!);
+        console.log(`📋 [TASK CHANGE DETECTION] Current task IDs (tasks with IDs): ${JSON.stringify(currentTaskIds)}`);
+
+        const deletedTaskIds = initialExistingTaskIds.filter(id => !currentTaskIds.includes(id));
+        console.log(`🗑️ [SHIFT EDIT] Deleted task IDs (in initial but not in current): ${JSON.stringify(deletedTaskIds)}`);
+        console.log(`🗑️ [SHIFT EDIT] Deleted count: ${deletedTaskIds.length}`);
+
+        // Only send NEW tasks (tasks without an id OR with temp id) in add_tasks
+        const newTasksOnly = filteredTasks.filter(task => {
+          // Find the original task in the tasks array
+          const originalTask = tasks.find(t =>
+            (t.bin_id && t.bin_id === task.bin_id) ||
+            (t.potential_location_id && t.potential_location_id === task.potential_location_id) ||
+            (t.move_request_id && t.move_request_id === task.move_request_id)
+          );
+
+          // Task is new if it has no ID OR has a temporary ID (starts with "temp-")
+          const isNew = !originalTask?.id || (typeof originalTask.id === 'string' && originalTask.id.startsWith('temp-'));
+
+          console.log(`🔍 [NEW TASK CHECK] ${task.task_type} - bin_id=${task.bin_id || 'N/A'}, potential_location_id=${task.potential_location_id || 'N/A'}, originalTask.id=${originalTask?.id || 'NO_ID'}, isNew=${isNew}`);
+
+          // Include only if the task doesn't have an ID or has a temp ID (meaning it's new)
+          return isNew;
+        });
+
+        console.log(`➕ [SHIFT EDIT] New tasks to add: ${newTasksOnly.length}`);
+        console.log(`🔧 [SHIFT EDIT] New tasks payload:`, JSON.stringify(newTasksOnly, null, 2));
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+        const editPayload = {
+          driver_id: driverId !== shift.driverId ? driverId : undefined,
+          add_tasks: newTasksOnly,
+          remove_task_ids: deletedTaskIds.length > 0 ? deletedTaskIds : undefined,
+          reoptimize: true,
+          reason: deletedTaskIds.length > 0
+            ? `Tasks modified via shift editor (${newTasksOnly.length} added, ${deletedTaskIds.length} removed)`
+            : 'Tasks added via shift editor',
+        };
+
+        console.log('✏️ [SHIFT EDIT] Updating shift:', shift.id);
+        console.log('✏️ [SHIFT EDIT] Payload:', editPayload);
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // PROXIMITY CHECK: Warn if THIS shift's driver is nearby their current task
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        console.log(`🔍 [PROXIMITY CHECK] Checking if driver is nearby current task for shift: ${shift.id}`);
+
+        try {
+          // Check if the driver of THIS shift is nearby THEIR current task
+          const proximity = await checkShiftDriverProximity(shift.id);
+
+          console.log(`📍 [PROXIMITY CHECK] Driver proximity: nearby=${proximity.is_nearby}, distance=${proximity.driver_distance_miles?.toFixed(2)} miles`);
+
+          // If driver is nearby their current task, show warning
+          if (proximity.is_nearby) {
+            setProximityData(proximity);
+            setPendingSubmitData({ editPayload, shift, API_URL, token });
+            setChangeSummary({ added: newTasksOnly.length, removed: deletedTaskIds.length });
+            setShowProximityWarning(true);
+            setIsSubmitting(false);
+            return; // Stop here - wait for user confirmation
+          }
+        } catch (err) {
+          console.error('Failed to check driver proximity:', err);
+          // Continue with submission even if check fails (don't block the user)
+        }
+
+        response = await fetch(`${API_URL}/api/manager/shifts/${shift.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(editPayload),
+        });
+      } else {
+        // Create mode: POST endpoint
+        response = await fetch(`${API_URL}/api/manager/shifts/create-with-tasks`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+      }
 
       if (!response.ok) {
-        let errorMessage = `Failed to create shift (${response.status} ${response.statusText})`;
+        let errorMessage = `Failed to ${isEditMode ? 'update' : 'create'} shift (${response.status} ${response.statusText})`;
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
@@ -2362,6 +2869,10 @@ function CreateShiftDrawer({
         }
         throw new Error(errorMessage);
       }
+
+      // Invalidate shifts cache to trigger refetch and show the updated/new shift immediately
+      console.log(`✅ Shift ${isEditMode ? 'updated' : 'created'} successfully, invalidating cache...`);
+      queryClient.invalidateQueries({ queryKey: shiftKeys.all });
 
       onClose();
     } catch (err) {
@@ -2380,7 +2891,9 @@ function CreateShiftDrawer({
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Build Custom Shift</h2>
+          <h2 className="text-lg font-semibold text-gray-900">
+            {isEditMode ? 'Edit Shift' : 'Build Custom Shift'}
+          </h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-fast"
@@ -2388,6 +2901,27 @@ function CreateShiftDrawer({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Edit Mode Info Banner */}
+        {isEditMode && existingTasksCount > 0 && (
+          <div className="px-6 pt-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center mt-0.5">
+                  <span className="text-white text-xs font-bold">{existingTasksCount}</span>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-900">
+                    This shift has {existingTasksCount} existing task{existingTasksCount !== 1 ? 's' : ''}
+                  </p>
+                  <p className="text-xs text-blue-700 mt-1">
+                    Use the form below to add new tasks. The shift will be re-optimized automatically after adding.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
@@ -2473,10 +3007,30 @@ function CreateShiftDrawer({
               />
             </div>
 
+            {/* Lock Route Order Checkbox */}
+            <div className="flex items-start gap-3 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <input
+                type="checkbox"
+                id="lockRouteOrder"
+                checked={lockRouteOrder}
+                onChange={(e) => setLockRouteOrder(e.target.checked)}
+                className="mt-0.5 w-4 h-4 text-primary border-gray-300 rounded focus:ring-2 focus:ring-primary/20"
+              />
+              <label htmlFor="lockRouteOrder" className="flex-1 cursor-pointer">
+                <div className="text-sm font-semibold text-gray-900 mb-1">
+                  Lock Task Order
+                </div>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  When enabled, the driver will follow your exact task sequence. When disabled, the system will optimize the route using real-time traffic and dynamic warehouse insertion for maximum efficiency.
+                </p>
+              </label>
+            </div>
+
             {/* Quick Add Buttons */}
             <div>
               <label className="text-sm font-semibold text-gray-900 mb-3 block">Add Tasks</label>
               <div className="grid grid-cols-2 gap-2">
+                {/* Warehouse Stop button — temporarily hidden
                 <button
                   type="button"
                   onClick={addWarehouseStop}
@@ -2485,6 +3039,7 @@ function CreateShiftDrawer({
                   <Warehouse className="w-4 h-4" />
                   Warehouse Stop
                 </button>
+                */}
                 <button
                   type="button"
                   onClick={openBinSelection}
@@ -2517,13 +3072,131 @@ function CreateShiftDrawer({
                   <MoveRight className="w-4 h-4" />
                   Move Request
                 </button>
+                <button
+                  type="button"
+                  onClick={openWarehouseDeployment}
+                  className="col-span-2 flex items-center gap-2 px-4 py-3 border-2 border-dashed border-purple-300 hover:border-purple-500 hover:bg-purple-50 rounded-lg transition-all text-sm font-medium text-purple-700"
+                >
+                  <Warehouse className="w-4 h-4" />
+                  Deploy from Warehouse
+                  {warehouseDeployments.length > 0 && (
+                    <span className="ml-auto bg-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                      {warehouseDeployments.length}
+                    </span>
+                  )}
+                </button>
               </div>
             </div>
 
-            {/* Smart Suggestions - Priority-Based Grouping */}
+            {/* Warehouse Deployments Panel */}
+            {showWarehouseDeployment && (
+              <div className="border border-purple-200 rounded-xl bg-purple-50/40 p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <Warehouse className="w-4 h-4 text-purple-600" />
+                    Deploy Bins from Warehouse
+                  </h3>
+                  <button type="button" onClick={() => setShowWarehouseDeployment(false)} className="text-gray-400 hover:text-gray-600">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {warehouseBins.length === 0 ? (
+                  <p className="text-sm text-gray-500">No bins currently in warehouse storage.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {/* Bin selector */}
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Select bin to deploy</label>
+                      <select
+                        value={selectedDeployBinId}
+                        onChange={e => setSelectedDeployBinId(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
+                      >
+                        <option value="">-- Choose a bin --</option>
+                        {warehouseBins
+                          .filter(b => !warehouseDeployments.some(d => d.bin_id === b.id))
+                          .map(b => (
+                            <option key={b.id} value={b.id}>
+                              Bin #{b.bin_number} — {b.current_street}, {b.city}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    {/* Destination address */}
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Destination address</label>
+                      <input
+                        type="text"
+                        value={deployAddress}
+                        onChange={e => setDeployAddress(e.target.value)}
+                        placeholder="123 Main St, City"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                      />
+                    </div>
+
+                    {/* Coordinates */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs font-medium text-gray-600 mb-1 block">Latitude</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={deployLat}
+                          onChange={e => setDeployLat(e.target.value)}
+                          placeholder="e.g. 25.7617"
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-600 mb-1 block">Longitude</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={deployLon}
+                          onChange={e => setDeployLon(e.target.value)}
+                          placeholder="e.g. -80.1918"
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleAddDeployment}
+                      disabled={!selectedDeployBinId || !deployAddress.trim() || !deployLat || !deployLon}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Deployment
+                    </button>
+                  </div>
+                )}
+
+                {/* Queued deployments list */}
+                {warehouseDeployments.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-purple-200">
+                    <p className="text-xs font-semibold text-gray-600">Queued deployments ({warehouseDeployments.length})</p>
+                    {warehouseDeployments.map(d => (
+                      <div key={d.bin_id} className="flex items-start justify-between bg-white border border-purple-200 rounded-lg px-3 py-2 text-sm">
+                        <div>
+                          <p className="font-medium text-gray-900">Bin #{d.bin_number}</p>
+                          <p className="text-xs text-gray-500">{d.destination_address}</p>
+                        </div>
+                        <button type="button" onClick={() => removeDeployment(d.bin_id)} className="text-gray-400 hover:text-red-500 mt-0.5">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Smart Suggestions — temporarily hidden
             {smartSuggestions.length > 0 && (
               <div className="space-y-3">
-                {/* Critical Issues */}
                 {smartSuggestions.filter(s => s.priority === 'critical').length > 0 && (
                   <div className="bg-red-50 border border-red-300 rounded-lg p-4 space-y-3">
                     <div className="flex items-center gap-2">
@@ -2544,11 +3217,8 @@ function CreateShiftDrawer({
                             </p>
                             <p className="text-xs text-gray-600 mt-1">{suggestion.reason}</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => acceptSuggestion(suggestion)}
-                            className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-medium hover:bg-red-700 transition-colors whitespace-nowrap"
-                          >
+                          <button type="button" onClick={() => acceptSuggestion(suggestion)}
+                            className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-medium hover:bg-red-700 transition-colors whitespace-nowrap">
                             {suggestion.action === 'add' && 'Add'}
                             {suggestion.action === 'update' && 'Update'}
                             {suggestion.action === 'remove' && 'Remove'}
@@ -2558,8 +3228,6 @@ function CreateShiftDrawer({
                     ))}
                   </div>
                 )}
-
-                {/* Optimizations */}
                 {smartSuggestions.filter(s => s.priority === 'optimization').length > 0 && (
                   <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4 space-y-3">
                     <div className="flex items-center gap-2">
@@ -2580,11 +3248,8 @@ function CreateShiftDrawer({
                             </p>
                             <p className="text-xs text-gray-600 mt-1">{suggestion.reason}</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => acceptSuggestion(suggestion)}
-                            className="px-3 py-1.5 bg-yellow-600 text-white rounded-md text-xs font-medium hover:bg-yellow-700 transition-colors whitespace-nowrap"
-                          >
+                          <button type="button" onClick={() => acceptSuggestion(suggestion)}
+                            className="px-3 py-1.5 bg-yellow-600 text-white rounded-md text-xs font-medium hover:bg-yellow-700 transition-colors whitespace-nowrap">
                             {suggestion.action === 'add' && 'Add'}
                             {suggestion.action === 'update' && 'Update'}
                             {suggestion.action === 'remove' && 'Remove'}
@@ -2594,8 +3259,6 @@ function CreateShiftDrawer({
                     ))}
                   </div>
                 )}
-
-                {/* Info/Suggestions */}
                 {smartSuggestions.filter(s => s.priority === 'info').length > 0 && (
                   <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 space-y-3">
                     <div className="flex items-center gap-2">
@@ -2616,11 +3279,8 @@ function CreateShiftDrawer({
                             </p>
                             <p className="text-xs text-gray-600 mt-1">{suggestion.reason}</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => acceptSuggestion(suggestion)}
-                            className="px-3 py-1.5 bg-primary text-white rounded-md text-xs font-medium hover:bg-primary/90 transition-colors whitespace-nowrap"
-                          >
+                          <button type="button" onClick={() => acceptSuggestion(suggestion)}
+                            className="px-3 py-1.5 bg-primary text-white rounded-md text-xs font-medium hover:bg-primary/90 transition-colors whitespace-nowrap">
                             {suggestion.action === 'add' && 'Add'}
                             {suggestion.action === 'update' && 'Update'}
                             {suggestion.action === 'remove' && 'Remove'}
@@ -2632,6 +3292,7 @@ function CreateShiftDrawer({
                 )}
               </div>
             )}
+            */}
 
             {/* Shift Analysis */}
             {tasks.length > 0 && (
@@ -2656,8 +3317,8 @@ function CreateShiftDrawer({
                   </div>
                 </div>
 
-                {/* Capacity Preview */}
-                {truckCapacity && parseInt(truckCapacity) > 0 && (
+                {/* Capacity Preview - Commented out to save space */}
+                {/* {truckCapacity && parseInt(truckCapacity) > 0 && (
                   <div className="mt-3 pt-3 border-t border-blue-200">
                     <h4 className="text-xs font-semibold text-blue-900 mb-2">Truck Capacity Preview</h4>
                     <div className="space-y-1.5">
@@ -2731,32 +3392,183 @@ function CreateShiftDrawer({
                       )}
                     </div>
                   </div>
-                )}
+                )} */}
               </div>
             )}
 
             {/* Task List */}
             {tasks.length > 0 && (
               <div>
-                <label className="text-sm font-semibold text-gray-900 mb-3 block">Task Sequence</label>
-                <div className="space-y-2">
-                  {tasks.map((task, index) => (
-                    <div
-                      key={task.id}
-                      draggable
-                      onDragStart={() => handleDragStart(index)}
-                      onDragOver={(e) => handleDragOver(e, index)}
-                      onDragEnd={handleDragEnd}
-                      className={`flex items-center gap-3 px-4 py-3 border rounded-lg cursor-move hover:shadow-md transition-all ${
-                        draggedTaskIndex === index ? 'opacity-50' : ''
-                      } ${dragOverIndex === index && draggedTaskIndex !== index ? 'border-blue-500 border-2 shadow-lg' : ''} ${
-                        task.auto_inserted ? 'bg-blue-50 border-blue-200' : 'bg-white'
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-sm font-semibold text-gray-900">Task Sequence</label>
+                  {selectedTaskIndices.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleDeleteSelectedTasks}
+                      className="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-fast flex items-center gap-1.5"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete Selected ({selectedTaskIndices.size})
+                    </button>
+                  )}
+                </div>
+
+                {/* Search and Filter Bar */}
+                <div className="mb-3 space-y-2">
+                  {/* Search Bar */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search by address..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full px-3 py-2 pr-10 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Type Filters */}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setTaskTypeFilter('all')}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-fast ${
+                        taskTypeFilter === 'all'
+                          ? 'bg-primary text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
-                      <GripVertical className="w-4 h-4 text-gray-400" />
+                      All Tasks
+                    </button>
+                    <button
+                      onClick={() => setTaskTypeFilter('collection')}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-fast flex items-center gap-1.5 ${
+                        taskTypeFilter === 'collection'
+                          ? 'bg-green-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      <Package className="w-3.5 h-3.5" />
+                      Collection
+                    </button>
+                    <button
+                      onClick={() => setTaskTypeFilter('placement')}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-fast flex items-center gap-1.5 ${
+                        taskTypeFilter === 'placement'
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      <MapPinned className="w-3.5 h-3.5" />
+                      Placement
+                    </button>
+                    <button
+                      onClick={() => setTaskTypeFilter('pickup')}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-fast flex items-center gap-1.5 ${
+                        taskTypeFilter === 'pickup'
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      <ArrowUp className="w-3.5 h-3.5" />
+                      Pickup
+                    </button>
+                    <button
+                      onClick={() => setTaskTypeFilter('dropoff')}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-fast flex items-center gap-1.5 ${
+                        taskTypeFilter === 'dropoff'
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      <ArrowDown className="w-3.5 h-3.5" />
+                      Dropoff
+                    </button>
+                    <button
+                      onClick={() => setTaskTypeFilter('warehouse_stop')}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-fast flex items-center gap-1.5 ${
+                        taskTypeFilter === 'warehouse_stop'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      <Warehouse className="w-3.5 h-3.5" />
+                      Warehouse
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {filteredTasks.map((task, displayIndex) => {
+                    // Find the real index in the original tasks array
+                    const index = tasks.findIndex(t => t === task);
+                    const isTaskLocked = task.type === 'collection' && task.bin_id
+                      ? allBins.find(b => b.id === task.bin_id)?.move_requested === true
+                      : false;
+                    // True if a pickup task for this bin's move request is already in the task list
+                    const moveRequestAlreadyInShift = isTaskLocked && task.bin_id
+                      ? tasks.some(t => (t.type === 'pickup' || t.type === 'dropoff') && t.bin_id === task.bin_id)
+                      : false;
+
+                    return (
+                    <div
+                      key={task.id || index}
+                      draggable={!task.isExisting} // Existing tasks are not draggable
+                      onDragStart={() => !task.isExisting && handleDragStart(index)}
+                      onDragOver={(e) => !task.isExisting && handleDragOver(e, index)}
+                      onDragEnd={!task.isExisting ? handleDragEnd : undefined}
+                      className={`flex items-center gap-3 px-4 py-3 border rounded-lg transition-all ${
+                        task.isExisting ? 'cursor-default' : 'cursor-move hover:shadow-md'
+                      } ${
+                        draggedTaskIndex === index ? 'opacity-50' : ''
+                      } ${dragOverIndex === index && draggedTaskIndex !== index ? 'border-blue-500 border-2 shadow-lg' : ''} ${
+                        task.isSkipped
+                          ? 'bg-yellow-50 border-l-4 border-yellow-500 opacity-75'
+                          : task.isCompleted
+                          ? 'bg-green-50 border-l-4 border-green-500 opacity-75'
+                          : task.isInProgress
+                          ? 'bg-blue-100 border-l-4 border-blue-600 shadow-lg ring-4 ring-blue-200 animate-pulse'
+                          : task.auto_inserted
+                          ? 'bg-blue-50 border-blue-200'
+                          : task.isExisting
+                          ? 'bg-gray-50 border-gray-300'
+                          : 'bg-white'
+                      }`}
+                    >
+                      {/* Checkbox for multi-select (only for deletable tasks) */}
+                      {canDeleteTask(task) && (
+                        <input
+                          type="checkbox"
+                          checked={selectedTaskIndices.has(index)}
+                          onChange={() => toggleTaskSelection(index)}
+                          className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-2 focus:ring-primary cursor-pointer"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      )}
+
+                      {/* Drag handle or status icon */}
+                      {!task.isExisting && canDeleteTask(task) && <GripVertical className="w-4 h-4 text-gray-400" />}
+                      {task.isExisting && (
+                        <div className="w-4 h-4 flex items-center justify-center">
+                          {task.isSkipped ? (
+                            <span className="text-xs">⏭️</span>
+                          ) : task.isCompleted ? (
+                            <span className="text-xs">✅</span>
+                          ) : task.isInProgress ? (
+                            <span className="text-base animate-pulse">🔵</span>
+                          ) : (
+                            <span className="text-xs">⭕</span>
+                          )}
+                        </div>
+                      )}
                       <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-gray-500">#{index + 1}</span>
+                        <div className="flex items-center gap-2 flex-wrap">{/* Sequence number removed */}
                           {task.type === 'warehouse_stop' && <Warehouse className="w-4 h-4 text-blue-600" />}
                           {task.type === 'collection' && <Package className="w-4 h-4 text-green-600" />}
                           {task.type === 'placement' && <MapPinned className="w-4 h-4 text-purple-600" />}
@@ -2768,17 +3580,54 @@ function CreateShiftDrawer({
                               : task.type.replace('_', ' ')}
                           </span>
                           {task.auto_inserted && (
-                            <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full border border-blue-200">
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full border border-blue-200">
                               Auto
+                            </span>
+                          )}
+                          {isTaskLocked && (
+                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full border ${
+                              moveRequestAlreadyInShift
+                                ? 'bg-green-50 text-green-700 border-green-300'
+                                : 'bg-amber-50 text-amber-700 border-amber-300'
+                            }`}>
+                              {moveRequestAlreadyInShift ? 'Move req. added' : 'Move req. pending'}
                             </span>
                           )}
                         </div>
 
                         {/* Collection metadata */}
                         {task.type === 'collection' && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            <span className="font-medium">Bin #{task.bin_number}</span> - {task.address}
-                          </p>
+                          <>
+                            <p className="text-xs text-gray-500 mt-1">
+                              <span className="font-medium">Bin #{task.bin_number}</span> - {task.address}
+                            </p>
+                            {isTaskLocked && (
+                              <div className={`flex items-center gap-2 mt-1.5 px-2 py-1.5 rounded-md ${
+                                moveRequestAlreadyInShift
+                                  ? 'bg-green-50 border border-green-200'
+                                  : 'bg-amber-50 border border-amber-200'
+                              }`}>
+                                <MoveRight className={`w-3.5 h-3.5 shrink-0 ${moveRequestAlreadyInShift ? 'text-green-600' : 'text-amber-600'}`} />
+                                <p className={`text-xs font-medium flex-1 ${moveRequestAlreadyInShift ? 'text-green-700' : 'text-amber-700'}`}>
+                                  {moveRequestAlreadyInShift
+                                    ? 'Move request is already in this shift.'
+                                    : 'This bin has an open move request.'}
+                                </p>
+                                {!moveRequestAlreadyInShift && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (task.bin_id) openMoveRequestSelectionForBin(task.bin_id);
+                                    }}
+                                    className="px-2 py-0.5 text-xs font-semibold text-amber-700 bg-amber-100 border border-amber-300 rounded hover:bg-amber-200 transition-colors shrink-0"
+                                  >
+                                    + Add to shift
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </>
                         )}
 
                         {/* Placement metadata */}
@@ -2813,23 +3662,19 @@ function CreateShiftDrawer({
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEditTask(index)}
-                          className="text-blue-500 hover:text-blue-700 transition-fast"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeTask(index)}
-                          className="text-red-500 hover:text-red-700 transition-fast"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {canDeleteTask(task) && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSingleTask(index)}
+                            className="text-red-500 hover:text-red-700 transition-fast p-1 hover:bg-red-50 rounded"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -2871,10 +3716,10 @@ function CreateShiftDrawer({
                 {isSubmitting ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Creating...
+                    {isEditMode ? 'Updating...' : 'Creating...'}
                   </>
                 ) : (
-                  'Create Shift'
+                  isEditMode ? 'Update Shift' : 'Create Shift'
                 )}
               </button>
             </div>
@@ -2882,12 +3727,98 @@ function CreateShiftDrawer({
         </form>
       </div>
 
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirmModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-start gap-4 mb-4">
+                <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <Trash2 className="w-5 h-5 text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                    Delete {tasksToDelete.length} Task{tasksToDelete.length > 1 ? 's' : ''}
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Are you sure you want to delete the following tasks? This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+
+              {/* Grouped task summary */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">
+                  Tasks to be deleted:
+                </p>
+                {(() => {
+                  const tasksByType = tasksToDelete.reduce((acc, taskIndex) => {
+                    const task = tasks[taskIndex];
+                    const type = task.type === 'pickup' || task.type === 'dropoff'
+                      ? 'move_request'
+                      : task.type;
+                    if (!acc[type]) acc[type] = [];
+                    acc[type].push(task);
+                    return acc;
+                  }, {} as Record<string, ShiftTask[]>);
+
+                  return Object.entries(tasksByType).map(([type, typeTasks]) => (
+                    <div key={type} className="mb-2 last:mb-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        {type === 'collection' && <Package className="w-4 h-4 text-green-600" />}
+                        {type === 'placement' && <MapPinned className="w-4 h-4 text-purple-600" />}
+                        {type === 'move_request' && <ArrowUp className="w-4 h-4 text-orange-600" />}
+                        {type === 'warehouse_stop' && <Warehouse className="w-4 h-4 text-blue-600" />}
+                        <span className="text-sm font-medium text-gray-900 capitalize">
+                          {type === 'move_request' ? 'Move Requests' : type.replace('_', ' ')}
+                          <span className="ml-1 text-gray-500">({typeTasks.length})</span>
+                        </span>
+                      </div>
+                      <div className="ml-6 space-y-1">
+                        {typeTasks.map((task, idx) => (
+                          <p key={idx} className="text-xs text-gray-600 truncate">
+                            • {task.address || task.destination_address}
+                            {task.bin_number && ` (Bin #${task.bin_number})`}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={cancelDeletion}
+                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-fast"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeletion}
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-fast flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete {tasksToDelete.length > 1 ? 'All' : ''}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Bin Selection Map Modal */}
       {showBinSelection && (
         <BinSelectionMap
           onClose={() => setShowBinSelection(false)}
           onConfirm={handleBinSelectionConfirm}
           initialSelectedBins={[]}
+          alreadyAddedBinIds={tasks
+            .filter(t => t.type === 'collection' && t.bin_id)
+            .map(t => t.bin_id!)}
         />
       )}
 
@@ -3006,9 +3937,9 @@ function CreateShiftDrawer({
                 <div>
                   <label className="text-sm font-medium text-gray-700 block mb-1">New Bin Number</label>
                   <input
-                    type="text"
+                    type="number"
                     value={editingTask.new_bin_number || ''}
-                    onChange={(e) => handleEditTaskChange('new_bin_number', e.target.value)}
+                    onChange={(e) => handleEditTaskChange('new_bin_number', e.target.value ? parseInt(e.target.value) : undefined)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
                   />
                 </div>
@@ -3065,16 +3996,111 @@ function CreateShiftDrawer({
           onClose={() => setShowPlacementSelection(false)}
           onConfirm={handlePlacementSelectionConfirm}
           potentialLocations={potentialLocations}
+          initialSelectedLocations={tasks
+            .filter(t => t.type === 'placement' && t.potential_location_id)
+            .map(t => t.potential_location_id!)}
         />
       )}
 
       {/* Move Request Selection Modal - Map-Based */}
       {showMoveRequestSelection && (
         <MoveRequestSelectionMap
-          onClose={() => setShowMoveRequestSelection(false)}
+          onClose={() => { setShowMoveRequestSelection(false); setMoveRequestFocusBinId(null); }}
           onConfirm={handleMoveRequestSelectionConfirm}
           moveRequests={moveRequests}
+          initialSelectedRequests={tasks
+            .filter(t => (t.type === 'pickup' || t.type === 'dropoff') && t.move_request_id)
+            .map(t => t.move_request_id!)}
+          focusBinId={moveRequestFocusBinId || undefined}
         />
+      )}
+
+      {/* Proximity Warning Dialog */}
+      {showProximityWarning && proximityData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-start gap-4 mb-4">
+                <div className="flex-shrink-0 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900">Driver Currently Nearby</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {proximityData.driver_name || 'The driver'} is currently near their active task. Making changes now may disrupt their navigation.
+                  </p>
+                </div>
+              </div>
+
+              {/* Proximity Info */}
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-700 font-medium">Driver:</span>
+                    <span className="text-gray-900">{proximityData.driver_name}</span>
+                  </div>
+                  {proximityData.driver_distance_miles !== undefined && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-700 font-medium">Distance:</span>
+                      <span className="text-red-700 font-semibold">{proximityData.driver_distance_miles.toFixed(1)} miles from current stop</span>
+                    </div>
+                  )}
+                  {proximityData.current_task_address && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-700 font-medium">Current Task:</span>
+                      <span className="text-gray-900 text-right">{proximityData.current_task_address}</span>
+                    </div>
+                  )}
+                  {proximityData.current_task_bin_number && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-700 font-medium">Bin:</span>
+                      <span className="text-gray-900">#{proximityData.current_task_bin_number}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Change Summary */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-gray-700">
+                  <span className="font-medium">Proposed Changes:</span>
+                  {' '}
+                  {changeSummary.added > 0 && changeSummary.removed > 0
+                    ? `Adding ${changeSummary.added} task(s), removing ${changeSummary.removed} task(s)`
+                    : changeSummary.added > 0
+                      ? `Adding ${changeSummary.added} task(s)`
+                      : `Removing ${changeSummary.removed} task(s)`
+                  }
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowProximityWarning(false);
+                    setIsSubmitting(false);
+                    setPendingSubmitData(null);
+                  }}
+                  disabled={isSubmitting}
+                  className="flex-1 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-fast disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleProximityWarningConfirm}
+                  disabled={isSubmitting}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-fast disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Updating...' : 'Proceed Anyway'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { Route } from '@/lib/types/route';
-import { getBins } from '@/lib/api/bins';
+import { useBins } from '@/lib/hooks/use-bins';
 import { Bin, isMappableBin } from '@/lib/types/bin';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 
@@ -36,7 +36,7 @@ function RoutePolyline({ bins, warehouseLocation }: RoutePolylineProps) {
         const coordinates = [warehouseCoordinate, ...binCoordinates, warehouseCoordinate].join(';');
 
         // Mapbox Directions API endpoint
-        const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?geometries=geojson&overview=full&access_token=pk.eyJ1IjoiYmlubHl5YWkiLCJhIjoiY21pNzN4bzlhMDVheTJpcHdqd2FtYjhpeSJ9.sQM8WHE2C9zWH0xG107xhw`;
+        const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?geometries=geojson&overview=full&access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}`;
 
         const response = await fetch(mapboxUrl);
         const data = await response.json();
@@ -129,41 +129,17 @@ export function RouteMapView({ route }: RouteMapViewProps) {
     address: warehouse?.address || 'Warehouse'
   };
 
-  const [bins, setBins] = useState<Bin[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Share the ['bins'] React Query cache with Live Map — updates flow automatically
+  const { data: allBins = [], isLoading: loading } = useBins();
 
-  // Load bins and filter to route's bins
-  useEffect(() => {
-    async function loadRouteBins() {
-      try {
-        setLoading(true);
-        const allBins = await getBins();
-        console.log('All bins from backend:', allBins.length);
-        console.log('First 5 bin IDs from backend:', allBins.slice(0, 5).map(b => b.id));
-        console.log('First 5 bins with coords:', allBins.slice(0, 5).map(b => ({ id: b.id, lat: b.latitude, lng: b.longitude })));
-        console.log('Route bin IDs we are looking for:', route.bin_ids);
-
-        // Map over route.bin_ids to preserve the optimized order
-        const routeBins = route.bin_ids
-          .map(binId => allBins.find(bin => bin.id === binId))
-          .filter((bin): bin is Bin => bin !== undefined && isMappableBin(bin));
-
-        console.log('Filtered mappable bins for route (in optimized order):', routeBins.length, routeBins);
-
-        // Also check bins that match ID but don't have coordinates
-        const matchingBinsNoCoords = allBins.filter(bin =>
-          route.bin_ids.includes(bin.id) && !isMappableBin(bin)
-        );
-        console.log('Matching bins WITHOUT coordinates:', matchingBinsNoCoords.length, matchingBinsNoCoords);
-        setBins(routeBins);
-      } catch (error) {
-        console.error('Failed to load route bins:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadRouteBins();
-  }, [route.bin_ids]);
+  // Filter and order bins to match the route's optimized sequence
+  const bins = useMemo(
+    () =>
+      route.bin_ids
+        .map(binId => allBins.find(bin => bin.id === binId))
+        .filter((bin): bin is Bin => bin !== undefined && isMappableBin(bin)),
+    [allBins, route.bin_ids]
+  );
 
   if (loading) {
     return (
@@ -199,7 +175,7 @@ export function RouteMapView({ route }: RouteMapViewProps) {
         gestureHandling="none"
         disableDefaultUI={true}
         className="w-full h-full rounded-lg"
-        mapTypeId="roadmap"
+        mapTypeId="hybrid"
       >
         {/* Route Polyline with Animation */}
         <RoutePolyline bins={bins} warehouseLocation={WAREHOUSE_LOCATION} />

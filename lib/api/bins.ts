@@ -4,11 +4,46 @@
  */
 
 import { Bin, BinWithPriority, PotentialLocation, BinCheck } from '@/lib/types/bin';
+import { ZoneIncident } from '@/lib/types/zone';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
+/**
+ * Get auth token from localStorage (Zustand persist storage)
+ */
+function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const authStorage = localStorage.getItem('binly-auth-storage');
+    if (!authStorage) return null;
+
+    const parsed = JSON.parse(authStorage);
+    return parsed?.state?.token || null;
+  } catch (error) {
+    console.error('Failed to get auth token:', error);
+    return null;
+  }
+}
+
+/**
+ * Get headers with authentication
+ */
+function getAuthHeaders(): HeadersInit {
+  const token = getAuthToken();
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return headers;
+}
+
 export type BinSortOption = 'priority' | 'bin_number' | 'fill_percentage' | 'days_since_check' | 'status';
-export type BinFilterOption = 'all' | 'next_move_request' | 'longest_unchecked' | 'high_fill' | 'has_check_recommendation';
+export type BinFilterOption = 'all' | 'next_move_request' | 'missing' | 'high_fill' | 'medium_fill' | 'low_fill';
 export type BinStatusFilter = 'active' | 'all' | 'retired' | 'pending_move' | 'in_storage';
 
 /**
@@ -66,6 +101,97 @@ export async function getBinById(id: string): Promise<Bin> {
     return bin;
   } catch (error) {
     console.error(`Error fetching bin ${id}:`, error);
+    throw error;
+  }
+}
+
+export type BinChangeReasonCategory =
+  | 'landlord_complaint'
+  | 'theft'
+  | 'vandalism'
+  | 'missing'
+  | 'relocation_request'
+  | 'pulled_from_service'
+  | 'other';
+
+export interface BinChangeLogEntry {
+  id: string;
+  bin_id: string;
+  changed_by_user_id: string;
+  changed_by_name?: string | null;
+  change_type: string;
+  old_values: string; // JSON string
+  new_values: string; // JSON string
+  reason_category?: BinChangeReasonCategory | null;
+  reason_notes?: string | null;
+  no_go_zone_created: boolean;
+  no_go_zone_id?: string | null;
+  created_at: number;
+  created_at_iso: string;
+}
+
+/**
+ * Fetch administrative change log for a bin
+ */
+export async function getBinChangeLog(binId: string): Promise<BinChangeLogEntry[]> {
+  try {
+    const response = await fetch(`${API_URL}/api/bins/${binId}/change-log`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch bin change log: ${response.statusText}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error(`Error fetching change log for bin ${binId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Update bin details (address, status, fill percentage, coordinates)
+ * @param id Bin ID
+ * @param data Update data
+ * @returns Promise<Bin> Updated bin object
+ */
+export async function updateBin(
+  id: string,
+  data: {
+    bin_number: number;
+    current_street: string;
+    city: string;
+    zip: string;
+    status: string;
+    checked: boolean;
+    fill_percentage: number | null;
+    move_requested: boolean;
+    latitude?: number | null;
+    longitude?: number | null;
+    reason_category?: BinChangeReasonCategory | null;
+    reason_notes?: string | null;
+    create_no_go_zone?: boolean | null;
+  }
+): Promise<Bin> {
+  try {
+    const response = await fetch(`${API_URL}/api/bins/${id}`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to update bin: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error(`Error updating bin ${id}:`, error);
     throw error;
   }
 }
@@ -182,14 +308,13 @@ export async function createBin(bin: {
   try {
     const response = await fetch(`${API_URL}/api/bins`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(bin),
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to create bin: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to create bin: ${response.statusText}`);
     }
 
     const created: Bin = await response.json();
@@ -250,6 +375,33 @@ export async function deletePotentialLocation(id: string): Promise<void> {
 }
 
 /**
+ * Fetch zone incidents associated with a specific bin
+ * @param binId Bin ID
+ * @returns Promise<ZoneIncident[]> Array of zone incidents (most recent first)
+ */
+export async function getBinIncidents(binId: string): Promise<ZoneIncident[]> {
+  try {
+    const response = await fetch(`${API_URL}/api/bins/${binId}/incidents`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch bin incidents: ${response.statusText}`);
+    }
+
+    const incidents: ZoneIncident[] = await response.json();
+    return incidents;
+  } catch (error) {
+    console.error(`Error fetching incidents for bin ${binId}:`, error);
+    throw error;
+  }
+}
+
+/**
  * Convert a potential location to a bin
  * @param id Potential location ID
  * @param additionalData Additional bin data (optional fill percentage)
@@ -278,6 +430,60 @@ export async function convertPotentialLocationToBin(
     return bin;
   } catch (error) {
     console.error(`Error converting potential location ${id}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Active shift dependency types
+ */
+export interface AffectedTask {
+  task_id: string;
+  task_type: string;
+  sequence_order: number;
+  address: string;
+  bin_id?: string;
+  move_request_id?: string;
+}
+
+export interface ActiveShiftDependency {
+  shift_id: string;
+  shift_date_iso: string;
+  driver_id: string;
+  driver_name: string;
+  status: string;
+  affected_tasks: AffectedTask[];
+
+  // Proximity information (for warning about driver being nearby)
+  current_task_id?: string;
+  current_task_address?: string;
+  current_task_bin_number?: number;
+  driver_distance_miles?: number;
+  location_age_seconds?: number;
+  is_driver_nearby: boolean;
+}
+
+/**
+ * Check if a bin is referenced in any active shifts
+ * @param binId Bin ID
+ * @returns Promise<ActiveShiftDependency[]> Array of active shifts using this bin
+ */
+export async function checkBinDependencies(binId: string): Promise<ActiveShiftDependency[]> {
+  try {
+    const response = await fetch(`${API_URL}/api/bins/${binId}/active-shift-dependencies`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to check bin dependencies: ${response.statusText}`);
+    }
+
+    const dependencies: ActiveShiftDependency[] = await response.json();
+    return dependencies;
+  } catch (error) {
+    console.error(`Error checking dependencies for bin ${binId}:`, error);
     throw error;
   }
 }

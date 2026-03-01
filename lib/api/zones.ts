@@ -2,9 +2,31 @@
  * No-Go Zones API service
  */
 
-import { NoGoZone, ZoneIncident } from '@/lib/types/zone';
+import { CreateManagerIncidentRequest, NoGoZone, ZoneIncident } from '@/lib/types/zone';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
+/**
+ * Get auth token from localStorage (Zustand persist storage)
+ */
+function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const authStorage = localStorage.getItem('binly-auth-storage');
+    if (!authStorage) return null;
+    const parsed = JSON.parse(authStorage);
+    return parsed?.state?.token || null;
+  } catch {
+    return null;
+  }
+}
+
+function getAuthHeaders(): HeadersInit {
+  const token = getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
 
 /**
  * Fetch all no-go zones
@@ -161,4 +183,25 @@ export async function getShiftIncidents(shiftId: string): Promise<ZoneIncident[]
     console.error(`Error fetching incidents for shift ${shiftId}:`, error);
     throw error;
   }
+}
+
+/**
+ * Submit a manager phone-call incident report
+ * POST /manager/incident-report (requires auth)
+ */
+export async function createManagerIncidentReport(
+  payload: CreateManagerIncidentRequest,
+): Promise<{ incident_id: string; zone_id: string; message: string }> {
+  const response = await fetch(`${API_URL}/api/manager/incident-report`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || `Request failed: ${response.status}`);
+  }
+
+  return response.json();
 }

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   getBinsWithPriority,
   type BinSortOption,
@@ -15,7 +16,9 @@ import { Button } from '@/components/ui/button';
 import { KpiCard } from '@/components/binly/kpi-card';
 import { BulkCreateBinModal } from '@/components/binly/bulk-create-bin-modal';
 import { BinDetailDrawer } from '@/components/binly/bin-detail-drawer';
-import { ScheduleMoveModal, RetireBinModal } from '@/components/binly/bin-modals';
+import { RetireBinModal } from '@/components/binly/bin-modals';
+import { ScheduleMoveModalWithMap } from '@/components/binly/schedule-move-modal-with-map';
+import { EditBinDialog } from '@/components/binly/edit-bin-dialog';
 import { Dropdown, MultiSelectDropdown } from '@/components/ui/dropdown';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import {
@@ -32,10 +35,14 @@ import {
   Eye,
   MoreVertical,
   X,
+  Edit,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export default function BinsPage() {
+function BinsPageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   // State for filters and sorting
   const [sortBy, setSortBy] = useState<BinSortOption>('bin_number');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -48,6 +55,7 @@ export default function BinsPage() {
   const [selectedBins, setSelectedBins] = useState<Set<string>>(new Set());
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showRetireModal, setShowRetireModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [modalTargetBin, setModalTargetBin] = useState<BinWithPriority | null>(null);
   const [modalTargetBins, setModalTargetBins] = useState<BinWithPriority[]>([]);
 
@@ -124,6 +132,32 @@ export default function BinsPage() {
     staleTime: 10000,
   });
 
+  // Handle deep-link query params: ?editBin=<id> or ?scheduleBin=<id>
+  // Fires once allBins is loaded so we can find the bin object
+  useEffect(() => {
+    if (!allBins) return;
+
+    const editBinId = searchParams.get('editBin');
+    const scheduleBinId = searchParams.get('scheduleBin');
+
+    if (editBinId) {
+      const bin = allBins.find((b) => b.id === editBinId);
+      if (bin) {
+        setModalTargetBin(bin);
+        setShowEditModal(true);
+        // Clear the param without triggering a navigation
+        router.replace('/administration/bins', { scroll: false });
+      }
+    } else if (scheduleBinId) {
+      const bin = allBins.find((b) => b.id === scheduleBinId);
+      if (bin) {
+        setModalTargetBin(bin);
+        setShowScheduleModal(true);
+        router.replace('/administration/bins', { scroll: false });
+      }
+    }
+  }, [allBins, searchParams]);
+
   // Apply client-side filtering for status, filters, search, and sorting
   const bins = allBins
     ?.filter((bin) => {
@@ -138,11 +172,14 @@ export default function BinsPage() {
           switch (filter) {
             case 'next_move_request':
               return bin.has_pending_move;
-            case 'longest_unchecked':
-            case 'has_check_recommendation':
-              return bin.has_check_recommendation;
+            case 'missing':
+              return bin.status === 'missing';
             case 'high_fill':
-              return (bin.fill_percentage || 0) >= 60;
+              return (bin.fill_percentage || 0) >= 50 && (bin.fill_percentage || 0) < 80;
+            case 'medium_fill':
+              return (bin.fill_percentage || 0) >= 25 && (bin.fill_percentage || 0) < 50;
+            case 'low_fill':
+              return (bin.fill_percentage || 0) >= 0 && (bin.fill_percentage || 0) < 25;
             default:
               return true;
           }
@@ -224,7 +261,9 @@ export default function BinsPage() {
       case 'pending_move':
         return { label: 'Pending Move', color: 'bg-blue-100 text-blue-700' };
       case 'in_storage':
-        return { label: 'In Storage', color: 'bg-purple-100 text-purple-700' };
+        return { label: 'In Warehouse', color: 'bg-purple-100 text-purple-700' };
+      case 'missing':
+        return { label: 'Missing', color: 'bg-red-100 text-red-600' };
       default:
         return { label: status, color: 'bg-gray-100 text-gray-600' };
     }
@@ -333,8 +372,10 @@ export default function BinsPage() {
               selectedValues={filters}
               options={[
                 { value: 'next_move_request', label: 'Move Requests' },
-                { value: 'longest_unchecked', label: 'Needs Check' },
+                { value: 'missing', label: 'Missing' },
                 { value: 'high_fill', label: 'High Fill' },
+                { value: 'medium_fill', label: 'Medium Fill' },
+                { value: 'low_fill', label: 'Low Fill' },
               ]}
               onChange={(values) => setFilters(values as BinFilterOption[])}
             />
@@ -377,8 +418,8 @@ export default function BinsPage() {
         ) : (
           <>
             {/* Desktop Table View */}
-            <Card className="hidden lg:block">
-              <div className="overflow-x-auto">
+            <Card className="hidden lg:block overflow-visible">
+              <div className="overflow-x-auto overflow-y-visible">
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
@@ -512,7 +553,7 @@ export default function BinsPage() {
                               </span>
                             </div>
                           </td>
-                          <td className="py-4 px-4 align-middle">
+                          <td className="py-4 px-4 align-middle relative">
                             <div className="flex items-center justify-center gap-2">
                               {/* View Details Icon */}
                               <button
@@ -527,7 +568,7 @@ export default function BinsPage() {
                               </button>
 
                               {/* More Actions Menu */}
-                              <div className="relative">
+                              <div className="relative z-10">
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -541,7 +582,19 @@ export default function BinsPage() {
 
                                 {/* Dropdown Menu */}
                                 {openMenuId === bin.id && (
-                                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[160px] animate-slide-in-down">
+                                  <div className="absolute right-0 bottom-full mb-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[160px] animate-slide-in-up">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setModalTargetBin(bin);
+                                        setShowEditModal(true);
+                                        setOpenMenuId(null);
+                                      }}
+                                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-t-lg whitespace-nowrap"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                      Edit Bin
+                                    </button>
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -549,7 +602,7 @@ export default function BinsPage() {
                                         setShowScheduleModal(true);
                                         setOpenMenuId(null);
                                       }}
-                                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-t-lg whitespace-nowrap"
+                                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 whitespace-nowrap"
                                     >
                                       <Calendar className="w-4 h-4" />
                                       Schedule Move
@@ -622,7 +675,19 @@ export default function BinsPage() {
                         </button>
 
                         {openMenuId === bin.id && (
-                          <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[160px] animate-slide-in-down">
+                          <div className="absolute right-0 bottom-full mb-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[160px] animate-slide-in-up">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setModalTargetBin(bin);
+                                setShowEditModal(true);
+                                setOpenMenuId(null);
+                              }}
+                              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-t-lg whitespace-nowrap"
+                            >
+                              <Edit className="w-4 h-4" />
+                              Edit Bin
+                            </button>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -630,7 +695,7 @@ export default function BinsPage() {
                                 setShowScheduleModal(true);
                                 setOpenMenuId(null);
                               }}
-                              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-t-lg whitespace-nowrap"
+                              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 whitespace-nowrap"
                             >
                               <Calendar className="w-4 h-4" />
                               Schedule Move
@@ -789,11 +854,21 @@ export default function BinsPage() {
           bin={selectedBin}
           onClose={() => setSelectedBin(null)}
           onUpdate={() => refetch()}
+          onScheduleMove={(bin) => {
+            setSelectedBin(null);
+            setModalTargetBin(bin);
+            setShowScheduleModal(true);
+          }}
+          onEdit={(bin) => {
+            setSelectedBin(null);
+            setModalTargetBin(bin);
+            setShowEditModal(true);
+          }}
         />
       )}
 
       {showScheduleModal && (modalTargetBin || modalTargetBins.length > 0) && (
-        <ScheduleMoveModal
+        <ScheduleMoveModalWithMap
           bin={modalTargetBin || undefined}
           bins={modalTargetBins.length > 0 ? modalTargetBins : undefined}
           onClose={() => {
@@ -829,6 +904,20 @@ export default function BinsPage() {
           }}
         />
       )}
+
+      <EditBinDialog
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        bin={modalTargetBin}
+      />
     </div>
+  );
+}
+
+export default function BinsPage() {
+  return (
+    <Suspense>
+      <BinsPageContent />
+    </Suspense>
   );
 }

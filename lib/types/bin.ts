@@ -23,6 +23,7 @@ export interface Bin {
   location_name?: string | null; // Optional formatted location name
   photo_url?: string | null; // Latest check photo URL
   created_by_user_id?: string | null;
+  placement_photo_url?: string | null; // Photo taken when bin was placed by driver
   retiredAtIso?: string | null;
   retired_by_user_id?: string | null;
 }
@@ -73,15 +74,27 @@ export function getFillLevelCategory(
 }
 
 /**
- * Get color for bin marker based on fill level
+ * Get color for bin marker based on status and fill level
+ * Priority: missing status (grey) > active bins with 0% (green) > fill level colors
  */
 export function getBinMarkerColor(
-  fillPercentage?: number | null
+  fillPercentage?: number | null,
+  status?: BinStatus
 ): string {
+  // Missing bins always show grey, regardless of fill level
+  if (status === 'missing') {
+    return '#6B7280'; // gray-500 (darker grey for missing)
+  }
+
+  // Active bins with 0% or null fill should show green (healthy/empty)
+  if (status === 'active' && (fillPercentage === 0 || fillPercentage === null || fillPercentage === undefined)) {
+    return '#10B981'; // green-500 (empty but active = good)
+  }
+
   const category = getFillLevelCategory(fillPercentage);
   switch (category) {
     case 'empty':
-      return '#9CA3AF'; // gray-400
+      return '#9CA3AF'; // gray-400 (for non-active bins)
     case 'low':
       return '#10B981'; // green-500
     case 'medium':

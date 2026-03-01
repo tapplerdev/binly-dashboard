@@ -2,31 +2,23 @@
 
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   ChevronDown,
   ChevronUp,
   MapPin,
-  Phone,
-  Navigation,
   Clock,
   CheckCircle2,
+  Route,
 } from 'lucide-react';
 import { Shift } from '@/lib/types/shift';
 
 interface ActiveRoutesTableProps {
   shifts: Shift[];
-  onTrackRoute?: (shiftId: string) => void;
-  onCallDriver?: (shiftId: string) => void;
-  onRerouteDriver?: (shiftId: string) => void;
 }
 
 export function ActiveRoutesTable({
   shifts,
-  onTrackRoute,
-  onCallDriver,
-  onRerouteDriver,
 }: ActiveRoutesTableProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -137,7 +129,7 @@ export function ActiveRoutesTable({
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   ETA
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -228,34 +220,14 @@ export function ActiveRoutesTable({
 
                     {/* Actions */}
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0"
-                          onClick={() => onTrackRoute?.(shift.id)}
-                          title="Track on map"
+                      <div className="flex items-center justify-center">
+                        <button
+                          onClick={() => window.open(`/operations/live-map?driver=${shift.driverId}`, '_blank')}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary border border-primary rounded-lg hover:bg-primary/5 transition-colors"
                         >
                           <MapPin className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0"
-                          onClick={() => onCallDriver?.(shift.id)}
-                          title="Call driver"
-                        >
-                          <Phone className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0"
-                          onClick={() => onRerouteDriver?.(shift.id)}
-                          title="Reroute"
-                        >
-                          <Navigation className="w-4 h-4" />
-                        </Button>
+                          Track
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -321,7 +293,7 @@ export function ActiveRoutesTable({
 
                 {/* Route */}
                 <div className="flex items-center gap-2 mb-3">
-                  <Navigation className="w-4 h-4 text-gray-400 shrink-0" />
+                  <Route className="w-4 h-4 text-gray-400 shrink-0" />
                   <span className="text-sm text-gray-700">{shift.route}</span>
                 </div>
 
@@ -347,35 +319,14 @@ export function ActiveRoutesTable({
                   </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1 h-9"
-                    onClick={() => onTrackRoute?.(shift.id)}
-                  >
-                    <MapPin className="w-4 h-4 mr-1.5" />
-                    Track
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1 h-9"
-                    onClick={() => onCallDriver?.(shift.id)}
-                  >
-                    <Phone className="w-4 h-4 mr-1.5" />
-                    Call
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-9 px-3"
-                    onClick={() => onRerouteDriver?.(shift.id)}
-                  >
-                    <Navigation className="w-4 h-4" />
-                  </Button>
-                </div>
+                {/* Action Button */}
+                <button
+                  onClick={() => window.open(`/operations/live-map?driver=${shift.driverId}`, '_blank')}
+                  className="w-full h-9 flex items-center justify-center gap-1.5 text-sm font-medium text-primary border border-primary rounded-lg hover:bg-primary/5 transition-colors"
+                >
+                  <MapPin className="w-4 h-4" />
+                  Track on Live Map
+                </button>
               </Card>
             );
           })}

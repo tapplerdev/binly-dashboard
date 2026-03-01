@@ -136,12 +136,6 @@ export function TemplateEditorModal({
     setLassoMode(false);
   };
 
-  // Select all bins
-  const selectAll = () => {
-    const allBinIds = new Set(filteredBins.map(b => b.id));
-    setSelectedBinIds(allBinIds);
-  };
-
   // Clear all selections
   const clearAll = () => {
     setSelectedBinIds(new Set());
@@ -158,6 +152,12 @@ export function TemplateEditorModal({
       bin.location_name?.toLowerCase().includes(query)
     );
   });
+
+  // Select all bins
+  const selectAll = () => {
+    const allBinIds = new Set(filteredBins.map(b => b.id));
+    setSelectedBinIds(allBinIds);
+  };
 
   // Get mappable bins for map display
   const mappableBins = filteredBins.filter(isMappableBin);
@@ -250,6 +250,7 @@ export function TemplateEditorModal({
                 defaultCenter={DEFAULT_CENTER}
                 defaultZoom={DEFAULT_ZOOM}
                 mapId="template-editor-map"
+                mapTypeId="hybrid"
                 gestureHandling="greedy"
                 disableDefaultUI={false}
                 className="w-full h-full"
@@ -293,7 +294,7 @@ export function TemplateEditorModal({
                         style={{ backgroundColor: markerColor }}
                         title={`Bin #${bin.bin_number} - ${bin.location_name || bin.current_street}`}
                       >
-                        {bin.bin_number % 100}
+                        {bin.bin_number}
                       </div>
                     </AdvancedMarker>
                   );
@@ -470,11 +471,9 @@ export function TemplateEditorModal({
                               {fillPercentage}%
                             </span>
                           </div>
-                          <p className="text-xs text-gray-600 truncate">
+                          <p className="text-xs text-gray-500 truncate">
                             {bin.location_name || `${bin.current_street}, ${bin.city}`}
                           </p>
-
-                          {/* Fill Level Bar */}
                           <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
                             <div
                               className="h-1.5 rounded-full transition-all"

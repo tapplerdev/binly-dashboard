@@ -1,25 +1,19 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
-import { useWebSocket, WebSocketMessage } from './use-websocket';
+import { useEffect, useRef } from 'react';
+import { useCentrifugo } from './use-centrifugo';
+import { useAuthStore } from '@/lib/auth/store';
 import { ActiveDriver, DriverLocation } from '../types/active-driver';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
-const WS_URL = BACKEND_URL.replace(/^https/, 'wss').replace(/^http/, 'ws');
 
-interface UseActiveDriversOptions {
-  token?: string;
-  enabled?: boolean;
-}
-
-export function useActiveDrivers({ token, enabled = true }: UseActiveDriversOptions = {}) {
+export function useActiveDrivers() {
+  const { token } = useAuthStore();
   const queryClient = useQueryClient();
 
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('🚗 useActiveDrivers Hook Called');
   console.log('   Token:', token ? `${token.substring(0, 20)}...` : 'NONE');
-  console.log('   Enabled:', enabled);
   console.log('   Backend URL:', BACKEND_URL);
-  console.log('   WebSocket URL:', WS_URL);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
   // Fetch initial list of active drivers
@@ -77,87 +71,105 @@ export function useActiveDrivers({ token, enabled = true }: UseActiveDriversOpti
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       return data;
     },
-    enabled,
+    enabled: !!token,
     refetchInterval: 30000, // Refetch every 30 seconds as backup
     staleTime: 10000, // Consider data fresh for 10 seconds
     placeholderData: [], // Provide placeholder data to prevent undefined
   });
 
-  const wsUrl = token ? `${WS_URL}/ws?token=${token}` : `${WS_URL}/ws`;
-  console.log('🔌 Setting up WebSocket connection');
-  console.log('   WebSocket URL:', wsUrl);
-
-  // WebSocket connection for real-time updates
-  const { status: wsStatus } = useWebSocket({
-    url: wsUrl,
-    onMessage: (message: WebSocketMessage) => {
-      handleWebSocketMessage(message);
-    },
-    autoReconnect: true,
-    reconnectInterval: 3000,
-    reconnectAttempts: 5,
-  });
+  // Connect to the shared Centrifugo connection (singleton managed by CentrifugoProvider)
+  const { subscribe, isConnected } = useCentrifugo();
 
   console.log('📊 Current State:');
-  console.log('   Drivers Count:', drivers.length);
+  console.log('   Drivers Count:', drivers?.length || 0);
+  console.log('   Drivers Data:', JSON.stringify(drivers, null, 2));
   console.log('   Loading:', isLoading);
   console.log('   Error:', error);
-  console.log('   WebSocket Status:', wsStatus);
+  console.log('   Centrifugo Connected:', isConnected);
 
-  const handleWebSocketMessage = (message: WebSocketMessage) => {
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📥 Handling WebSocket Message');
-    console.log('   Type:', message.type);
-    console.log('   Data:', message.data);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  // Track currently subscribed driver IDs to avoid re-subscribing on location updates
+  const subscribedDriverIdsRef = useRef<Set<string>>(new Set());
 
-    switch (message.type) {
-      case 'driver:location':
-      case 'driver_location_update': // Backend sends this format
-        console.log('🚗 Processing driver location update...');
-        handleDriverLocationUpdate(message.data);
-        break;
-
-      case 'shift:update':
-      case 'shift_update': // Backend might send this format
-        console.log('📋 Processing shift update...');
-        handleShiftUpdate(message.data);
-        break;
-
-      case 'shift:started':
-      case 'shift_started':
-      case 'shift:paused':
-      case 'shift_paused':
-      case 'shift:resumed':
-      case 'shift_resumed':
-      case 'shift:ended':
-      case 'shift_ended':
-        console.log('🔄 Shift status changed, invalidating queries...');
-        queryClient.invalidateQueries({ queryKey: ['active-drivers'] });
-        break;
-
-      default:
-        console.log('⏭️  Ignoring message type:', message.type);
-        break;
+  // Subscribe to all active driver location channels
+  useEffect(() => {
+    if (!drivers || drivers.length === 0 || !isConnected) {
+      console.log('⏭️  [Centrifugo] Not ready to subscribe:');
+      console.log('   Drivers:', drivers?.length || 0);
+      console.log('   Connected:', isConnected);
+      return;
     }
-  };
 
-  const handleDriverLocationUpdate = (locationData: Record<string, unknown>) => {
-    // Handle both snake_case (from backend) and camelCase
-    const driverId = locationData.driver_id || locationData.driverId;
-    const latitude = locationData.latitude;
-    const longitude = locationData.longitude;
-    const heading = locationData.heading;
-    const speed = locationData.speed;
-    const accuracy = locationData.accuracy;
-    const timestamp = locationData.timestamp;
+    const currentDriverIds = new Set(drivers.map(d => d.driverId));
+    const previousDriverIds = subscribedDriverIdsRef.current;
+
+    // Find drivers to subscribe to (new drivers)
+    const driversToSubscribe = drivers.filter(d => !previousDriverIds.has(d.driverId));
+
+    // Find drivers to unsubscribe from (drivers that left)
+    const driverIdsToUnsubscribe = Array.from(previousDriverIds).filter(id => !currentDriverIds.has(id));
+
+    // Only log if there are changes
+    if (driversToSubscribe.length > 0 || driverIdsToUnsubscribe.length > 0) {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📡 [Centrifugo] Updating driver location subscriptions');
+      console.log('   New drivers:', driversToSubscribe.length);
+      console.log('   Removed drivers:', driverIdsToUnsubscribe.length);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    }
+
+    const unsubscribeFunctions: Array<() => void> = [];
+
+    // Subscribe to new drivers only
+    driversToSubscribe.forEach((driver) => {
+      const channel = `driver:location:${driver.driverId}`;
+      console.log(`   📍 Subscribing to ${driver.driverName} (${channel})`);
+
+      const unsubscribe = subscribe(channel, (data: unknown) => {
+        handleDriverLocationUpdate(data as Record<string, unknown>, driver.driverId);
+      });
+
+      unsubscribeFunctions.push(unsubscribe);
+      subscribedDriverIdsRef.current.add(driver.driverId);
+    });
+
+    // Unsubscribe from drivers that left
+    driverIdsToUnsubscribe.forEach((driverId) => {
+      const channel = `driver:location:${driverId}`;
+      console.log(`   🔄 Unsubscribing from ${channel}`);
+      // Let the subscribe function handle unsubscribe via its return value
+      subscribedDriverIdsRef.current.delete(driverId);
+    });
+
+    if (driversToSubscribe.length > 0) {
+      console.log('✅ [Centrifugo] Subscription updates complete');
+    }
+
+    // Cleanup: only cleanup subscriptions we just created
+    return () => {
+      if (unsubscribeFunctions.length > 0) {
+        console.log('🧹 [Centrifugo] Cleaning up new subscriptions...');
+        unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
+      }
+    };
+  }, [drivers?.map(d => d.driverId).join(','), isConnected, subscribe]);
+
+  const handleDriverLocationUpdate = (locationData: Record<string, unknown>, driverId: string) => {
+    // Extract location data from Centrifugo message
+    const latitude = locationData.latitude as number;
+    const longitude = locationData.longitude as number;
+    const heading = locationData.heading as number | undefined;
+    const speed = locationData.speed as number | undefined;
+    const accuracy = locationData.accuracy as number | undefined;
+    const timestamp = locationData.timestamp as number;
+    const shiftId = locationData.shift_id as string | undefined;
 
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📍 Updating Driver Location');
+    console.log('📍 [Centrifugo] Location Update Received');
     console.log('   Driver ID:', driverId);
     console.log('   Lat/Lng:', latitude, longitude);
     console.log('   Heading:', heading);
     console.log('   Speed:', speed);
+    console.log('   Shift ID:', shiftId);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     queryClient.setQueryData<ActiveDriver[]>(['active-drivers'], (old) => {
@@ -167,13 +179,15 @@ export function useActiveDrivers({ token, enabled = true }: UseActiveDriversOpti
       }
 
       console.log('📊 Current drivers in cache:', old.length);
+
+      // Update the driver's location by driver_id (from channel name)
       const updatedDrivers = old.map((driver) => {
         if (driver.driverId === driverId) {
           console.log('✅ Found driver to update:', driver.driverName);
           return {
             ...driver,
             currentLocation: {
-              driverId,
+              driverId: driver.driverId,
               latitude,
               longitude,
               heading,
@@ -192,42 +206,9 @@ export function useActiveDrivers({ token, enabled = true }: UseActiveDriversOpti
     });
   };
 
-  const handleShiftUpdate = (shiftData: Record<string, unknown>) => {
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📋 Updating Shift Data');
-    console.log('   Shift ID:', shiftData.shiftId);
-    console.log('   Status:', shiftData.status);
-    console.log('   Bins:', shiftData.completedBins, '/', shiftData.totalBins);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-    queryClient.setQueryData<ActiveDriver[]>(['active-drivers'], (old) => {
-      if (!old) {
-        console.log('⚠️  No existing driver data in cache');
-        return old;
-      }
-
-      const updatedDrivers = old.map((driver) => {
-        if (driver.shiftId === shiftData.shiftId) {
-          console.log('✅ Found shift to update for driver:', driver.driverName);
-          return {
-            ...driver,
-            status: shiftData.status,
-            completedBins: shiftData.completedBins,
-            totalBins: shiftData.totalBins,
-          };
-        }
-        return driver;
-      });
-
-      console.log('✅ Shift update complete');
-      return updatedDrivers;
-    });
-  };
-
   return {
     drivers: drivers || [], // Ensure drivers is always an array
     isLoading,
     error,
-    wsStatus,
   };
 }

@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
+import { APIProvider, Map as GoogleMap, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { getBins } from '@/lib/api/bins';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
-import { X, Search, Lasso } from 'lucide-react';
+import { X, Search, Lasso, MapIcon, List, Filter, ChevronDown } from 'lucide-react';
 
 // Default map center (San Jose, CA area)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -12,8 +12,9 @@ const DEFAULT_ZOOM = 12;
 
 interface BinSelectionMapProps {
   onClose: () => void;
-  onConfirm: (selectedBinIds: string[]) => void;
+  onConfirm: (newBinIds: string[], removedBinIds: string[]) => void;
   initialSelectedBins?: string[];
+  alreadyAddedBinIds?: string[]; // Bins already in the task list — shown as pre-checked with distinct style
 }
 
 // Drawing Manager Component - Must be child of Map to use useMap
@@ -93,12 +94,22 @@ function DrawingManagerComponent({ lassoMode, bins, onBinsSelected }: DrawingMan
   return null;
 }
 
-export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }: BinSelectionMapProps) {
+export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], alreadyAddedBinIds = [] }: BinSelectionMapProps) {
   const [bins, setBins] = useState<Bin[]>([]);
-  const [selectedBinIds, setSelectedBinIds] = useState<Set<string>>(new Set(initialSelectedBins));
+  const alreadyAdded = new Set(alreadyAddedBinIds);
+  const [selectedBinIds, setSelectedBinIds] = useState<Set<string>>(new Set([...initialSelectedBins, ...alreadyAddedBinIds]));
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [lassoMode, setLassoMode] = useState(false);
+  const [viewMode, setViewMode] = useState<'map' | 'list'>('map'); // Mobile view toggle
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+
+  // Filter options
+  const [showMissingBins, setShowMissingBins] = useState(true);
+  const [showCriticalBins, setShowCriticalBins] = useState(true);
+  const [showHighFillBins, setShowHighFillBins] = useState(true);
+  const [showMediumFillBins, setShowMediumFillBins] = useState(true);
+  const [showLowFillBins, setShowLowFillBins] = useState(true);
 
   // Load bins from API
   useEffect(() => {
@@ -115,6 +126,9 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
     }
     loadBins();
   }, []);
+
+  // Check if a bin has a pending move request (informational only)
+  const hasMoveRequest = (bin: Bin): boolean => bin.move_requested === true;
 
   // Toggle bin selection
   const toggleBinSelection = (binId: string) => {
@@ -146,8 +160,25 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
     setSelectedBinIds(new Set());
   };
 
-  // Filter bins based on search
+  // Filter bins based on search and filter options
   const filteredBins = bins.filter(bin => {
+    // Apply fill level and status filters first
+    if (bin.status === 'missing') {
+      if (!showMissingBins) return false;
+    } else {
+      const fillPercentage = bin.fill_percentage ?? 0;
+      if (fillPercentage >= 80) {
+        if (!showCriticalBins) return false;
+      } else if (fillPercentage >= 50) {
+        if (!showHighFillBins) return false;
+      } else if (fillPercentage >= 25) {
+        if (!showMediumFillBins) return false;
+      } else {
+        if (!showLowFillBins) return false;
+      }
+    }
+
+    // Then apply search filter
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -161,9 +192,11 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
   // Get mappable bins for map display
   const mappableBins = filteredBins.filter(isMappableBin);
 
-  // Handle confirm
+  // Handle confirm — pass newly added bins AND bins that were removed (unchecked from alreadyAdded)
   const handleConfirm = () => {
-    onConfirm(Array.from(selectedBinIds));
+    const newBinIds = Array.from(selectedBinIds).filter(id => !alreadyAdded.has(id));
+    const removedBinIds = Array.from(alreadyAdded).filter(id => !selectedBinIds.has(id));
+    onConfirm(newBinIds, removedBinIds);
     onClose();
   };
 
@@ -175,25 +208,58 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
       {/* Full-screen Modal */}
       <div className="fixed inset-4 bg-white rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">Select Bins for Shift</h2>
-            <p className="text-sm text-gray-600 mt-0.5">
-              Click bins individually or use Lasso Select to choose multiple at once
-            </p>
+        <div className="flex flex-col px-4 md:px-6 py-4 border-b border-gray-200 bg-gray-50">
+          {/* Top Row: Title and Close */}
+          <div className="flex items-center justify-between mb-3 md:mb-0">
+            <div>
+              <h2 className="text-lg md:text-xl font-semibold text-gray-900">Select Bins for Shift</h2>
+              <p className="text-xs md:text-sm text-gray-600 mt-0.5 hidden md:block">
+                Click bins individually or use Lasso Select to choose multiple at once
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-200 rounded-lg transition-fast"
+            >
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-200 rounded-lg transition-fast"
-          >
-            <X className="w-5 h-5 text-gray-600" />
-          </button>
+
+          {/* Mobile View Toggle (only visible on mobile) */}
+          <div className="flex md:hidden gap-2 mt-2">
+            <button
+              onClick={() => setViewMode('map')}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                viewMode === 'map'
+                  ? 'bg-primary text-white'
+                  : 'bg-white text-gray-700 border border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <MapIcon className="w-4 h-4" />
+                <span>Map</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                viewMode === 'list'
+                  ? 'bg-primary text-white'
+                  : 'bg-white text-gray-700 border border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <List className="w-4 h-4" />
+                <span>List ({filteredBins.length})</span>
+              </div>
+            </button>
+          </div>
         </div>
 
-        {/* Main Content - Split View */}
+        {/* Main Content - Responsive Layout */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Map View - Left 60% */}
-          <div className="flex-1 relative">
+          {/* Map View - Desktop: Left 60% | Mobile: Full screen when viewMode === 'map' */}
+          <div className={`flex-1 relative ${viewMode === 'list' ? 'hidden md:flex' : 'flex'}`}>
             {loading ? (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
                 <div className="text-center">
@@ -206,11 +272,13 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
                 apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}
                 libraries={['drawing', 'geometry']}
               >
-                <Map
+                <GoogleMap
                   defaultCenter={DEFAULT_CENTER}
                   defaultZoom={DEFAULT_ZOOM}
                   mapId="binly-bin-selection"
+                  mapTypeId="hybrid"
                   gestureHandling="greedy"
+                  streetViewControl={false}
                   disableDefaultUI={false}
                   className="w-full h-full"
                 >
@@ -224,82 +292,192 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
                   {/* Bin Markers */}
                   {mappableBins.map((bin) => {
                     const isSelected = selectedBinIds.has(bin.id);
-                    const markerColor = isSelected ? '#16a34a' : getBinMarkerColor(bin.fill_percentage);
+                    const isAlreadyAdded = alreadyAdded.has(bin.id);
+                    const fillColor = getBinMarkerColor(bin.fill_percentage, bin.status);
+                    const markerColor = isSelected ? '#16a34a' : fillColor;
+                    const pingColor = isSelected ? '#16a34a' : fillColor;
 
                     return (
                       <AdvancedMarker
                         key={bin.id}
                         position={{ lat: bin.latitude, lng: bin.longitude }}
                         onClick={() => toggleBinSelection(bin.id)}
+                        zIndex={isSelected ? 15 : 10}
                       >
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold cursor-pointer transition-all hover:scale-110 ${
-                            isSelected ? 'ring-4 ring-green-300 animate-pulse-glow' : ''
-                          }`}
-                          style={{ backgroundColor: markerColor }}
-                          title={`Bin #${bin.bin_number} - ${bin.location_name || bin.current_street}`}
-                        >
-                          {bin.bin_number % 100}
+                        <div className="relative cursor-pointer" title={`Bin #${bin.bin_number} - ${bin.location_name || bin.current_street}${isAlreadyAdded ? ' · Already in shift' : ''}${hasMoveRequest(bin) ? ' · Move req. pending' : ''}`}>
+                          {/* Pulsing ring — fill-level color unselected, green when selected */}
+                          <div className="absolute inset-0 -m-2">
+                            <div
+                              className="w-12 h-12 rounded-full opacity-30 animate-ping"
+                              style={{ backgroundColor: pingColor }}
+                            />
+                          </div>
+                          <div
+                            className="relative w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg ring-2 ring-white transition-all hover:scale-110"
+                            style={{ backgroundColor: markerColor }}
+                          >
+                            {bin.bin_number % 100}
+                          </div>
                         </div>
                       </AdvancedMarker>
                     );
                   })}
-                </Map>
+                </GoogleMap>
               </APIProvider>
             )}
 
-            {/* Lasso Tool Button & Instructions */}
-            <div className="absolute top-4 right-4 flex flex-col gap-2">
-              <button
-                onClick={() => setLassoMode(!lassoMode)}
-                className={`px-4 py-2 rounded-lg shadow-lg font-medium text-sm transition-all ${
-                  lassoMode
-                    ? 'bg-primary text-white ring-4 ring-primary/20'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-                title="Draw a polygon to select multiple bins"
-              >
-                <div className="flex items-center gap-2">
-                  <Lasso className="w-4 h-4" />
-                  <span>{lassoMode ? 'Click to Draw' : 'Lasso Select'}</span>
-                </div>
-              </button>
+            {/* Lasso Tool Button & Instructions - Only show in map mode */}
+            {viewMode === 'map' && (
+              <>
+                <div className="absolute top-4 right-4 flex flex-col gap-2">
+                  <button
+                    onClick={() => setLassoMode(!lassoMode)}
+                    className={`px-3 md:px-4 py-2 rounded-lg shadow-lg font-medium text-xs md:text-sm transition-all ${
+                      lassoMode
+                        ? 'bg-primary text-white ring-4 ring-primary/20'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                    title="Draw a polygon to select multiple bins"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Lasso className="w-4 h-4" />
+                      <span className="hidden sm:inline">{lassoMode ? 'Click to Draw' : 'Lasso Select'}</span>
+                      <span className="sm:hidden">{lassoMode ? 'Drawing' : 'Lasso'}</span>
+                    </div>
+                  </button>
 
-              {/* Drawing Instructions */}
-              {lassoMode && (
-                <div className="bg-white rounded-lg shadow-lg p-3 text-xs text-gray-700 max-w-xs animate-slide-in-down">
-                  <p className="font-semibold mb-1">How to use:</p>
-                  <ol className="list-decimal list-inside space-y-0.5">
-                    <li>Click on map to add points</li>
-                    <li>Draw around bins you want</li>
-                    <li>Click first point to close polygon</li>
-                  </ol>
-                  <p className="mt-2 text-gray-500">Bins inside will be selected automatically</p>
+                  {/* Drawing Instructions - Desktop only */}
+                  {lassoMode && (
+                    <div className="hidden md:block bg-white rounded-lg shadow-lg p-3 text-xs text-gray-700 max-w-xs animate-slide-in-down">
+                      <p className="font-semibold mb-1">How to use:</p>
+                      <ol className="list-decimal list-inside space-y-0.5">
+                        <li>Click on map to add points</li>
+                        <li>Draw around bins you want</li>
+                        <li>Click first point to close polygon</li>
+                      </ol>
+                      <p className="mt-2 text-gray-500">Bins inside will be selected automatically</p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* Selection Counter */}
-            <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg px-4 py-2 border border-gray-200">
-              <p className="text-sm font-semibold text-gray-900">
-                {selectedBinIds.size} bin{selectedBinIds.size !== 1 ? 's' : ''} selected
-              </p>
-            </div>
+                {/* Selection Counter */}
+                <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg px-3 md:px-4 py-2 border border-gray-200">
+                  <p className="text-xs md:text-sm font-semibold text-gray-900">
+                    {selectedBinIds.size} bin{selectedBinIds.size !== 1 ? 's' : ''} selected
+                  </p>
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Bin List - Right 40% */}
-          <div className="w-[40%] border-l border-gray-200 flex flex-col bg-gray-50">
+          {/* Bin List - Desktop: Right 40% | Mobile: Full screen when viewMode === 'list' */}
+          <div className={`w-full md:w-[40%] border-l border-gray-200 flex flex-col bg-gray-50 ${viewMode === 'map' ? 'hidden md:flex' : 'flex'}`}>
             {/* Search Header */}
             <div className="p-4 border-b border-gray-200 bg-white">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by bin number or address..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
+              {/* Search Bar and Filter Button */}
+              <div className="flex gap-2 mb-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by bin number or address..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  />
+                </div>
+
+                {/* Filter Button */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-fast flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <Filter className="w-4 h-4" />
+                    <span className="hidden sm:inline">Filter</span>
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showFilterDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Filter Dropdown */}
+                  {showFilterDropdown && (
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50 animate-slide-in-down">
+                      <div className="p-3 border-b border-gray-200">
+                        <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Bin Types</p>
+                      </div>
+                      <div className="p-2 space-y-1 max-h-72 overflow-y-auto">
+                        {/* Missing Bins */}
+                        <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-gray-500" />
+                            <span className="text-sm text-gray-700">Missing</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={showMissingBins}
+                            onChange={(e) => setShowMissingBins(e.target.checked)}
+                            className="w-4 h-4 text-gray-600 rounded focus:ring-2 focus:ring-gray-400/20"
+                          />
+                        </label>
+
+                        {/* Critical Fill (80%+) */}
+                        <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-red-500" />
+                            <span className="text-sm text-gray-700">Critical (80%+)</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={showCriticalBins}
+                            onChange={(e) => setShowCriticalBins(e.target.checked)}
+                            className="w-4 h-4 text-red-600 rounded focus:ring-2 focus:ring-red-400/20"
+                          />
+                        </label>
+
+                        {/* High Fill (50-79%) */}
+                        <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-orange-500" />
+                            <span className="text-sm text-gray-700">High Fill (50-79%)</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={showHighFillBins}
+                            onChange={(e) => setShowHighFillBins(e.target.checked)}
+                            className="w-4 h-4 text-orange-600 rounded focus:ring-2 focus:ring-orange-400/20"
+                          />
+                        </label>
+
+                        {/* Medium Fill (25-49%) */}
+                        <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-amber-500" />
+                            <span className="text-sm text-gray-700">Medium Fill (25-49%)</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={showMediumFillBins}
+                            onChange={(e) => setShowMediumFillBins(e.target.checked)}
+                            className="w-4 h-4 text-amber-600 rounded focus:ring-2 focus:ring-amber-400/20"
+                          />
+                        </label>
+
+                        {/* Low Fill (0-24%) */}
+                        <label className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-green-500" />
+                            <span className="text-sm text-gray-700">Low Fill (0-24%)</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={showLowFillBins}
+                            onChange={(e) => setShowLowFillBins(e.target.checked)}
+                            className="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-400/20"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Quick Actions */}
@@ -324,7 +502,9 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
               <div className="p-2 space-y-1">
                 {filteredBins.map((bin) => {
                   const isSelected = selectedBinIds.has(bin.id);
+                  const isAlreadyAdded = alreadyAdded.has(bin.id);
                   const fillPercentage = bin.fill_percentage ?? 0;
+                  const moveReqPending = hasMoveRequest(bin);
 
                   return (
                     <div
@@ -342,33 +522,57 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => {}}
-                          className="mt-0.5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          className="mt-0.5 rounded border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500"
                         />
 
                         {/* Bin Info */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <p className="font-semibold text-sm text-gray-900">
                               Bin #{bin.bin_number}
                             </p>
-                            <span className="text-xs text-gray-500">
-                              {fillPercentage}%
-                            </span>
+                            <span className="text-xs text-gray-500">{fillPercentage}%</span>
+                            {isAlreadyAdded && (
+                              <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 text-xs rounded border border-gray-200">
+                                Already in shift
+                              </span>
+                            )}
+                            {moveReqPending && (
+                              <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-xs rounded border border-blue-200">
+                                Move req. pending
+                              </span>
+                            )}
                           </div>
                           <p className="text-xs text-gray-600 truncate">
                             {bin.location_name || `${bin.current_street}, ${bin.city}`}
                           </p>
 
-                          {/* Fill Level Bar */}
+                          {/* Always show the fill bar */}
                           <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
                             <div
                               className="h-1.5 rounded-full transition-all"
                               style={{
                                 width: `${fillPercentage}%`,
-                                backgroundColor: getBinMarkerColor(fillPercentage),
+                                backgroundColor: getBinMarkerColor(fillPercentage, bin.status),
                               }}
                             />
                           </div>
+
+                          {/* Sub-labels below the bar */}
+                          {moveReqPending && (
+                            <p className="mt-1 text-xs text-gray-400">
+                              This bin also has an open move request.{' '}
+                              <a
+                                href="/operations/move-requests"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="underline hover:text-gray-600"
+                              >
+                                View
+                              </a>
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -380,20 +584,27 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [] }
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+        <div className="px-4 md:px-6 py-3 md:py-4 border-t border-gray-200 bg-gray-50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-fast"
+            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-fast order-2 sm:order-1"
           >
             Cancel
           </button>
-          <button
-            onClick={handleConfirm}
-            disabled={selectedBinIds.size === 0}
-            className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-fast"
-          >
-            Confirm Selection ({selectedBinIds.size})
-          </button>
+          {(() => {
+            const added = [...selectedBinIds].filter(id => !alreadyAdded.has(id)).length;
+            const removed = [...alreadyAdded].filter(id => !selectedBinIds.has(id)).length;
+            const hasChanges = added > 0 || removed > 0;
+            return (
+              <button
+                onClick={handleConfirm}
+                disabled={!hasChanges}
+                className="px-6 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-fast order-1 sm:order-2"
+              >
+                Save
+              </button>
+            );
+          })()}
         </div>
       </div>
     </>

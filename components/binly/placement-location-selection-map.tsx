@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { PotentialLocation } from '@/lib/api/potential-locations';
-import { X, Search, MapPin, Filter } from 'lucide-react';
+import { X, Search, MapPin, Filter, MapIcon, List, ShieldAlert } from 'lucide-react';
 import { PotentialLocationPin } from '@/components/ui/potential-location-pin';
+import { useNoGoZones } from '@/lib/hooks/use-zones';
+import { getZoneColor } from '@/lib/types/zone';
 
 // Default map center (San Jose, CA area)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -67,6 +69,7 @@ interface PlacementLocationSelectionMapProps {
   onClose: () => void;
   onConfirm: (selectedLocationIds: string[]) => void;
   potentialLocations: PotentialLocation[];
+  initialSelectedLocations?: string[]; // Location IDs already in the task list — shown as pre-checked with distinct style
 }
 
 /**
@@ -81,11 +84,15 @@ function isMappableLocation(location: PotentialLocation): location is PotentialL
   );
 }
 
-export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLocations }: PlacementLocationSelectionMapProps) {
-  const [selectedLocationIds, setSelectedLocationIds] = useState<Set<string>>(new Set());
+export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLocations, initialSelectedLocations = [] }: PlacementLocationSelectionMapProps) {
+  const alreadyAdded = new Set(initialSelectedLocations);
+  const [selectedLocationIds, setSelectedLocationIds] = useState<Set<string>>(new Set(initialSelectedLocations));
+  const { data: activeZones = [] } = useNoGoZones('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number; timestamp: number } | null>(null);
+  const [viewMode, setViewMode] = useState<'map' | 'list'>('map'); // Mobile view toggle
+  const [hoveredLocationId, setHoveredLocationId] = useState<string | null>(null); // For popup display
 
   // Toggle location selection and pan to location
   const toggleLocationSelection = (locationId: string, location: PotentialLocation) => {
@@ -105,6 +112,9 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
       newSelection.add(locationId);
     }
     setSelectedLocationIds(newSelection);
+
+    // Show popup for this location
+    setHoveredLocationId(locationId);
 
     // Always pan to the location when clicked (even if deselecting)
     if (location.latitude && location.longitude) {
@@ -157,9 +167,10 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
   // Get mappable locations
   const mappableLocations = filteredLocations.filter(isMappableLocation);
 
-  // Handle confirm
+  // Handle confirm — only pass newly selected locations (exclude already-added ones)
   const handleConfirm = () => {
-    onConfirm(Array.from(selectedLocationIds));
+    const newlySelectedIds = Array.from(selectedLocationIds).filter(id => !alreadyAdded.has(id));
+    onConfirm(newlySelectedIds);
     onClose();
   };
 
@@ -171,25 +182,58 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
       {/* Full-screen Modal */}
       <div className="fixed inset-4 bg-white rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">Select Placement Locations for Shift</h2>
-            <p className="text-sm text-gray-600 mt-0.5">
-              Click on map markers or cards to add placement tasks to your shift
-            </p>
+        <div className="flex flex-col px-4 md:px-6 py-4 border-b border-gray-200 bg-gray-50">
+          {/* Top Row: Title and Close */}
+          <div className="flex items-center justify-between mb-3 md:mb-0">
+            <div>
+              <h2 className="text-lg md:text-xl font-semibold text-gray-900">Select Placement Locations for Shift</h2>
+              <p className="text-xs md:text-sm text-gray-600 mt-0.5 hidden md:block">
+                Click on map markers or cards to add placement tasks to your shift
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-200 rounded-lg transition-fast"
+            >
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-200 rounded-lg transition-fast"
-          >
-            <X className="w-5 h-5 text-gray-600" />
-          </button>
+
+          {/* Mobile View Toggle (only visible on mobile) */}
+          <div className="flex md:hidden gap-2 mt-2">
+            <button
+              onClick={() => setViewMode('map')}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                viewMode === 'map'
+                  ? 'bg-primary text-white'
+                  : 'bg-white text-gray-700 border border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <MapIcon className="w-4 h-4" />
+                <span>Map</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                viewMode === 'list'
+                  ? 'bg-primary text-white'
+                  : 'bg-white text-gray-700 border border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <List className="w-4 h-4" />
+                <span>List ({filteredLocations.length})</span>
+              </div>
+            </button>
+          </div>
         </div>
 
-        {/* Main Content - Split View */}
+        {/* Main Content - Responsive Layout */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Map View - Left 60% */}
-          <div className="flex-1 relative">
+          {/* Map View - Desktop: Left 60% | Mobile: Full screen when viewMode === 'map' */}
+          <div className={`flex-1 relative ${viewMode === 'list' ? 'hidden md:flex' : 'flex'}`}>
             <APIProvider
               apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}
             >
@@ -197,10 +241,12 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                 defaultCenter={DEFAULT_CENTER}
                 defaultZoom={DEFAULT_ZOOM}
                 mapId="binly-placement-location-selection"
+                mapTypeId="hybrid"
                 gestureHandling="greedy"
                 disableDefaultUI={false}
                 streetViewControl={false}
                 className="w-full h-full"
+                onClick={() => setHoveredLocationId(null)} // Close popup when clicking map
               >
                 {/* Map controller for selected location navigation */}
                 <MapController
@@ -211,12 +257,16 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                 {/* Placement Location Markers - Using PotentialLocationPin */}
                 {mappableLocations.map((location) => {
                   const isSelected = selectedLocationIds.has(location.id);
+                  const showPopup = hoveredLocationId === location.id;
 
                   return (
                     <AdvancedMarker
                       key={location.id}
                       position={{ lat: location.latitude, lng: location.longitude }}
-                      onClick={() => toggleLocationSelection(location.id, location)}
+                      onClick={(e) => {
+                        e.stop(); // Prevent map click event
+                        toggleLocationSelection(location.id, location);
+                      }}
                     >
                       <div
                         className="relative cursor-pointer transition-all hover:scale-110"
@@ -236,6 +286,60 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                             color={isSelected ? '#16a34a' : '#FF9500'}
                           />
                         </div>
+
+                        {/* Address Popup - Shows above marker when selected */}
+                        {showPopup && (
+                          <div
+                            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-white rounded-lg shadow-lg border border-gray-200 min-w-[200px] max-w-[280px] animate-slide-in-up z-50"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="text-xs font-semibold text-gray-900 mb-1">
+                              {location.address || `${location.street}`}
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              {location.city}, {location.zip}
+                            </div>
+                            {/* Arrow pointing down to marker */}
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white" />
+                          </div>
+                        )}
+                      </div>
+                    </AdvancedMarker>
+                  );
+                })}
+
+                {/* No-Go Zone Markers */}
+                {activeZones.map((zone) => {
+                  const color = getZoneColor(zone.conflict_score);
+                  return (
+                    <AdvancedMarker
+                      key={`zone-${zone.id}`}
+                      position={{ lat: zone.center_latitude, lng: zone.center_longitude }}
+                      zIndex={3}
+                    >
+                      <div className="flex flex-col items-center pointer-events-none">
+                        <div
+                          className="rounded-full flex items-center justify-center animate-pulse"
+                          style={{
+                            width: 28,
+                            height: 28,
+                            backgroundColor: color + '99',
+                            border: '2px solid white',
+                            boxShadow: `0 0 0 2px ${color}, 0 2px 8px rgba(0,0,0,0.6)`,
+                          }}
+                        >
+                          <ShieldAlert className="w-3 h-3 text-white" />
+                        </div>
+                        <div
+                          className="mt-0.5 px-1.5 py-0 rounded text-white whitespace-nowrap font-bold"
+                          style={{
+                            backgroundColor: color,
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.6)',
+                            fontSize: '10px',
+                          }}
+                        >
+                          {zone.name}
+                        </div>
                       </div>
                     </AdvancedMarker>
                   );
@@ -243,16 +347,18 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
               </Map>
             </APIProvider>
 
-            {/* Selection Counter */}
-            <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg px-4 py-2 border border-gray-200">
-              <p className="text-sm font-semibold text-gray-900">
-                {selectedLocationIds.size} location{selectedLocationIds.size !== 1 ? 's' : ''} selected
-              </p>
-            </div>
+            {/* Selection Counter - Only show in map mode */}
+            {viewMode === 'map' && (
+              <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg px-3 md:px-4 py-2 border border-gray-200">
+                <p className="text-xs md:text-sm font-semibold text-gray-900">
+                  {selectedLocationIds.size} location{selectedLocationIds.size !== 1 ? 's' : ''} selected
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* Location List - Right 40% */}
-          <div className="w-[40%] border-l border-gray-200 flex flex-col bg-gray-50">
+          {/* Location List - Desktop: Right 40% | Mobile: Full screen when viewMode === 'list' */}
+          <div className={`w-full md:w-[40%] border-l border-gray-200 flex flex-col bg-gray-50 ${viewMode === 'map' ? 'hidden md:flex' : 'flex'}`}>
             {/* Search Header */}
             <div className="p-4 border-b border-gray-200 bg-white">
               <div className="relative">
@@ -334,6 +440,7 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                 ) : (
                   filteredLocations.map((location) => {
                     const isSelected = selectedLocationIds.has(location.id);
+                    const isAlreadyAdded = alreadyAdded.has(location.id);
 
                     // Format created date
                     const createdDate = new Date(location.created_at_iso);
@@ -348,7 +455,9 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                         key={location.id}
                         onClick={() => toggleLocationSelection(location.id, location)}
                         className={`p-3 rounded-lg cursor-pointer transition-all ${
-                          isSelected
+                          isAlreadyAdded
+                            ? 'bg-indigo-50 border-2 border-indigo-400'
+                            : isSelected
                             ? 'bg-green-50 border-2 border-green-500'
                             : 'bg-white border border-gray-200 hover:bg-gray-50'
                         }`}
@@ -359,16 +468,27 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => {}}
-                            className="mt-0.5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                            className={`mt-0.5 rounded border-gray-300 focus:ring-2 ${
+                              isAlreadyAdded
+                                ? 'text-indigo-600 focus:ring-indigo-500'
+                                : 'text-green-600 focus:ring-green-500'
+                            }`}
                           />
 
                           {/* Location Info */}
                           <div className="flex-1 min-w-0">
                             <div className="mb-2">
-                              <p className="font-semibold text-sm text-gray-900 truncate">
-                                {location.address || `${location.street}, ${location.city}`}
-                              </p>
-                              <p className="text-xs text-gray-600 mt-0.5">
+                              <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                <p className="font-semibold text-sm text-gray-900 truncate">
+                                  {location.address || `${location.street}, ${location.city}`}
+                                </p>
+                                {isAlreadyAdded && (
+                                  <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded border border-indigo-300 font-medium shrink-0">
+                                    Already in shift
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-600">
                                 {location.city}, {location.zip}
                               </p>
                             </div>
@@ -397,6 +517,12 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                                   ✓ Converted to Bin #{location.bin_number}
                                 </div>
                               )}
+
+                              {isAlreadyAdded && (
+                                <p className="text-xs text-indigo-500 mt-1">
+                                  This location is already in the task list
+                                </p>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -410,20 +536,25 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+        <div className="px-4 md:px-6 py-3 md:py-4 border-t border-gray-200 bg-gray-50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-fast"
+            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-fast order-2 sm:order-1"
           >
             Cancel
           </button>
-          <button
-            onClick={handleConfirm}
-            disabled={selectedLocationIds.size === 0}
-            className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-fast"
-          >
-            Add to Shift ({selectedLocationIds.size})
-          </button>
+          {(() => {
+            const newlySelected = [...selectedLocationIds].filter(id => !alreadyAdded.has(id)).length;
+            return (
+              <button
+                onClick={handleConfirm}
+                disabled={newlySelected === 0}
+                className="px-6 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-fast order-1 sm:order-2"
+              >
+                Add to Shift ({newlySelected})
+              </button>
+            );
+          })()}
         </div>
       </div>
     </>
