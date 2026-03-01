@@ -17,7 +17,6 @@ import {
   Loader2,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import Cookies from 'js-cookie';
 
 interface DriverDetailDrawerProps {
   driver: Driver;
@@ -27,7 +26,22 @@ interface DriverDetailDrawerProps {
 export function DriverDetailDrawer({ driver, onClose }: DriverDetailDrawerProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'history'>('overview');
   const [isClosing, setIsClosing] = useState(false);
-  const token = Cookies.get('token') || '';
+
+  // Get auth token from localStorage (Zustand persist storage)
+  const getAuthToken = () => {
+    try {
+      const authStorage = localStorage.getItem('binly-auth-storage');
+      if (!authStorage) return null;
+
+      const parsed = JSON.parse(authStorage);
+      return parsed?.state?.token || null;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  };
+
+  const token = getAuthToken() || '';
 
   const handleClose = () => {
     setIsClosing(true);

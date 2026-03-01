@@ -6,11 +6,25 @@ import { getAllDrivers, type Driver } from '@/lib/api/team';
 import { DriverDetailDrawer } from '@/components/binly/driver-detail-drawer';
 import { Card } from '@/components/ui/card';
 import { Users, UserCheck, UserX, TrendingUp, Loader2, Circle } from 'lucide-react';
-import Cookies from 'js-cookie';
 
 export default function TeamPage() {
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
-  const token = Cookies.get('token') || '';
+
+  // Get auth token from localStorage (Zustand persist storage)
+  const getAuthToken = () => {
+    try {
+      const authStorage = localStorage.getItem('binly-auth-storage');
+      if (!authStorage) return null;
+
+      const parsed = JSON.parse(authStorage);
+      return parsed?.state?.token || null;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  };
+
+  const token = getAuthToken() || '';
 
   const { data: drivers, isLoading } = useQuery({
     queryKey: ['all-drivers'],
