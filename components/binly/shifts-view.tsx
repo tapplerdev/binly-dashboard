@@ -115,23 +115,29 @@ export function ShiftsView() {
 
     const thisWeekMonday = new Date(today);
     thisWeekMonday.setDate(today.getDate() + mondayOffset);
+    thisWeekMonday.setHours(0, 0, 0, 0); // Strip time component
 
     const thisWeekSunday = new Date(thisWeekMonday);
     thisWeekSunday.setDate(thisWeekMonday.getDate() + 6);
+    thisWeekSunday.setHours(23, 59, 59, 999); // End of day
 
     if (dateRange === 'this-week') {
       return { start: thisWeekMonday, end: thisWeekSunday };
     } else if (dateRange === 'next-week') {
       const nextWeekMonday = new Date(thisWeekMonday);
       nextWeekMonday.setDate(thisWeekMonday.getDate() + 7);
+      nextWeekMonday.setHours(0, 0, 0, 0);
       const nextWeekSunday = new Date(nextWeekMonday);
       nextWeekSunday.setDate(nextWeekMonday.getDate() + 6);
+      nextWeekSunday.setHours(23, 59, 59, 999);
       return { start: nextWeekMonday, end: nextWeekSunday };
     } else if (dateRange === 'last-week') {
       const lastWeekMonday = new Date(thisWeekMonday);
       lastWeekMonday.setDate(thisWeekMonday.getDate() - 7);
+      lastWeekMonday.setHours(0, 0, 0, 0);
       const lastWeekSunday = new Date(lastWeekMonday);
       lastWeekSunday.setDate(lastWeekMonday.getDate() + 6);
+      lastWeekSunday.setHours(23, 59, 59, 999);
       return { start: lastWeekMonday, end: lastWeekSunday };
     }
     return null; // 'all' - no filtering
@@ -145,6 +151,7 @@ export function ShiftsView() {
         const weekRange = getWeekRange(filters.dateRange);
         if (weekRange) {
           const shiftDate = new Date(shift.date);
+          shiftDate.setHours(0, 0, 0, 0); // Normalize to midnight for date-only comparison
           if (shiftDate < weekRange.start || shiftDate > weekRange.end) {
             return false;
           }
