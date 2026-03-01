@@ -13,6 +13,7 @@ export default function TeamPage() {
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [activeTab, setActiveTab] = useState<'drivers' | 'admins'>('drivers');
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [modalRole, setModalRole] = useState<'driver' | 'admin'>('driver');
 
   // Get auth token from localStorage (Zustand persist storage)
   const getAuthToken = () => {
@@ -135,7 +136,19 @@ export default function TeamPage() {
       {/* Drivers Tab */}
       {activeTab === 'drivers' && (
         <Card className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Driver Roster</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Driver Roster</h2>
+            <button
+              onClick={() => {
+                setModalRole('driver');
+                setShowCreateUserModal(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+            >
+              <UserPlus className="w-4 h-4" />
+              Add Driver
+            </button>
+          </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
@@ -238,7 +251,19 @@ export default function TeamPage() {
       {/* Admins Tab */}
       {activeTab === 'admins' && (
         <Card className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Administrators</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Administrators</h2>
+            <button
+              onClick={() => {
+                setModalRole('admin');
+                setShowCreateUserModal(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+            >
+              <Shield className="w-4 h-4" />
+              Add Admin
+            </button>
+          </div>
 
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
@@ -293,18 +318,9 @@ export default function TeamPage() {
         </Card>
       )}
 
-      {/* Floating Add User Button */}
-      <button
-        onClick={() => setShowCreateUserModal(true)}
-        className="fixed bottom-8 right-8 w-14 h-14 bg-primary text-white rounded-full shadow-lg hover:bg-primary/90 transition-all hover:scale-110 flex items-center justify-center z-30"
-        title="Add New User"
-      >
-        <UserPlus className="w-6 h-6" />
-      </button>
-
       {/* Create User Modal */}
       {showCreateUserModal && (
-        <CreateUserModal onClose={() => setShowCreateUserModal(false)} />
+        <CreateUserModal defaultRole={modalRole} onClose={() => setShowCreateUserModal(false)} />
       )}
 
       {/* Driver Detail Drawer */}
