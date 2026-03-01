@@ -12,7 +12,7 @@ import { Route, getRouteLabel } from '@/lib/types/route';
 import { RouteTask } from '@/lib/types/route-task';
 import { Bin } from '@/lib/types/bin';
 import { getBins } from '@/lib/api/bins';
-import { getShifts, getShiftTasks } from '@/lib/api/shifts';
+import { getShifts, getShiftTasks, checkShiftDriverProximity, ShiftDriverProximity } from '@/lib/api/shifts';
 import { PotentialLocation } from '@/lib/api/potential-locations';
 import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
 import { MoveRequest, getMoveRequests } from '@/lib/api/move-requests';
@@ -1425,6 +1425,13 @@ function CreateShiftDrawer({
   const [deployAddress, setDeployAddress] = useState('');
   const [deployLat, setDeployLat] = useState('');
   const [deployLon, setDeployLon] = useState('');
+
+  // Proximity warning state
+  const [showProximityWarning, setShowProximityWarning] = useState(false);
+  const [proximityData, setProximityData] = useState<ShiftDriverProximity | null>(null);
+  const [pendingSubmitData, setPendingSubmitData] = useState<any>(null);
+  const [changeSummary, setChangeSummary] = useState({ added: 0, removed: 0 });
+
   // React Query — automatically refetches when GlobalCentrifugoSync invalidates ['move-requests']
   const { data: moveRequests = [], isFetching: moveRequestsFetching } = useQuery<MoveRequest[]>({
     queryKey: ['move-requests', 'pending-unassigned'],
@@ -2611,6 +2618,50 @@ function CreateShiftDrawer({
     return sorted.slice(0, 5); // Return top 5
   }, [tasks, capacityFlow, truckCapacity]);
 
+  // Handle confirmed submission after proximity warning
+  const handleProximityWarningConfirm = async () => {
+    setShowProximityWarning(false);
+    setIsSubmitting(true);
+
+    try {
+      const { editPayload, shift, API_URL, token } = pendingSubmitData;
+
+      console.log('✅ [PROXIMITY WARNING] User confirmed - proceeding with shift update');
+
+      const response = await fetch(`${API_URL}/api/manager/shifts/${shift.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(editPayload),
+      });
+
+      if (!response.ok) {
+        let errorMessage = `Failed to update shift (${response.status} ${response.statusText})`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // Response is not JSON, use status text
+        }
+        throw new Error(errorMessage);
+      }
+
+      // Invalidate shifts cache to trigger refetch
+      console.log('✅ Shift updated successfully, invalidating cache...');
+      queryClient.invalidateQueries({ queryKey: shiftKeys.all });
+
+      onClose();
+    } catch (err) {
+      console.error('Failed to update shift:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update shift. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+      setPendingSubmitData(null);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -2727,7 +2778,7 @@ function CreateShiftDrawer({
         console.log(`🗑️ [SHIFT EDIT] Deleted task IDs (in initial but not in current): ${JSON.stringify(deletedTaskIds)}`);
         console.log(`🗑️ [SHIFT EDIT] Deleted count: ${deletedTaskIds.length}`);
 
-        // Only send NEW tasks (tasks without an id) in add_tasks
+        // Only send NEW tasks (tasks without an id OR with temp id) in add_tasks
         const newTasksOnly = filteredTasks.filter(task => {
           // Find the original task in the tasks array
           const originalTask = tasks.find(t =>
@@ -2736,11 +2787,12 @@ function CreateShiftDrawer({
             (t.move_request_id && t.move_request_id === task.move_request_id)
           );
 
-          const isNew = !originalTask?.id;
+          // Task is new if it has no ID OR has a temporary ID (starts with "temp-")
+          const isNew = !originalTask?.id || (typeof originalTask.id === 'string' && originalTask.id.startsWith('temp-'));
 
           console.log(`🔍 [NEW TASK CHECK] ${task.task_type} - bin_id=${task.bin_id || 'N/A'}, potential_location_id=${task.potential_location_id || 'N/A'}, originalTask.id=${originalTask?.id || 'NO_ID'}, isNew=${isNew}`);
 
-          // Include only if the task doesn't have an ID (meaning it's new)
+          // Include only if the task doesn't have an ID or has a temp ID (meaning it's new)
           return isNew;
         });
 
@@ -2760,6 +2812,32 @@ function CreateShiftDrawer({
 
         console.log('✏️ [SHIFT EDIT] Updating shift:', shift.id);
         console.log('✏️ [SHIFT EDIT] Payload:', editPayload);
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // PROXIMITY CHECK: Warn if THIS shift's driver is nearby their current task
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        console.log(`🔍 [PROXIMITY CHECK] Checking if driver is nearby current task for shift: ${shift.id}`);
+
+        try {
+          // Check if the driver of THIS shift is nearby THEIR current task
+          const proximity = await checkShiftDriverProximity(shift.id);
+
+          console.log(`📍 [PROXIMITY CHECK] Driver proximity: nearby=${proximity.is_nearby}, distance=${proximity.driver_distance_miles?.toFixed(2)} miles`);
+
+          // If driver is nearby their current task, show warning
+          if (proximity.is_nearby) {
+            setProximityData(proximity);
+            setPendingSubmitData({ editPayload, shift, API_URL, token });
+            setChangeSummary({ added: newTasksOnly.length, removed: deletedTaskIds.length });
+            setShowProximityWarning(true);
+            setIsSubmitting(false);
+            return; // Stop here - wait for user confirmation
+          }
+        } catch (err) {
+          console.error('Failed to check driver proximity:', err);
+          // Continue with submission even if check fails (don't block the user)
+        }
 
         response = await fetch(`${API_URL}/api/manager/shifts/${shift.id}`, {
           method: 'PATCH',
@@ -3935,6 +4013,94 @@ function CreateShiftDrawer({
             .map(t => t.move_request_id!)}
           focusBinId={moveRequestFocusBinId || undefined}
         />
+      )}
+
+      {/* Proximity Warning Dialog */}
+      {showProximityWarning && proximityData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-start gap-4 mb-4">
+                <div className="flex-shrink-0 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900">Driver Currently Nearby</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {proximityData.driver_name || 'The driver'} is currently near their active task. Making changes now may disrupt their navigation.
+                  </p>
+                </div>
+              </div>
+
+              {/* Proximity Info */}
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-700 font-medium">Driver:</span>
+                    <span className="text-gray-900">{proximityData.driver_name}</span>
+                  </div>
+                  {proximityData.driver_distance_miles !== undefined && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-700 font-medium">Distance:</span>
+                      <span className="text-red-700 font-semibold">{proximityData.driver_distance_miles.toFixed(1)} miles from current stop</span>
+                    </div>
+                  )}
+                  {proximityData.current_task_address && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-700 font-medium">Current Task:</span>
+                      <span className="text-gray-900 text-right">{proximityData.current_task_address}</span>
+                    </div>
+                  )}
+                  {proximityData.current_task_bin_number && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-700 font-medium">Bin:</span>
+                      <span className="text-gray-900">#{proximityData.current_task_bin_number}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Change Summary */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-gray-700">
+                  <span className="font-medium">Proposed Changes:</span>
+                  {' '}
+                  {changeSummary.added > 0 && changeSummary.removed > 0
+                    ? `Adding ${changeSummary.added} task(s), removing ${changeSummary.removed} task(s)`
+                    : changeSummary.added > 0
+                      ? `Adding ${changeSummary.added} task(s)`
+                      : `Removing ${changeSummary.removed} task(s)`
+                  }
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowProximityWarning(false);
+                    setIsSubmitting(false);
+                    setPendingSubmitData(null);
+                  }}
+                  disabled={isSubmitting}
+                  className="flex-1 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-fast disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleProximityWarningConfirm}
+                  disabled={isSubmitting}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-fast disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Updating...' : 'Proceed Anyway'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

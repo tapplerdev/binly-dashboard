@@ -107,8 +107,8 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
       setAllTasks(allTasksData);
 
       if (tasksData && tasksData.length > 0) {
-        // New task-based system
-        console.log('✅ [SHIFT DETAILS] Using task-based system with', tasksData.length, 'active tasks');
+        // Task-based system
+        console.log('✅ [SHIFT DETAILS] Loaded', tasksData.length, 'active tasks');
         console.log('🔍 [SHIFT DETAILS] Active tasks summary:', tasksData.map(t => ({
           id: t.id,
           bin: t.bin_number,
@@ -119,12 +119,8 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
         console.log('🔍 [SHIFT DETAILS] First task sample:', JSON.stringify(tasksData[0], null, 2));
         setTasks(tasksData);
       } else {
-        // Fallback to old bins system
-        console.log('⚠️  [SHIFT DETAILS] No tasks found, falling back to bins system');
-        const details = await getShiftById(shift.id);
-        console.log('🔍 [SHIFT DETAILS] Shift details response:', JSON.stringify(details, null, 2));
-        console.log('🔍 [SHIFT DETAILS] Bins array:', details.bins?.length || 0);
-        setBins(details.bins || []);
+        console.log('⚠️  [SHIFT DETAILS] No tasks found for this shift');
+        setTasks([]);
       }
     } catch (error) {
       console.error('❌ [SHIFT DETAILS] Failed to load shift details:', error);

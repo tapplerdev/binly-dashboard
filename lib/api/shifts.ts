@@ -77,7 +77,6 @@ interface BackendBinInShift {
 }
 
 interface BackendShiftDetails extends BackendShift {
-  bins: BackendBinInShift[];
   driver_name?: string;
   driver_email?: string;
 }
@@ -658,5 +657,44 @@ export async function getShiftTasksWithHistory(shiftId: string): Promise<any[]> 
   } catch (error) {
     console.error('❌ [API] Error fetching task history:', error);
     return [];
+  }
+}
+
+/**
+ * Driver proximity response from backend
+ */
+export interface ShiftDriverProximity {
+  is_nearby: boolean;
+  driver_distance_miles?: number;
+  location_age_seconds?: number;
+  current_task_id?: string;
+  current_task_address?: string;
+  current_task_bin_number?: number;
+  driver_name?: string;
+}
+
+/**
+ * Check if a shift's driver is currently nearby their current task
+ * @param shiftId Shift ID
+ * @returns Promise<ShiftDriverProximity> Proximity information
+ */
+export async function checkShiftDriverProximity(shiftId: string): Promise<ShiftDriverProximity> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}/driver-proximity`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to check driver proximity: ${response.statusText}`);
+    }
+
+    const proximity: ShiftDriverProximity = await response.json();
+    return proximity;
+  } catch (error) {
+    console.error(`Error checking driver proximity for shift ${shiftId}:`, error);
+    // Return safe default on error
+    return { is_nearby: false };
   }
 }

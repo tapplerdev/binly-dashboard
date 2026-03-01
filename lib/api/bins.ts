@@ -453,6 +453,14 @@ export interface ActiveShiftDependency {
   driver_name: string;
   status: string;
   affected_tasks: AffectedTask[];
+
+  // Proximity information (for warning about driver being nearby)
+  current_task_id?: string;
+  current_task_address?: string;
+  current_task_bin_number?: number;
+  driver_distance_miles?: number;
+  location_age_seconds?: number;
+  is_driver_nearby: boolean;
 }
 
 /**

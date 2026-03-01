@@ -161,13 +161,57 @@ export function ActiveShiftWarningDialog({
                 <p className="text-sm text-gray-700 mt-2">{getImpactDescription()}</p>
               </div>
 
+              {/* Proximity Alert - Show if any driver is nearby */}
+              {dependencies.some((dep) => dep.is_driver_nearby) && (
+                <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-red-900">
+                        ⚠️ Driver(s) Currently Nearby
+                      </p>
+                      <p className="text-sm text-red-800 mt-1">
+                        One or more drivers are within 5 miles of their current task. Making changes now may disrupt their active navigation.
+                      </p>
+                      {dependencies
+                        .filter((dep) => dep.is_driver_nearby)
+                        .map((dep) => (
+                          <div
+                            key={dep.shift_id}
+                            className="mt-2 p-2 bg-white/50 rounded border border-red-200"
+                          >
+                            <p className="text-xs text-red-900 font-medium">
+                              {dep.driver_name}
+                              {dep.driver_distance_miles !== undefined && (
+                                <span className="ml-2 font-normal text-red-700">
+                                  {dep.driver_distance_miles.toFixed(1)} miles from current stop
+                                </span>
+                              )}
+                            </p>
+                            {dep.current_task_address && (
+                              <p className="text-xs text-red-700 mt-0.5">
+                                Current task: {dep.current_task_address}
+                                {dep.current_task_bin_number && ` (Bin #${dep.current_task_bin_number})`}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Affected Shifts */}
               <div className="space-y-3">
                 <h4 className="font-semibold text-sm text-gray-900">Affected Shifts:</h4>
                 {dependencies.map((dep) => (
                   <div
                     key={dep.shift_id}
-                    className="border border-gray-200 rounded-lg p-3 bg-white"
+                    className={`rounded-lg p-3 bg-white ${
+                      dep.is_driver_nearby
+                        ? 'border-2 border-red-400 shadow-md'
+                        : 'border border-gray-200'
+                    }`}
                   >
                     {/* Shift Header */}
                     <div className="flex items-center justify-between mb-3">
@@ -187,9 +231,19 @@ export function ActiveShiftWarningDialog({
                           {dep.status}
                         </Badge>
                       </div>
-                      <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                        <User className="h-3.5 w-3.5" />
-                        <span>{dep.driver_name}</span>
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-1.5">
+                          <User className="h-3.5 w-3.5" />
+                          <span>{dep.driver_name}</span>
+                        </div>
+                        {dep.is_driver_nearby && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs bg-red-100 text-red-800 border-red-400"
+                          >
+                            NEARBY
+                          </Badge>
+                        )}
                       </div>
                     </div>
 
