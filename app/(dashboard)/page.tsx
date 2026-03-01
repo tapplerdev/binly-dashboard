@@ -169,12 +169,7 @@ export default function PulsePage() {
         </div>
 
         {/* Active Routes Table */}
-        <ActiveRoutesTable
-          shifts={activeShifts}
-          onTrackRoute={(shiftId) => console.log('Track route:', shiftId)}
-          onCallDriver={(shiftId) => console.log('Call driver:', shiftId)}
-          onRerouteDriver={(shiftId) => console.log('Reroute driver:', shiftId)}
-        />
+        <ActiveRoutesTable shifts={activeShifts} />
       </div>
     </div>
   );
