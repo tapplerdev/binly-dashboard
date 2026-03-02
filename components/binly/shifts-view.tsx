@@ -2679,35 +2679,39 @@ function CreateShiftDrawer({
       }
 
       // Convert tasks to API format
-      const tasksPayload = tasks.map(task => {
-        const baseTask: Record<string, unknown> = {
-          task_type: task.type,
-          latitude: task.latitude,
-          longitude: task.longitude,
-          address: task.address,
-        };
+      // ❌ Filter out warehouse_stop tasks - Mapbox will add them automatically
+      const tasksPayload = tasks
+        .filter(task => task.type !== 'warehouse_stop')
+        .map(task => {
+          const baseTask: Record<string, unknown> = {
+            task_type: task.type,
+            latitude: task.latitude,
+            longitude: task.longitude,
+            address: task.address,
+          };
 
-        if (task.type === 'collection') {
-          baseTask.bin_id = task.bin_id;
-          baseTask.bin_number = task.bin_number;
-          baseTask.fill_percentage = task.fill_percentage;
-        } else if (task.type === 'placement') {
-          baseTask.potential_location_id = task.potential_location_id;
-        } else if (task.type === 'pickup' || task.type === 'dropoff') {
-          // Pickup/dropoff tasks from move requests
-          baseTask.move_request_id = task.move_request_id;
-          baseTask.bin_id = task.bin_id; // Needed for pickup coordinate lookup
-          baseTask.destination_latitude = task.destination_latitude;
-          baseTask.destination_longitude = task.destination_longitude;
-          baseTask.destination_address = task.destination_address;
-          baseTask.move_type = task.move_type;
-        } else if (task.type === 'warehouse_stop') {
-          baseTask.warehouse_action = task.warehouse_action;
-          baseTask.bins_to_load = task.bins_to_load;
-        }
+          if (task.type === 'collection') {
+            baseTask.bin_id = task.bin_id;
+            baseTask.bin_number = task.bin_number;
+            baseTask.fill_percentage = task.fill_percentage;
+          } else if (task.type === 'placement') {
+            baseTask.potential_location_id = task.potential_location_id;
+          } else if (task.type === 'pickup' || task.type === 'dropoff') {
+            // Pickup/dropoff tasks from move requests
+            baseTask.move_request_id = task.move_request_id;
+            baseTask.bin_id = task.bin_id; // Needed for pickup coordinate lookup
+            baseTask.destination_latitude = task.destination_latitude;
+            baseTask.destination_longitude = task.destination_longitude;
+            baseTask.destination_address = task.destination_address;
+            baseTask.move_type = task.move_type;
+          }
 
-        return baseTask;
-      });
+          return baseTask;
+        });
+
+      if (tasks.length > tasksPayload.length) {
+        console.log(`🔧 [SHIFT CREATE] Filtered out ${tasks.length - tasksPayload.length} warehouse_stop task(s) - Mapbox will add them automatically`);
+      }
 
       console.log('🏭 [SHIFT SUBMIT] Warehouse data:', warehouse);
       console.log('🏭 [SHIFT SUBMIT] Warehouse coords:', {
