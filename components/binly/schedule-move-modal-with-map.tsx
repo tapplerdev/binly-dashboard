@@ -1444,7 +1444,7 @@ export function ScheduleMoveModalWithMap({
 
   // Render Step 2: Configuration
   const renderConfigurationStep = () => (
-    <div className="flex-1 overflow-y-auto p-3 pb-0 md:p-6 md:pb-6">
+    <div className="flex-1 overflow-y-auto p-3 pb-0 md:p-6 md:pb-0">
       <div className="max-w-5xl mx-auto space-y-4 md:space-y-6">
         {/* Bulk Actions - Collapsible on Mobile */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 overflow-hidden">
@@ -2659,7 +2659,7 @@ export function ScheduleMoveModalWithMap({
     const WAREHOUSE_ADDRESS = warehouse?.address || "123 Warehouse St, San Jose, CA 95110";
 
     return (
-    <div className="flex-1 overflow-y-auto p-3 pb-0 md:p-6 md:pb-6">
+    <div className="flex-1 overflow-y-auto p-3 pb-0 md:p-6 md:pb-0">
       <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
         {/* Summary Header */}
         <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 md:p-6 border border-green-200">
