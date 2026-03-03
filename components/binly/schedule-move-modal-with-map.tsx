@@ -44,6 +44,7 @@ import { GroupedDropdown, Dropdown } from '@/components/ui/dropdown';
 import { getNearbyPotentialLocations, NearbyPotentialLocation } from '@/lib/api/potential-locations';
 import { PotentialLocationPickerModal } from './potential-location-picker-modal';
 import { moveRequestReducer, createInitialState } from '@/lib/reducers/move-request-reducer';
+import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 
 // Google Maps imports
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
@@ -251,6 +252,9 @@ export function ScheduleMoveModalWithMap({
     queryKey: ['shifts'],
     queryFn: getShifts,
   });
+
+  // Fetch warehouse location
+  const { data: warehouse } = useWarehouseLocation();
 
   // Initialize bin configs when bins are selected
   useEffect(() => {
@@ -1440,7 +1444,7 @@ export function ScheduleMoveModalWithMap({
 
   // Render Step 2: Configuration
   const renderConfigurationStep = () => (
-    <div className="flex-1 overflow-y-auto p-3 md:p-6">
+    <div className="flex-1 overflow-y-auto p-3 pb-0 md:p-6 md:pb-6">
       <div className="max-w-5xl mx-auto space-y-4 md:space-y-6">
         {/* Bulk Actions - Collapsible on Mobile */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 overflow-hidden">
@@ -2629,7 +2633,7 @@ export function ScheduleMoveModalWithMap({
         </div>
 
         {/* Footer Actions - Flush with bottom, no gap */}
-        <div className="flex gap-2 md:gap-4 p-3 pb-3 md:pt-4 md:pb-4 md:px-0 border-t border-gray-200 sticky bottom-0 left-0 right-0 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none -mx-3 md:mx-0 -mb-3 md:mb-0">
+        <div className="flex gap-2 md:gap-4 p-3 md:pt-4 md:pb-4 md:px-0 border-t border-gray-200 sticky bottom-0 left-0 right-0 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none -mx-3 md:mx-0">
           <button
             onClick={() => dispatch({ type: 'SET_STEP', step: 'selection' })}
             className="flex-1 md:flex-none md:px-8 py-3 border-2 border-gray-300 rounded-lg md:rounded-xl font-semibold text-sm md:text-base hover:bg-gray-50 active:bg-gray-100 transition-all"
@@ -2641,8 +2645,7 @@ export function ScheduleMoveModalWithMap({
             onClick={() => dispatch({ type: 'SET_STEP', step: 'review' })}
             className="flex-1 md:flex-none md:px-8 py-3 bg-primary text-white rounded-lg md:rounded-xl font-semibold text-sm md:text-base hover:bg-primary/90 active:bg-primary transition-all"
           >
-            <span className="hidden md:inline">Next: Review ({selectedBins.length})</span>
-            <span className="md:hidden">Review ({selectedBins.length})</span>
+            Review ({selectedBins.length})
             <ChevronRight className="w-4 h-4 md:w-5 md:h-5 inline ml-1 md:ml-2" />
           </button>
         </div>
@@ -2652,11 +2655,11 @@ export function ScheduleMoveModalWithMap({
 
   // Render Step 3: Review & Confirm
   const renderReviewStep = () => {
-    // Get warehouse address (hardcoded for now - could be from env or config)
-    const WAREHOUSE_ADDRESS = "123 Warehouse St, San Jose, CA 95110";
+    // Get warehouse address from API or fallback
+    const WAREHOUSE_ADDRESS = warehouse?.address || "123 Warehouse St, San Jose, CA 95110";
 
     return (
-    <div className="flex-1 overflow-y-auto p-3 md:p-6">
+    <div className="flex-1 overflow-y-auto p-3 pb-0 md:p-6 md:pb-6">
       <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
         {/* Summary Header */}
         <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 md:p-6 border border-green-200">
@@ -2751,7 +2754,7 @@ export function ScheduleMoveModalWithMap({
                       )}
                       {config.moveType === 'relocation' && config.newStreet && (
                         <div>
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span>Relocate to New Address</span>
                             {config.sourcePotentialLocationId && (
                               <Badge className="bg-orange-100 text-orange-700 text-xs">
@@ -2900,7 +2903,7 @@ export function ScheduleMoveModalWithMap({
                     <div className="text-sm font-bold text-gray-900">
                       {config.moveType === 'redeployment' && config.newStreet && (
                         <div>
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span>Deploy to Field</span>
                             {config.sourcePotentialLocationId && (
                               <Badge className="bg-orange-100 text-orange-700 text-xs">
@@ -2983,7 +2986,7 @@ export function ScheduleMoveModalWithMap({
         )}
 
         {/* Footer Actions - Flush with bottom, no gap */}
-        <div className="flex gap-2 md:gap-4 p-3 pb-3 md:pt-4 md:pb-4 md:px-0 border-t border-gray-200 sticky bottom-0 left-0 right-0 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none -mx-3 md:mx-0 -mb-3 md:mb-0">
+        <div className="flex gap-2 md:gap-4 p-3 md:pt-4 md:pb-4 md:px-0 border-t border-gray-200 sticky bottom-0 left-0 right-0 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none -mx-3 md:mx-0">
           <button
             onClick={() => dispatch({ type: 'SET_STEP', step: 'configuration' })}
             disabled={isSubmitting}
