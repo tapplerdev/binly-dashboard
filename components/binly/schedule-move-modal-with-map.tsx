@@ -2651,7 +2651,11 @@ export function ScheduleMoveModalWithMap({
   );
 
   // Render Step 3: Review & Confirm
-  const renderReviewStep = () => (
+  const renderReviewStep = () => {
+    // Get warehouse address (hardcoded for now - could be from env or config)
+    const WAREHOUSE_ADDRESS = "123 Warehouse St, San Jose, CA 95110";
+
+    return (
     <div className="flex-1 overflow-y-auto p-3 md:p-6">
       <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
         {/* Summary Header */}
@@ -2682,95 +2686,301 @@ export function ScheduleMoveModalWithMap({
           </div>
         </div>
 
-        {/* Move Request Cards */}
-        <div className="space-y-3 md:space-y-4">
-          {selectedBins.map((bin) => {
-            const config = binConfigs[bin.id];
-            if (!config) return null;
-
-            const assignedUser = config.assignedUserId ? users?.find(u => u.id === config.assignedUserId) : null;
-            const assignedShift = config.assignedShiftId ? shifts?.find(s => s.id === config.assignedShiftId) : null;
-
-            return (
-              <Card key={bin.id} className="p-4 md:p-5 border-2 border-gray-200 hover:border-gray-300 transition-all">
-                {/* Bin Header */}
-                <div className="flex items-start justify-between mb-4 pb-4 border-b border-gray-200">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-sm md:text-base font-bold flex-shrink-0"
-                      style={{
-                        backgroundColor: getBinMarkerColor(bin.fill_percentage, bin.status),
-                      }}
-                    >
-                      {bin.bin_number}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-bold text-base md:text-lg text-gray-900">Bin #{bin.bin_number}</div>
-                      <div className="text-sm text-gray-600 truncate">{bin.current_street}</div>
-                      <div className="text-xs text-gray-500">{bin.city}, {bin.zip}</div>
-                    </div>
-                  </div>
-                  <Badge className="bg-blue-100 text-blue-700 capitalize flex-shrink-0">
-                    {config.moveType}
-                  </Badge>
+        {/* Field Bins Section */}
+        {fieldBinCount > 0 && (
+          <div className="space-y-4">
+            {/* Enhanced Field Bins Header */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center shadow-md">
+                  <Truck className="w-5 h-5 text-white" />
                 </div>
+                <div>
+                  <h3 className="text-lg font-bold text-blue-900">
+                    Field Bins ({fieldBinCount})
+                  </h3>
+                  <p className="text-sm text-blue-700">
+                    Bins currently deployed in the field
+                  </p>
+                </div>
+              </div>
+            </div>
 
-                {/* Move Details Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Scheduled Date */}
-                  <div className="flex items-start gap-2">
-                    <Calendar className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs text-gray-500 font-medium">Scheduled Date</div>
-                      <div className="text-sm font-semibold text-gray-900">
-                        {format(config.scheduledDate, 'MMM d, yyyy')}
+            {/* Field Bin Cards */}
+            {fieldBins.map((bin) => {
+              const config = binConfigs[bin.id];
+              if (!config) return null;
+
+              const assignedUser = config.assignedUserId ? users?.find(u => u.id === config.assignedUserId) : null;
+              const assignedShift = config.assignedShiftId ? shifts?.find(s => s.id === config.assignedShiftId) : null;
+
+              return (
+                <Card key={bin.id} className="p-4 md:p-5 border-2 border-gray-200 hover:border-blue-300 transition-all border-l-4 border-l-blue-500">
+                  {/* Bin Header */}
+                  <div className="flex items-start justify-between mb-4 pb-4 border-b border-gray-200">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-sm md:text-base font-bold flex-shrink-0"
+                        style={{
+                          backgroundColor: getBinMarkerColor(bin.fill_percentage, bin.status),
+                        }}
+                      >
+                        {bin.bin_number}
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Assignment */}
-                  <div className="flex items-start gap-2">
-                    <User className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs text-gray-500 font-medium">Assignment</div>
-                      <div className="text-sm font-semibold text-gray-900">
-                        {config.assignmentType === 'unassigned' && 'Unassigned'}
-                        {config.assignmentType === 'user' && assignedUser && assignedUser.name}
-                        {(config.assignmentType === 'active_shift' || config.assignmentType === 'future_shift') &&
-                          assignedShift && `Shift - ${assignedShift.driver_name}`}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Destination (for relocation/redeployment) */}
-                  {(config.moveType === 'relocation' || config.moveType === 'redeployment') && config.newStreet && (
-                    <div className="flex items-start gap-2 md:col-span-2">
-                      <MapPin className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs text-gray-500 font-medium">New Location</div>
+                        <div className="font-bold text-base md:text-lg text-gray-900">Bin #{bin.bin_number}</div>
+                        <div className="text-sm text-gray-600 truncate">{bin.current_street}</div>
+                        <div className="text-xs text-gray-500">{bin.city}, {bin.zip}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Move Type with Details */}
+                  <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Package className="w-4 h-4 text-blue-600" />
+                      <span className="text-xs font-semibold text-blue-900 uppercase">Move Action</span>
+                    </div>
+                    <div className="text-sm font-bold text-gray-900">
+                      {config.moveType === 'store' && (
+                        <div className="flex items-center gap-2">
+                          <span>Store in Warehouse</span>
+                          <span className="text-gray-400">→</span>
+                          <span className="text-purple-700">{WAREHOUSE_ADDRESS}</span>
+                        </div>
+                      )}
+                      {config.moveType === 'relocation' && config.newStreet && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span>Relocate to New Address</span>
+                            {config.sourcePotentialLocationId && (
+                              <Badge className="bg-orange-100 text-orange-700 text-xs">
+                                From Potential Location
+                              </Badge>
+                            )}
+                            {!config.sourcePotentialLocationId && (
+                              <Badge className="bg-gray-100 text-gray-700 text-xs">
+                                Manual Address
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-700 mt-1">
+                            → {config.newStreet}{config.newCity && config.newZip && `, ${config.newCity}, ${config.newZip}`}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Scheduled Date */}
+                    <div className="flex items-start gap-2">
+                      <Calendar className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs text-gray-500 font-medium">Scheduled Date</div>
                         <div className="text-sm font-semibold text-gray-900">
-                          {config.newStreet}
-                          {config.newCity && config.newZip && `, ${config.newCity}, ${config.newZip}`}
+                          {format(config.scheduledDate, 'MMM d, yyyy')}
                         </div>
                       </div>
                     </div>
-                  )}
 
-                  {/* Notes (if any) */}
-                  {config.notes && (
-                    <div className="flex items-start gap-2 md:col-span-2">
-                      <AlertTriangle className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                    {/* Assignment */}
+                    <div className="flex items-start gap-2">
+                      <User className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs text-gray-500 font-medium">Notes</div>
-                        <div className="text-sm text-gray-700">{config.notes}</div>
+                        <div className="text-xs text-gray-500 font-medium">Assignment</div>
+                        <div className="text-sm font-semibold text-gray-900">
+                          {config.assignmentType === 'unassigned' && 'Unassigned'}
+                          {config.assignmentType === 'user' && assignedUser && (
+                            <div>
+                              <div>{assignedUser.name}</div>
+                              <div className="text-xs text-gray-500 capitalize">({assignedUser.role})</div>
+                            </div>
+                          )}
+                          {config.assignmentType === 'active_shift' && assignedShift && (
+                            <div>
+                              <div>Active Shift - {assignedShift.driver_name}</div>
+                              <div className="text-xs text-gray-500">In progress</div>
+                            </div>
+                          )}
+                          {config.assignmentType === 'future_shift' && assignedShift && (
+                            <div>
+                              <div>Future Shift - {assignedShift.driver_name}</div>
+                              <div className="text-xs text-gray-500">
+                                {assignedShift.start_time && format(new Date(assignedShift.start_time * 1000), 'MMM d, h:mm a')}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  )}
+
+                    {/* Reason (if any) */}
+                    {config.reasonCategory && (
+                      <div className="flex items-start gap-2 md:col-span-2">
+                        <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs text-gray-500 font-medium">Reason</div>
+                          <div className="text-sm font-semibold text-gray-900 capitalize">
+                            {config.reasonCategory.replace(/_/g, ' ')}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Notes (if any) */}
+                    {config.notes && (
+                      <div className="flex items-start gap-2 md:col-span-2">
+                        <AlertTriangle className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs text-gray-500 font-medium">Notes</div>
+                          <div className="text-sm text-gray-700">{config.notes}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Warehouse Bins Section */}
+        {warehouseBinCount > 0 && (
+          <div className="space-y-4">
+            {/* Enhanced Warehouse Bins Header */}
+            <div className="bg-gradient-to-r from-purple-50 to-violet-50 border-2 border-purple-200 rounded-xl p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-purple-500 flex items-center justify-center shadow-md">
+                  <Package className="w-5 h-5 text-white" />
                 </div>
-              </Card>
-            );
-          })}
-        </div>
+                <div>
+                  <h3 className="text-lg font-bold text-purple-900">
+                    Warehouse Bins ({warehouseBinCount})
+                  </h3>
+                  <p className="text-sm text-purple-700">
+                    Bins currently in warehouse storage
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Warehouse Bin Cards */}
+            {warehouseBins.map((bin) => {
+              const config = binConfigs[bin.id];
+              if (!config) return null;
+
+              const assignedUser = config.assignedUserId ? users?.find(u => u.id === config.assignedUserId) : null;
+              const assignedShift = config.assignedShiftId ? shifts?.find(s => s.id === config.assignedShiftId) : null;
+
+              return (
+                <Card key={bin.id} className="p-4 md:p-5 border-2 border-gray-200 hover:border-purple-300 transition-all border-l-4 border-l-purple-500">
+                  {/* Bin Header */}
+                  <div className="flex items-start justify-between mb-4 pb-4 border-b border-gray-200">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-sm md:text-base font-bold flex-shrink-0 bg-purple-500"
+                      >
+                        {bin.bin_number}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-base md:text-lg text-gray-900">Bin #{bin.bin_number}</div>
+                        <div className="text-sm text-purple-600 font-medium">In Warehouse Storage</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Move Type with Details */}
+                  <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Package className="w-4 h-4 text-purple-600" />
+                      <span className="text-xs font-semibold text-purple-900 uppercase">Move Action</span>
+                    </div>
+                    <div className="text-sm font-bold text-gray-900">
+                      {config.moveType === 'redeployment' && config.newStreet && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span>Deploy to Field</span>
+                            {config.sourcePotentialLocationId && (
+                              <Badge className="bg-orange-100 text-orange-700 text-xs">
+                                From Potential Location
+                              </Badge>
+                            )}
+                            {!config.sourcePotentialLocationId && (
+                              <Badge className="bg-gray-100 text-gray-700 text-xs">
+                                Manual Address
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-700 mt-1">
+                            → {config.newStreet}{config.newCity && config.newZip && `, ${config.newCity}, ${config.newZip}`}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Scheduled Date */}
+                    <div className="flex items-start gap-2">
+                      <Calendar className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs text-gray-500 font-medium">Scheduled Date</div>
+                        <div className="text-sm font-semibold text-gray-900">
+                          {format(config.scheduledDate, 'MMM d, yyyy')}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Assignment */}
+                    <div className="flex items-start gap-2">
+                      <User className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs text-gray-500 font-medium">Assignment</div>
+                        <div className="text-sm font-semibold text-gray-900">
+                          {config.assignmentType === 'unassigned' && 'Unassigned'}
+                          {config.assignmentType === 'user' && assignedUser && (
+                            <div>
+                              <div>{assignedUser.name}</div>
+                              <div className="text-xs text-gray-500 capitalize">({assignedUser.role})</div>
+                            </div>
+                          )}
+                          {config.assignmentType === 'active_shift' && assignedShift && (
+                            <div>
+                              <div>Active Shift - {assignedShift.driver_name}</div>
+                              <div className="text-xs text-gray-500">In progress</div>
+                            </div>
+                          )}
+                          {config.assignmentType === 'future_shift' && assignedShift && (
+                            <div>
+                              <div>Future Shift - {assignedShift.driver_name}</div>
+                              <div className="text-xs text-gray-500">
+                                {assignedShift.start_time && format(new Date(assignedShift.start_time * 1000), 'MMM d, h:mm a')}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Notes (if any) */}
+                    {config.notes && (
+                      <div className="flex items-start gap-2 md:col-span-2">
+                        <AlertTriangle className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs text-gray-500 font-medium">Notes</div>
+                          <div className="text-sm text-gray-700">{config.notes}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
         {/* Footer Actions - Flush with bottom, no gap */}
         <div className="flex gap-2 md:gap-4 p-3 pb-3 md:pt-4 md:pb-4 md:px-0 border-t border-gray-200 sticky bottom-0 left-0 right-0 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none -mx-3 md:mx-0 -mb-3 md:mb-0">
@@ -2808,7 +3018,8 @@ export function ScheduleMoveModalWithMap({
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   return typeof window !== 'undefined'
     ? createPortal(
