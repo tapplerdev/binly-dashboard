@@ -20,6 +20,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronLeft,
+  ChevronUp,
   Package,
   Map as MapIcon,
   Filter,
@@ -28,6 +29,7 @@ import {
   ExternalLink,
   Clock,
   CheckCircle2,
+  Info,
 } from 'lucide-react';
 import { createMoveRequest, assignMoveToShift, assignMoveToUser } from '@/lib/api/move-requests';
 import { BinChangeReasonCategory } from '@/lib/api/bins';
@@ -217,6 +219,11 @@ export function ScheduleMoveModalWithMap({
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [activeShiftListExpanded, setActiveShiftListExpanded] = useState<Record<string, boolean>>({});
   const [futureShiftListExpanded, setFutureShiftListExpanded] = useState<Record<string, boolean>>({});
+
+  // Mobile UI state
+  const [showLegend, setShowLegend] = useState(false); // Collapsed by default on mobile
+  const [bulkActionsExpanded, setBulkActionsExpanded] = useState(false); // Collapsed by default on mobile
+  const [expandedBinCards, setExpandedBinCards] = useState<Record<string, boolean>>({}); // Track which bin cards are expanded
 
   // Drag-to-Relocate State (separate feature, not part of main reducer)
   const [binRelocations, setBinRelocations] = useState<Record<string, {
@@ -931,14 +938,25 @@ export function ScheduleMoveModalWithMap({
           </Map>
         </APIProvider>
 
-        {/* Map Legend */}
-        <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg border border-gray-200 p-3 text-xs">
-          <div className="font-semibold text-gray-900 mb-2">
-            {selectedBins.some((b) => binConfigs[b.id]?.moveType === 'redeployment')
-              ? 'Map Legend'
-              : 'Click bins to select'}
-          </div>
-          <div className="space-y-1.5">
+        {/* Map Legend - Collapsible on mobile */}
+        <div className="absolute bottom-4 left-4 z-10">
+          <button
+            onClick={() => setShowLegend(!showLegend)}
+            className="md:hidden bg-white rounded-lg shadow-lg border border-gray-200 p-2.5 text-primary hover:bg-blue-50 transition-colors"
+            title="Toggle legend"
+          >
+            <Info className="w-5 h-5" />
+          </button>
+          <div className={cn(
+            "bg-white rounded-lg shadow-lg border border-gray-200 p-3 text-xs transition-all",
+            showLegend ? "block" : "hidden md:block"
+          )}>
+            <div className="font-semibold text-gray-900 mb-2">
+              {selectedBins.some((b) => binConfigs[b.id]?.moveType === 'redeployment')
+                ? 'Map Legend'
+                : 'Click bins to select'}
+            </div>
+            <div className="space-y-1.5">
             {/* Show potential location legend when redeployment is active */}
             {selectedBins.some((b) => binConfigs[b.id]?.moveType === 'redeployment') && (
               <>
@@ -977,6 +995,7 @@ export function ScheduleMoveModalWithMap({
               <span className="font-semibold text-gray-900">Selected bin</span>
             </div>
           </div>
+          </div>
         </div>
 
         {/* Selection Counter Badge */}
@@ -987,15 +1006,73 @@ export function ScheduleMoveModalWithMap({
         )}
       </div>
 
-      {/* Left Side: Bin List (40%) */}
-      <div className="w-full md:w-[40%] flex flex-col bg-white">
+      {/* Bin List - Bottom Sheet on Mobile, Sidebar on Desktop */}
+      <div className="
+        absolute md:relative
+        bottom-0 md:bottom-auto
+        left-0 right-0 md:left-auto md:right-auto
+        w-full md:w-[40%]
+        h-[50vh] md:h-auto
+        flex flex-col bg-white
+        rounded-t-2xl md:rounded-none
+        shadow-2xl md:shadow-none
+        border-t-2 md:border-t-0 md:border-l
+        border-gray-200
+        z-20
+      ">
+        {/* Drag Handle (Mobile Only) */}
+        <div className="md:hidden pt-2 pb-1 flex justify-center">
+          <div className="w-12 h-1 bg-gray-300 rounded-full"></div>
+        </div>
+
+        {/* Mode Selector - Mobile Only (at top of bottom sheet) */}
+        <div className="md:hidden px-3 pt-2 pb-3 border-b border-gray-200 bg-gray-50">
+          <div className="flex gap-2">
+            <button
+              onClick={() => dispatch({ type: 'SET_MODE', mode: 'field_bins' })}
+              className={cn(
+                'flex-1 px-3 py-2 rounded-lg border-2 font-medium text-xs transition-all flex items-center justify-center gap-1.5',
+                moveMode === 'field_bins'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 bg-white text-gray-700'
+              )}
+            >
+              <Truck className="w-3.5 h-3.5" />
+              <span>Field Bins</span>
+              {fieldBinCount > 0 && (
+                <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
+                  {fieldBinCount}
+                </Badge>
+              )}
+            </button>
+            <button
+              onClick={() => dispatch({ type: 'SET_MODE', mode: 'warehouse_bins' })}
+              className={cn(
+                'flex-1 px-3 py-2 rounded-lg border-2 font-medium text-xs transition-all flex items-center justify-center gap-1.5',
+                moveMode === 'warehouse_bins'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 bg-white text-gray-700'
+              )}
+            >
+              <Package className="w-3.5 h-3.5" />
+              <span>Warehouse</span>
+              {warehouseBinCount > 0 && (
+                <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
+                  {warehouseBinCount}
+                </Badge>
+              )}
+            </button>
+          </div>
+        </div>
+
         {/* Header */}
-        <div className="p-4 border-b border-gray-200 flex-shrink-0">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-gray-900">Select bins for your route template</h3>
+        <div className="p-3 md:p-4 border-b border-gray-200 flex-shrink-0">
+          <div className="flex items-center justify-between mb-2 md:mb-3">
+            <h3 className="text-xs md:text-sm font-semibold text-gray-900 hidden md:block">Select bins for your route template</h3>
+            <h3 className="text-xs font-semibold text-gray-900 md:hidden">Select bins</h3>
             {selectedBins.length > 0 && (
               <button
-                onClick={() => setSelectedBins([])}
+                onClick={() => dispatch({ type: 'CLEAR_SELECTION' })}
                 className="text-xs text-blue-600 hover:text-blue-700 font-medium"
               >
                 Clear All
@@ -1151,7 +1228,7 @@ export function ScheduleMoveModalWithMap({
                   <label
                     key={b.id}
                     className={cn(
-                      'flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer transition-colors',
+                      'flex items-center gap-2 md:gap-3 p-2 md:p-3 hover:bg-gray-50 cursor-pointer transition-colors active:bg-gray-100',
                       isSelected && 'bg-blue-50 hover:bg-blue-100',
                       isMissing && 'bg-gray-50/50'
                     )}
@@ -1160,7 +1237,7 @@ export function ScheduleMoveModalWithMap({
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => handleBinMarkerClick(b)}
-                      className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                      className="w-4 h-4 md:w-4 md:h-4 text-primary border-gray-300 rounded focus:ring-primary min-w-[16px]"
                     />
 
                     <div className="flex-1 min-w-0">
@@ -1198,16 +1275,16 @@ export function ScheduleMoveModalWithMap({
           )}
         </div>
 
-        {/* Footer with next button */}
-        <div className="p-4 border-t border-gray-200 flex-shrink-0 bg-gray-50">
+        {/* Footer with next button - Sticky on mobile */}
+        <div className="sticky bottom-0 p-3 md:p-4 border-t border-gray-200 flex-shrink-0 bg-white md:bg-gray-50 shadow-lg md:shadow-none">
           {/* Next Button */}
           <button
             onClick={handleNext}
             disabled={selectedBins.length === 0}
             className={cn(
-              'w-full py-2.5 rounded-lg font-semibold text-sm transition-all',
+              'w-full py-3 md:py-2.5 rounded-lg font-semibold text-sm transition-all',
               selectedBins.length > 0
-                ? 'bg-primary text-white hover:bg-primary/90 shadow-sm'
+                ? 'bg-primary text-white hover:bg-primary/90 active:bg-primary shadow-sm'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             )}
           >
@@ -1363,15 +1440,31 @@ export function ScheduleMoveModalWithMap({
 
   // Render Step 2: Configuration
   const renderConfigurationStep = () => (
-    <div className="flex-1 overflow-y-auto p-4 md:p-6">
-      <div className="max-w-5xl mx-auto space-y-6">
-        {/* Bulk Actions */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-            <Truck className="w-4 h-4" />
-            Quick Bulk Actions
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <div className="flex-1 overflow-y-auto p-3 md:p-6">
+      <div className="max-w-5xl mx-auto space-y-4 md:space-y-6">
+        {/* Bulk Actions - Collapsible on Mobile */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 overflow-hidden">
+          <button
+            onClick={() => setBulkActionsExpanded(!bulkActionsExpanded)}
+            className="w-full p-3 md:p-4 flex items-center justify-between hover:bg-blue-100/50 transition-colors md:cursor-default"
+          >
+            <div className="flex items-center gap-2">
+              <Truck className="w-4 h-4 text-gray-700" />
+              <h3 className="text-xs md:text-sm font-semibold text-gray-900">
+                Quick Bulk Actions
+              </h3>
+            </div>
+            <ChevronDown className={cn(
+              "w-4 h-4 text-gray-600 transition-transform md:hidden",
+              bulkActionsExpanded && "rotate-180"
+            )} />
+          </button>
+          <div className={cn(
+            "transition-all overflow-hidden",
+            bulkActionsExpanded ? "block" : "hidden md:block"
+          )}>
+            <div className="px-3 pb-3 md:px-4 md:pb-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {/* Bulk Move Type */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -1471,6 +1564,8 @@ export function ScheduleMoveModalWithMap({
               />
             </div>
           </div>
+            </div>
+          </div>
         </div>
 
         {/* Per-Bin Configuration Cards */}
@@ -1509,22 +1604,22 @@ export function ScheduleMoveModalWithMap({
             return (
               <div
                 key={bin.id}
-                className="bg-white border-2 border-gray-200 rounded-xl p-4 space-y-4 hover:border-gray-300 transition-all border-l-4 border-l-blue-500"
+                className="bg-white border-2 border-gray-200 rounded-xl p-3 md:p-4 space-y-3 md:space-y-4 hover:border-gray-300 transition-all border-l-4 border-l-blue-500"
               >
                 {/* Bin Header */}
-                <div className="flex items-center justify-between pb-3 border-b border-gray-200">
-                  <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between pb-2 md:pb-3 border-b border-gray-200">
+                  <div className="flex items-center gap-2 md:gap-3">
                     <div
-                      className="w-10 h-10 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-sm font-bold"
+                      className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-xs md:text-sm font-bold"
                       style={{
                         backgroundColor: getBinMarkerColor(bin.fill_percentage, bin.status),
                       }}
                     >
                       {bin.bin_number}
                     </div>
-                    <div>
-                      <div className="font-semibold text-gray-900">Bin #{bin.bin_number}</div>
-                      <div className="text-xs text-gray-500">{bin.current_street}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-sm md:text-base text-gray-900">Bin #{bin.bin_number}</div>
+                      <div className="text-xs text-gray-500 truncate">{bin.current_street}</div>
                     </div>
                   </div>
                   <button
@@ -1539,7 +1634,7 @@ export function ScheduleMoveModalWithMap({
 
                 {/* Move Type */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1.5 md:mb-2">
                     Move Type *
                   </label>
                   {bin.status === 'in_storage' ? (
@@ -2533,34 +2628,40 @@ export function ScheduleMoveModalWithMap({
           )}
         </div>
 
-        {/* Footer Actions */}
-        <div className="flex gap-4 pt-4 border-t border-gray-200 sticky bottom-0 bg-white">
+        {/* Footer Actions - Sticky with Shadow on Mobile */}
+        <div className="flex gap-2 md:gap-4 p-3 md:pt-4 md:px-0 border-t border-gray-200 sticky bottom-0 bg-white shadow-lg md:shadow-none -mx-3 md:mx-0">
           <button
             onClick={() => dispatch({ type: 'SET_STEP', step: 'selection' })}
             disabled={isSubmitting}
-            className="flex-1 md:flex-none md:px-8 py-3 border-2 border-gray-300 rounded-xl font-semibold hover:bg-gray-50 transition-all disabled:opacity-50"
+            className="flex-1 md:flex-none md:px-8 py-3 border-2 border-gray-300 rounded-lg md:rounded-xl font-semibold text-sm md:text-base hover:bg-gray-50 active:bg-gray-100 transition-all disabled:opacity-50"
           >
-            <ChevronLeft className="w-5 h-5 inline mr-2" />
+            <ChevronLeft className="w-4 h-4 md:w-5 md:h-5 inline mr-1 md:mr-2" />
             Back
           </button>
           <button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="flex-1 md:flex-none md:px-8 py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all disabled:opacity-50"
+            className="flex-1 md:flex-none md:px-8 py-3 bg-primary text-white rounded-lg md:rounded-xl font-semibold text-sm md:text-base hover:bg-primary/90 active:bg-primary transition-all disabled:opacity-50"
           >
             {isSubmitting ? (
               <>
-                <Loader2 className="w-5 h-5 inline mr-2 animate-spin" />
-                Creating {selectedBins.length} move{selectedBins.length !== 1 ? 's' : ''}...
+                <Loader2 className="w-4 h-4 md:w-5 md:h-5 inline mr-1 md:mr-2 animate-spin" />
+                <span className="hidden md:inline">Creating {selectedBins.length} move{selectedBins.length !== 1 ? 's' : ''}...</span>
+                <span className="md:hidden">Creating...</span>
               </>
             ) : (
               <>
-                Schedule {selectedBins.length} Move{selectedBins.length !== 1 ? 's' : ''}
-                {fieldBinCount > 0 && warehouseBinCount > 0 && (
-                  <span className="text-xs ml-2 opacity-90">
-                    ({fieldBinCount} field, {warehouseBinCount} warehouse)
-                  </span>
-                )}
+                <span className="hidden md:inline">
+                  Schedule {selectedBins.length} Move{selectedBins.length !== 1 ? 's' : ''}
+                  {fieldBinCount > 0 && warehouseBinCount > 0 && (
+                    <span className="text-xs ml-2 opacity-90">
+                      ({fieldBinCount} field, {warehouseBinCount} warehouse)
+                    </span>
+                  )}
+                </span>
+                <span className="md:hidden">
+                  Submit ({selectedBins.length})
+                </span>
               </>
             )}
           </button>
@@ -2611,9 +2712,9 @@ export function ScheduleMoveModalWithMap({
                   </button>
                 </div>
 
-                {/* Mode Selector - Only show in selection step */}
+                {/* Mode Selector - Only show in selection step (hidden on mobile, shown in bottom sheet) */}
                 {wizardStep === 'selection' && (
-                  <div className="mt-4 flex gap-2">
+                  <div className="mt-4 flex gap-2 hidden md:flex">
                     <button
                       onClick={() => {
                         dispatch({ type: 'SET_MODE', mode: 'field_bins' });
