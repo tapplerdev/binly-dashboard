@@ -7,7 +7,7 @@ import { addDays } from 'date-fns';
 // State Types
 // ============================================================================
 
-export type WizardStep = 'selection' | 'configuration';
+export type WizardStep = 'selection' | 'configuration' | 'review';
 export type MoveMode = 'field_bins' | 'warehouse_bins';
 export type MoveType = 'store' | 'relocation' | 'redeployment';
 export type DestinationType = 'custom' | 'potential_location';

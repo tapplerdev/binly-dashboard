@@ -1275,8 +1275,8 @@ export function ScheduleMoveModalWithMap({
           )}
         </div>
 
-        {/* Footer with next button - Sticky on mobile */}
-        <div className="sticky bottom-0 p-3 md:p-4 border-t border-gray-200 flex-shrink-0 bg-white md:bg-gray-50 shadow-lg md:shadow-none">
+        {/* Footer with next button - Flush with bottom, no gap */}
+        <div className="sticky bottom-0 p-3 pb-3 md:p-4 md:pb-4 border-t border-gray-200 flex-shrink-0 bg-white md:bg-gray-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none -mb-3 md:mb-0">
           {/* Next Button */}
           <button
             onClick={handleNext}
@@ -2628,10 +2628,154 @@ export function ScheduleMoveModalWithMap({
           )}
         </div>
 
-        {/* Footer Actions - Sticky with Shadow on Mobile */}
-        <div className="flex gap-2 md:gap-4 p-3 md:pt-4 md:px-0 border-t border-gray-200 sticky bottom-0 bg-white shadow-lg md:shadow-none -mx-3 md:mx-0">
+        {/* Footer Actions - Flush with bottom, no gap */}
+        <div className="flex gap-2 md:gap-4 p-3 pb-3 md:pt-4 md:pb-4 md:px-0 border-t border-gray-200 sticky bottom-0 left-0 right-0 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none -mx-3 md:mx-0 -mb-3 md:mb-0">
           <button
             onClick={() => dispatch({ type: 'SET_STEP', step: 'selection' })}
+            className="flex-1 md:flex-none md:px-8 py-3 border-2 border-gray-300 rounded-lg md:rounded-xl font-semibold text-sm md:text-base hover:bg-gray-50 active:bg-gray-100 transition-all"
+          >
+            <ChevronLeft className="w-4 h-4 md:w-5 md:h-5 inline mr-1 md:mr-2" />
+            Back
+          </button>
+          <button
+            onClick={() => dispatch({ type: 'SET_STEP', step: 'review' })}
+            className="flex-1 md:flex-none md:px-8 py-3 bg-primary text-white rounded-lg md:rounded-xl font-semibold text-sm md:text-base hover:bg-primary/90 active:bg-primary transition-all"
+          >
+            <span className="hidden md:inline">Next: Review ({selectedBins.length})</span>
+            <span className="md:hidden">Review ({selectedBins.length})</span>
+            <ChevronRight className="w-4 h-4 md:w-5 md:h-5 inline ml-1 md:ml-2" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Render Step 3: Review & Confirm
+  const renderReviewStep = () => (
+    <div className="flex-1 overflow-y-auto p-3 md:p-6">
+      <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
+        {/* Summary Header */}
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 md:p-6 border border-green-200">
+          <div className="flex items-start gap-3 md:gap-4">
+            <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-green-500 flex items-center justify-center shadow-lg flex-shrink-0">
+              <CheckCircle2 className="w-6 h-6 md:w-7 md:h-7 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-1">
+                Review Your Move Requests
+              </h3>
+              <p className="text-sm md:text-base text-gray-700">
+                You're about to schedule <span className="font-semibold">{selectedBins.length} bin move{selectedBins.length !== 1 ? 's' : ''}</span>.
+                Please review the details below before submitting.
+              </p>
+              {fieldBinCount > 0 && warehouseBinCount > 0 && (
+                <div className="flex gap-3 mt-3">
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                    {fieldBinCount} Field Bin{fieldBinCount !== 1 ? 's' : ''}
+                  </Badge>
+                  <Badge variant="secondary" className="bg-purple-100 text-purple-700">
+                    {warehouseBinCount} Warehouse Bin{warehouseBinCount !== 1 ? 's' : ''}
+                  </Badge>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Move Request Cards */}
+        <div className="space-y-3 md:space-y-4">
+          {selectedBins.map((bin) => {
+            const config = binConfigs[bin.id];
+            if (!config) return null;
+
+            const assignedUser = config.assignedUserId ? users?.find(u => u.id === config.assignedUserId) : null;
+            const assignedShift = config.assignedShiftId ? shifts?.find(s => s.id === config.assignedShiftId) : null;
+
+            return (
+              <Card key={bin.id} className="p-4 md:p-5 border-2 border-gray-200 hover:border-gray-300 transition-all">
+                {/* Bin Header */}
+                <div className="flex items-start justify-between mb-4 pb-4 border-b border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-sm md:text-base font-bold flex-shrink-0"
+                      style={{
+                        backgroundColor: getBinMarkerColor(bin.fill_percentage, bin.status),
+                      }}
+                    >
+                      {bin.bin_number}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-base md:text-lg text-gray-900">Bin #{bin.bin_number}</div>
+                      <div className="text-sm text-gray-600 truncate">{bin.current_street}</div>
+                      <div className="text-xs text-gray-500">{bin.city}, {bin.zip}</div>
+                    </div>
+                  </div>
+                  <Badge className="bg-blue-100 text-blue-700 capitalize flex-shrink-0">
+                    {config.moveType}
+                  </Badge>
+                </div>
+
+                {/* Move Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Scheduled Date */}
+                  <div className="flex items-start gap-2">
+                    <Calendar className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs text-gray-500 font-medium">Scheduled Date</div>
+                      <div className="text-sm font-semibold text-gray-900">
+                        {format(config.scheduledDate, 'MMM d, yyyy')}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Assignment */}
+                  <div className="flex items-start gap-2">
+                    <User className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs text-gray-500 font-medium">Assignment</div>
+                      <div className="text-sm font-semibold text-gray-900">
+                        {config.assignmentType === 'unassigned' && 'Unassigned'}
+                        {config.assignmentType === 'user' && assignedUser && assignedUser.name}
+                        {(config.assignmentType === 'active_shift' || config.assignmentType === 'future_shift') &&
+                          assignedShift && `Shift - ${assignedShift.driver_name}`}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Destination (for relocation/redeployment) */}
+                  {(config.moveType === 'relocation' || config.moveType === 'redeployment') && config.newStreet && (
+                    <div className="flex items-start gap-2 md:col-span-2">
+                      <MapPin className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs text-gray-500 font-medium">New Location</div>
+                        <div className="text-sm font-semibold text-gray-900">
+                          {config.newStreet}
+                          {config.newCity && config.newZip && `, ${config.newCity}, ${config.newZip}`}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Notes (if any) */}
+                  {config.notes && (
+                    <div className="flex items-start gap-2 md:col-span-2">
+                      <AlertTriangle className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs text-gray-500 font-medium">Notes</div>
+                        <div className="text-sm text-gray-700">{config.notes}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Footer Actions - Flush with bottom, no gap */}
+        <div className="flex gap-2 md:gap-4 p-3 pb-3 md:pt-4 md:pb-4 md:px-0 border-t border-gray-200 sticky bottom-0 left-0 right-0 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none -mx-3 md:mx-0 -mb-3 md:mb-0">
+          <button
+            onClick={() => dispatch({ type: 'SET_STEP', step: 'configuration' })}
             disabled={isSubmitting}
             className="flex-1 md:flex-none md:px-8 py-3 border-2 border-gray-300 rounded-lg md:rounded-xl font-semibold text-sm md:text-base hover:bg-gray-50 active:bg-gray-100 transition-all disabled:opacity-50"
           >
@@ -2641,7 +2785,7 @@ export function ScheduleMoveModalWithMap({
           <button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="flex-1 md:flex-none md:px-8 py-3 bg-primary text-white rounded-lg md:rounded-xl font-semibold text-sm md:text-base hover:bg-primary/90 active:bg-primary transition-all disabled:opacity-50"
+            className="flex-1 md:flex-none md:px-8 py-3 bg-green-600 text-white rounded-lg md:rounded-xl font-semibold text-sm md:text-base hover:bg-green-700 active:bg-green-600 transition-all disabled:opacity-50"
           >
             {isSubmitting ? (
               <>
@@ -2651,16 +2795,12 @@ export function ScheduleMoveModalWithMap({
               </>
             ) : (
               <>
+                <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5 inline mr-1 md:mr-2" />
                 <span className="hidden md:inline">
-                  Schedule {selectedBins.length} Move{selectedBins.length !== 1 ? 's' : ''}
-                  {fieldBinCount > 0 && warehouseBinCount > 0 && (
-                    <span className="text-xs ml-2 opacity-90">
-                      ({fieldBinCount} field, {warehouseBinCount} warehouse)
-                    </span>
-                  )}
+                  Confirm & Schedule {selectedBins.length} Move{selectedBins.length !== 1 ? 's' : ''}
                 </span>
                 <span className="md:hidden">
-                  Submit ({selectedBins.length})
+                  Confirm ({selectedBins.length})
                 </span>
               </>
             )}
@@ -2699,9 +2839,9 @@ export function ScheduleMoveModalWithMap({
                       Schedule Bin Moves
                     </h2>
                     <p className="text-xs md:text-sm text-gray-600 mt-1">
-                      {wizardStep === 'selection'
-                        ? 'Step 1: Select bins from map or search'
-                        : `Step 2: Configure ${selectedBins.length} move requests`}
+                      {wizardStep === 'selection' && 'Step 1 of 3: Select bins from map or search'}
+                      {wizardStep === 'configuration' && `Step 2 of 3: Configure ${selectedBins.length} move request${selectedBins.length !== 1 ? 's' : ''}`}
+                      {wizardStep === 'review' && `Step 3 of 3: Review & confirm ${selectedBins.length} move request${selectedBins.length !== 1 ? 's' : ''}`}
                     </p>
                   </div>
                   <button
@@ -2771,6 +2911,7 @@ export function ScheduleMoveModalWithMap({
               <div className="flex-1 flex overflow-hidden">
                 {wizardStep === 'selection' && renderSelectionStep()}
                 {wizardStep === 'configuration' && renderConfigurationStep()}
+                {wizardStep === 'review' && renderReviewStep()}
               </div>
             </Card>
           </div>
