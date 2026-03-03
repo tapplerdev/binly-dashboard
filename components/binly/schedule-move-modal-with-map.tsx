@@ -236,7 +236,7 @@ export function ScheduleMoveModalWithMap({
   // Fetch users for assignment
   const { data: users, isLoading: usersLoading } = useQuery({
     queryKey: ['users'],
-    queryFn: getUsers,
+    queryFn: getAllUsers,
   });
 
   // Fetch shifts for assignment

@@ -86,7 +86,7 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
   // Fetch users for user assignment (fetch when assignment section is shown or user mode is selected)
   const { data: users, isLoading: usersLoading } = useQuery({
     queryKey: ['users'],
-    queryFn: getUsers,
+    queryFn: getAllUsers,
     enabled: assignmentMode === 'user' || showAssignmentSection,
   });
 

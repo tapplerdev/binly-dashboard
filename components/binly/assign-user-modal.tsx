@@ -30,7 +30,7 @@ export function AssignUserModal({ moveRequest, onClose, onSuccess }: AssignUserM
   // Fetch users
   const { data: users, isLoading: usersLoading } = useQuery<UserType[]>({
     queryKey: ['users'],
-    queryFn: getUsers,
+    queryFn: getAllUsers,
   });
 
   // Assign mutation
