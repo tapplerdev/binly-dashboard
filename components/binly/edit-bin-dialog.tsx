@@ -15,6 +15,7 @@ import { updateBin, BinChangeReasonCategory, checkBinDependencies, ActiveShiftDe
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
 import { ActiveShiftWarningDialog } from './active-shift-warning-dialog';
+import { PotentialLocationPin } from '@/components/ui/potential-location-pin';
 
 // ─── Reason options by context ──────────────────────────────────────────────
 
@@ -1391,26 +1392,37 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                 {/* Potential Location Markers */}
                 {addressMode === 'potential' && potentialLocations
                   .filter(loc => loc.latitude && loc.longitude)
-                  .map((loc) => (
-                    <AdvancedMarker
-                      key={loc.id}
-                      position={{ lat: loc.latitude!, lng: loc.longitude! }}
-                      zIndex={selectedPotentialLocation?.id === loc.id ? 5 : 3}
-                      onClick={() => handleSelectPotentialLocation(loc)}
-                    >
-                      <div
-                        className={cn(
-                          'w-10 h-10 rounded-full flex items-center justify-center shadow-xl border-4 border-white cursor-pointer transition-transform hover:scale-110',
-                          selectedPotentialLocation?.id === loc.id
-                            ? 'bg-orange-500 scale-125'
-                            : 'bg-green-500'
-                        )}
-                        title={loc.address}
+                  .map((loc) => {
+                    const isSelected = selectedPotentialLocation?.id === loc.id;
+                    return (
+                      <AdvancedMarker
+                        key={loc.id}
+                        position={{ lat: loc.latitude!, lng: loc.longitude! }}
+                        zIndex={isSelected ? 10 : 3}
+                        onClick={() => handleSelectPotentialLocation(loc)}
                       >
-                        <MapPin className="w-6 h-6 text-white" />
-                      </div>
-                    </AdvancedMarker>
-                  ))}
+                        <div
+                          className="relative cursor-pointer transition-all hover:scale-110"
+                          title={loc.address}
+                        >
+                          {/* Pulsing background circle for selected state */}
+                          {isSelected && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-14 h-14 rounded-full bg-green-400 opacity-40 animate-ping" />
+                              <div className="absolute w-16 h-16 rounded-full bg-green-300 opacity-30" />
+                            </div>
+                          )}
+                          {/* Pin marker */}
+                          <div className="relative z-10">
+                            <PotentialLocationPin
+                              size={40}
+                              color={isSelected ? '#16a34a' : '#FF9500'}
+                            />
+                          </div>
+                        </div>
+                      </AdvancedMarker>
+                    );
+                  })}
               </Map>
             </APIProvider>
 
