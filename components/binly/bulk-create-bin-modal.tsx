@@ -216,6 +216,9 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
         addressAutoFilled: false,
         isGeocodingAddress: false,
         isGeocodingCoordinates: false,
+        addressMode: 'manual',
+        selectedPotentialLocationId: null,
+        selectedPotentialLocationAddress: null,
       },
     ]);
   };
@@ -228,6 +231,73 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
 
   const updateRow = (id: string, field: keyof BinRow, value: string | number) => {
     setRows(rows.map((r) => (r.id === id ? { ...r, [field]: value, error: undefined } : r)));
+  };
+
+  // Handle mode switching (Manual <-> Potential Location)
+  const handleModeChange = (rowId: string, mode: 'manual' | 'potential') => {
+    setRows(rows.map(r => {
+      if (r.id !== rowId) return r;
+
+      if (mode === 'manual') {
+        // Potential → Manual: Keep fields, clear potential location
+        return {
+          ...r,
+          addressMode: 'manual',
+          selectedPotentialLocationId: null,
+          selectedPotentialLocationAddress: null,
+        };
+      } else {
+        // Manual → Potential: Clear fields
+        return {
+          ...r,
+          addressMode: 'potential',
+          current_street: '',
+          city: '',
+          zip: '',
+          latitude: '',
+          longitude: '',
+          selectedPotentialLocationId: null,
+          selectedPotentialLocationAddress: null,
+          cityAutoFilled: false,
+          zipAutoFilled: false,
+          coordinatesAutoFilled: false,
+          addressAutoFilled: false,
+        };
+      }
+    }));
+  };
+
+  // Handle potential location selection from dropdown
+  const handlePotentialLocationSelect = (rowId: string, locationId: string) => {
+    if (!locationId) return;
+
+    const location = activePotentialLocations.find(l => l.id === locationId);
+    if (!location) return;
+
+    setRows(rows.map(r => {
+      if (r.id !== rowId) return r;
+
+      return {
+        ...r,
+        selectedPotentialLocationId: locationId,
+        selectedPotentialLocationAddress: location.address,
+        current_street: location.street,
+        city: location.city,
+        zip: location.zip,
+        latitude: location.latitude?.toString() || '',
+        longitude: location.longitude?.toString() || '',
+        addressAutoFilled: true,
+        cityAutoFilled: true,
+        zipAutoFilled: true,
+        coordinatesAutoFilled: true,
+      };
+    }));
+
+    // Update map center to show the selected location
+    if (location.latitude && location.longitude) {
+      setMapCenter({ lat: location.latitude, lng: location.longitude });
+      setMapZoom(16);
+    }
   };
 
   // OLD: Google Places autocomplete selection (commented out for rollback)
@@ -424,7 +494,7 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
     const currentRow = rows[currentRowIndex];
     if (!currentRow) return;
 
-    // Update coordinates immediately
+    // Update coordinates immediately and switch to manual mode
     setRows((prevRows) =>
       prevRows.map((r, idx) =>
         idx === currentRowIndex
@@ -433,6 +503,9 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
               latitude: lat.toFixed(6),
               longitude: lng.toFixed(6),
               coordinatesAutoFilled: false,
+              addressMode: 'manual', // Auto-switch to manual mode when dragging
+              selectedPotentialLocationId: null, // Clear potential location selection
+              selectedPotentialLocationAddress: null,
             }
           : r
       )
@@ -480,21 +553,30 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
     let isValid = true;
     const updatedRows = rows.map((row) => {
       // Check if row has any data
-      const hasAnyData = row.current_street || row.city || row.zip || row.latitude || row.longitude;
+      const hasAnyData = row.current_street || row.city || row.zip || row.latitude || row.longitude || row.selectedPotentialLocationId;
 
       if (hasAnyData) {
-        // Require BOTH complete address AND coordinates
-        const hasCompleteAddress = row.current_street && row.city && row.zip;
-        const hasCompleteCoordinates = row.latitude && row.longitude;
+        // Different validation based on mode
+        if (row.addressMode === 'potential') {
+          // For potential location mode, just need a selected location
+          if (!row.selectedPotentialLocationId) {
+            isValid = false;
+            return { ...row, error: 'Please select a potential location' };
+          }
+        } else {
+          // For manual mode, require BOTH complete address AND coordinates
+          const hasCompleteAddress = row.current_street && row.city && row.zip;
+          const hasCompleteCoordinates = row.latitude && row.longitude;
 
-        if (!hasCompleteAddress) {
-          isValid = false;
-          return { ...row, error: 'Street address, city, and ZIP are required' };
-        }
+          if (!hasCompleteAddress) {
+            isValid = false;
+            return { ...row, error: 'Street address, city, and ZIP are required' };
+          }
 
-        if (!hasCompleteCoordinates) {
-          isValid = false;
-          return { ...row, error: 'Both latitude and longitude are required' };
+          if (!hasCompleteCoordinates) {
+            isValid = false;
+            return { ...row, error: 'Both latitude and longitude are required' };
+          }
         }
       }
 
@@ -514,11 +596,16 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
       return;
     }
 
-    // Filter out empty rows (require BOTH complete address AND coordinates)
-    const validRows = rows.filter(
-      (r) =>
-        r.current_street && r.city && r.zip && r.latitude && r.longitude
-    );
+    // Filter out empty rows (different criteria based on mode)
+    const validRows = rows.filter((r) => {
+      if (r.addressMode === 'potential') {
+        // For potential location mode: need selected location and it should auto-fill address/coords
+        return r.selectedPotentialLocationId && r.current_street && r.city && r.zip && r.latitude && r.longitude;
+      } else {
+        // For manual mode: require BOTH complete address AND coordinates
+        return r.current_street && r.city && r.zip && r.latitude && r.longitude;
+      }
+    });
 
     if (validRows.length === 0) {
       setGlobalError('Please add at least one bin');
@@ -539,12 +626,14 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
           fill_percentage: 0, // New bins are always empty
           latitude: parseFloat(row.latitude),
           longitude: parseFloat(row.longitude),
+          source_potential_location_id: row.selectedPotentialLocationId,
         })
       );
 
       await Promise.all(promises);
 
       queryClient.invalidateQueries({ queryKey: ['bins'] });
+      queryClient.invalidateQueries({ queryKey: ['potential-locations'] }); // Refresh potential locations since some may have been converted
       onSuccess?.();
       handleClose();
     } catch (error) {
@@ -559,10 +648,13 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
     }
   };
 
-  const validRowCount = rows.filter(
-    (r) =>
-      r.current_street && r.city && r.zip && r.latitude && r.longitude
-  ).length;
+  const validRowCount = rows.filter((r) => {
+    if (r.addressMode === 'potential') {
+      return r.selectedPotentialLocationId && r.current_street && r.city && r.zip && r.latitude && r.longitude;
+    } else {
+      return r.current_street && r.city && r.zip && r.latitude && r.longitude;
+    }
+  }).length;
 
   return (
     <>
@@ -715,76 +807,141 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
                         />
                       </div>
 
-                      {/* Street Address */}
+                      {/* Location Type Toggle */}
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                          Street Address *
+                          Location Type
                         </label>
-                        {/* OLD: Google Places Autocomplete (commented out for rollback) */}
-                        {/* <PlacesAutocomplete
-                          value={row.current_street}
-                          onChange={(value) => updateRow(row.id, 'current_street', value)}
-                          onPlaceSelect={(place) => handlePlaceSelect(row.id, place)}
-                          disabled={row.isGeocodingCoordinates}
-                          isAutoFilled={row.addressAutoFilled}
-                          isLoading={row.isGeocodingCoordinates}
-                          error={!!row.error}
-                          placeholder="123 Main Street"
-                        /> */}
-                        {/* NEW: HERE Maps Autocomplete */}
-                        <HerePlacesAutocomplete
-                          value={row.current_street}
-                          onChange={(value) => updateRow(row.id, 'current_street', value)}
-                          onPlaceSelect={(place) => handlePlaceSelect(row.id, place)}
-                          disabled={row.isGeocodingCoordinates}
-                          isAutoFilled={row.addressAutoFilled}
-                          isLoading={row.isGeocodingCoordinates}
-                          error={!!row.error}
-                          placeholder="123 Main Street"
-                        />
-                      </div>
-
-                      {/* City and ZIP */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                            City *
-                          </label>
-                          <input
-                          type="text"
-                          value={row.city}
-                          onChange={(e) => updateRow(row.id, 'city', e.target.value)}
-                          disabled={row.isGeocodingCoordinates}
-                          className={cn(
-                            'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-primary transition-colors',
-                            getFieldStyle(row.cityAutoFilled, row.isGeocodingCoordinates),
-                            row.error && 'border-red-300'
-                          )}
-                          placeholder="Portland"
-                        />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                            ZIP *
-                          </label>
-                          <input
-                          type="text"
-                          value={row.zip}
-                          onChange={(e) => updateRow(row.id, 'zip', e.target.value)}
-                          disabled={row.isGeocodingCoordinates}
-                          className={cn(
-                            'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-primary transition-colors',
-                            getFieldStyle(row.zipAutoFilled, row.isGeocodingCoordinates),
-                            row.error && 'border-red-300'
-                          )}
-                          placeholder="97201"
-                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleModeChange(row.id, 'manual')}
+                            className={cn(
+                              'flex-1 px-3 py-2 rounded-lg border-2 text-xs font-medium transition-all',
+                              row.addressMode === 'manual'
+                                ? 'bg-primary text-white border-primary'
+                                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                            )}
+                          >
+                            Manual Address
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleModeChange(row.id, 'potential')}
+                            className={cn(
+                              'flex-1 px-3 py-2 rounded-lg border-2 text-xs font-medium transition-all',
+                              row.addressMode === 'potential'
+                                ? 'bg-primary text-white border-primary'
+                                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                            )}
+                          >
+                            Potential Location ({activePotentialLocations.length})
+                          </button>
                         </div>
                       </div>
 
-                      {/* Latitude and Longitude */}
-                      <div className="grid grid-cols-2 gap-3">
+                      {/* Potential Location Dropdown (conditional) */}
+                      {row.addressMode === 'potential' && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                            Select Potential Location *
+                          </label>
+                          <select
+                            value={row.selectedPotentialLocationId || ''}
+                            onChange={(e) => handlePotentialLocationSelect(row.id, e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary transition-colors bg-white text-gray-900"
+                          >
+                            <option value="">Choose a potential location...</option>
+                            {activePotentialLocations.map((loc) => (
+                              <option key={loc.id} value={loc.id}>
+                                {loc.address}
+                              </option>
+                            ))}
+                          </select>
+                          {row.selectedPotentialLocationAddress && (
+                            <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              From Potential Location
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Street Address - Only show in manual mode */}
+                      {row.addressMode === 'manual' && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                            Street Address *
+                          </label>
+                          {/* OLD: Google Places Autocomplete (commented out for rollback) */}
+                          {/* <PlacesAutocomplete
+                            value={row.current_street}
+                            onChange={(value) => updateRow(row.id, 'current_street', value)}
+                            onPlaceSelect={(place) => handlePlaceSelect(row.id, place)}
+                            disabled={row.isGeocodingCoordinates}
+                            isAutoFilled={row.addressAutoFilled}
+                            isLoading={row.isGeocodingCoordinates}
+                            error={!!row.error}
+                            placeholder="123 Main Street"
+                          /> */}
+                          {/* NEW: HERE Maps Autocomplete */}
+                          <HerePlacesAutocomplete
+                            value={row.current_street}
+                            onChange={(value) => updateRow(row.id, 'current_street', value)}
+                            onPlaceSelect={(place) => handlePlaceSelect(row.id, place)}
+                            disabled={row.isGeocodingCoordinates}
+                            isAutoFilled={row.addressAutoFilled}
+                            isLoading={row.isGeocodingCoordinates}
+                            error={!!row.error}
+                            placeholder="123 Main Street"
+                          />
+                        </div>
+                      )}
+
+                      {/* City and ZIP - Only show in manual mode */}
+                      {row.addressMode === 'manual' && (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                              City *
+                            </label>
+                            <input
+                            type="text"
+                            value={row.city}
+                            onChange={(e) => updateRow(row.id, 'city', e.target.value)}
+                            disabled={row.isGeocodingCoordinates}
+                            className={cn(
+                              'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-primary transition-colors',
+                              getFieldStyle(row.cityAutoFilled, row.isGeocodingCoordinates),
+                              row.error && 'border-red-300'
+                            )}
+                            placeholder="Portland"
+                          />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                              ZIP *
+                            </label>
+                            <input
+                            type="text"
+                            value={row.zip}
+                            onChange={(e) => updateRow(row.id, 'zip', e.target.value)}
+                            disabled={row.isGeocodingCoordinates}
+                            className={cn(
+                              'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-primary transition-colors',
+                              getFieldStyle(row.zipAutoFilled, row.isGeocodingCoordinates),
+                              row.error && 'border-red-300'
+                            )}
+                            placeholder="97201"
+                          />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Latitude and Longitude - Only show in manual mode */}
+                      {row.addressMode === 'manual' && (
+                        <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1.5">
                             Latitude *
@@ -819,6 +976,7 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
                         />
                         </div>
                       </div>
+                      )}
 
                       {/* Error Message */}
                       {row.error && (
