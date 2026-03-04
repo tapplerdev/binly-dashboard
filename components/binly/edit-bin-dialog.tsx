@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { MapPin, X, Loader2, Edit, FileText, Map as MapIcon, AlertTriangle, ChevronLeft, Warehouse, ChevronDown, CheckCircle, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
