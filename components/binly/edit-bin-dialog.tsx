@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
-import { MapPin, X, Loader2, Edit, FileText, Map as MapIcon, AlertTriangle, ChevronLeft, Warehouse } from 'lucide-react';
+import { MapPin, X, Loader2, Edit, FileText, Map as MapIcon, AlertTriangle, ChevronLeft, Warehouse, ChevronDown, CheckCircle, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dropdown } from '@/components/ui/dropdown';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
@@ -241,6 +241,43 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
   const [addressMode, setAddressMode] = useState<'manual' | 'potential'>('manual');
   const [selectedPotentialLocation, setSelectedPotentialLocation] = useState<PotentialLocation | null>(null);
   const { data: potentialLocations = [] } = usePotentialLocations('active');
+  const [potentialLocationSearch, setPotentialLocationSearch] = useState('');
+  const [potentialLocationDropdownOpen, setPotentialLocationDropdownOpen] = useState(false);
+
+  // Filter potential locations by search
+  const filteredPotentialLocations = useMemo(() => {
+    if (!potentialLocationSearch.trim()) return potentialLocations;
+    const query = potentialLocationSearch.toLowerCase();
+    return potentialLocations.filter(loc =>
+      loc.address.toLowerCase().includes(query) ||
+      loc.street.toLowerCase().includes(query) ||
+      loc.city.toLowerCase().includes(query) ||
+      loc.zip.includes(query)
+    );
+  }, [potentialLocations, potentialLocationSearch]);
+
+  // Handle potential location selection
+  const handleSelectPotentialLocation = useCallback((loc: PotentialLocation) => {
+    setSelectedPotentialLocation(loc);
+    setStreet(loc.street);
+    setCity(loc.city);
+    setZip(loc.zip);
+    if (loc.latitude && loc.longitude) {
+      setLatitude(loc.latitude);
+      setLongitude(loc.longitude);
+      setMarkerPosition({ lat: loc.latitude, lng: loc.longitude });
+      setMapCenter({ lat: loc.latitude, lng: loc.longitude });
+    }
+    setPotentialLocationDropdownOpen(false);
+    setPotentialLocationSearch('');
+  }, []);
+
+  // Clear potential location when user manually edits address
+  const clearPotentialLocationIfSelected = useCallback(() => {
+    if (selectedPotentialLocation) {
+      setSelectedPotentialLocation(null);
+    }
+  }, [selectedPotentialLocation]);
 
   // Form state
   const [binNumber, setBinNumber] = useState<number>(0);
@@ -295,6 +332,8 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
       setReasonContext(null);
       setAddressMode('manual');
       setSelectedPotentialLocation(null);
+      setPotentialLocationSearch('');
+      setPotentialLocationDropdownOpen(false);
     }
   }, [open]);
 
@@ -709,33 +748,98 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                             <p className="text-sm text-gray-500">No potential locations available</p>
                           </div>
                         ) : (
-                          <select
-                            value={selectedPotentialLocation?.id || ''}
-                            onChange={(e) => {
-                              const loc = potentialLocations.find(l => l.id === e.target.value);
-                              if (loc) {
-                                setSelectedPotentialLocation(loc);
-                                setStreet(loc.street);
-                                setCity(loc.city);
-                                setZip(loc.zip);
-                                if (loc.latitude && loc.longitude) {
-                                  setLatitude(loc.latitude);
-                                  setLongitude(loc.longitude);
-                                  setMarkerPosition({ lat: loc.latitude, lng: loc.longitude });
-                                  setMapCenter({ lat: loc.latitude, lng: loc.longitude });
-                                }
-                              }
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
-                          >
-                            <option value="">Select a potential location...</option>
-                            {potentialLocations.map(loc => (
-                              <option key={loc.id} value={loc.id}>
-                                {loc.address}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="relative">
+                            {/* Dropdown Button */}
+                            <button
+                              type="button"
+                              onClick={() => setPotentialLocationDropdownOpen(!potentialLocationDropdownOpen)}
+                              className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-left hover:border-primary transition-all flex items-center justify-between"
+                            >
+                              <span className={selectedPotentialLocation ? 'text-gray-900 font-medium' : 'text-gray-500'}>
+                                {selectedPotentialLocation ? selectedPotentialLocation.address : 'Select a potential location...'}
+                              </span>
+                              <ChevronDown className={cn(
+                                'w-5 h-5 text-gray-400 transition-transform',
+                                potentialLocationDropdownOpen && 'transform rotate-180'
+                              )} />
+                            </button>
+
+                            {/* Dropdown Panel */}
+                            {potentialLocationDropdownOpen && (
+                              <div className="absolute z-50 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-2xl max-h-80 overflow-hidden animate-slide-in-up">
+                                {/* Search Bar */}
+                                <div className="p-3 border-b border-gray-200">
+                                  <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <input
+                                      type="text"
+                                      value={potentialLocationSearch}
+                                      onChange={(e) => setPotentialLocationSearch(e.target.value)}
+                                      placeholder="Search by address, city, or zip..."
+                                      className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                                      autoFocus
+                                    />
+                                    {potentialLocationSearch && (
+                                      <button
+                                        onClick={() => setPotentialLocationSearch('')}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Location List */}
+                                <div className="max-h-64 overflow-y-auto">
+                                  {filteredPotentialLocations.length === 0 ? (
+                                    <div className="p-8 text-center">
+                                      <MapPin className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                                      <p className="text-sm text-gray-500">No locations match your search</p>
+                                    </div>
+                                  ) : (
+                                    filteredPotentialLocations.map((loc) => (
+                                      <button
+                                        key={loc.id}
+                                        type="button"
+                                        onClick={() => handleSelectPotentialLocation(loc)}
+                                        className={cn(
+                                          'w-full px-4 py-3 text-left hover:bg-primary/5 transition-colors border-b border-gray-100 last:border-0',
+                                          selectedPotentialLocation?.id === loc.id && 'bg-primary/10'
+                                        )}
+                                      >
+                                        <div className="flex items-start gap-3">
+                                          <MapPin className={cn(
+                                            'w-4 h-4 mt-0.5 shrink-0',
+                                            selectedPotentialLocation?.id === loc.id ? 'text-primary' : 'text-gray-400'
+                                          )} />
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium text-gray-900">
+                                              {loc.address}
+                                            </p>
+                                            <p className="text-xs text-gray-500 mt-0.5">
+                                              Requested by {loc.requested_by_name}
+                                            </p>
+                                            {loc.notes && (
+                                              <p className="text-xs text-gray-600 mt-1 italic line-clamp-1">
+                                                "{loc.notes}"
+                                              </p>
+                                            )}
+                                          </div>
+                                          {selectedPotentialLocation?.id === loc.id && (
+                                            <CheckCircle className="w-5 h-5 text-primary shrink-0" />
+                                          )}
+                                        </div>
+                                      </button>
+                                    ))
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         )}
+
+                        {/* Selected Location Badge */}
                         {selectedPotentialLocation && (
                           <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
                             <div className="flex items-start gap-2">
@@ -870,7 +974,10 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                     ) : (
                       <HerePlacesAutocomplete
                         value={street}
-                        onChange={setStreet}
+                        onChange={(value) => {
+                          setStreet(value);
+                          clearPotentialLocationIfSelected();
+                        }}
                         onPlaceSelect={handleStreetPlaceSelect}
                         placeholder="123 Main St"
                         className={inputStyles()}
@@ -886,7 +993,10 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                       <input
                         type="text"
                         value={city}
-                        onChange={(e) => setCity(e.target.value)}
+                        onChange={(e) => {
+                          setCity(e.target.value);
+                          clearPotentialLocationIfSelected();
+                        }}
                         readOnly={warehouseMode === 'send'}
                         className={cn(inputStyles(), warehouseMode === 'send' && 'bg-gray-100 text-gray-600 cursor-not-allowed')}
                         placeholder="Mountain View"
@@ -900,7 +1010,10 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                       <input
                         type="text"
                         value={zip}
-                        onChange={(e) => setZip(e.target.value)}
+                        onChange={(e) => {
+                          setZip(e.target.value);
+                          clearPotentialLocationIfSelected();
+                        }}
                         readOnly={warehouseMode === 'send'}
                         className={cn(inputStyles(), warehouseMode === 'send' && 'bg-gray-100 text-gray-600 cursor-not-allowed')}
                         placeholder="94040"
@@ -1274,6 +1387,30 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                     </div>
                   </AdvancedMarker>
                 )}
+
+                {/* Potential Location Markers */}
+                {addressMode === 'potential' && potentialLocations
+                  .filter(loc => loc.latitude && loc.longitude)
+                  .map((loc) => (
+                    <AdvancedMarker
+                      key={loc.id}
+                      position={{ lat: loc.latitude!, lng: loc.longitude! }}
+                      zIndex={selectedPotentialLocation?.id === loc.id ? 5 : 3}
+                      onClick={() => handleSelectPotentialLocation(loc)}
+                    >
+                      <div
+                        className={cn(
+                          'w-10 h-10 rounded-full flex items-center justify-center shadow-xl border-4 border-white cursor-pointer transition-transform hover:scale-110',
+                          selectedPotentialLocation?.id === loc.id
+                            ? 'bg-orange-500 scale-125'
+                            : 'bg-green-500'
+                        )}
+                        title={loc.address}
+                      >
+                        <MapPin className="w-6 h-6 text-white" />
+                      </div>
+                    </AdvancedMarker>
+                  ))}
               </Map>
             </APIProvider>
 
