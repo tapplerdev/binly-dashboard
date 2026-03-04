@@ -257,8 +257,15 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
     );
   }, [potentialLocations, potentialLocationSearch]);
 
-  // Handle potential location selection
+  // Handle potential location selection (toggle: click again to unselect)
   const handleSelectPotentialLocation = useCallback((loc: PotentialLocation) => {
+    // If clicking the already-selected location, unselect it but keep address as-is
+    if (selectedPotentialLocation?.id === loc.id) {
+      setSelectedPotentialLocation(null);
+      setPotentialLocationDropdownOpen(false);
+      return;
+    }
+
     setSelectedPotentialLocation(loc);
     setStreet(loc.street);
     setCity(loc.city);
@@ -271,7 +278,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
     }
     setPotentialLocationDropdownOpen(false);
     setPotentialLocationSearch('');
-  }, []);
+  }, [selectedPotentialLocation]);
 
   // Clear potential location when user manually edits address
   const clearPotentialLocationIfSelected = useCallback(() => {
@@ -398,6 +405,8 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
     setMarkerPosition({ lat, lng });
     setLatitude(lat);
     setLongitude(lng);
+    // Clicking elsewhere on the map clears the potential location link
+    setSelectedPotentialLocation(null);
     setReverseGeocoding(true);
 
     try {
@@ -419,6 +428,8 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
     setMarkerPosition({ lat, lng });
     setLatitude(lat);
     setLongitude(lng);
+    // Dragging the marker away clears the potential location link
+    setSelectedPotentialLocation(null);
     setReverseGeocoding(true);
 
     try {
@@ -1389,40 +1400,24 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                   </AdvancedMarker>
                 )}
 
-                {/* Potential Location Markers */}
+                {/* Potential Location Markers — skip the selected one since the draggable bin marker is already there */}
                 {addressMode === 'potential' && potentialLocations
-                  .filter(loc => loc.latitude && loc.longitude)
-                  .map((loc) => {
-                    const isSelected = selectedPotentialLocation?.id === loc.id;
-                    return (
-                      <AdvancedMarker
-                        key={loc.id}
-                        position={{ lat: loc.latitude!, lng: loc.longitude! }}
-                        zIndex={isSelected ? 10 : 3}
-                        onClick={() => handleSelectPotentialLocation(loc)}
+                  .filter(loc => loc.latitude && loc.longitude && selectedPotentialLocation?.id !== loc.id)
+                  .map((loc) => (
+                    <AdvancedMarker
+                      key={loc.id}
+                      position={{ lat: loc.latitude!, lng: loc.longitude! }}
+                      zIndex={3}
+                      onClick={() => handleSelectPotentialLocation(loc)}
+                    >
+                      <div
+                        className="relative cursor-pointer transition-all hover:scale-110"
+                        title={loc.address}
                       >
-                        <div
-                          className="relative cursor-pointer transition-all hover:scale-110"
-                          title={loc.address}
-                        >
-                          {/* Pulsing background circle for selected state */}
-                          {isSelected && (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="w-14 h-14 rounded-full bg-green-400 opacity-40 animate-ping" />
-                              <div className="absolute w-16 h-16 rounded-full bg-green-300 opacity-30" />
-                            </div>
-                          )}
-                          {/* Pin marker */}
-                          <div className="relative z-10">
-                            <PotentialLocationPin
-                              size={40}
-                              color={isSelected ? '#16a34a' : '#FF9500'}
-                            />
-                          </div>
-                        </div>
-                      </AdvancedMarker>
-                    );
-                  })}
+                        <PotentialLocationPin size={40} color="#FF9500" />
+                      </div>
+                    </AdvancedMarker>
+                  ))}
               </Map>
             </APIProvider>
 
