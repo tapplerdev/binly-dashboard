@@ -10,9 +10,10 @@ import { HerePlaceDetails, hereReverseGeocode } from '@/lib/services/geocoding.s
 import { inputStyles, cn } from '@/lib/utils';
 import { useBins } from '@/lib/hooks/use-bins';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
-import { Bin, isMappableBin, getBinMarkerColor, BinStatus } from '@/lib/types/bin';
+import { Bin, isMappableBin, getBinMarkerColor, BinStatus, PotentialLocation } from '@/lib/types/bin';
 import { updateBin, BinChangeReasonCategory, checkBinDependencies, ActiveShiftDependency } from '@/lib/api/bins';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
 import { ActiveShiftWarningDialog } from './active-shift-warning-dialog';
 
 // ─── Reason options by context ──────────────────────────────────────────────
@@ -225,6 +226,22 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
   const [activeShiftDependencies, setActiveShiftDependencies] = useState<ActiveShiftDependency[]>([]);
   const [checkingDependencies, setCheckingDependencies] = useState(false);
 
+  // Closing animation state
+  const [isClosing, setIsClosing] = useState(false);
+
+  // Handle close with animation
+  const handleClose = useCallback(() => {
+    setIsClosing(true);
+    setTimeout(() => {
+      onOpenChange(false);
+    }, 200); // Match animation duration
+  }, [onOpenChange]);
+
+  // Potential location mode state
+  const [addressMode, setAddressMode] = useState<'manual' | 'potential'>('manual');
+  const [selectedPotentialLocation, setSelectedPotentialLocation] = useState<PotentialLocation | null>(null);
+  const { data: potentialLocations = [] } = usePotentialLocations('active');
+
   // Form state
   const [binNumber, setBinNumber] = useState<number>(0);
   const [street, setStreet] = useState('');
@@ -257,6 +274,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
   // Reset form when dialog closes
   useEffect(() => {
     if (!open) {
+      setIsClosing(false); // Reset closing state
       setStreet('');
       setCity('');
       setZip('');
@@ -275,6 +293,8 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
       setReasonNotes('');
       setCreateNoGoZone(false);
       setReasonContext(null);
+      setAddressMode('manual');
+      setSelectedPotentialLocation(null);
     }
   }, [open]);
 
@@ -396,6 +416,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
         reason_category: finalReason as BinChangeReasonCategory | null,
         reason_notes: reasonNotes.trim() || null,
         create_no_go_zone: reasonCategory === 'relocation_request' ? createNoGoZone : null,
+        source_potential_location_id: selectedPotentialLocation?.id || null,
       });
     },
     onSuccess: () => {
@@ -553,8 +574,14 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
   const isAutoReason = reasonContext?.autoReason != null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in">
-      <div className="relative w-full max-w-[1400px] h-[90vh] bg-white rounded-xl shadow-2xl overflow-hidden animate-slide-in-up">
+    <div className={cn(
+      "fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50",
+      isClosing ? "animate-fade-out" : "animate-fade-in"
+    )}>
+      <div className={cn(
+        "relative w-full max-w-[1400px] h-[90vh] bg-white rounded-xl shadow-2xl overflow-hidden",
+        isClosing ? "animate-slide-out-down" : "animate-slide-in-up"
+      )}>
         {/* Header */}
         <div className="absolute top-0 left-0 right-0 z-10 bg-white border-b border-gray-200 px-4 md:px-6 py-4">
           <div className="flex items-center justify-between mb-3 md:mb-0">
@@ -572,7 +599,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
               </div>
             </div>
             <button
-              onClick={() => onOpenChange(false)}
+              onClick={handleClose}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <X className="w-5 h-5 text-gray-500" />
@@ -621,14 +648,116 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                 {warehouseMode !== 'send' && (
                   <div className="mb-6">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Search Address
+                      Location Type
                     </label>
-                    <HerePlacesAutocomplete
-                      value={searchQuery}
-                      onChange={setSearchQuery}
-                      onPlaceSelect={handlePlaceSelect}
-                      placeholder="Search for a new address..."
-                    />
+
+                    {/* Mode Toggle */}
+                    <div className="flex gap-2 mb-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAddressMode('manual');
+                          setSelectedPotentialLocation(null);
+                        }}
+                        className={cn(
+                          'flex-1 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all',
+                          addressMode === 'manual'
+                            ? 'bg-primary text-white border-primary'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                        )}
+                      >
+                        Manual Address
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAddressMode('potential')}
+                        className={cn(
+                          'flex-1 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all',
+                          addressMode === 'potential'
+                            ? 'bg-primary text-white border-primary'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                        )}
+                      >
+                        Potential Location ({potentialLocations.length})
+                      </button>
+                    </div>
+
+                    {/* Manual Address Mode */}
+                    {addressMode === 'manual' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Search Address
+                        </label>
+                        <HerePlacesAutocomplete
+                          value={searchQuery}
+                          onChange={setSearchQuery}
+                          onPlaceSelect={handlePlaceSelect}
+                          placeholder="Search for a new address..."
+                        />
+                      </div>
+                    )}
+
+                    {/* Potential Location Mode */}
+                    {addressMode === 'potential' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Select Potential Location
+                        </label>
+                        {potentialLocations.length === 0 ? (
+                          <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                            <MapPin className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                            <p className="text-sm text-gray-500">No potential locations available</p>
+                          </div>
+                        ) : (
+                          <select
+                            value={selectedPotentialLocation?.id || ''}
+                            onChange={(e) => {
+                              const loc = potentialLocations.find(l => l.id === e.target.value);
+                              if (loc) {
+                                setSelectedPotentialLocation(loc);
+                                setStreet(loc.street);
+                                setCity(loc.city);
+                                setZip(loc.zip);
+                                if (loc.latitude && loc.longitude) {
+                                  setLatitude(loc.latitude);
+                                  setLongitude(loc.longitude);
+                                  setMarkerPosition({ lat: loc.latitude, lng: loc.longitude });
+                                  setMapCenter({ lat: loc.latitude, lng: loc.longitude });
+                                }
+                              }
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
+                          >
+                            <option value="">Select a potential location...</option>
+                            {potentialLocations.map(loc => (
+                              <option key={loc.id} value={loc.id}>
+                                {loc.address}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        {selectedPotentialLocation && (
+                          <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                            <div className="flex items-start gap-2">
+                              <MapPin className="w-4 h-4 text-orange-600 mt-0.5 shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-orange-900">
+                                  {selectedPotentialLocation.address}
+                                </p>
+                                <p className="text-xs text-orange-700 mt-1">
+                                  Requested by {selectedPotentialLocation.requested_by_name}
+                                </p>
+                                {selectedPotentialLocation.notes && (
+                                  <p className="text-xs text-orange-600 mt-1 italic">
+                                    "{selectedPotentialLocation.notes}"
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -886,7 +1015,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                 {/* Step 1 Buttons */}
                 <div className="flex gap-3 pt-4">
                   <Button
-                    onClick={() => onOpenChange(false)}
+                    onClick={handleClose}
                     variant="outline"
                     className="flex-1"
                   >

@@ -174,6 +174,7 @@ export async function updateBin(
     reason_category?: BinChangeReasonCategory | null;
     reason_notes?: string | null;
     create_no_go_zone?: boolean | null;
+    source_potential_location_id?: string | null;
   }
 ): Promise<Bin> {
   try {
