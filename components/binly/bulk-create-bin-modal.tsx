@@ -5,7 +5,7 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { createBin, getPotentialLocations } from '@/lib/api/bins';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, Plus, Trash2, Loader2, Package, MapPin, Navigation, MapIcon, List } from 'lucide-react';
+import { X, Plus, Trash2, Loader2, Package, MapPin, Navigation, MapIcon, List, Search, ChevronDown, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 // OLD: Google Places Autocomplete (commented out for rollback)
 // import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
@@ -184,6 +184,10 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
   const [mapZoom, setMapZoom] = useState(13);
   const [viewMode, setViewMode] = useState<'form' | 'map'>('form'); // Mobile view toggle
 
+  // Potential location dropdown state (per row)
+  const [potentialLocationDropdownOpen, setPotentialLocationDropdownOpen] = useState<Record<string, boolean>>({});
+  const [potentialLocationSearch, setPotentialLocationSearch] = useState<Record<string, string>>({});
+
   const handleClose = () => {
     setIsClosing(true);
     setTimeout(() => {
@@ -298,6 +302,23 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
       setMapCenter({ lat: location.latitude, lng: location.longitude });
       setMapZoom(16);
     }
+
+    // Close dropdown and clear search for this row
+    setPotentialLocationDropdownOpen(prev => ({ ...prev, [rowId]: false }));
+    setPotentialLocationSearch(prev => ({ ...prev, [rowId]: '' }));
+  };
+
+  // Get filtered potential locations for a specific row
+  const getFilteredPotentialLocations = (rowId: string) => {
+    const searchTerm = potentialLocationSearch[rowId]?.toLowerCase() || '';
+    if (!searchTerm) return activePotentialLocations;
+
+    return activePotentialLocations.filter((loc) =>
+      loc.address.toLowerCase().includes(searchTerm) ||
+      loc.city?.toLowerCase().includes(searchTerm) ||
+      loc.zip?.toLowerCase().includes(searchTerm) ||
+      loc.requested_by_name?.toLowerCase().includes(searchTerm)
+    );
   };
 
   // OLD: Google Places autocomplete selection (commented out for rollback)
@@ -846,23 +867,102 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
                           <label className="block text-xs font-medium text-gray-600 mb-1.5">
                             Select Potential Location *
                           </label>
-                          <select
-                            value={row.selectedPotentialLocationId || ''}
-                            onChange={(e) => handlePotentialLocationSelect(row.id, e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary transition-colors bg-white text-gray-900"
-                          >
-                            <option value="">Choose a potential location...</option>
-                            {activePotentialLocations.map((loc) => (
-                              <option key={loc.id} value={loc.id}>
-                                {loc.address}
-                              </option>
-                            ))}
-                          </select>
-                          {row.selectedPotentialLocationAddress && (
-                            <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />
-                              From Potential Location
-                            </p>
+                          {activePotentialLocations.length === 0 ? (
+                            <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                              <MapPin className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                              <p className="text-xs text-gray-500">No potential locations available</p>
+                            </div>
+                          ) : (
+                            <div className="relative">
+                              {/* Dropdown Button */}
+                              <button
+                                type="button"
+                                onClick={() => setPotentialLocationDropdownOpen(prev => ({ ...prev, [row.id]: !prev[row.id] }))}
+                                className="w-full px-3 py-2.5 bg-white border-2 border-gray-200 rounded-lg text-left hover:border-primary transition-all flex items-center justify-between text-sm"
+                              >
+                                <span className={row.selectedPotentialLocation ? 'text-gray-900 font-medium' : 'text-gray-500'}>
+                                  {row.selectedPotentialLocationAddress || 'Select a potential location...'}
+                                </span>
+                                <ChevronDown className={cn(
+                                  'w-4 h-4 text-gray-400 transition-transform',
+                                  potentialLocationDropdownOpen[row.id] && 'transform rotate-180'
+                                )} />
+                              </button>
+
+                              {/* Dropdown Panel */}
+                              {potentialLocationDropdownOpen[row.id] && (
+                                <div className="absolute z-50 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-2xl max-h-80 overflow-hidden">
+                                  {/* Search Bar */}
+                                  <div className="p-2.5 border-b border-gray-200">
+                                    <div className="relative">
+                                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                                      <input
+                                        type="text"
+                                        value={potentialLocationSearch[row.id] || ''}
+                                        onChange={(e) => setPotentialLocationSearch(prev => ({ ...prev, [row.id]: e.target.value }))}
+                                        placeholder="Search by address, city, or zip..."
+                                        className="w-full pl-8 pr-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                                        autoFocus
+                                      />
+                                      {potentialLocationSearch[row.id] && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPotentialLocationSearch(prev => ({ ...prev, [row.id]: '' }))}
+                                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                        >
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Location List */}
+                                  <div className="max-h-64 overflow-y-auto">
+                                    {getFilteredPotentialLocations(row.id).length === 0 ? (
+                                      <div className="p-6 text-center">
+                                        <MapPin className="w-6 h-6 text-gray-300 mx-auto mb-2" />
+                                        <p className="text-xs text-gray-500">No locations match your search</p>
+                                      </div>
+                                    ) : (
+                                      getFilteredPotentialLocations(row.id).map((loc) => (
+                                        <button
+                                          key={loc.id}
+                                          type="button"
+                                          onClick={() => handlePotentialLocationSelect(row.id, loc.id)}
+                                          className={cn(
+                                            'w-full px-3 py-2.5 text-left hover:bg-primary/5 transition-colors border-b border-gray-100 last:border-0',
+                                            row.selectedPotentialLocationId === loc.id && 'bg-primary/10'
+                                          )}
+                                        >
+                                          <div className="flex items-start gap-2.5">
+                                            <MapPin className={cn(
+                                              'w-3.5 h-3.5 mt-0.5 shrink-0',
+                                              row.selectedPotentialLocationId === loc.id ? 'text-primary' : 'text-gray-400'
+                                            )} />
+                                            <div className="flex-1 min-w-0">
+                                              <p className="text-xs font-medium text-gray-900">
+                                                {loc.address}
+                                              </p>
+                                              <p className="text-[11px] text-gray-500 mt-0.5">
+                                                Requested by {loc.requested_by_name}
+                                              </p>
+                                              {loc.notes && (
+                                                <p className="text-[11px] text-gray-600 mt-1 italic line-clamp-1">
+                                                  "{loc.notes}"
+                                                </p>
+                                              )}
+                                            </div>
+                                            {row.selectedPotentialLocationId === loc.id && (
+                                              <CheckCircle className="w-4 h-4 text-primary shrink-0" />
+                                            )}
+                                          </div>
+                                        </button>
+                                      ))
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
                       )}
