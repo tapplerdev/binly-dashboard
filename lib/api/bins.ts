@@ -305,6 +305,7 @@ export async function createBin(bin: {
   fill_percentage?: number;
   latitude?: number;
   longitude?: number;
+  source_potential_location_id?: string | null;
 }): Promise<Bin> {
   try {
     const response = await fetch(`${API_URL}/api/bins`, {

@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useRef, useCallback } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createBin } from '@/lib/api/bins';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { createBin, getPotentialLocations } from '@/lib/api/bins';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X, Plus, Trash2, Loader2, Package, MapPin, Navigation, MapIcon, List } from 'lucide-react';
@@ -29,6 +29,10 @@ interface BinRow {
   addressAutoFilled: boolean;
   isGeocodingAddress: boolean; // Loading state when selecting from autocomplete
   isGeocodingCoordinates: boolean; // Loading state for reverse geocoding
+  // Potential location support
+  addressMode: 'manual' | 'potential'; // Location type
+  selectedPotentialLocationId: string | null; // Selected potential location ID
+  selectedPotentialLocationAddress: string | null; // For display purposes
   error?: string;
 }
 
@@ -135,6 +139,18 @@ const MapContent = React.memo(function MapContent({
 export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalProps) {
   const queryClient = useQueryClient();
   const [isClosing, setIsClosing] = useState(false);
+
+  // Fetch potential locations
+  const { data: potentialLocationsData = [] } = useQuery({
+    queryKey: ['potential-locations'],
+    queryFn: getPotentialLocations,
+  });
+
+  // Filter only active (unconverted) potential locations
+  const activePotentialLocations = potentialLocationsData.filter(
+    (loc) => !loc.converted_at
+  );
+
   const [rows, setRows] = useState<BinRow[]>([
     {
       id: '1',
@@ -150,6 +166,9 @@ export function BulkCreateBinModal({ onClose, onSuccess }: BulkCreateBinModalPro
       addressAutoFilled: false,
       isGeocodingAddress: false,
       isGeocodingCoordinates: false,
+      addressMode: 'manual',
+      selectedPotentialLocationId: null,
+      selectedPotentialLocationAddress: null,
     },
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);

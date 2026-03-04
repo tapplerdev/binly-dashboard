@@ -405,8 +405,9 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
     setMarkerPosition({ lat, lng });
     setLatitude(lat);
     setLongitude(lng);
-    // Clicking elsewhere on the map clears the potential location link
+    // Clicking elsewhere on the map clears the potential location link and switches to manual mode
     setSelectedPotentialLocation(null);
+    setAddressMode('manual');
     setReverseGeocoding(true);
 
     try {
@@ -428,8 +429,9 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
     setMarkerPosition({ lat, lng });
     setLatitude(lat);
     setLongitude(lng);
-    // Dragging the marker away clears the potential location link
+    // Dragging the marker away clears the potential location link and switches to manual mode
     setSelectedPotentialLocation(null);
+    setAddressMode('manual');
     setReverseGeocoding(true);
 
     try {
@@ -708,6 +710,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                         type="button"
                         onClick={() => {
                           setAddressMode('manual');
+                          // Keep fields but clear the potential location link
                           setSelectedPotentialLocation(null);
                         }}
                         className={cn(
@@ -721,7 +724,17 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setAddressMode('potential')}
+                        onClick={() => {
+                          setAddressMode('potential');
+                          // Clear all fields and reset to blank state
+                          setSelectedPotentialLocation(null);
+                          setStreet('');
+                          setCity('');
+                          setZip('');
+                          setLatitude(null);
+                          setLongitude(null);
+                          setMarkerPosition(null);
+                        }}
                         className={cn(
                           'flex-1 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all',
                           addressMode === 'potential'
@@ -850,28 +863,6 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                             )}
                           </div>
                         )}
-
-                        {/* Selected Location Badge */}
-                        {selectedPotentialLocation && (
-                          <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                            <div className="flex items-start gap-2">
-                              <MapPin className="w-4 h-4 text-orange-600 mt-0.5 shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-orange-900">
-                                  {selectedPotentialLocation.address}
-                                </p>
-                                <p className="text-xs text-orange-700 mt-1">
-                                  Requested by {selectedPotentialLocation.requested_by_name}
-                                </p>
-                                {selectedPotentialLocation.notes && (
-                                  <p className="text-xs text-orange-600 mt-1 italic">
-                                    "{selectedPotentialLocation.notes}"
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
@@ -966,7 +957,14 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                 {/* Location Details */}
                 <div className={cn('bg-gray-50 border-2 rounded-xl p-4 mb-6', warehouseMode === 'send' ? 'border-amber-200 bg-amber-50/40' : 'border-gray-200')}>
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-gray-700">Location Details</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-gray-700">Location Details</h3>
+                      {addressMode === 'potential' && selectedPotentialLocation && (
+                        <span className="text-xs font-medium text-primary bg-[#EDF0FF] px-2 py-0.5 rounded-full">
+                          From Potential Location
+                        </span>
+                      )}
+                    </div>
                     {warehouseMode === 'send' && (
                       <span className="text-xs font-medium text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">Locked — Warehouse</span>
                     )}
