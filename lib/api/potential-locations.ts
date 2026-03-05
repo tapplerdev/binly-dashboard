@@ -52,10 +52,17 @@ export interface PotentialLocation {
   notes?: string;
   created_at_iso: string;
   converted_to_bin_id?: string;
-  converted_at_iso?: string;
-  converted_by_user_id?: string;
-  converted_via_shift_id?: string; // NEW: Links to shift if converted during driver placement
-  bin_number?: number;
+  converted_via_shift_id?: string; // Links to shift if converted during driver placement
+  bin_number?: number; // From JOIN with bins table
+
+  // Conversion snapshot fields - capture bin state at moment of conversion
+  converted_bin_number_snapshot?: number; // Bin number at time of conversion
+  converted_address_snapshot?: string; // Address at time of conversion
+  converted_at_iso?: string; // When conversion happened (ISO format)
+  converted_by_user_id?: string; // Who performed conversion
+  conversion_status?: 'active' | 'pending' | 'converted'; // Conversion status
+  bin_current_status?: 'active' | 'deleted' | 'renumbered' | 'moved'; // Current bin status
+  conversion_metadata?: string; // JSON string with conversion context
 }
 
 export type PotentialLocationStatus = 'active' | 'converted';
