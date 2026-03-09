@@ -17,6 +17,7 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCentrifugo } from '@/lib/hooks/use-centrifugo';
 import { binKeys } from '@/lib/hooks/use-bins';
+import { shiftKeys } from '@/lib/hooks/use-shifts';
 import { zoneKeys } from '@/lib/hooks/use-zones';
 import { potentialLocationKeys } from '@/lib/hooks/use-potential-locations';
 import { Bin } from '@/lib/types/bin';
@@ -132,6 +133,15 @@ export function GlobalCentrifugoSync() {
           queryClient.invalidateQueries({ queryKey: potentialLocationKeys.list('converted') });
           // Invalidate bins so the new bin appears in the bins list/map
           queryClient.invalidateQueries({ queryKey: binKeys.all });
+          break;
+        }
+
+        // ── Shift events ────────────────────────────────────────────────────────
+
+        case 'shift_created':
+        case 'shift_updated': {
+          console.log('🔄 [GlobalCentrifugoSync] invalidating shifts queries');
+          queryClient.invalidateQueries({ queryKey: shiftKeys.all });
           break;
         }
 
