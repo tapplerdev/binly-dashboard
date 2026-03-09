@@ -8,10 +8,8 @@ import { useBins } from '@/lib/hooks/use-bins';
 import { useNoGoZones } from '@/lib/hooks/use-zones';
 import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
 import { useActiveDrivers } from '@/lib/hooks/use-active-drivers';
-import { useWebSocket, WebSocketMessage } from '@/lib/hooks/use-websocket';
 import { useCentrifugo } from '@/lib/hooks/use-centrifugo';
-import { useQueryClient } from '@tanstack/react-query';
-import { useWarehouseLocation, warehouseKeys } from '@/lib/hooks/use-warehouse';
+import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import {
   Bin,
   MappableBin,
@@ -28,9 +26,6 @@ import { BinDetailDrawer } from './bin-detail-drawer';
 import { PotentialLocationDetailsDrawer } from './potential-location-details-drawer';
 import { MapSearchBar } from './map-search-bar';
 import { PotentialLocationPin } from '@/components/ui/potential-location-pin';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-const WS_URL = API_URL.replace(/^https/, 'wss').replace(/^http/, 'ws');
 
 // Default map center (San Jose, CA area - center of bin operations)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -261,25 +256,8 @@ function BinClusterLayer({
 }
 
 export function LiveMapView() {
-  const queryClient = useQueryClient();
   const router = useRouter();
   const { data: warehouse } = useWarehouseLocation();
-
-  // Get auth token from localStorage (Zustand persist storage)
-  const getAuthToken = () => {
-    try {
-      const authStorage = localStorage.getItem('binly-auth-storage');
-      if (!authStorage) return null;
-
-      const parsed = JSON.parse(authStorage);
-      return parsed?.state?.token || null;
-    } catch (error) {
-      console.error('Error getting auth token:', error);
-      return null;
-    }
-  };
-
-  const token = getAuthToken();
 
   // React Query hooks for data fetching
   const { data: bins = [], isLoading: loadingBins, error: binsError } = useBins();
@@ -307,8 +285,6 @@ export function LiveMapView() {
   const [showMediumFillBins, setShowMediumFillBins] = useState(true);
   const [showLowFillBins, setShowLowFillBins] = useState(true);
 
-  const wsUrl = token ? `${WS_URL}/ws?token=${token}` : `${WS_URL}/ws`;
-
   // Centrifugo — UI state only: close the potential-location drawer if the open location is
   // deleted or converted. All cache updates are handled by GlobalCentrifugoSync in the layout.
   const { subscribe, isConnected } = useCentrifugo();
@@ -330,20 +306,6 @@ export function LiveMapView() {
 
     return unsubscribe;
   }, [isConnected, subscribe]);
-
-  // WebSocket — kept only for warehouse_location_updated (still uses WebSocket Hub)
-  const { status: wsStatus } = useWebSocket({
-    url: wsUrl,
-    onMessage: (message: WebSocketMessage) => {
-      if (message.type === 'warehouse_location_updated') {
-        console.log('📍 Warehouse location updated via WebSocket, invalidating cache...');
-        queryClient.invalidateQueries({ queryKey: warehouseKeys.location });
-      }
-    },
-    autoReconnect: true,
-    reconnectInterval: 3000,
-    reconnectAttempts: 5,
-  });
 
   // Check URL params for bin ID and zoom to it
   useEffect(() => {

@@ -17,8 +17,8 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCentrifugo } from '@/lib/hooks/use-centrifugo';
 import { binKeys } from '@/lib/hooks/use-bins';
-import { shiftKeys } from '@/lib/hooks/use-shifts';
 import { zoneKeys } from '@/lib/hooks/use-zones';
+import { shiftKeys } from '@/lib/hooks/use-shifts';
 import { potentialLocationKeys } from '@/lib/hooks/use-potential-locations';
 import { Bin } from '@/lib/types/bin';
 import { NoGoZone } from '@/lib/types/zone';
@@ -136,15 +136,6 @@ export function GlobalCentrifugoSync() {
           break;
         }
 
-        // ── Shift events ────────────────────────────────────────────────────────
-
-        case 'shift_created':
-        case 'shift_updated': {
-          console.log('🔄 [GlobalCentrifugoSync] invalidating shifts queries');
-          queryClient.invalidateQueries({ queryKey: shiftKeys.all });
-          break;
-        }
-
         // ── Move Request events ────────────────────────────────────────────────
 
         case 'move_request_created':
@@ -154,6 +145,61 @@ export function GlobalCentrifugoSync() {
           // The broad prefix match ['move-requests'] covers every sub-key variant.
           console.log('🔄 [GlobalCentrifugoSync] invalidating move-requests queries');
           queryClient.invalidateQueries({ queryKey: ['move-requests'] });
+          break;
+        }
+
+        case 'move_request_status_updated': {
+          // Move requests changed status (assigned→in_progress, completed, etc.)
+          console.log('🔄 [GlobalCentrifugoSync] move request status updated');
+          queryClient.invalidateQueries({ queryKey: ['move-requests'] });
+          queryClient.invalidateQueries({ queryKey: shiftKeys.all });
+          break;
+        }
+
+        // ── Shift events ──────────────────────────────────────────────────────
+
+        case 'shift_created':
+        case 'shift_update':
+        case 'driver_shift_change':
+        case 'route_assigned':
+        case 'shift_deleted':
+        case 'shift_cancelled':
+        case 'bulk_shifts_cancelled':
+        case 'shift_edited':
+        case 'route_reoptimized': {
+          console.log(`🔄 [GlobalCentrifugoSync] shift event: ${event.type}`);
+          queryClient.invalidateQueries({ queryKey: shiftKeys.all });
+          break;
+        }
+
+        // ── Bin lifecycle events ────────────────────────────────────────────
+
+        case 'bin_created': {
+          console.log('🔄 [GlobalCentrifugoSync] bin created, invalidating bins');
+          queryClient.invalidateQueries({ queryKey: binKeys.all });
+          break;
+        }
+
+        case 'bin_deleted': {
+          const d = event.data as { bin_id: string };
+          queryClient.setQueryData<Bin[]>(
+            binKeys.all,
+            (old) => old?.filter((b) => b.id !== d.bin_id) ?? []
+          );
+          break;
+        }
+
+        case 'bin_redeployed': {
+          console.log('🔄 [GlobalCentrifugoSync] bin redeployed, invalidating bins');
+          queryClient.invalidateQueries({ queryKey: binKeys.all });
+          break;
+        }
+
+        // ── Warehouse events ──────────────────────────────────────────────
+
+        case 'warehouse_location_updated': {
+          console.log('📍 [GlobalCentrifugoSync] warehouse location updated');
+          queryClient.invalidateQueries({ queryKey: ['warehouse-location'] });
           break;
         }
 

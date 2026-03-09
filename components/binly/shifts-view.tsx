@@ -4118,10 +4118,7 @@ function LiveOpsView({ shifts }: { shifts: Shift[] }) {
   const { token } = useAuthStore();
 
   // Use active drivers hook for real-time data
-  const { drivers: driversData, isLoading, error, wsStatus } = useActiveDrivers({
-    token: token || undefined,
-    enabled: true,
-  });
+  const { drivers: driversData, isLoading, error } = useActiveDrivers();
 
   // ALWAYS ensure drivers is an array
   const drivers = Array.isArray(driversData) ? driversData : [];
@@ -4139,21 +4136,13 @@ function LiveOpsView({ shifts }: { shifts: Shift[] }) {
                 {drivers.length} driver{drivers.length !== 1 ? 's' : ''} on duty
               </p>
             </div>
-            {/* WebSocket status indicator */}
+            {/* Real-time status indicator */}
             <div className="flex items-center gap-2">
               <div
-                className={`w-2 h-2 rounded-full ${
-                  wsStatus === 'connected'
-                    ? 'bg-green-500 animate-pulse'
-                    : wsStatus === 'connecting'
-                    ? 'bg-yellow-500 animate-pulse'
-                    : 'bg-gray-400'
-                }`}
-                title={`WebSocket: ${wsStatus}`}
+                className="w-2 h-2 rounded-full bg-green-500 animate-pulse"
+                title="Real-time updates via Centrifugo"
               />
-              <span className="text-xs text-gray-500">
-                {wsStatus === 'connected' ? 'Live' : wsStatus === 'connecting' ? 'Connecting...' : 'Offline'}
-              </span>
+              <span className="text-xs text-gray-500">Live</span>
             </div>
           </div>
         </div>

@@ -6,8 +6,7 @@ import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shi
 import { getShiftById, getShiftTasks, cancelShift, removeTasksFromShift, getShiftTasksWithHistory } from '@/lib/api/shifts';
 import { RouteTask, getTaskLabel, getTaskSubtitle, getTaskColor, getTaskBgColor } from '@/lib/types/route-task';
 import { ShiftRouteMap } from './shift-route-map';
-import { useWebSocket, WebSocketMessage } from '@/lib/hooks/use-websocket';
-import { useAuthStore } from '@/lib/auth/store';
+import { useCentrifugo } from '@/lib/hooks/use-centrifugo';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Toast } from '@/components/ui/toast';
@@ -78,7 +77,6 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'warning' | 'info'>('success');
   const [fullscreenPhoto, setFullscreenPhoto] = useState<string | null>(null);
-  const { token } = useAuthStore();
 
   // Function to load shift details
   const loadShiftDetails = async () => {
@@ -134,46 +132,27 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
     loadShiftDetails();
   }, [shift.id]);
 
-  // WebSocket connection for real-time shift updates
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-  const WS_URL = API_URL.replace(/^https/, 'wss').replace(/^http/, 'ws');
-  const wsUrl = token ? `${WS_URL}/ws?token=${token}` : `${WS_URL}/ws`;
+  // Centrifugo subscription for real-time shift updates
+  const { subscribe, isConnected } = useCentrifugo();
 
-  useWebSocket({
-    url: wsUrl,
-    onMessage: (message: WebSocketMessage) => {
-      console.log('📡 [WEBSOCKET] Received message:', message);
-      console.log('📡 [WEBSOCKET] Message type:', message.type);
-      console.log('📡 [WEBSOCKET] Message data:', message.data);
+  useEffect(() => {
+    if (!isConnected) return;
 
-      if (message.type === 'shift_update' && message.data?.shift_id === shift.id) {
-        // Shift was updated (e.g., driver started shift and route was optimized)
-        console.log('📡 [WEBSOCKET] ✅ Shift updated event received for shift:', shift.id);
-        console.log('📡 [WEBSOCKET] Reloading shift details...');
+    const unsubscribe = subscribe('company:events', (raw: unknown) => {
+      const event = raw as { type: string; data: Record<string, unknown> };
+
+      // Only handle events for this specific shift
+      const eventShiftId = event.data?.shift_id;
+      if (eventShiftId !== shift.id) return;
+
+      if (event.type === 'shift_update' || event.type === 'shift_edited' || event.type === 'route_reoptimized') {
+        console.log(`📡 [Centrifugo] ${event.type} for shift ${shift.id} — reloading details`);
         loadShiftDetails();
       }
+    });
 
-      if (message.type === 'shift_edited' && message.data?.shift_id === shift.id) {
-        // Shift was edited by manager (tasks added/removed, driver changed, time changed)
-        console.log('📡 [WEBSOCKET] ✅ shift_edited event received!');
-        console.log('📡 [WEBSOCKET] Shift ID:', message.data?.shift_id);
-        console.log('📡 [WEBSOCKET] Changes:', message.data?.changes);
-        console.log('📡 [WEBSOCKET] Reason:', message.data?.reason);
-        console.log('📡 [WEBSOCKET] Full event data:', JSON.stringify(message.data, null, 2));
-        console.log('📡 [WEBSOCKET] Triggering reload of shift details...');
-        loadShiftDetails();
-      }
-
-      if (message.type === 'route_reoptimized' && message.data?.shift_id === shift.id) {
-        // Route was re-optimized after task removal
-        console.log('📡 [WEBSOCKET] ✅ route_reoptimized event received!');
-        console.log('📡 [WEBSOCKET] Shift ID:', message.data?.shift_id);
-        console.log('📡 [WEBSOCKET] Full event data:', JSON.stringify(message.data, null, 2));
-        console.log('📡 [WEBSOCKET] Triggering reload of shift details...');
-        loadShiftDetails();
-      }
-    },
-  });
+    return unsubscribe;
+  }, [isConnected, subscribe, shift.id]);
 
   const handleClose = () => {
     setIsClosing(true);
@@ -199,7 +178,7 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
       handleClose();
 
       // Optional: Trigger a page refresh or refetch shifts
-      // The parent component should handle this via WebSocket or polling
+      // GlobalCentrifugoSync handles real-time cache invalidation
       window.location.reload();
     } catch (error) {
       console.error('❌ Failed to cancel shift:', error);

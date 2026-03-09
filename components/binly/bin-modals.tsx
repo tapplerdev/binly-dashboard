@@ -661,7 +661,7 @@ export function ScheduleMoveModal({ bin, bins, moveRequest, onClose, onSuccess }
               console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
               console.log('✅ [UNASSIGNMENT] Successfully unassigned move request');
               console.log('   Updated move request:', result);
-              console.log('   Backend should send WebSocket to driver:', oldShiftId);
+              console.log('   Backend should send Centrifugo event to driver:', oldShiftId);
               console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
             } catch (error) {
               console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
