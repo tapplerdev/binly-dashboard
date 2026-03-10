@@ -11,6 +11,7 @@ import {
   Calendar,
   Users,
   ShieldAlert,
+  Radio,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -74,6 +75,13 @@ export const sidebarNavItems: NavItem[] = [
         key: 'no-go-zones',
         title: 'No-Go Zones',
         icon: <ShieldAlert className="w-5 h-5" />,
+        children: [],
+      },
+      {
+        path: '/operations/airtag-tracker',
+        key: 'airtag-tracker',
+        title: 'AirTag Tracker',
+        icon: <Radio className="w-5 h-5" />,
         children: [],
       },
     ],
