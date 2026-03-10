@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps';
-import { Loader2, Radio, X, MapPin, Clock } from 'lucide-react';
+import { Loader2, Radio, X, MapPin, Clock, AlertCircle } from 'lucide-react';
 import { MapSearchBar } from './map-search-bar';
+import { useAirTags } from '@/lib/hooks/use-airtags';
+import type { AirTagLocation } from '@/lib/api/airtags';
 
 // Default map center (San Jose, CA area - center of bin operations)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -11,56 +13,6 @@ const DEFAULT_ZOOM = 11;
 
 // AirTag marker color (primary blue)
 const AIRTAG_MARKER_COLOR = '#4880FF';
-
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-interface AirTagLocation {
-  id: string;
-  name: string;
-  bin_number: number;
-  latitude: number;
-  longitude: number;
-  address: string;
-  city: string;
-  last_seen: string; // ISO timestamp
-}
-
-// ── Mock Data (replace with API call to binly-findmy-bridge) ────────────────
-
-const MOCK_AIRTAG_LOCATIONS: AirTagLocation[] = [
-  { id: '1', name: 'Bin 46', bin_number: 46, latitude: 37.3352, longitude: -121.8811, address: 'S 1st St', city: 'San Jose, CA', last_seen: new Date(Date.now() - 12 * 60000).toISOString() },
-  { id: '2', name: 'Bin 47', bin_number: 47, latitude: 37.3501, longitude: -121.9050, address: 'The Alameda', city: 'San Jose, CA', last_seen: new Date(Date.now() - 25 * 60000).toISOString() },
-  { id: '3', name: 'Bin 48', bin_number: 48, latitude: 37.3230, longitude: -121.9190, address: 'Bascom Ave', city: 'San Jose, CA', last_seen: new Date(Date.now() - 8 * 60000).toISOString() },
-  { id: '4', name: 'Bin 49', bin_number: 49, latitude: 37.3680, longitude: -121.9280, address: 'Stevens Creek Blvd', city: 'Santa Clara, CA', last_seen: new Date(Date.now() - 45 * 60000).toISOString() },
-  { id: '5', name: 'Bin 50', bin_number: 50, latitude: 37.3860, longitude: -121.9630, address: 'El Camino Real', city: 'Sunnyvale, CA', last_seen: new Date(Date.now() - 5 * 60000).toISOString() },
-  { id: '6', name: 'Bin 51', bin_number: 51, latitude: 37.3920, longitude: -122.0790, address: 'W Bayshore Rd', city: 'Palo Alto, CA', last_seen: new Date(Date.now() - 9 * 60000).toISOString() },
-  { id: '7', name: 'Bin 52', bin_number: 52, latitude: 37.3100, longitude: -121.8700, address: 'Tully Rd', city: 'San Jose, CA', last_seen: new Date(Date.now() - 18 * 60000).toISOString() },
-  { id: '8', name: 'Bin 53', bin_number: 53, latitude: 37.3560, longitude: -121.8460, address: 'Alum Rock Ave', city: 'San Jose, CA', last_seen: new Date(Date.now() - 5 * 60 * 60000).toISOString() },
-  { id: '9', name: 'Bin 54', bin_number: 54, latitude: 37.4050, longitude: -122.0250, address: 'El Camino Real', city: 'Redwood City, CA', last_seen: new Date(Date.now() - 8 * 60000).toISOString() },
-  { id: '10', name: 'Bin 55', bin_number: 55, latitude: 37.3750, longitude: -121.8550, address: 'Piedmont Rd', city: 'San Jose, CA', last_seen: new Date(Date.now() - 32 * 60000).toISOString() },
-  { id: '11', name: 'Bin 56', bin_number: 56, latitude: 37.3290, longitude: -121.9500, address: 'Saratoga Ave', city: 'San Jose, CA', last_seen: new Date(Date.now() - 14 * 60000).toISOString() },
-  { id: '12', name: 'Bin 57', bin_number: 57, latitude: 37.3020, longitude: -121.8500, address: 'Capitol Expy', city: 'San Jose, CA', last_seen: new Date(Date.now() - 22 * 60000).toISOString() },
-  { id: '13', name: 'Bin 58', bin_number: 58, latitude: 37.3430, longitude: -121.8320, address: 'White Rd', city: 'San Jose, CA', last_seen: new Date(Date.now() - 6 * 60000).toISOString() },
-  { id: '14', name: 'Bin 59', bin_number: 59, latitude: 37.3610, longitude: -121.8680, address: 'N Capitol Ave', city: 'San Jose, CA', last_seen: new Date(Date.now() - 11 * 60000).toISOString() },
-  { id: '15', name: 'Bin 60', bin_number: 60, latitude: 37.3180, longitude: -121.9680, address: 'Prospect Rd', city: 'San Jose, CA', last_seen: new Date(Date.now() - 7 * 60000).toISOString() },
-  { id: '16', name: 'Bin 61', bin_number: 61, latitude: 37.3980, longitude: -122.0560, address: 'Middlefield Rd', city: 'Redwood City, CA', last_seen: new Date(Date.now() - 16 * 60000).toISOString() },
-  { id: '17', name: 'Bin 62', bin_number: 62, latitude: 37.3850, longitude: -122.0830, address: 'El Camino Real', city: 'Palo Alto, CA', last_seen: new Date(Date.now() - 2 * 24 * 60 * 60000).toISOString() },
-  { id: '18', name: 'Bin 63', bin_number: 63, latitude: 37.2950, longitude: -121.8960, address: 'Blossom Hill Rd', city: 'San Jose, CA', last_seen: new Date(Date.now() - 30 * 60000).toISOString() },
-  { id: '19', name: 'Bin 64', bin_number: 64, latitude: 37.3710, longitude: -121.9120, address: 'Park Ave', city: 'San Jose, CA', last_seen: new Date(Date.now() - 19 * 60000).toISOString() },
-  { id: '20', name: 'Bin 65', bin_number: 65, latitude: 37.3560, longitude: -121.9380, address: 'Winchester Blvd', city: 'San Jose, CA', last_seen: new Date(Date.now() - 10 * 60000).toISOString() },
-  { id: '21', name: 'Bin 66', bin_number: 66, latitude: 37.3380, longitude: -121.8060, address: 'Story Rd', city: 'San Jose, CA', last_seen: new Date(Date.now() - 27 * 60000).toISOString() },
-  { id: '22', name: 'Bin 67', bin_number: 67, latitude: 37.3480, longitude: -121.9750, address: 'Saratoga Ave', city: 'San Jose, CA', last_seen: new Date(Date.now() - 4 * 60000).toISOString() },
-  { id: '23', name: 'Bin 68', bin_number: 68, latitude: 37.3120, longitude: -121.9280, address: 'Hamilton Ave', city: 'San Jose, CA', last_seen: new Date(Date.now() - 15 * 60000).toISOString() },
-  { id: '24', name: 'Bin 69', bin_number: 69, latitude: 37.3340, longitude: -121.8240, address: '295 S White Rd', city: 'San Jose, CA', last_seen: new Date(Date.now() - 7 * 60000).toISOString() },
-  { id: '25', name: 'Bin 70', bin_number: 70, latitude: 37.4860, longitude: -122.2310, address: 'Broadway', city: 'Redwood City, CA', last_seen: new Date(Date.now() - 5 * 60000).toISOString() },
-  { id: '26', name: 'Bin 71', bin_number: 71, latitude: 37.4540, longitude: -122.1780, address: 'Middlefield Rd', city: 'Redwood City, CA', last_seen: new Date(Date.now() - 16 * 60000).toISOString() },
-  { id: '27', name: 'Bin 72', bin_number: 72, latitude: 37.2810, longitude: -121.9450, address: 'Camden Ave', city: 'San Jose, CA', last_seen: new Date(Date.now() - 35 * 60000).toISOString() },
-  { id: '28', name: 'Bin 73', bin_number: 73, latitude: 37.3630, longitude: -121.9950, address: 'Stevens Creek Blvd', city: 'Cupertino, CA', last_seen: new Date(Date.now() - 21 * 60000).toISOString() },
-  { id: '29', name: 'Bin 74', bin_number: 74, latitude: 37.3770, longitude: -121.9430, address: 'Forest Ave', city: 'San Jose, CA', last_seen: new Date(Date.now() - 9 * 60000).toISOString() },
-  { id: '30', name: 'Bin 75', bin_number: 75, latitude: 37.3950, longitude: -121.9780, address: 'Monroe St', city: 'Santa Clara, CA', last_seen: new Date(Date.now() - 42 * 60000).toISOString() },
-  { id: '31', name: 'Bin 76', bin_number: 76, latitude: 37.4110, longitude: -121.9420, address: 'Great America Pkwy', city: 'Santa Clara, CA', last_seen: new Date(Date.now() - 13 * 60000).toISOString() },
-  { id: '32', name: 'Bin 77', bin_number: 77, latitude: 37.4230, longitude: -122.0980, address: 'University Ave', city: 'Palo Alto, CA', last_seen: new Date(Date.now() - 20 * 60000).toISOString() },
-];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -201,15 +153,13 @@ function AirTagMarkerLayer({
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export function AirTagMapView() {
-  const [locations] = useState<AirTagLocation[]>(MOCK_AIRTAG_LOCATIONS);
+  const { data: locations = [], isLoading, isError, error } = useAirTags();
   const [selectedLocation, setSelectedLocation] = useState<AirTagLocation | null>(null);
   const [targetLocation, setTargetLocation] = useState<{
     lat: number;
     lng: number;
     zoom?: number;
   } | null>(null);
-
-  const isLoading = false; // Will be replaced with actual loading state from API
 
   const handleMarkerClick = useCallback((loc: AirTagLocation) => {
     setSelectedLocation(loc);
@@ -246,6 +196,20 @@ export function AirTagMapView() {
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
           <span className="text-sm text-gray-500">Loading AirTag locations...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex items-center justify-center h-full bg-gray-100">
+        <div className="flex flex-col items-center gap-3 text-center px-4">
+          <AlertCircle className="w-8 h-8 text-red-500" />
+          <span className="text-sm text-gray-700 font-medium">Failed to load AirTag locations</span>
+          <span className="text-xs text-gray-500 max-w-xs">
+            {error instanceof Error ? error.message : 'Could not connect to FindMy bridge service'}
+          </span>
         </div>
       </div>
     );
