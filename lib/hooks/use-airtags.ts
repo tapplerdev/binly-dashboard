@@ -17,8 +17,8 @@ export function useAirTags() {
   return useQuery({
     queryKey: airtagKeys.all,
     queryFn: getAirTagLocations,
-    staleTime: 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchInterval: 3 * 60 * 1000,
     select: (data: AirTagLocationsResponse) => data.data,
   });
 }
