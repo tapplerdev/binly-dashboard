@@ -83,6 +83,39 @@ export async function updateNotificationSettings(
   return response.json();
 }
 
+export interface DigestResult {
+  already_sent: boolean;
+  window: string;
+  overdue_count: number;
+  urgent_count: number;
+  soon_count: number;
+  warehouse_count: number;
+  tokens_sent: number;
+}
+
+export async function triggerDigest(
+  window: 'morning' | 'afternoon',
+  force: boolean = false
+): Promise<DigestResult> {
+  const params = new URLSearchParams({ window });
+  if (force) params.set('force', 'true');
+
+  const response = await fetch(
+    `${API_URL}/api/manager/daily-digest?${params}`,
+    {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    }
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'Failed to trigger digest');
+  }
+
+  return response.json();
+}
+
 export async function getNotificationLog(
   page: number = 1,
   limit: number = 20,

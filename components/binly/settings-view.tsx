@@ -13,6 +13,7 @@ import {
   Loader2,
   Search,
   User as UserIcon,
+  Send,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +23,7 @@ import {
   useNotificationSettings,
   useUpdateNotificationSettings,
   useNotificationLog,
+  useTriggerDigest,
 } from '@/lib/hooks/use-notification-settings';
 import {
   useNotificationPreferences,
@@ -99,7 +101,9 @@ function Toggle({
 function NotificationSettingsTab() {
   const { data: settings, isLoading } = useNotificationSettings();
   const updateMutation = useUpdateNotificationSettings();
+  const digestMutation = useTriggerDigest();
   const [localSettings, setLocalSettings] = useState<NotificationSettings | null>(null);
+  const [digestResult, setDigestResult] = useState<string | null>(null);
 
   const current = localSettings || settings;
 
@@ -212,19 +216,47 @@ function NotificationSettingsTab() {
         </CardHeader>
         {current.morning_digest_enabled && (
           <CardContent className="pt-0">
-            <div className="pl-12">
-              <label className="text-sm font-medium text-gray-700">Send At</label>
-              <select
-                value={current.morning_digest_hour}
-                onChange={(e) => update('morning_digest_hour', parseInt(e.target.value))}
-                className="mt-1 block w-full sm:w-48 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
+            <div className="pl-12 flex items-end gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Send At</label>
+                <select
+                  value={current.morning_digest_hour}
+                  onChange={(e) => update('morning_digest_hour', parseInt(e.target.value))}
+                  className="mt-1 block w-full sm:w-48 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
+                >
+                  {HOUR_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
+                disabled={digestMutation.isPending}
+                onClick={() => {
+                  setDigestResult(null);
+                  digestMutation.mutate({ window: 'morning', force: true }, {
+                    onSuccess: (res) => {
+                      setDigestResult(
+                        `Morning digest sent! Overdue: ${res.overdue_count}, Urgent: ${res.urgent_count}, Warehouse: ${res.warehouse_count}, Tokens: ${res.tokens_sent}`
+                      );
+                    },
+                    onError: (err) => {
+                      setDigestResult(`Failed: ${(err as Error).message}`);
+                    },
+                  });
+                }}
               >
-                {HOUR_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                {digestMutation.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+                Send Test Now
+              </Button>
             </div>
           </CardContent>
         )}
@@ -253,23 +285,61 @@ function NotificationSettingsTab() {
         </CardHeader>
         {current.afternoon_digest_enabled && (
           <CardContent className="pt-0">
-            <div className="pl-12">
-              <label className="text-sm font-medium text-gray-700">Send At</label>
-              <select
-                value={current.afternoon_digest_hour}
-                onChange={(e) => update('afternoon_digest_hour', parseInt(e.target.value))}
-                className="mt-1 block w-full sm:w-48 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
+            <div className="pl-12 flex items-end gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Send At</label>
+                <select
+                  value={current.afternoon_digest_hour}
+                  onChange={(e) => update('afternoon_digest_hour', parseInt(e.target.value))}
+                  className="mt-1 block w-full sm:w-48 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
+                >
+                  {HOUR_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                disabled={digestMutation.isPending}
+                onClick={() => {
+                  setDigestResult(null);
+                  digestMutation.mutate({ window: 'afternoon', force: true }, {
+                    onSuccess: (res) => {
+                      setDigestResult(
+                        `Afternoon digest sent! Overdue: ${res.overdue_count}, Urgent: ${res.urgent_count}, Warehouse: ${res.warehouse_count}, Tokens: ${res.tokens_sent}`
+                      );
+                    },
+                    onError: (err) => {
+                      setDigestResult(`Failed: ${(err as Error).message}`);
+                    },
+                  });
+                }}
               >
-                {HOUR_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                {digestMutation.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+                Send Test Now
+              </Button>
             </div>
           </CardContent>
         )}
       </Card>
+
+      {/* Digest Test Result */}
+      {digestResult && (
+        <p className={cn(
+          'text-sm px-1',
+          digestResult.startsWith('Failed') ? 'text-red-600' : 'text-green-600'
+        )}>
+          {digestResult}
+        </p>
+      )}
 
       {/* Shift Notifications */}
       <Card className="rounded-2xl">

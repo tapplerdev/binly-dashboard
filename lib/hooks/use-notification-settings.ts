@@ -3,6 +3,7 @@ import {
   getNotificationSettings,
   updateNotificationSettings,
   getNotificationLog,
+  triggerDigest,
   type NotificationSettings,
 } from '@/lib/api/notification-settings';
 
@@ -43,6 +44,21 @@ export function useUpdateNotificationSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: notificationSettingsKeys.settings });
+    },
+  });
+}
+
+/**
+ * Trigger a digest manually (with force to bypass dedup)
+ */
+export function useTriggerDigest() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ window, force }: { window: 'morning' | 'afternoon'; force?: boolean }) =>
+      triggerDigest(window, force),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notification-log'] });
     },
   });
 }
