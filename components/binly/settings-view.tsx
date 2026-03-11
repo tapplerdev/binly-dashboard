@@ -29,6 +29,7 @@ import {
 } from '@/lib/hooks/use-notifications';
 import type { NotificationSettings } from '@/lib/api/notification-settings';
 import type { NotificationPreferences } from '@/lib/api/notifications';
+import { useAuthStore } from '@/lib/auth/store';
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => ({
   value: i,
@@ -486,8 +487,10 @@ function NotificationHistoryTab() {
 
 function MyPreferencesTab() {
   const { data: prefs, isLoading } = useNotificationPreferences();
+  const { data: sysSettings } = useNotificationSettings();
   const updateMutation = useUpdateNotificationPreferences();
   const [localPrefs, setLocalPrefs] = useState<Omit<NotificationPreferences, 'user_id'> | null>(null);
+  const userRole = useAuthStore((s) => s.user?.role);
 
   const current = localPrefs || (prefs ? {
     drift_alerts: prefs.drift_alerts,
@@ -529,19 +532,34 @@ function MyPreferencesTab() {
     updateMutation.mutate(localPrefs);
   };
 
-  const PREF_ITEMS = [
-    { key: 'drift_alerts' as const, label: 'Drift Alerts', desc: 'Get alerted when bins move from their location', icon: Radar, bg: 'bg-red-50', color: 'text-red-600' },
-    { key: 'digests' as const, label: 'Daily Digests', desc: 'Receive morning and afternoon summary digests', icon: Clock, bg: 'bg-blue-50', color: 'text-blue-600' },
-    { key: 'shift_events' as const, label: 'Shift Events', desc: 'Notifications for shift creation and status changes', icon: Truck, bg: 'bg-green-50', color: 'text-green-600' },
-    { key: 'move_requests' as const, label: 'Move Requests', desc: 'Alerts for new and updated move requests', icon: ArrowRightLeft, bg: 'bg-amber-50', color: 'text-amber-600' },
+  // Build context descriptions from system settings
+  const driftContext = sysSettings
+    ? `Checking every ${sysSettings.drift_check_interval_minutes} min, ${sysSettings.drift_threshold_meters}m threshold`
+    : undefined;
+
+  const formatHour = (h: number) => h === 0 ? '12:00 AM' : h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h - 12}:00 PM`;
+  const digestContext = sysSettings
+    ? `Morning at ${formatHour(sysSettings.morning_digest_hour)}, afternoon at ${formatHour(sysSettings.afternoon_digest_hour)}`
+    : undefined;
+
+  const ALL_PREF_ITEMS = [
+    { key: 'drift_alerts' as const, label: 'Drift Alerts', desc: 'Get alerted when bins move from their location', context: driftContext, icon: Radar, bg: 'bg-red-50', color: 'text-red-600', adminOnly: true },
+    { key: 'digests' as const, label: 'Daily Digests', desc: 'Receive morning and afternoon summary digests', context: digestContext, icon: Clock, bg: 'bg-blue-50', color: 'text-blue-600', adminOnly: true },
+    { key: 'shift_events' as const, label: 'Shift Events', desc: 'Shift creation, cancellation, and reassignment alerts', context: 'Includes route assignments and driver changes', icon: Truck, bg: 'bg-green-50', color: 'text-green-600', adminOnly: false },
+    { key: 'move_requests' as const, label: 'Move Requests', desc: 'Alerts for new and updated move requests', context: 'New assignments and status changes', icon: ArrowRightLeft, bg: 'bg-amber-50', color: 'text-amber-600', adminOnly: false },
   ];
+
+  const PREF_ITEMS = userRole === 'admin'
+    ? ALL_PREF_ITEMS
+    : ALL_PREF_ITEMS.filter((item) => !item.adminOnly);
 
   return (
     <div className="space-y-6">
       <div className="rounded-xl bg-blue-50/50 border border-blue-100 px-4 py-3">
         <p className="text-sm text-blue-700">
-          These are your personal notification preferences. System-wide toggles are managed in the
-          &quot;Notification Settings&quot; tab by admins.
+          {userRole === 'admin'
+            ? 'These are your personal notification preferences. System-wide toggles are managed in the "Notification Settings" tab.'
+            : 'Manage which notifications you receive.'}
         </p>
       </div>
 
@@ -556,6 +574,9 @@ function MyPreferencesTab() {
                 <div>
                   <CardTitle className="text-base">{item.label}</CardTitle>
                   <p className="text-sm text-gray-500 mt-0.5">{item.desc}</p>
+                  {item.context && (
+                    <p className="text-xs text-gray-400 mt-1">{item.context}</p>
+                  )}
                 </div>
               </div>
               <Toggle checked={current[item.key]} onChange={(val) => toggle(item.key, val)} />
@@ -584,7 +605,9 @@ function MyPreferencesTab() {
 }
 
 export function SettingsView() {
-  const [activeTab, setActiveTab] = useState<'settings' | 'history' | 'preferences'>('settings');
+  const userRole = useAuthStore((s) => s.user?.role);
+  const isAdmin = userRole === 'admin';
+  const [activeTab, setActiveTab] = useState<'settings' | 'history' | 'preferences'>('preferences');
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
@@ -598,20 +621,22 @@ export function SettingsView() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
-        <button
-          onClick={() => setActiveTab('settings')}
-          className={cn(
-            'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
-            activeTab === 'settings'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
-          )}
-        >
-          <div className="flex items-center gap-2">
-            <Bell className="w-4 h-4" />
-            Notification Settings
-          </div>
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={cn(
+              'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
+              activeTab === 'settings'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <Bell className="w-4 h-4" />
+              Notification Settings
+            </div>
+          </button>
+        )}
         <button
           onClick={() => setActiveTab('preferences')}
           className={cn(
@@ -626,26 +651,28 @@ export function SettingsView() {
             My Preferences
           </div>
         </button>
-        <button
-          onClick={() => setActiveTab('history')}
-          className={cn(
-            'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
-            activeTab === 'history'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
-          )}
-        >
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4" />
-            Notification History
-          </div>
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setActiveTab('history')}
+            className={cn(
+              'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
+              activeTab === 'history'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Notification History
+            </div>
+          </button>
+        )}
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'settings' && <NotificationSettingsTab />}
+      {activeTab === 'settings' && isAdmin && <NotificationSettingsTab />}
       {activeTab === 'preferences' && <MyPreferencesTab />}
-      {activeTab === 'history' && <NotificationHistoryTab />}
+      {activeTab === 'history' && isAdmin && <NotificationHistoryTab />}
     </div>
   );
 }
