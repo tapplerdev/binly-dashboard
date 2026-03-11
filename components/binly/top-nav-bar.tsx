@@ -79,24 +79,32 @@ export function TopNavBar({ onOpenAIAssistant }: TopNavBarProps) {
   const { data: unreadData } = useUnreadCount();
   const markReadMutation = useMarkRead();
   const markAllReadMutation = useMarkAllRead();
-  const store = useNotificationStore();
+
+  // Use individual selectors to avoid infinite re-render loops
+  const storeNotifications = useNotificationStore((s) => s.notifications);
+  const storeUnreadCount = useNotificationStore((s) => s.unreadCount);
+  const isHydrated = useNotificationStore((s) => s.isHydrated);
+  const hydrate = useNotificationStore((s) => s.hydrate);
+  const setUnreadCount = useNotificationStore((s) => s.setUnreadCount);
+  const storeMarkRead = useNotificationStore((s) => s.markRead);
+  const storeMarkAllRead = useNotificationStore((s) => s.markAllRead);
 
   // Hydrate store from API on first load
   useEffect(() => {
-    if (notifData && unreadData && !store.isHydrated) {
-      store.hydrate(notifData.notifications, unreadData.unread_count);
+    if (notifData && unreadData && !isHydrated) {
+      hydrate(notifData.notifications, unreadData.unread_count);
     }
-  }, [notifData, unreadData, store]);
+  }, [notifData, unreadData, isHydrated, hydrate]);
 
-  // Keep unread count in sync with API
+  // Keep unread count in sync with API (only after hydrated)
   useEffect(() => {
-    if (unreadData) {
-      store.setUnreadCount(unreadData.unread_count);
+    if (unreadData && isHydrated) {
+      setUnreadCount(unreadData.unread_count);
     }
-  }, [unreadData, store]);
+  }, [unreadData, isHydrated, setUnreadCount]);
 
-  const notifications = store.isHydrated ? store.notifications : (notifData?.notifications ?? []);
-  const unreadCount = store.unreadCount;
+  const notifications = isHydrated ? storeNotifications : (notifData?.notifications ?? []);
+  const unreadCount = storeUnreadCount;
 
   const userInitial = user?.name?.charAt(0).toUpperCase() || 'U';
 
@@ -220,7 +228,7 @@ export function TopNavBar({ onOpenAIAssistant }: TopNavBarProps) {
                 {unreadCount > 0 && (
                   <button
                     onClick={() => {
-                      store.markAllRead();
+                      storeMarkAllRead();
                       markAllReadMutation.mutate();
                     }}
                     className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
@@ -242,7 +250,7 @@ export function TopNavBar({ onOpenAIAssistant }: TopNavBarProps) {
                       notif={notif}
                       onRead={() => {
                         if (!notif.read_at) {
-                          store.markRead(notif.id);
+                          storeMarkRead(notif.id);
                           markReadMutation.mutate(notif.id);
                         }
                       }}
