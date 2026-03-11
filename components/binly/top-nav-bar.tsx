@@ -1,14 +1,64 @@
 'use client';
 
-import { Search, Sparkles, Bell, Settings, LogOut, ChevronDown, Menu, X, ChevronUp, MapPin } from 'lucide-react';
+import {
+  Search, Sparkles, Bell, Settings, LogOut, ChevronDown, Menu, X,
+  ChevronUp, MapPin, Clock, Truck, ArrowRightLeft, CheckCheck, MapPinPlus,
+} from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/lib/auth/store';
 import { useNotificationStore } from '@/lib/stores/notification-store';
+import { useNotifications, useUnreadCount, useMarkRead, useMarkAllRead } from '@/lib/hooks/use-notifications';
+import type { UserNotification } from '@/lib/api/notifications';
 import { cn } from '@/lib/utils';
 import { sidebarNavItems } from './sidebar-nav-items';
+
+function getNotifIcon(type: string) {
+  if (type.startsWith('bin_drift')) return { icon: MapPin, bg: 'bg-red-100', color: 'text-red-600' };
+  if (type.startsWith('digest_')) return { icon: Clock, bg: 'bg-blue-100', color: 'text-blue-600' };
+  if (type.includes('shift')) return { icon: Truck, bg: 'bg-green-100', color: 'text-green-600' };
+  if (type.includes('move_request')) return { icon: ArrowRightLeft, bg: 'bg-amber-100', color: 'text-amber-600' };
+  if (type.includes('potential_location')) return { icon: MapPinPlus, bg: 'bg-violet-100', color: 'text-violet-600' };
+  return { icon: Bell, bg: 'bg-gray-100', color: 'text-gray-600' };
+}
+
+function relativeTime(epochSeconds: number) {
+  const diff = Math.floor(Date.now() / 1000) - epochSeconds;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function NotificationRow({ notif, onRead }: { notif: UserNotification; onRead: () => void }) {
+  const { icon: Icon, bg, color } = getNotifIcon(notif.type);
+  return (
+    <div
+      onClick={onRead}
+      className={cn(
+        'px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer',
+        !notif.read_at && 'bg-blue-50/50'
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <div className={cn('mt-0.5 p-1.5 rounded-lg shrink-0', bg, color)}>
+          <Icon className="w-3.5 h-3.5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-semibold text-gray-900">{notif.title}</p>
+            {!notif.read_at && (
+              <span className="mt-1 w-2 h-2 rounded-full bg-primary shrink-0" />
+            )}
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">{notif.body}</p>
+          <p className="text-[10px] text-gray-300 mt-1">{relativeTime(notif.created_at)}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface TopNavBarProps {
   onOpenAIAssistant: () => void;
@@ -24,7 +74,29 @@ export function TopNavBar({ onOpenAIAssistant }: TopNavBarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, clearAuth } = useAuthStore();
-  const { alerts, unreadCount, markAllRead } = useNotificationStore();
+  // DB-backed notifications
+  const { data: notifData } = useNotifications(1);
+  const { data: unreadData } = useUnreadCount();
+  const markReadMutation = useMarkRead();
+  const markAllReadMutation = useMarkAllRead();
+  const store = useNotificationStore();
+
+  // Hydrate store from API on first load
+  useEffect(() => {
+    if (notifData && unreadData && !store.isHydrated) {
+      store.hydrate(notifData.notifications, unreadData.unread_count);
+    }
+  }, [notifData, unreadData, store]);
+
+  // Keep unread count in sync with API
+  useEffect(() => {
+    if (unreadData) {
+      store.setUnreadCount(unreadData.unread_count);
+    }
+  }, [unreadData, store]);
+
+  const notifications = store.isHydrated ? store.notifications : (notifData?.notifications ?? []);
+  const unreadCount = store.unreadCount;
 
   const userInitial = user?.name?.charAt(0).toUpperCase() || 'U';
 
@@ -128,55 +200,53 @@ export function TopNavBar({ onOpenAIAssistant }: TopNavBarProps) {
         {/* Notifications */}
         <div className="relative" ref={notificationsRef}>
           <button
-            onClick={() => {
-              setNotificationsOpen(!notificationsOpen);
-              if (!notificationsOpen && unreadCount > 0) markAllRead();
-            }}
+            onClick={() => setNotificationsOpen(!notificationsOpen)}
             className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
           >
             <Bell className="w-5 h-5 text-gray-600" />
             {unreadCount > 0 && (
               <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 bg-red-500 rounded-full flex items-center justify-center">
-                <span className="text-[10px] font-bold text-white leading-none">{unreadCount}</span>
+                <span className="text-[10px] font-bold text-white leading-none">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
               </span>
             )}
           </button>
 
           {notificationsOpen && (
             <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden animate-scale-in z-50">
-              <div className="px-4 py-3 border-b border-gray-100">
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={() => {
+                      store.markAllRead();
+                      markAllReadMutation.mutate();
+                    }}
+                    className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+                  >
+                    <CheckCheck className="w-3.5 h-3.5" />
+                    Mark all read
+                  </button>
+                )}
               </div>
               <div className="max-h-80 overflow-y-auto">
-                {alerts.length === 0 ? (
+                {notifications.length === 0 ? (
                   <div className="px-4 py-8 text-center text-sm text-gray-400">
                     No notifications yet
                   </div>
                 ) : (
-                  alerts.slice(0, 20).map((alert) => (
-                    <div
-                      key={alert.id}
-                      className={cn(
-                        'px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer',
-                        !alert.read && 'bg-blue-50/50'
-                      )}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="mt-0.5 p-1.5 rounded-lg bg-red-100 text-red-600 shrink-0">
-                          <MapPin className="w-3.5 h-3.5" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-gray-900">{alert.title}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">{alert.body}</p>
-                          {alert.actual_address && (
-                            <p className="text-xs text-gray-400 mt-1">at {alert.actual_address}</p>
-                          )}
-                          <p className="text-[10px] text-gray-300 mt-1">
-                            {new Date(alert.detected_at).toLocaleTimeString()}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+                  notifications.slice(0, 20).map((notif) => (
+                    <NotificationRow
+                      key={notif.id}
+                      notif={notif}
+                      onRead={() => {
+                        if (!notif.read_at) {
+                          store.markRead(notif.id);
+                          markReadMutation.mutate(notif.id);
+                        }
+                      }}
+                    />
                   ))
                 )}
               </div>

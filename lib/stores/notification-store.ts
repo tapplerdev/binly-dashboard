@@ -1,46 +1,57 @@
 import { create } from 'zustand';
-
-export interface DriftAlert {
-  id: string;
-  bin_number: number;
-  bin_id: string;
-  bin_status: string;
-  expected_lat: number;
-  expected_lng: number;
-  actual_lat: number;
-  actual_lng: number;
-  distance_meters: number;
-  expected_address: string;
-  actual_address: string;
-  detected_at: string;
-  title: string;
-  body: string;
-  read: boolean;
-}
+import type { UserNotification } from '@/lib/api/notifications';
 
 interface NotificationState {
-  alerts: DriftAlert[];
+  notifications: UserNotification[];
   unreadCount: number;
-  addAlert: (alert: DriftAlert) => void;
+  isHydrated: boolean;
+
+  /** Called once on mount from API data */
+  hydrate: (notifications: UserNotification[], unreadCount: number) => void;
+
+  /** Called by Centrifugo when a real-time notification arrives */
+  addNotification: (notif: UserNotification) => void;
+
+  /** Optimistic local mark-read */
+  markRead: (id: string) => void;
+
+  /** Optimistic local mark-all-read */
   markAllRead: () => void;
-  clearAlerts: () => void;
+
+  /** Sync unread count from API refetch */
+  setUnreadCount: (count: number) => void;
 }
 
 export const useNotificationStore = create<NotificationState>((set) => ({
-  alerts: [],
+  notifications: [],
   unreadCount: 0,
+  isHydrated: false,
 
-  addAlert: (alert) =>
+  hydrate: (notifications, unreadCount) =>
+    set({ notifications, unreadCount, isHydrated: true }),
+
+  addNotification: (notif) =>
     set((state) => ({
-      alerts: [alert, ...state.alerts].slice(0, 50), // keep last 50
+      notifications: [notif, ...state.notifications].slice(0, 50),
       unreadCount: state.unreadCount + 1,
+    })),
+
+  markRead: (id) =>
+    set((state) => ({
+      notifications: state.notifications.map((n) =>
+        n.id === id ? { ...n, read_at: Math.floor(Date.now() / 1000) } : n
+      ),
+      unreadCount: Math.max(0, state.unreadCount - 1),
     })),
 
   markAllRead: () =>
     set((state) => ({
-      alerts: state.alerts.map((a) => ({ ...a, read: true })),
+      notifications: state.notifications.map((n) => ({
+        ...n,
+        read_at: n.read_at || Math.floor(Date.now() / 1000),
+      })),
       unreadCount: 0,
     })),
 
-  clearAlerts: () => set({ alerts: [], unreadCount: 0 }),
+  setUnreadCount: (count) => set({ unreadCount: count }),
 }));

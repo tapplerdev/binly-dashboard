@@ -23,12 +23,16 @@ import { potentialLocationKeys } from '@/lib/hooks/use-potential-locations';
 import { Bin } from '@/lib/types/bin';
 import { NoGoZone } from '@/lib/types/zone';
 import { PotentialLocation } from '@/lib/api/potential-locations';
-import { useNotificationStore, DriftAlert } from '@/lib/stores/notification-store';
+import { useNotificationStore } from '@/lib/stores/notification-store';
+import { notificationKeys } from '@/lib/hooks/use-notifications';
+import { useAuthStore } from '@/lib/auth/store';
+import type { UserNotification } from '@/lib/api/notifications';
 
 export function GlobalCentrifugoSync() {
   const queryClient = useQueryClient();
   const { subscribe, isConnected } = useCentrifugo();
-  const addAlert = useNotificationStore((s) => s.addAlert);
+  const addNotification = useNotificationStore((s) => s.addNotification);
+  const currentUserId = useAuthStore((s) => s.user?.id);
 
   useEffect(() => {
     if (!isConnected) return;
@@ -205,22 +209,17 @@ export function GlobalCentrifugoSync() {
           break;
         }
 
-        // ── AirTag drift alerts ──────────────────────────────────────────
+        // ── Per-user notifications (DB-backed) ─────────────────────────
 
-        case 'bin_drift_alert': {
-          const { alert, title, body } = event.data as {
-            alert: Omit<DriftAlert, 'id' | 'title' | 'body' | 'read'>;
-            title: string;
-            body: string;
-          };
-          console.log('🚨 [GlobalCentrifugoSync] bin drift alert:', alert);
-          addAlert({
-            ...alert,
-            id: `drift-${alert.bin_number}-${Date.now()}`,
-            title,
-            body,
-            read: false,
-          });
+        case 'user_notification_created': {
+          const notif = event.data as UserNotification & { user_id: string };
+          // Only add if this notification belongs to the current user
+          if (notif.user_id === currentUserId) {
+            console.log('🔔 [GlobalCentrifugoSync] user notification:', notif.type);
+            addNotification(notif);
+            // Also invalidate the React Query unread count
+            queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount });
+          }
           break;
         }
 
@@ -230,7 +229,7 @@ export function GlobalCentrifugoSync() {
     });
 
     return unsubscribe;
-  }, [isConnected, subscribe, queryClient]);
+  }, [isConnected, subscribe, queryClient, addNotification, currentUserId]);
 
   return null;
 }

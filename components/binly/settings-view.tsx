@@ -11,6 +11,8 @@ import {
   Truck,
   ArrowRightLeft,
   Loader2,
+  Search,
+  User as UserIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +23,12 @@ import {
   useUpdateNotificationSettings,
   useNotificationLog,
 } from '@/lib/hooks/use-notification-settings';
+import {
+  useNotificationPreferences,
+  useUpdateNotificationPreferences,
+} from '@/lib/hooks/use-notifications';
 import type { NotificationSettings } from '@/lib/api/notification-settings';
+import type { NotificationPreferences } from '@/lib/api/notifications';
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => ({
   value: i,
@@ -34,6 +41,9 @@ const NOTIFICATION_TYPES = [
   { value: 'digest_overdue_moves', label: 'Overdue Moves' },
   { value: 'digest_upcoming_moves', label: 'Upcoming Moves' },
   { value: 'digest_warehouse_bins', label: 'Warehouse Bins' },
+  { value: 'shift_created', label: 'Shift Created' },
+  { value: 'shift_cancelled', label: 'Shift Cancelled' },
+  { value: 'move_request_created', label: 'Move Request Created' },
 ];
 
 function getTypeBadge(type: string) {
@@ -46,8 +56,14 @@ function getTypeBadge(type: string) {
       return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Upcoming</Badge>;
     case 'digest_warehouse_bins':
       return <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100">Warehouse</Badge>;
+    case 'shift_created':
+      return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Shift Created</Badge>;
+    case 'shift_cancelled':
+      return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Shift Cancelled</Badge>;
+    case 'move_request_created':
+      return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Move Request</Badge>;
     default:
-      return <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">{type}</Badge>;
+      return <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">{type.replace(/_/g, ' ')}</Badge>;
   }
 }
 
@@ -256,7 +272,7 @@ function NotificationSettingsTab() {
 
       {/* Shift Notifications */}
       <Card className="rounded-2xl">
-        <CardHeader className="pb-0">
+        <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-green-50">
@@ -279,7 +295,7 @@ function NotificationSettingsTab() {
 
       {/* Move Request Notifications */}
       <Card className="rounded-2xl">
-        <CardHeader className="pb-0">
+        <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-amber-50">
@@ -331,15 +347,34 @@ function NotificationSettingsTab() {
 function NotificationHistoryTab() {
   const [page, setPage] = useState(1);
   const [typeFilter, setTypeFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const { data, isLoading } = useNotificationLog(page, typeFilter || undefined);
 
   const totalPages = data ? Math.ceil(data.total / data.limit) : 0;
 
+  // Client-side search filter on title/body
+  const filteredNotifications = data?.notifications.filter((notif) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return notif.title.toLowerCase().includes(q) || notif.body.toLowerCase().includes(q);
+  });
+
   return (
     <div className="space-y-4">
-      {/* Filter */}
-      <div className="flex items-center gap-3">
-        <label className="text-sm font-medium text-gray-700">Filter by type:</label>
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by title or body..."
+            className="block w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
+          />
+        </div>
         <select
           value={typeFilter}
           onChange={(e) => {
@@ -386,14 +421,14 @@ function NotificationHistoryTab() {
                     <Loader2 className="w-5 h-5 animate-spin text-gray-400 mx-auto" />
                   </td>
                 </tr>
-              ) : !data?.notifications.length ? (
+              ) : !filteredNotifications?.length ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-12 text-center text-sm text-gray-400">
-                    No notifications sent yet
+                    {searchQuery ? 'No notifications match your search' : 'No notifications sent yet'}
                   </td>
                 </tr>
               ) : (
-                data.notifications.map((notif) => (
+                filteredNotifications.map((notif) => (
                   <tr
                     key={notif.id}
                     className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors"
@@ -449,8 +484,107 @@ function NotificationHistoryTab() {
   );
 }
 
+function MyPreferencesTab() {
+  const { data: prefs, isLoading } = useNotificationPreferences();
+  const updateMutation = useUpdateNotificationPreferences();
+  const [localPrefs, setLocalPrefs] = useState<Omit<NotificationPreferences, 'user_id'> | null>(null);
+
+  const current = localPrefs || (prefs ? {
+    drift_alerts: prefs.drift_alerts,
+    digests: prefs.digests,
+    shift_events: prefs.shift_events,
+    move_requests: prefs.move_requests,
+  } : null);
+
+  if (isLoading || !current) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+
+  if (!localPrefs && prefs) {
+    setLocalPrefs({
+      drift_alerts: prefs.drift_alerts,
+      digests: prefs.digests,
+      shift_events: prefs.shift_events,
+      move_requests: prefs.move_requests,
+    });
+  }
+
+  const toggle = (key: keyof Omit<NotificationPreferences, 'user_id'>, val: boolean) => {
+    setLocalPrefs((prev) => (prev ? { ...prev, [key]: val } : prev));
+  };
+
+  const isDirty = JSON.stringify(localPrefs) !== JSON.stringify(prefs ? {
+    drift_alerts: prefs.drift_alerts,
+    digests: prefs.digests,
+    shift_events: prefs.shift_events,
+    move_requests: prefs.move_requests,
+  } : null);
+
+  const handleSave = () => {
+    if (!localPrefs) return;
+    updateMutation.mutate(localPrefs);
+  };
+
+  const PREF_ITEMS = [
+    { key: 'drift_alerts' as const, label: 'Drift Alerts', desc: 'Get alerted when bins move from their location', icon: Radar, bg: 'bg-red-50', color: 'text-red-600' },
+    { key: 'digests' as const, label: 'Daily Digests', desc: 'Receive morning and afternoon summary digests', icon: Clock, bg: 'bg-blue-50', color: 'text-blue-600' },
+    { key: 'shift_events' as const, label: 'Shift Events', desc: 'Notifications for shift creation and status changes', icon: Truck, bg: 'bg-green-50', color: 'text-green-600' },
+    { key: 'move_requests' as const, label: 'Move Requests', desc: 'Alerts for new and updated move requests', icon: ArrowRightLeft, bg: 'bg-amber-50', color: 'text-amber-600' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-xl bg-blue-50/50 border border-blue-100 px-4 py-3">
+        <p className="text-sm text-blue-700">
+          These are your personal notification preferences. System-wide toggles are managed in the
+          &quot;Notification Settings&quot; tab by admins.
+        </p>
+      </div>
+
+      {PREF_ITEMS.map((item) => (
+        <Card key={item.key} className="rounded-2xl">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={cn('p-2 rounded-lg', item.bg)}>
+                  <item.icon className={cn('w-5 h-5', item.color)} />
+                </div>
+                <div>
+                  <CardTitle className="text-base">{item.label}</CardTitle>
+                  <p className="text-sm text-gray-500 mt-0.5">{item.desc}</p>
+                </div>
+              </div>
+              <Toggle checked={current[item.key]} onChange={(val) => toggle(item.key, val)} />
+            </div>
+          </CardHeader>
+        </Card>
+      ))}
+
+      <div className="flex justify-end pt-2">
+        <Button onClick={handleSave} disabled={!isDirty || updateMutation.isPending} className="gap-2">
+          {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          {updateMutation.isPending ? 'Saving...' : 'Save Preferences'}
+        </Button>
+      </div>
+
+      {updateMutation.isSuccess && (
+        <p className="text-sm text-green-600 text-right">Preferences saved successfully.</p>
+      )}
+      {updateMutation.isError && (
+        <p className="text-sm text-red-600 text-right">
+          Failed to save: {(updateMutation.error as Error).message}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function SettingsView() {
-  const [activeTab, setActiveTab] = useState<'settings' | 'history'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'history' | 'preferences'>('settings');
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
@@ -479,6 +613,20 @@ export function SettingsView() {
           </div>
         </button>
         <button
+          onClick={() => setActiveTab('preferences')}
+          className={cn(
+            'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
+            activeTab === 'preferences'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <UserIcon className="w-4 h-4" />
+            My Preferences
+          </div>
+        </button>
+        <button
           onClick={() => setActiveTab('history')}
           className={cn(
             'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
@@ -495,7 +643,9 @@ export function SettingsView() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'settings' ? <NotificationSettingsTab /> : <NotificationHistoryTab />}
+      {activeTab === 'settings' && <NotificationSettingsTab />}
+      {activeTab === 'preferences' && <MyPreferencesTab />}
+      {activeTab === 'history' && <NotificationHistoryTab />}
     </div>
   );
 }
