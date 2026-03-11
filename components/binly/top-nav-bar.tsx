@@ -207,7 +207,7 @@ export function TopNavBar({ onOpenAIAssistant }: TopNavBarProps) {
             <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden animate-scale-in z-50">
               <button
                 onClick={() => {
-                  console.log('Settings clicked');
+                  router.push('/settings');
                   setProfileOpen(false);
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-[#EDF0FF] hover:text-[#4880FF] transition-colors duration-150"
