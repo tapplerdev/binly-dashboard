@@ -1,11 +1,12 @@
 'use client';
 
-import { Search, Sparkles, Bell, Settings, LogOut, ChevronDown, Menu, X, ChevronUp } from 'lucide-react';
+import { Search, Sparkles, Bell, Settings, LogOut, ChevronDown, Menu, X, ChevronUp, MapPin } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/lib/auth/store';
+import { useNotificationStore } from '@/lib/stores/notification-store';
 import { cn } from '@/lib/utils';
 import { sidebarNavItems } from './sidebar-nav-items';
 
@@ -16,11 +17,14 @@ interface TopNavBarProps {
 export function TopNavBar({ onOpenAIAssistant }: TopNavBarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const pathname = usePathname();
   const { user, clearAuth } = useAuthStore();
+  const { alerts, unreadCount, markAllRead } = useNotificationStore();
 
   const userInitial = user?.name?.charAt(0).toUpperCase() || 'U';
 
@@ -51,22 +55,25 @@ export function TopNavBar({ onOpenAIAssistant }: TopNavBarProps) {
     router.push('/login');
   };
 
-  // Close profile dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
         setProfileOpen(false);
       }
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        setNotificationsOpen(false);
+      }
     }
 
-    if (profileOpen) {
+    if (profileOpen || notificationsOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [profileOpen]);
+  }, [profileOpen, notificationsOpen]);
 
   const isActive = (path?: string) => {
     if (!path) return false;
@@ -119,11 +126,63 @@ export function TopNavBar({ onOpenAIAssistant }: TopNavBarProps) {
         </Button>
 
         {/* Notifications */}
-        <button className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors">
-          <Bell className="w-5 h-5 text-gray-600" />
-          {/* Notification badge */}
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-        </button>
+        <div className="relative" ref={notificationsRef}>
+          <button
+            onClick={() => {
+              setNotificationsOpen(!notificationsOpen);
+              if (!notificationsOpen && unreadCount > 0) markAllRead();
+            }}
+            className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <Bell className="w-5 h-5 text-gray-600" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 bg-red-500 rounded-full flex items-center justify-center">
+                <span className="text-[10px] font-bold text-white leading-none">{unreadCount}</span>
+              </span>
+            )}
+          </button>
+
+          {notificationsOpen && (
+            <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden animate-scale-in z-50">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+              </div>
+              <div className="max-h-80 overflow-y-auto">
+                {alerts.length === 0 ? (
+                  <div className="px-4 py-8 text-center text-sm text-gray-400">
+                    No notifications yet
+                  </div>
+                ) : (
+                  alerts.slice(0, 20).map((alert) => (
+                    <div
+                      key={alert.id}
+                      className={cn(
+                        'px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer',
+                        !alert.read && 'bg-blue-50/50'
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 p-1.5 rounded-lg bg-red-100 text-red-600 shrink-0">
+                          <MapPin className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-gray-900">{alert.title}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{alert.body}</p>
+                          {alert.actual_address && (
+                            <p className="text-xs text-gray-400 mt-1">at {alert.actual_address}</p>
+                          )}
+                          <p className="text-[10px] text-gray-300 mt-1">
+                            {new Date(alert.detected_at).toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Profile */}
         <div className="relative" ref={profileRef}>
