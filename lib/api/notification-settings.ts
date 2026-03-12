@@ -34,6 +34,11 @@ export interface NotificationSettings {
   afternoon_digest_hour: number;
   shift_notifications_enabled: boolean;
   move_request_notifications_enabled: boolean;
+  timezone: string;
+  overdue_move_alerts_enabled: boolean;
+  overdue_move_check_interval_minutes: number;
+  due_soon_alerts_enabled: boolean;
+  due_soon_hours_before: number;
 }
 
 export interface NotificationLogEntry {

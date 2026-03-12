@@ -50,6 +50,8 @@ export interface NotificationPreferences {
   digests: boolean;
   shift_events: boolean;
   move_requests: boolean;
+  overdue_move_alerts: boolean;
+  due_soon_alerts: boolean;
 }
 
 export async function getNotifications(page = 1, limit = 20): Promise<NotificationsResponse> {

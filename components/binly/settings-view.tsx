@@ -14,6 +14,9 @@ import {
   Search,
   User as UserIcon,
   Send,
+  Globe,
+  AlertTriangle,
+  Timer,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,12 +41,23 @@ const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => ({
   label: i === 0 ? '12:00 AM' : i < 12 ? `${i}:00 AM` : i === 12 ? '12:00 PM' : `${i - 12}:00 PM`,
 }));
 
+const TIMEZONE_OPTIONS = [
+  { value: 'America/New_York', label: 'Eastern (ET)' },
+  { value: 'America/Chicago', label: 'Central (CT)' },
+  { value: 'America/Denver', label: 'Mountain (MT)' },
+  { value: 'America/Los_Angeles', label: 'Pacific (PT)' },
+  { value: 'America/Phoenix', label: 'Arizona (no DST)' },
+  { value: 'UTC', label: 'UTC' },
+];
+
 const NOTIFICATION_TYPES = [
   { value: '', label: 'All Types' },
   { value: 'bin_drift_alert', label: 'Drift Alerts' },
-  { value: 'digest_overdue_moves', label: 'Overdue Moves' },
-  { value: 'digest_upcoming_moves', label: 'Upcoming Moves' },
-  { value: 'digest_warehouse_bins', label: 'Warehouse Bins' },
+  { value: 'digest_overdue_moves', label: 'Overdue Moves (Digest)' },
+  { value: 'digest_upcoming_moves', label: 'Upcoming Moves (Digest)' },
+  { value: 'digest_warehouse_bins', label: 'Warehouse Bins (Digest)' },
+  { value: 'move_request_overdue', label: 'Overdue Move (Real-time)' },
+  { value: 'move_request_due_soon', label: 'Due Soon (Real-time)' },
   { value: 'shift_created', label: 'Shift Created' },
   { value: 'shift_cancelled', label: 'Shift Cancelled' },
   { value: 'move_request_created', label: 'Move Request Created' },
@@ -65,6 +79,10 @@ function getTypeBadge(type: string) {
       return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Shift Cancelled</Badge>;
     case 'move_request_created':
       return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Move Request</Badge>;
+    case 'move_request_overdue':
+      return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Overdue (RT)</Badge>;
+    case 'move_request_due_soon':
+      return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Due Soon (RT)</Badge>;
     default:
       return <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">{type.replace(/_/g, ' ')}</Badge>;
   }
@@ -120,7 +138,7 @@ function NotificationSettingsTab() {
     setLocalSettings({ ...settings });
   }
 
-  const update = (key: keyof NotificationSettings, value: boolean | number) => {
+  const update = (key: keyof NotificationSettings, value: boolean | number | string) => {
     setLocalSettings((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
@@ -133,6 +151,36 @@ function NotificationSettingsTab() {
 
   return (
     <div className="space-y-6">
+      {/* Timezone */}
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-gray-100">
+                <Globe className="w-5 h-5 text-gray-600" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Timezone</CardTitle>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  All scheduled notifications use this timezone
+                </p>
+              </div>
+            </div>
+            <select
+              value={current.timezone || 'America/New_York'}
+              onChange={(e) => update('timezone', e.target.value)}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
+            >
+              {TIMEZONE_OPTIONS.map((tz) => (
+                <option key={tz.value} value={tz.value}>
+                  {tz.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </CardHeader>
+      </Card>
+
       {/* Drift Alerts */}
       <Card className="rounded-2xl">
         <CardHeader className="pb-3">
@@ -387,6 +435,94 @@ function NotificationSettingsTab() {
         </CardHeader>
       </Card>
 
+      {/* Overdue Move Alerts */}
+      <Card className="rounded-2xl">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-red-50">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Overdue Move Alerts</CardTitle>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Real-time alerts when move requests pass their scheduled date
+                </p>
+              </div>
+            </div>
+            <Toggle
+              checked={current.overdue_move_alerts_enabled}
+              onChange={(val) => update('overdue_move_alerts_enabled', val)}
+            />
+          </div>
+        </CardHeader>
+        {current.overdue_move_alerts_enabled && (
+          <CardContent className="pt-0">
+            <div className="pl-12">
+              <div className="max-w-xs">
+                <label className="text-sm font-medium text-gray-700">
+                  Check Interval (minutes)
+                </label>
+                <input
+                  type="number"
+                  min={5}
+                  max={120}
+                  value={current.overdue_move_check_interval_minutes}
+                  onChange={(e) =>
+                    update('overdue_move_check_interval_minutes', parseInt(e.target.value) || 15)
+                  }
+                  className="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
+                />
+              </div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Due Soon Alerts */}
+      <Card className="rounded-2xl">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-yellow-50">
+                <Timer className="w-5 h-5 text-yellow-600" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Due Soon Alerts</CardTitle>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Alerts when move requests are approaching their scheduled date
+                </p>
+              </div>
+            </div>
+            <Toggle
+              checked={current.due_soon_alerts_enabled}
+              onChange={(val) => update('due_soon_alerts_enabled', val)}
+            />
+          </div>
+        </CardHeader>
+        {current.due_soon_alerts_enabled && (
+          <CardContent className="pt-0">
+            <div className="pl-12">
+              <div className="max-w-xs">
+                <label className="text-sm font-medium text-gray-700">
+                  Hours Before Due Date
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={168}
+                  value={current.due_soon_hours_before}
+                  onChange={(e) =>
+                    update('due_soon_hours_before', parseInt(e.target.value) || 24)
+                  }
+                  className="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
+                />
+              </div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
       {/* Save Button */}
       <div className="flex justify-end pt-2">
         <Button
@@ -567,6 +703,8 @@ function MyPreferencesTab() {
     digests: prefs.digests,
     shift_events: prefs.shift_events,
     move_requests: prefs.move_requests,
+    overdue_move_alerts: prefs.overdue_move_alerts,
+    due_soon_alerts: prefs.due_soon_alerts,
   } : null);
 
   if (isLoading || !current) {
@@ -583,6 +721,8 @@ function MyPreferencesTab() {
       digests: prefs.digests,
       shift_events: prefs.shift_events,
       move_requests: prefs.move_requests,
+      overdue_move_alerts: prefs.overdue_move_alerts,
+      due_soon_alerts: prefs.due_soon_alerts,
     });
   }
 
@@ -595,6 +735,8 @@ function MyPreferencesTab() {
     digests: prefs.digests,
     shift_events: prefs.shift_events,
     move_requests: prefs.move_requests,
+    overdue_move_alerts: prefs.overdue_move_alerts,
+    due_soon_alerts: prefs.due_soon_alerts,
   } : null);
 
   const handleSave = () => {
@@ -617,6 +759,8 @@ function MyPreferencesTab() {
     { key: 'digests' as const, label: 'Daily Digests', desc: 'Receive morning and afternoon summary digests', context: digestContext, icon: Clock, bg: 'bg-blue-50', color: 'text-blue-600', adminOnly: true },
     { key: 'shift_events' as const, label: 'Shift Events', desc: 'Shift creation, cancellation, and reassignment alerts', context: 'Includes route assignments and driver changes', icon: Truck, bg: 'bg-green-50', color: 'text-green-600', adminOnly: false },
     { key: 'move_requests' as const, label: 'Move Requests', desc: 'Alerts for new and updated move requests', context: 'New assignments and status changes', icon: ArrowRightLeft, bg: 'bg-amber-50', color: 'text-amber-600', adminOnly: false },
+    { key: 'overdue_move_alerts' as const, label: 'Overdue Move Alerts', desc: 'Real-time alerts when moves pass their scheduled date', context: 'Individual alerts per overdue move request', icon: AlertTriangle, bg: 'bg-red-50', color: 'text-red-600', adminOnly: true },
+    { key: 'due_soon_alerts' as const, label: 'Due Soon Alerts', desc: 'Alerts when move requests are approaching their due date', context: 'Individual alerts per upcoming move request', icon: Timer, bg: 'bg-yellow-50', color: 'text-yellow-600', adminOnly: true },
   ];
 
   const PREF_ITEMS = userRole === 'admin'
