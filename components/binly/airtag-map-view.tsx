@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps';
-import { Loader2, Radio, X, MapPin, Clock, AlertCircle, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning } from 'lucide-react';
-import { MapSearchBar } from './map-search-bar';
+import { Loader2, Radio, X, MapPin, Clock, AlertCircle, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Search } from 'lucide-react';
 import { useAirTags } from '@/lib/hooks/use-airtags';
 import type { AirTagLocation } from '@/lib/api/airtags';
 
@@ -53,6 +52,110 @@ function getBatteryColor(status: number): string {
     case 3: return '#EF4444'; // red
     default: return '#9CA3AF'; // gray
   }
+}
+
+// ── AirTag Search Bar ─────────────────────────────────────────────────────────
+
+function AirTagSearchBar({
+  locations,
+  onSelect,
+}: {
+  locations: AirTagLocation[];
+  onSelect: (loc: AirTagLocation) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const results = useMemo(() => {
+    if (!query.trim()) return [];
+    const q = query.toLowerCase().trim();
+    return locations
+      .filter((l) =>
+        String(l.bin_number).includes(q) ||
+        l.name.toLowerCase().includes(q) ||
+        l.address.toLowerCase().includes(q) ||
+        l.city.toLowerCase().includes(q)
+      )
+      .slice(0, 5);
+  }, [query, locations]);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+    setIsOpen(results.length > 0);
+  }, [results]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelect = (loc: AirTagLocation) => {
+    onSelect(loc);
+    setQuery('');
+    setIsOpen(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex((i) => Math.min(i + 1, results.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter' && results[selectedIndex]) {
+      handleSelect(results[selectedIndex]);
+    } else if (e.key === 'Escape') {
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={() => results.length > 0 && setIsOpen(true)}
+          placeholder="Search bin #, name, or address..."
+          className="w-full bg-white/95 backdrop-blur-sm rounded-xl shadow-lg pl-10 pr-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-primary/30 border border-white/50"
+        />
+      </div>
+      {isOpen && results.length > 0 && (
+        <div className="absolute top-full mt-1 w-full bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50">
+          {results.map((loc, i) => (
+            <button
+              key={loc.id}
+              onClick={() => handleSelect(loc)}
+              className={`w-full px-3 py-2.5 flex items-center gap-3 text-left transition-colors ${
+                i === selectedIndex ? 'bg-primary/5' : 'hover:bg-gray-50'
+              }`}
+            >
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
+                style={{ backgroundColor: AIRTAG_MARKER_COLOR }}
+              >
+                {loc.bin_number}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-800 truncate">{loc.name}</p>
+                <p className="text-xs text-gray-400 truncate">{loc.address}, {loc.city}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Map Controller ─────────────────────────────────────────────────────────────
@@ -191,32 +294,30 @@ export function AirTagMapView() {
     lng: number;
     zoom?: number;
   } | null>(null);
+  const [batteryFilter, setBatteryFilter] = useState<number | null>(null);
+
+  const filteredLocations = useMemo(() => {
+    if (batteryFilter === null) return locations;
+    return locations.filter((l) => l.battery_status === batteryFilter);
+  }, [locations, batteryFilter]);
 
   const handleMarkerClick = useCallback((loc: AirTagLocation) => {
     setSelectedLocation(loc);
     setTargetLocation({ lat: loc.latitude, lng: loc.longitude, zoom: 16 });
   }, []);
 
-  const handleSearchSelect = useCallback(
-    (result: { lat: number; lng: number; binId?: string }) => {
-      setTargetLocation({ lat: result.lat, lng: result.lng, zoom: 16 });
+  const handleSearchSelect = useCallback((loc: AirTagLocation) => {
+    setSelectedLocation(loc);
+    setTargetLocation({ lat: loc.latitude, lng: loc.longitude, zoom: 16 });
+  }, []);
 
-      // Try to find a matching AirTag location near the search result
-      if (result.binId) {
-        const match = locations.find((l) => l.id === result.binId);
-        if (match) setSelectedLocation(match);
-      }
-    },
-    [locations]
-  );
-
-  // Stats
-  const totalTags = locations.length;
-  const recentCount = locations.filter((l) => {
+  // Stats (based on filtered view)
+  const totalTags = filteredLocations.length;
+  const recentCount = filteredLocations.filter((l) => {
     const diff = Date.now() - new Date(l.last_seen).getTime();
     return diff < 30 * 60000; // last 30 min
   }).length;
-  const staleCount = locations.filter((l) => {
+  const staleCount = filteredLocations.filter((l) => {
     const diff = Date.now() - new Date(l.last_seen).getTime();
     return diff > 2 * 60 * 60000; // over 2 hours
   }).length;
@@ -288,9 +389,40 @@ export function AirTagMapView() {
 
       {/* Search Bar */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 w-full max-w-md px-4">
-        <MapSearchBar
-          onSelect={handleSearchSelect}
-        />
+        <AirTagSearchBar locations={filteredLocations} onSelect={handleSearchSelect} />
+      </div>
+
+      {/* Battery Filter Chips */}
+      <div className="absolute top-[60px] left-4 z-30 flex items-center gap-1.5">
+        {([
+          { value: null, label: 'All', color: '#6B7280' },
+          { value: 0, label: 'Full', color: getBatteryColor(0) },
+          { value: 1, label: 'Medium', color: getBatteryColor(1) },
+          { value: 2, label: 'Low', color: getBatteryColor(2) },
+          { value: 3, label: 'Critical', color: getBatteryColor(3) },
+        ] as const).map((chip) => {
+          const isActive = batteryFilter === chip.value;
+          const count = chip.value === null
+            ? locations.length
+            : locations.filter((l) => l.battery_status === chip.value).length;
+          return (
+            <button
+              key={chip.label}
+              onClick={() => setBatteryFilter(chip.value)}
+              className={`backdrop-blur-sm rounded-full shadow-md px-2.5 py-1 flex items-center gap-1.5 transition-all text-xs font-medium border ${
+                isActive
+                  ? 'bg-white border-gray-300 text-gray-900'
+                  : 'bg-white/80 border-transparent text-gray-500 hover:bg-white/95'
+              }`}
+            >
+              {chip.value !== null && (
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: chip.color }} />
+              )}
+              <span>{chip.label}</span>
+              <span className="text-gray-400">{count}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Info Card (shown on marker click) */}
@@ -411,7 +543,7 @@ export function AirTagMapView() {
           />
 
           <AirTagMarkerLayer
-            locations={locations}
+            locations={filteredLocations}
             onMarkerClick={handleMarkerClick}
           />
         </Map>
