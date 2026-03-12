@@ -30,8 +30,10 @@ export interface NotificationSettings {
   drift_threshold_meters: number;
   morning_digest_enabled: boolean;
   morning_digest_hour: number;
+  morning_digest_minute: number;
   afternoon_digest_enabled: boolean;
   afternoon_digest_hour: number;
+  afternoon_digest_minute: number;
   shift_notifications_enabled: boolean;
   move_request_notifications_enabled: boolean;
   timezone: string;

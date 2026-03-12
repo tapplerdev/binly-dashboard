@@ -38,7 +38,12 @@ import { useAuthStore } from '@/lib/auth/store';
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => ({
   value: i,
-  label: i === 0 ? '12:00 AM' : i < 12 ? `${i}:00 AM` : i === 12 ? '12:00 PM' : `${i - 12}:00 PM`,
+  label: i === 0 ? '12 AM' : i < 12 ? `${i} AM` : i === 12 ? '12 PM' : `${i - 12} PM`,
+}));
+
+const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
+  value: i * 5,
+  label: String(i * 5).padStart(2, '0'),
 }));
 
 const TIMEZONE_OPTIONS = [
@@ -267,17 +272,31 @@ function NotificationSettingsTab() {
             <div className="pl-12 flex items-end gap-4">
               <div>
                 <label className="text-sm font-medium text-gray-700">Send At</label>
-                <select
-                  value={current.morning_digest_hour}
-                  onChange={(e) => update('morning_digest_hour', parseInt(e.target.value))}
-                  className="mt-1 block w-full sm:w-48 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
-                >
-                  {HOUR_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-1 mt-1">
+                  <select
+                    value={current.morning_digest_hour}
+                    onChange={(e) => update('morning_digest_hour', parseInt(e.target.value))}
+                    className="block w-24 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
+                  >
+                    {HOUR_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-gray-400 font-medium">:</span>
+                  <select
+                    value={current.morning_digest_minute}
+                    onChange={(e) => update('morning_digest_minute', parseInt(e.target.value))}
+                    className="block w-20 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
+                  >
+                    {MINUTE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <Button
                 variant="outline"
@@ -336,17 +355,31 @@ function NotificationSettingsTab() {
             <div className="pl-12 flex items-end gap-4">
               <div>
                 <label className="text-sm font-medium text-gray-700">Send At</label>
-                <select
-                  value={current.afternoon_digest_hour}
-                  onChange={(e) => update('afternoon_digest_hour', parseInt(e.target.value))}
-                  className="mt-1 block w-full sm:w-48 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
-                >
-                  {HOUR_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-1 mt-1">
+                  <select
+                    value={current.afternoon_digest_hour}
+                    onChange={(e) => update('afternoon_digest_hour', parseInt(e.target.value))}
+                    className="block w-24 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
+                  >
+                    {HOUR_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-gray-400 font-medium">:</span>
+                  <select
+                    value={current.afternoon_digest_minute}
+                    onChange={(e) => update('afternoon_digest_minute', parseInt(e.target.value))}
+                    className="block w-20 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
+                  >
+                    {MINUTE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <Button
                 variant="outline"
@@ -749,9 +782,12 @@ function MyPreferencesTab() {
     ? `Checking every ${sysSettings.drift_check_interval_minutes} min, ${sysSettings.drift_threshold_meters}m threshold`
     : undefined;
 
-  const formatHour = (h: number) => h === 0 ? '12:00 AM' : h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h - 12}:00 PM`;
+  const formatTime = (h: number, m: number) => {
+    const min = String(m || 0).padStart(2, '0');
+    return h === 0 ? `12:${min} AM` : h < 12 ? `${h}:${min} AM` : h === 12 ? `12:${min} PM` : `${h - 12}:${min} PM`;
+  };
   const digestContext = sysSettings
-    ? `Morning at ${formatHour(sysSettings.morning_digest_hour)}, afternoon at ${formatHour(sysSettings.afternoon_digest_hour)}`
+    ? `Morning at ${formatTime(sysSettings.morning_digest_hour, sysSettings.morning_digest_minute)}, afternoon at ${formatTime(sysSettings.afternoon_digest_hour, sysSettings.afternoon_digest_minute)}`
     : undefined;
 
   const ALL_PREF_ITEMS = [
