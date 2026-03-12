@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps';
-import { Loader2, Radio, X, MapPin, Clock, AlertCircle } from 'lucide-react';
+import { Loader2, Radio, X, MapPin, Clock, AlertCircle, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning } from 'lucide-react';
 import { MapSearchBar } from './map-search-bar';
 import { useAirTags } from '@/lib/hooks/use-airtags';
 import type { AirTagLocation } from '@/lib/api/airtags';
@@ -33,6 +33,26 @@ function getLastSeenColor(isoString: string): string {
   if (minutes < 30) return '#10B981'; // green — recent
   if (minutes < 120) return '#F59E0B'; // amber — aging
   return '#EF4444'; // red — stale
+}
+
+function getBatteryLabel(status: number): string {
+  switch (status) {
+    case 0: return 'Full';
+    case 1: return 'Medium';
+    case 2: return 'Low';
+    case 3: return 'Critical';
+    default: return 'Unknown';
+  }
+}
+
+function getBatteryColor(status: number): string {
+  switch (status) {
+    case 0: return '#10B981'; // green
+    case 1: return '#3B82F6'; // blue
+    case 2: return '#F59E0B'; // amber
+    case 3: return '#EF4444'; // red
+    default: return '#9CA3AF'; // gray
+  }
 }
 
 // ── Map Controller ─────────────────────────────────────────────────────────────
@@ -119,6 +139,17 @@ function AirTagMarkerLayer({
       `;
       el.appendChild(dot);
 
+      // Battery indicator dot (top-right, only for Low/Critical)
+      if (loc.battery_status >= 2) {
+        const battDot = document.createElement('div');
+        battDot.style.cssText = `
+          position:absolute;top:-1px;right:-1px;
+          width:10px;height:10px;border-radius:50%;
+          background:${getBatteryColor(loc.battery_status)};border:2px solid #fff;
+        `;
+        el.appendChild(battDot);
+      }
+
       el.addEventListener('mouseenter', () => {
         el.style.transform = 'scale(1.15)';
       });
@@ -189,6 +220,7 @@ export function AirTagMapView() {
     const diff = Date.now() - new Date(l.last_seen).getTime();
     return diff > 2 * 60 * 60000; // over 2 hours
   }).length;
+  const lowBatteryCount = locations.filter((l) => l.battery_status >= 2).length;
 
   if (isLoading) {
     return (
@@ -243,6 +275,12 @@ export function AirTagMapView() {
             <div className="bg-white/95 backdrop-blur-sm rounded-full shadow-md px-3 py-1.5 flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-red-500" />
               <span className="text-xs font-medium text-gray-700">{staleCount} Stale</span>
+            </div>
+          )}
+          {lowBatteryCount > 0 && (
+            <div className="bg-white/95 backdrop-blur-sm rounded-full shadow-md px-3 py-1.5 flex items-center gap-1.5">
+              <BatteryWarning className="w-3.5 h-3.5 text-amber-500" />
+              <span className="text-xs font-medium text-gray-700">{lowBatteryCount} Low Battery</span>
             </div>
           )}
         </div>
@@ -310,6 +348,15 @@ export function AirTagMapView() {
                 <Radio className="w-4 h-4 text-gray-400 flex-shrink-0" />
                 <p className="text-xs text-gray-500">
                   {selectedLocation.latitude.toFixed(6)}, {selectedLocation.longitude.toFixed(6)}
+                </p>
+              </div>
+              <div className="flex items-center gap-2.5">
+                {selectedLocation.battery_status === 0 && <BatteryFull className="w-4 h-4 flex-shrink-0" style={{ color: getBatteryColor(0) }} />}
+                {selectedLocation.battery_status === 1 && <BatteryMedium className="w-4 h-4 flex-shrink-0" style={{ color: getBatteryColor(1) }} />}
+                {selectedLocation.battery_status === 2 && <BatteryLow className="w-4 h-4 flex-shrink-0" style={{ color: getBatteryColor(2) }} />}
+                {selectedLocation.battery_status === 3 && <BatteryWarning className="w-4 h-4 flex-shrink-0" style={{ color: getBatteryColor(3) }} />}
+                <p className="text-xs text-gray-500" style={{ color: getBatteryColor(selectedLocation.battery_status) }}>
+                  Battery: {getBatteryLabel(selectedLocation.battery_status)}
                 </p>
               </div>
             </div>

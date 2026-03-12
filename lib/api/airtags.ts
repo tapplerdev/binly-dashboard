@@ -14,6 +14,7 @@ export interface AirTagLocation {
   address: string;
   city: string;
   last_seen: string; // ISO timestamp
+  battery_status: number; // 0=Full, 1=Medium, 2=Low, 3=Critical
 }
 
 export interface AirTagLocationsResponse {
