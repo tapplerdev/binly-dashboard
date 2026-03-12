@@ -448,15 +448,6 @@ function BinsPageContent() {
                         Location
                       </th>
                       <th
-                        className="text-left py-4 px-4 text-sm font-semibold text-gray-700 cursor-pointer align-middle"
-                        onClick={() => handleSort('priority')}
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <span>Check Status</span>
-                          <ChevronsUpDown className="w-4 h-4 text-gray-400" />
-                        </div>
-                      </th>
-                      <th
                         className="text-left py-4 px-4 text-sm font-semibold text-gray-700 cursor-pointer whitespace-nowrap align-middle"
                         onClick={() => handleSort('fill_percentage')}
                       >
@@ -471,6 +462,15 @@ function BinsPageContent() {
                       >
                         <div className="flex items-center gap-1.5">
                           <span>Status</span>
+                          <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                        </div>
+                      </th>
+                      <th
+                        className="text-left py-4 px-4 text-sm font-semibold text-gray-700 cursor-pointer whitespace-nowrap align-middle"
+                        onClick={() => handleSort('priority')}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Check Status</span>
                           <ChevronsUpDown className="w-4 h-4 text-gray-400" />
                         </div>
                       </th>
@@ -524,17 +524,17 @@ function BinsPageContent() {
                             </div>
                           </td>
                           <td className="py-4 px-4 align-middle">
-                            <Badge className={cn('border', checkStatus.color)}>
-                              {checkStatus.label}
-                            </Badge>
-                          </td>
-                          <td className="py-4 px-4 align-middle">
                             <div className="flex items-center justify-center">
                               <Badge className={fill.color}>{fill.label}</Badge>
                             </div>
                           </td>
                           <td className="py-4 px-4 align-middle">
                             <Badge className={cn(status.color, 'whitespace-nowrap')}>{status.label}</Badge>
+                          </td>
+                          <td className="py-4 px-4 align-middle">
+                            <Badge className={cn('border whitespace-nowrap', checkStatus.color)}>
+                              {checkStatus.label}
+                            </Badge>
                           </td>
                           <td className="py-4 px-4 align-middle">
                             <div className="flex items-center justify-center">
