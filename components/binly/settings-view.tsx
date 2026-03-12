@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Bell,
   Clock,
@@ -17,6 +17,7 @@ import {
   Globe,
   AlertTriangle,
   Timer,
+  ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,15 +37,149 @@ import type { NotificationSettings } from '@/lib/api/notification-settings';
 import type { NotificationPreferences } from '@/lib/api/notifications';
 import { useAuthStore } from '@/lib/auth/store';
 
-const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => ({
-  value: i,
-  label: i === 0 ? '12 AM' : i < 12 ? `${i} AM` : i === 12 ? '12 PM' : `${i - 12} PM`,
-}));
+function formatTimeDisplay(hour: number, minute: number) {
+  const min = String(minute).padStart(2, '0');
+  if (hour === 0) return `12:${min} AM`;
+  if (hour < 12) return `${hour}:${min} AM`;
+  if (hour === 12) return `12:${min} PM`;
+  return `${hour - 12}:${min} PM`;
+}
 
-const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
-  value: i * 5,
-  label: String(i * 5).padStart(2, '0'),
-}));
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const MINUTES = Array.from({ length: 60 }, (_, i) => i);
+
+function TimePicker({
+  hour,
+  minute,
+  onHourChange,
+  onMinuteChange,
+}: {
+  hour: number;
+  minute: number;
+  onHourChange: (h: number) => void;
+  onMinuteChange: (m: number) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const hourScrollRef = useRef<HTMLDivElement>(null);
+  const minuteScrollRef = useRef<HTMLDivElement>(null);
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsClosing(false);
+      setIsOpen(false);
+    }, 150);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        if (isOpen) handleClose();
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  // Scroll selected items into view when dropdown opens
+  useEffect(() => {
+    if (isOpen && !isClosing) {
+      setTimeout(() => {
+        hourScrollRef.current?.querySelector('[data-selected="true"]')?.scrollIntoView({ block: 'center' });
+        minuteScrollRef.current?.querySelector('[data-selected="true"]')?.scrollIntoView({ block: 'center' });
+      }, 50);
+    }
+  }, [isOpen, isClosing]);
+
+  const formatHourLabel = (h: number) => {
+    if (h === 0) return '12 AM';
+    if (h < 12) return `${h} AM`;
+    if (h === 12) return '12 PM';
+    return `${h - 12} PM`;
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => (isOpen ? handleClose() : setIsOpen(true))}
+        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700 min-w-[150px]"
+      >
+        <Clock className="w-4 h-4 text-gray-400" />
+        <span className="text-gray-900">{formatTimeDisplay(hour, minute)}</span>
+        <ChevronDown
+          className={cn(
+            'w-4 h-4 text-gray-400 transition-transform ml-auto',
+            isOpen && 'rotate-180'
+          )}
+        />
+      </button>
+
+      {(isOpen || isClosing) && (
+        <div
+          className={cn(
+            'absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden',
+            isClosing ? 'animate-slide-out-up' : 'animate-slide-in-down'
+          )}
+        >
+          <div className="flex">
+            {/* Hour column */}
+            <div className="border-r border-gray-100">
+              <div className="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 border-b border-gray-100 text-center">
+                Hour
+              </div>
+              <div ref={hourScrollRef} className="max-h-[220px] overflow-y-auto w-[80px]">
+                {HOURS.map((h) => (
+                  <button
+                    key={h}
+                    type="button"
+                    data-selected={h === hour}
+                    onClick={() => onHourChange(h)}
+                    className={cn(
+                      'w-full px-3 py-2 text-sm text-center transition-colors',
+                      h === hour
+                        ? 'bg-blue-50 text-primary font-semibold'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    )}
+                  >
+                    {formatHourLabel(h)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Minute column */}
+            <div>
+              <div className="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 border-b border-gray-100 text-center">
+                Min
+              </div>
+              <div ref={minuteScrollRef} className="max-h-[220px] overflow-y-auto w-[60px]">
+                {MINUTES.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    data-selected={m === minute}
+                    onClick={() => onMinuteChange(m)}
+                    className={cn(
+                      'w-full px-3 py-2 text-sm text-center transition-colors',
+                      m === minute
+                        ? 'bg-blue-50 text-primary font-semibold'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    )}
+                  >
+                    {String(m).padStart(2, '0')}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const TIMEZONE_OPTIONS = [
   { value: 'America/New_York', label: 'Eastern (ET)' },
@@ -271,32 +406,13 @@ function NotificationSettingsTab() {
           <CardContent className="pt-0">
             <div className="pl-12 flex items-end gap-4">
               <div>
-                <label className="text-sm font-medium text-gray-700">Send At</label>
-                <div className="flex items-center gap-1 mt-1">
-                  <select
-                    value={current.morning_digest_hour}
-                    onChange={(e) => update('morning_digest_hour', parseInt(e.target.value))}
-                    className="block w-24 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
-                  >
-                    {HOUR_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="text-gray-400 font-medium">:</span>
-                  <select
-                    value={current.morning_digest_minute}
-                    onChange={(e) => update('morning_digest_minute', parseInt(e.target.value))}
-                    className="block w-20 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
-                  >
-                    {MINUTE_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Send At</label>
+                <TimePicker
+                  hour={current.morning_digest_hour}
+                  minute={current.morning_digest_minute}
+                  onHourChange={(h) => update('morning_digest_hour', h)}
+                  onMinuteChange={(m) => update('morning_digest_minute', m)}
+                />
               </div>
               <Button
                 variant="outline"
@@ -354,32 +470,13 @@ function NotificationSettingsTab() {
           <CardContent className="pt-0">
             <div className="pl-12 flex items-end gap-4">
               <div>
-                <label className="text-sm font-medium text-gray-700">Send At</label>
-                <div className="flex items-center gap-1 mt-1">
-                  <select
-                    value={current.afternoon_digest_hour}
-                    onChange={(e) => update('afternoon_digest_hour', parseInt(e.target.value))}
-                    className="block w-24 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
-                  >
-                    {HOUR_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="text-gray-400 font-medium">:</span>
-                  <select
-                    value={current.afternoon_digest_minute}
-                    onChange={(e) => update('afternoon_digest_minute', parseInt(e.target.value))}
-                    className="block w-20 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
-                  >
-                    {MINUTE_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Send At</label>
+                <TimePicker
+                  hour={current.afternoon_digest_hour}
+                  minute={current.afternoon_digest_minute}
+                  onHourChange={(h) => update('afternoon_digest_hour', h)}
+                  onMinuteChange={(m) => update('afternoon_digest_minute', m)}
+                />
               </div>
               <Button
                 variant="outline"
