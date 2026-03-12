@@ -842,6 +842,7 @@ function MyPreferencesTab() {
     move_requests: prefs.move_requests,
     overdue_move_alerts: prefs.overdue_move_alerts,
     due_soon_alerts: prefs.due_soon_alerts,
+    bin_check_reports: prefs.bin_check_reports,
   } : null);
 
   if (isLoading || !current) {
@@ -860,6 +861,7 @@ function MyPreferencesTab() {
       move_requests: prefs.move_requests,
       overdue_move_alerts: prefs.overdue_move_alerts,
       due_soon_alerts: prefs.due_soon_alerts,
+      bin_check_reports: prefs.bin_check_reports,
     });
   }
 
@@ -874,6 +876,7 @@ function MyPreferencesTab() {
     move_requests: prefs.move_requests,
     overdue_move_alerts: prefs.overdue_move_alerts,
     due_soon_alerts: prefs.due_soon_alerts,
+    bin_check_reports: prefs.bin_check_reports,
   } : null);
 
   const handleSave = () => {
@@ -890,13 +893,17 @@ function MyPreferencesTab() {
     const min = String(m || 0).padStart(2, '0');
     return h === 0 ? `12:${min} AM` : h < 12 ? `${h}:${min} AM` : h === 12 ? `12:${min} PM` : `${h - 12}:${min} PM`;
   };
-  const digestContext = sysSettings
-    ? `Morning at ${formatTime(sysSettings.morning_digest_hour, sysSettings.morning_digest_minute)}, afternoon at ${formatTime(sysSettings.afternoon_digest_hour, sysSettings.afternoon_digest_minute)}`
+  const moveReportContext = sysSettings
+    ? `Scheduled at ${formatTime(sysSettings.daily_move_report_hour, sysSettings.daily_move_report_minute)}`
+    : undefined;
+  const binCheckContext = sysSettings
+    ? `Scheduled at ${formatTime(sysSettings.daily_bin_check_hour, sysSettings.daily_bin_check_minute)}`
     : undefined;
 
   const ALL_PREF_ITEMS = [
     { key: 'drift_alerts' as const, label: 'Drift Alerts', desc: 'Get alerted when bins move from their location', context: driftContext, icon: Radar, bg: 'bg-red-50', color: 'text-red-600', adminOnly: true },
-    { key: 'digests' as const, label: 'Daily Digests', desc: 'Receive morning and afternoon summary digests', context: digestContext, icon: Clock, bg: 'bg-blue-50', color: 'text-blue-600', adminOnly: true },
+    { key: 'digests' as const, label: 'Daily Move Reports', desc: 'Daily summary of overdue and upcoming moves', context: moveReportContext, icon: Clock, bg: 'bg-blue-50', color: 'text-blue-600', adminOnly: true },
+    { key: 'bin_check_reports' as const, label: 'Bin Check Reports', desc: 'Daily summary of bins that need checking', context: binCheckContext, icon: ClipboardList, bg: 'bg-teal-50', color: 'text-teal-600', adminOnly: true },
     { key: 'shift_events' as const, label: 'Shift Events', desc: 'Shift creation, cancellation, and reassignment alerts', context: 'Includes route assignments and driver changes', icon: Truck, bg: 'bg-green-50', color: 'text-green-600', adminOnly: false },
     { key: 'move_requests' as const, label: 'Move Requests', desc: 'Alerts for new and updated move requests', context: 'New assignments and status changes', icon: ArrowRightLeft, bg: 'bg-amber-50', color: 'text-amber-600', adminOnly: false },
     { key: 'overdue_move_alerts' as const, label: 'Overdue Move Alerts', desc: 'Real-time alerts when moves pass their scheduled date', context: 'Individual alerts per overdue move request', icon: AlertTriangle, bg: 'bg-red-50', color: 'text-red-600', adminOnly: true },
