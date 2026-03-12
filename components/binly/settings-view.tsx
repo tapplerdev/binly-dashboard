@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   Timer,
   ChevronDown,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -192,27 +193,33 @@ const TIMEZONE_OPTIONS = [
 
 const NOTIFICATION_TYPES = [
   { value: '', label: 'All Types' },
+  { value: 'daily_move_report', label: 'Daily Move Report' },
+  { value: 'daily_bin_check_report', label: 'Daily Bin Check Report' },
   { value: 'bin_drift_alert', label: 'Drift Alerts' },
-  { value: 'digest_overdue_moves', label: 'Overdue Moves (Digest)' },
-  { value: 'digest_upcoming_moves', label: 'Upcoming Moves (Digest)' },
-  { value: 'digest_warehouse_bins', label: 'Warehouse Bins (Digest)' },
   { value: 'move_request_overdue', label: 'Overdue Move (Real-time)' },
   { value: 'move_request_due_soon', label: 'Due Soon (Real-time)' },
   { value: 'shift_created', label: 'Shift Created' },
   { value: 'shift_cancelled', label: 'Shift Cancelled' },
   { value: 'move_request_created', label: 'Move Request Created' },
+  { value: 'digest_overdue_moves', label: 'Overdue Moves (Legacy)' },
+  { value: 'digest_upcoming_moves', label: 'Upcoming Moves (Legacy)' },
+  { value: 'digest_warehouse_bins', label: 'Warehouse Bins (Legacy)' },
 ];
 
 function getTypeBadge(type: string) {
   switch (type) {
+    case 'daily_move_report':
+      return <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">Move Report</Badge>;
+    case 'daily_bin_check_report':
+      return <Badge className="bg-teal-100 text-teal-700 hover:bg-teal-100">Bin Check</Badge>;
     case 'bin_drift_alert':
       return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Drift Alert</Badge>;
     case 'digest_overdue_moves':
-      return <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">Overdue</Badge>;
+      return <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">Overdue (Legacy)</Badge>;
     case 'digest_upcoming_moves':
-      return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Upcoming</Badge>;
+      return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Upcoming (Legacy)</Badge>;
     case 'digest_warehouse_bins':
-      return <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100">Warehouse</Badge>;
+      return <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100">Warehouse (Legacy)</Badge>;
     case 'shift_created':
       return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Shift Created</Badge>;
     case 'shift_cancelled':
@@ -381,50 +388,50 @@ function NotificationSettingsTab() {
         )}
       </Card>
 
-      {/* Morning Digest */}
+      {/* Daily Move Report */}
       <Card className="rounded-2xl">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-50">
-                <Clock className="w-5 h-5 text-blue-600" />
+              <div className="p-2 rounded-lg bg-orange-50">
+                <ClipboardList className="w-5 h-5 text-orange-600" />
               </div>
               <div>
-                <CardTitle className="text-base">Morning Digest</CardTitle>
+                <CardTitle className="text-base">Daily Move Report</CardTitle>
                 <p className="text-sm text-gray-500 mt-0.5">
-                  Daily summary of overdue moves and warehouse status
+                  Consolidated summary of overdue, upcoming moves & warehouse bins
                 </p>
               </div>
             </div>
             <Toggle
-              checked={current.morning_digest_enabled}
-              onChange={(val) => update('morning_digest_enabled', val)}
+              checked={current.daily_move_report_enabled}
+              onChange={(val) => update('daily_move_report_enabled', val)}
             />
           </div>
         </CardHeader>
-        {current.morning_digest_enabled && (
+        {current.daily_move_report_enabled && (
           <CardContent className="pt-0">
             <div className="pl-12 flex items-end gap-4">
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-1 block">Send At</label>
                 <TimePicker
-                  hour={current.morning_digest_hour}
-                  minute={current.morning_digest_minute}
-                  onHourChange={(h) => update('morning_digest_hour', h)}
-                  onMinuteChange={(m) => update('morning_digest_minute', m)}
+                  hour={current.daily_move_report_hour}
+                  minute={current.daily_move_report_minute}
+                  onHourChange={(h) => update('daily_move_report_hour', h)}
+                  onMinuteChange={(m) => update('daily_move_report_minute', m)}
                 />
               </div>
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
+                className="gap-1.5 text-orange-600 border-orange-200 hover:bg-orange-50"
                 disabled={digestMutation.isPending}
                 onClick={() => {
                   setDigestResult(null);
-                  digestMutation.mutate({ window: 'morning', force: true }, {
+                  digestMutation.mutate({ window: 'daily_move_report', force: true }, {
                     onSuccess: (res) => {
                       setDigestResult(
-                        `Morning digest sent! Overdue: ${res.overdue_count}, Urgent: ${res.urgent_count}, Warehouse: ${res.warehouse_count}, Tokens: ${res.tokens_sent}`
+                        `Move report sent! Overdue: ${res.overdue_count}, Urgent: ${res.urgent_count}, Warehouse: ${res.warehouse_count}, Tokens: ${res.tokens_sent}`
                       );
                     },
                     onError: (err) => {
@@ -445,50 +452,50 @@ function NotificationSettingsTab() {
         )}
       </Card>
 
-      {/* Afternoon Digest */}
+      {/* Daily Bin Check Report */}
       <Card className="rounded-2xl">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-indigo-50">
-                <Clock className="w-5 h-5 text-indigo-600" />
+              <div className="p-2 rounded-lg bg-teal-50">
+                <Search className="w-5 h-5 text-teal-600" />
               </div>
               <div>
-                <CardTitle className="text-base">Afternoon Digest</CardTitle>
+                <CardTitle className="text-base">Daily Bin Check Report</CardTitle>
                 <p className="text-sm text-gray-500 mt-0.5">
-                  Afternoon update on move requests and warehouse bins
+                  Summary of bins not checked in 7+ days
                 </p>
               </div>
             </div>
             <Toggle
-              checked={current.afternoon_digest_enabled}
-              onChange={(val) => update('afternoon_digest_enabled', val)}
+              checked={current.daily_bin_check_enabled}
+              onChange={(val) => update('daily_bin_check_enabled', val)}
             />
           </div>
         </CardHeader>
-        {current.afternoon_digest_enabled && (
+        {current.daily_bin_check_enabled && (
           <CardContent className="pt-0">
             <div className="pl-12 flex items-end gap-4">
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-1 block">Send At</label>
                 <TimePicker
-                  hour={current.afternoon_digest_hour}
-                  minute={current.afternoon_digest_minute}
-                  onHourChange={(h) => update('afternoon_digest_hour', h)}
-                  onMinuteChange={(m) => update('afternoon_digest_minute', m)}
+                  hour={current.daily_bin_check_hour}
+                  minute={current.daily_bin_check_minute}
+                  onHourChange={(h) => update('daily_bin_check_hour', h)}
+                  onMinuteChange={(m) => update('daily_bin_check_minute', m)}
                 />
               </div>
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                className="gap-1.5 text-teal-600 border-teal-200 hover:bg-teal-50"
                 disabled={digestMutation.isPending}
                 onClick={() => {
                   setDigestResult(null);
-                  digestMutation.mutate({ window: 'afternoon', force: true }, {
+                  digestMutation.mutate({ window: 'daily_bin_check_report', force: true }, {
                     onSuccess: (res) => {
                       setDigestResult(
-                        `Afternoon digest sent! Overdue: ${res.overdue_count}, Urgent: ${res.urgent_count}, Warehouse: ${res.warehouse_count}, Tokens: ${res.tokens_sent}`
+                        `Bin check report sent! Critical: ${res.critical_bins ?? 0}, Overdue: ${res.overdue_bins ?? 0}, Tokens: ${res.tokens_sent}`
                       );
                     },
                     onError: (err) => {
@@ -509,7 +516,7 @@ function NotificationSettingsTab() {
         )}
       </Card>
 
-      {/* Digest Test Result */}
+      {/* Report Test Result */}
       {digestResult && (
         <p className={cn(
           'text-sm px-1',

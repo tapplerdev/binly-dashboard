@@ -235,11 +235,12 @@ function BinsPageContent() {
   const needsCheck = allBinsForKpis?.filter((b) => b.has_check_recommendation).length || 0;
 
   // Get priority badge color and label
-  const getPriorityBadge = (score: number) => {
-    if (score >= 1000) return { label: 'URGENT', color: 'bg-red-100 text-red-700 border-red-200' };
-    if (score >= 500) return { label: 'HIGH', color: 'bg-orange-100 text-orange-700 border-orange-200' };
-    if (score >= 200) return { label: 'MEDIUM', color: 'bg-yellow-100 text-yellow-700 border-yellow-200' };
-    return { label: 'LOW', color: 'bg-green-100 text-green-700 border-green-200' };
+  const getCheckStatusBadge = (daysSinceCheck?: number | null) => {
+    if (daysSinceCheck == null) return { label: 'UNKNOWN', color: 'bg-gray-100 text-gray-600 border-gray-200' };
+    if (daysSinceCheck >= 14) return { label: 'CRITICAL', color: 'bg-red-100 text-red-700 border-red-200' };
+    if (daysSinceCheck >= 7) return { label: 'OVERDUE', color: 'bg-orange-100 text-orange-700 border-orange-200' };
+    if (daysSinceCheck >= 4) return { label: 'CHECK SOON', color: 'bg-yellow-100 text-yellow-700 border-yellow-200' };
+    return { label: 'CHECKED', color: 'bg-green-100 text-green-700 border-green-200' };
   };
 
   // Get fill level badge
@@ -451,7 +452,7 @@ function BinsPageContent() {
                         onClick={() => handleSort('priority')}
                       >
                         <div className="flex items-center gap-1.5">
-                          <span>Priority</span>
+                          <span>Check Status</span>
                           <ChevronsUpDown className="w-4 h-4 text-gray-400" />
                         </div>
                       </th>
@@ -489,7 +490,7 @@ function BinsPageContent() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {bins?.map((bin) => {
-                      const priority = getPriorityBadge(bin.priority_score);
+                      const checkStatus = getCheckStatusBadge(bin.days_since_check);
                       const fill = getFillBadge(bin.fill_percentage);
                       const status = getStatusBadge(bin.status);
 
@@ -523,8 +524,8 @@ function BinsPageContent() {
                             </div>
                           </td>
                           <td className="py-4 px-4 align-middle">
-                            <Badge className={cn('border', priority.color)}>
-                              {priority.label}
+                            <Badge className={cn('border', checkStatus.color)}>
+                              {checkStatus.label}
                             </Badge>
                           </td>
                           <td className="py-4 px-4 align-middle">

@@ -41,6 +41,12 @@ export interface NotificationSettings {
   overdue_move_check_interval_minutes: number;
   due_soon_alerts_enabled: boolean;
   due_soon_hours_before: number;
+  daily_move_report_enabled: boolean;
+  daily_move_report_hour: number;
+  daily_move_report_minute: number;
+  daily_bin_check_enabled: boolean;
+  daily_bin_check_hour: number;
+  daily_bin_check_minute: number;
 }
 
 export interface NotificationLogEntry {
@@ -97,11 +103,13 @@ export interface DigestResult {
   urgent_count: number;
   soon_count: number;
   warehouse_count: number;
+  critical_bins?: number;
+  overdue_bins?: number;
   tokens_sent: number;
 }
 
 export async function triggerDigest(
-  window: 'morning' | 'afternoon',
+  window: 'morning' | 'afternoon' | 'daily_move_report' | 'daily_bin_check_report',
   force: boolean = false
 ): Promise<DigestResult> {
   const params = new URLSearchParams({ window });

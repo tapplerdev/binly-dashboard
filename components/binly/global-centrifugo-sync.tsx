@@ -209,17 +209,13 @@ export function GlobalCentrifugoSync() {
           break;
         }
 
-        // ── Per-user notifications (DB-backed) ─────────────────────────
+        // ── Daily report notifications ─────────────────────────────────
 
-        case 'user_notification_created': {
-          const notif = event.data as UserNotification & { user_id: string };
-          // Only add if this notification belongs to the current user
-          if (notif.user_id === currentUserId) {
-            console.log('🔔 [GlobalCentrifugoSync] user notification:', notif.type);
-            addNotification(notif);
-            // Also invalidate the React Query unread count
-            queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount });
-          }
+        case 'daily_move_report':
+        case 'daily_bin_check_report': {
+          console.log(`📊 [GlobalCentrifugoSync] ${event.type} received`);
+          queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount });
+          queryClient.invalidateQueries({ queryKey: notificationKeys.all });
           break;
         }
 
