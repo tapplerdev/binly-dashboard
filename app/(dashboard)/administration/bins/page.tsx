@@ -636,7 +636,7 @@ function BinsPageContent() {
             {/* Mobile Card View */}
             <div className="lg:hidden space-y-3">
               {bins?.map((bin) => {
-                const priority = getPriorityBadge(bin.priority_score);
+                const checkStatus = getCheckStatusBadge(bin.days_since_check);
                 const fill = getFillBadge(bin.fill_percentage);
                 const status = getStatusBadge(bin.status);
 
@@ -731,8 +731,8 @@ function BinsPageContent() {
 
                     {/* Badges Row */}
                     <div className="flex flex-wrap items-center gap-2 mb-3">
-                      <Badge className={cn('border', priority.color)}>
-                        {priority.label}
+                      <Badge className={cn('border', checkStatus.color)}>
+                        {checkStatus.label}
                       </Badge>
                       <Badge className={fill.color}>{fill.label}</Badge>
                       <Badge className={cn(status.color, 'whitespace-nowrap')}>{status.label}</Badge>
