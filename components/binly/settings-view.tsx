@@ -19,6 +19,7 @@ import {
   Timer,
   ChevronDown,
   ClipboardList,
+  BatteryWarning,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -195,6 +196,7 @@ const NOTIFICATION_TYPES = [
   { value: '', label: 'All Types' },
   { value: 'daily_move_report', label: 'Daily Move Report' },
   { value: 'daily_bin_check_report', label: 'Daily Bin Check Report' },
+  { value: 'daily_battery_report', label: 'Daily Battery Report' },
   { value: 'bin_drift_alert', label: 'Drift Alerts' },
   { value: 'move_request_overdue', label: 'Overdue Move (Real-time)' },
   { value: 'move_request_due_soon', label: 'Due Soon (Real-time)' },
@@ -212,6 +214,8 @@ function getTypeBadge(type: string) {
       return <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">Move Report</Badge>;
     case 'daily_bin_check_report':
       return <Badge className="bg-teal-100 text-teal-700 hover:bg-teal-100">Bin Check</Badge>;
+    case 'daily_battery_report':
+      return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Battery Report</Badge>;
     case 'bin_drift_alert':
       return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Drift Alert</Badge>;
     case 'digest_overdue_moves':
@@ -496,6 +500,70 @@ function NotificationSettingsTab() {
                     onSuccess: (res) => {
                       setDigestResult(
                         `Bin check report sent! Critical: ${res.critical_bins ?? 0}, Overdue: ${res.overdue_bins ?? 0}, Tokens: ${res.tokens_sent}`
+                      );
+                    },
+                    onError: (err) => {
+                      setDigestResult(`Failed: ${(err as Error).message}`);
+                    },
+                  });
+                }}
+              >
+                {digestMutation.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+                Send Test Now
+              </Button>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Daily Battery Report */}
+      <Card className="rounded-2xl">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-amber-50">
+                <BatteryWarning className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Daily Battery Report</CardTitle>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Alert when AirTags have low or critical battery
+                </p>
+              </div>
+            </div>
+            <Toggle
+              checked={current.daily_battery_report_enabled}
+              onChange={(val) => update('daily_battery_report_enabled', val)}
+            />
+          </div>
+        </CardHeader>
+        {current.daily_battery_report_enabled && (
+          <CardContent className="pt-0">
+            <div className="pl-12 flex items-end gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Send At</label>
+                <TimePicker
+                  hour={current.daily_battery_report_hour}
+                  minute={current.daily_battery_report_minute}
+                  onHourChange={(h) => update('daily_battery_report_hour', h)}
+                  onMinuteChange={(m) => update('daily_battery_report_minute', m)}
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-amber-600 border-amber-200 hover:bg-amber-50"
+                disabled={digestMutation.isPending}
+                onClick={() => {
+                  setDigestResult(null);
+                  digestMutation.mutate({ window: 'daily_battery_report', force: true }, {
+                    onSuccess: (res) => {
+                      setDigestResult(
+                        `Battery report sent! Tokens: ${res.tokens_sent}`
                       );
                     },
                     onError: (err) => {
@@ -843,6 +911,7 @@ function MyPreferencesTab() {
     overdue_move_alerts: prefs.overdue_move_alerts,
     due_soon_alerts: prefs.due_soon_alerts,
     bin_check_reports: prefs.bin_check_reports,
+    battery_alerts: prefs.battery_alerts,
   } : null);
 
   if (isLoading || !current) {
@@ -862,6 +931,7 @@ function MyPreferencesTab() {
       overdue_move_alerts: prefs.overdue_move_alerts,
       due_soon_alerts: prefs.due_soon_alerts,
       bin_check_reports: prefs.bin_check_reports,
+      battery_alerts: prefs.battery_alerts,
     });
   }
 
@@ -877,6 +947,7 @@ function MyPreferencesTab() {
     overdue_move_alerts: prefs.overdue_move_alerts,
     due_soon_alerts: prefs.due_soon_alerts,
     bin_check_reports: prefs.bin_check_reports,
+    battery_alerts: prefs.battery_alerts,
   } : null);
 
   const handleSave = () => {
@@ -908,6 +979,7 @@ function MyPreferencesTab() {
     { key: 'move_requests' as const, label: 'Move Requests', desc: 'Alerts for new and updated move requests', context: 'New assignments and status changes', icon: ArrowRightLeft, bg: 'bg-amber-50', color: 'text-amber-600', adminOnly: false },
     { key: 'overdue_move_alerts' as const, label: 'Overdue Move Alerts', desc: 'Real-time alerts when moves pass their scheduled date', context: 'Individual alerts per overdue move request', icon: AlertTriangle, bg: 'bg-red-50', color: 'text-red-600', adminOnly: true },
     { key: 'due_soon_alerts' as const, label: 'Due Soon Alerts', desc: 'Alerts when move requests are approaching their due date', context: 'Individual alerts per upcoming move request', icon: Timer, bg: 'bg-yellow-50', color: 'text-yellow-600', adminOnly: true },
+    { key: 'battery_alerts' as const, label: 'Battery Alerts', desc: 'Daily AirTag low battery reports', context: sysSettings ? `Scheduled at ${formatTime(sysSettings.daily_battery_report_hour, sysSettings.daily_battery_report_minute)}` : undefined, icon: BatteryWarning, bg: 'bg-amber-50', color: 'text-amber-600', adminOnly: true },
   ];
 
   const PREF_ITEMS = userRole === 'admin'

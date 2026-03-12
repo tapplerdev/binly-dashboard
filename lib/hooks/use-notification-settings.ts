@@ -55,7 +55,7 @@ export function useTriggerDigest() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ window, force }: { window: 'morning' | 'afternoon'; force?: boolean }) =>
+    mutationFn: ({ window, force }: { window: 'morning' | 'afternoon' | 'daily_move_report' | 'daily_bin_check_report' | 'daily_battery_report'; force?: boolean }) =>
       triggerDigest(window, force),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notification-log'] });

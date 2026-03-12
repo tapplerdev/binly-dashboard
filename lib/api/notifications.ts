@@ -53,6 +53,7 @@ export interface NotificationPreferences {
   overdue_move_alerts: boolean;
   due_soon_alerts: boolean;
   bin_check_reports: boolean;
+  battery_alerts: boolean;
 }
 
 export async function getNotifications(page = 1, limit = 20): Promise<NotificationsResponse> {

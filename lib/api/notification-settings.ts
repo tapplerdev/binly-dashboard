@@ -47,6 +47,9 @@ export interface NotificationSettings {
   daily_bin_check_enabled: boolean;
   daily_bin_check_hour: number;
   daily_bin_check_minute: number;
+  daily_battery_report_enabled: boolean;
+  daily_battery_report_hour: number;
+  daily_battery_report_minute: number;
 }
 
 export interface NotificationLogEntry {
@@ -109,7 +112,7 @@ export interface DigestResult {
 }
 
 export async function triggerDigest(
-  window: 'morning' | 'afternoon' | 'daily_move_report' | 'daily_bin_check_report',
+  window: 'morning' | 'afternoon' | 'daily_move_report' | 'daily_bin_check_report' | 'daily_battery_report',
   force: boolean = false
 ): Promise<DigestResult> {
   const params = new URLSearchParams({ window });

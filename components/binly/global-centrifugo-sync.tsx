@@ -212,7 +212,8 @@ export function GlobalCentrifugoSync() {
         // ── Daily report notifications ─────────────────────────────────
 
         case 'daily_move_report':
-        case 'daily_bin_check_report': {
+        case 'daily_bin_check_report':
+        case 'daily_battery_report': {
           console.log(`📊 [GlobalCentrifugoSync] ${event.type} received`);
           queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount });
           queryClient.invalidateQueries({ queryKey: notificationKeys.all });
