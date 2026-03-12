@@ -1,9 +1,28 @@
 /**
  * AirTag API client
- * Fetches AirTag locations from the binly-findmy-bridge service
+ * Fetches AirTag locations from the backend (proxied from FindMy bridge)
  */
 
-const BRIDGE_URL = process.env.NEXT_PUBLIC_FINDMY_BRIDGE_URL || 'http://localhost:8080';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
+function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const authStorage = localStorage.getItem('binly-auth-storage');
+    if (!authStorage) return null;
+    const parsed = JSON.parse(authStorage);
+    return parsed?.state?.token || null;
+  } catch {
+    return null;
+  }
+}
+
+function getAuthHeaders(): HeadersInit {
+  const token = getAuthToken();
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
 
 export interface AirTagLocation {
   id: string;
@@ -24,12 +43,12 @@ export interface AirTagLocationsResponse {
 }
 
 /**
- * Fetch all AirTag locations from the FindMy bridge service
+ * Fetch all AirTag locations from the backend (proxied from FindMy bridge)
  */
 export async function getAirTagLocations(): Promise<AirTagLocationsResponse> {
-  const response = await fetch(`${BRIDGE_URL}/api/airtag-locations`, {
+  const response = await fetch(`${API_URL}/api/manager/airtag-locations`, {
     method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     cache: 'no-store',
   });
 
