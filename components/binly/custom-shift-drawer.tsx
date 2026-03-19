@@ -73,9 +73,8 @@ export function CustomShiftDrawer({
   const [startAtWarehouse, setStartAtWarehouse] =
     useState(false);
 
-  // Shift schedule (vehicle-level time constraint)
-  const [scheduledStart, setScheduledStart] = useState('');
-  const [scheduledEnd, setScheduledEnd] = useState('');
+  // Shift deadline (vehicle latest_end constraint)
+  const [finishBy, setFinishBy] = useState('');
 
   // UI state
   const [isDriverDropdownOpen, setIsDriverDropdownOpen] =
@@ -168,7 +167,6 @@ export function CustomShiftDrawer({
   // Validate form
   const isValid = () => {
     if (!driverId) return false;
-    if (!scheduledStart || !scheduledEnd) return false;
     if (stops.length === 0) return false;
     return stops.every(
       (s) => s.address && s.latitude !== 0 && s.taskLabel,
@@ -232,15 +230,10 @@ export function CustomShiftDrawer({
           warehouse?.address || 'Warehouse',
       };
 
-      // Shift schedule → vehicle earliest_start / latest_end
-      if (scheduledStart) {
-        payload.scheduled_start = new Date(
-          scheduledStart,
-        ).toISOString();
-      }
-      if (scheduledEnd) {
+      // Finish by → vehicle latest_end
+      if (finishBy) {
         payload.scheduled_end = new Date(
-          scheduledEnd,
+          finishBy,
         ).toISOString();
       }
 
@@ -441,48 +434,26 @@ export function CustomShiftDrawer({
               </div>
             </div>
 
-            {/* Shift Schedule */}
-            <div className="border border-blue-200 rounded-lg p-4 bg-blue-50/30">
-              <div className="flex items-center gap-2 mb-3">
-                <CalendarClock className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-semibold text-gray-900">
-                  Shift Schedule{' '}
-                  <span className="text-red-500">*</span>
+            {/* Finish By */}
+            <div>
+              <label className="text-sm font-semibold text-gray-900 mb-2 block">
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarClock className="w-4 h-4 text-blue-600" />
+                  Finish by
                 </span>
-              </div>
-              <p className="text-xs text-gray-500 mb-3">
-                When can the driver start and when must
-                they finish? The optimizer will plan the
-                route within this window.
+              </label>
+              <input
+                type="datetime-local"
+                value={finishBy}
+                onChange={(e) =>
+                  setFinishBy(e.target.value)
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Optional. Route will be optimized to
+                finish before this time.
               </p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-gray-700 mb-1 block">
-                    Start time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={scheduledStart}
-                    onChange={(e) =>
-                      setScheduledStart(e.target.value)
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-700 mb-1 block">
-                    End time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={scheduledEnd}
-                    onChange={(e) =>
-                      setScheduledEnd(e.target.value)
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  />
-                </div>
-              </div>
             </div>
 
             {/* Start at Warehouse */}
