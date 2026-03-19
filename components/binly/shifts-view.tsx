@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Calendar, List, User, X, Search, ChevronDown, Filter, MapPin, Loader2, Trash2, GripVertical, Package, MapPinned, Warehouse, MoveRight, Plus, Pencil, ArrowUp, ArrowDown } from 'lucide-react';
+import { Calendar, List, User, X, Search, ChevronDown, Filter, MapPin, Loader2, Trash2, GripVertical, Package, MapPinned, Warehouse, MoveRight, Plus, Pencil, ArrowUp, ArrowDown, ClipboardCheck } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel, ShiftStatus } from '@/lib/types/shift';
 import { ShiftDetailsDrawer } from './shift-details-drawer';
 import { BinSelectionMap } from './bin-selection-map';
@@ -26,6 +26,7 @@ import { LiveOpsMap } from './live-ops-map';
 import { ShiftHistoryView } from './shift-history-view';
 import { useAuthStore } from '@/lib/auth/store';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
+import { CustomShiftDrawer } from './custom-shift-drawer';
 
 type ViewMode = 'list' | 'timeline' | 'live' | 'history';
 
@@ -53,6 +54,8 @@ export function ShiftsView() {
   // Local state
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
+  const [isCustomShiftDrawerOpen, setIsCustomShiftDrawerOpen] = useState(false);
+  const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [shiftToEdit, setShiftToEdit] = useState<Shift | null>(null);
   const [filters, setFilters] = useState<ShiftFilters>({
@@ -249,13 +252,51 @@ export function ShiftsView() {
             <div className="flex items-center justify-between mb-3 md:mb-4">
               <h1 className="text-xl md:text-2xl font-semibold text-gray-900">Shifts</h1>
               {viewMode !== 'live' && (
-                <button
-                  onClick={() => setIsCreateDrawerOpen(true)}
-                  className="bg-green-600 hover:bg-green-700 text-white px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-fast shadow-sm"
-                >
-                  <span className="hidden sm:inline">Create Shift</span>
-                  <span className="sm:hidden">Create</span>
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => setIsCreateMenuOpen(!isCreateMenuOpen)}
+                    className="bg-green-600 hover:bg-green-700 text-white px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-fast shadow-sm flex items-center gap-1"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline">Create Shift</span>
+                    <span className="sm:hidden">Create</span>
+                    <ChevronDown className="w-3 h-3 ml-0.5" />
+                  </button>
+                  {isCreateMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsCreateMenuOpen(false)} />
+                      <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden animate-slide-in-down">
+                        <button
+                          onClick={() => {
+                            setIsCreateDrawerOpen(true);
+                            setIsCreateMenuOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-fast text-left"
+                        >
+                          <Package className="w-4 h-4 text-green-600" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Standard Shift</p>
+                            <p className="text-xs text-gray-500">Bins, placements, moves</p>
+                          </div>
+                        </button>
+                        <div className="border-t border-gray-100" />
+                        <button
+                          onClick={() => {
+                            setIsCustomShiftDrawerOpen(true);
+                            setIsCreateMenuOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-fast text-left"
+                        >
+                          <ClipboardCheck className="w-4 h-4 text-blue-600" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Custom Shift</p>
+                            <p className="text-xs text-gray-500">Service stops, inspections</p>
+                          </div>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
             </div>
 
@@ -364,6 +405,13 @@ export function ShiftsView() {
             setIsCreateDrawerOpen(false);
             setShiftToEdit(null); // Clear edit mode
           }}
+        />
+      )}
+
+      {/* Custom Shift Drawer */}
+      {isCustomShiftDrawerOpen && (
+        <CustomShiftDrawer
+          onClose={() => setIsCustomShiftDrawerOpen(false)}
         />
       )}
 
@@ -1335,7 +1383,7 @@ function DailyGantt({
 // Task type for shift builder
 interface ShiftTask {
   id?: string;
-  type: 'collection' | 'placement' | 'pickup' | 'dropoff' | 'warehouse_stop';
+  type: 'collection' | 'placement' | 'pickup' | 'dropoff' | 'warehouse_stop' | 'service';
   // Collection fields
   bin_id?: string;
   bin_number?: number;

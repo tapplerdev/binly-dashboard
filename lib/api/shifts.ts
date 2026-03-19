@@ -458,7 +458,7 @@ export async function getShiftHistory(params?: {
 export interface ShiftHistoryTask {
   id: string;
   sequence_order: number;
-  task_type: 'collection' | 'placement' | 'pickup' | 'dropoff' | 'warehouse_stop';
+  task_type: 'collection' | 'placement' | 'pickup' | 'dropoff' | 'warehouse_stop' | 'service';
   is_completed: number; // 0 | 1
   skipped: boolean;
   completed_at: number | null;

@@ -8,7 +8,8 @@ export type TaskType =
   | 'placement'
   | 'pickup'
   | 'dropoff'
-  | 'warehouse_stop';
+  | 'warehouse_stop'
+  | 'service';
 
 export interface RouteTask {
   // Core fields
@@ -39,6 +40,16 @@ export interface RouteTask {
   // Warehouse stop fields
   warehouse_action?: 'load' | 'unload' | 'both' | null;
   bins_to_load?: number | null;
+
+  // Service task fields
+  task_label?: string | null;
+  task_description?: string | null;
+  photo_required?: boolean;
+  completion_notes?: string | null;
+  earliest_arrival?: string | null;
+  latest_arrival?: string | null;
+  time_window_type?: string | null;
+  service_duration_seconds?: number | null;
 
   // Route tracking
   route_id?: string | null;
@@ -107,6 +118,9 @@ export function getTaskLabel(task: RouteTask): string {
       console.log('🔍 [TASK LABEL] Warehouse label:', warehouseLabel);
       return warehouseLabel;
 
+    case 'service':
+      return task.task_label || 'Service Stop';
+
     default:
       console.log('🔍 [TASK LABEL] Unknown task type:', task.task_type);
       return 'Unknown Task';
@@ -129,6 +143,9 @@ export function getTaskSubtitle(task: RouteTask): string {
     case 'warehouse_stop':
       return task.address || 'Warehouse Location';
 
+    case 'service':
+      return task.task_description || task.address || 'Service location';
+
     default:
       return '';
   }
@@ -149,6 +166,8 @@ export function getTaskIconName(taskType: TaskType): string {
       return 'ArrowDown';
     case 'warehouse_stop':
       return 'Warehouse';
+    case 'service':
+      return 'ClipboardCheck';
     default:
       return 'Circle';
   }
@@ -169,6 +188,8 @@ export function getTaskColor(taskType: TaskType): string {
       return 'text-purple-600';
     case 'warehouse_stop':
       return 'text-gray-700';
+    case 'service':
+      return 'text-blue-600';
     default:
       return 'text-gray-400';
   }
@@ -189,6 +210,8 @@ export function getTaskBgColor(taskType: TaskType): string {
       return 'bg-purple-100';
     case 'warehouse_stop':
       return 'bg-gray-100';
+    case 'service':
+      return 'bg-blue-100';
     default:
       return 'bg-gray-50';
   }
