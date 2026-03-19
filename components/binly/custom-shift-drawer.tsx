@@ -11,10 +11,9 @@ import {
   ClipboardCheck,
   Camera,
   Clock,
-  MapPin,
-  Navigation,
-  GripVertical,
   ChevronUp,
+  Warehouse,
+  CalendarClock,
 } from 'lucide-react';
 import { useDrivers } from '@/lib/hooks/use-drivers';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
@@ -57,7 +56,8 @@ export function CustomShiftDrawer({
 }: {
   onClose: () => void;
 }) {
-  const { data: drivers = [], isLoading: loadingDrivers } = useDrivers();
+  const { data: drivers = [], isLoading: loadingDrivers } =
+    useDrivers();
   const { data: warehouse } = useWarehouseLocation();
   const { token } = useAuthStore();
   const queryClient = useQueryClient();
@@ -69,21 +69,19 @@ export function CustomShiftDrawer({
     createEmptyStop(),
   ]);
 
-  // Custom start/end locations
-  const [useCustomStart, setUseCustomStart] = useState(false);
-  const [startAddress, setStartAddress] = useState('');
-  const [startLat, setStartLat] = useState(0);
-  const [startLon, setStartLon] = useState(0);
+  // Start location — simple checkbox
+  const [startAtWarehouse, setStartAtWarehouse] =
+    useState(false);
 
-  const [useCustomEnd, setUseCustomEnd] = useState(false);
-  const [endAddress, setEndAddress] = useState('');
-  const [endLat, setEndLat] = useState(0);
-  const [endLon, setEndLon] = useState(0);
+  // Shift schedule (vehicle-level time constraint)
+  const [scheduledStart, setScheduledStart] = useState('');
+  const [scheduledEnd, setScheduledEnd] = useState('');
 
   // UI state
   const [isDriverDropdownOpen, setIsDriverDropdownOpen] =
     useState(false);
-  const [isDriverClosing, setIsDriverClosing] = useState(false);
+  const [isDriverClosing, setIsDriverClosing] =
+    useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedStopIndex, setExpandedStopIndex] = useState<
@@ -91,7 +89,9 @@ export function CustomShiftDrawer({
   >(0);
 
   const driverDropdownRef = useRef<HTMLDivElement>(null);
-  const selectedDriver = drivers.find((d) => d.id === driverId);
+  const selectedDriver = drivers.find(
+    (d) => d.id === driverId,
+  );
 
   const closeDriverDropdown = () => {
     setIsDriverClosing(true);
@@ -168,6 +168,7 @@ export function CustomShiftDrawer({
   // Validate form
   const isValid = () => {
     if (!driverId) return false;
+    if (!scheduledStart || !scheduledEnd) return false;
     if (stops.length === 0) return false;
     return stops.every(
       (s) => s.address && s.latitude !== 0 && s.taskLabel,
@@ -175,9 +176,7 @@ export function CustomShiftDrawer({
   };
 
   // Submit
-  const handleSubmit = async (
-    e: React.FormEvent,
-  ) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isValid() || isSubmitting) return;
 
@@ -192,7 +191,8 @@ export function CustomShiftDrawer({
           longitude: stop.longitude,
           address: stop.address,
           task_label: stop.taskLabel,
-          task_description: stop.taskDescription || undefined,
+          task_description:
+            stop.taskDescription || undefined,
           photo_required: stop.photoRequired,
           service_duration_seconds:
             stop.serviceDurationMinutes * 60,
@@ -226,28 +226,29 @@ export function CustomShiftDrawer({
         truck_bin_capacity: 0,
         lock_route_order: false,
         tasks: tasksPayload,
-        // Warehouse fields — use custom start or fall back to warehouse
-        warehouse_latitude: useCustomStart
-          ? startLat
-          : warehouse?.latitude || 0,
-        warehouse_longitude: useCustomStart
-          ? startLon
-          : warehouse?.longitude || 0,
-        warehouse_address: useCustomStart
-          ? startAddress
-          : warehouse?.address || 'Warehouse',
+        warehouse_latitude: warehouse?.latitude || 0,
+        warehouse_longitude: warehouse?.longitude || 0,
+        warehouse_address:
+          warehouse?.address || 'Warehouse',
       };
 
-      // Custom start/end overrides
-      if (useCustomStart && startLat && startLon) {
-        payload.start_latitude = startLat;
-        payload.start_longitude = startLon;
-        payload.start_address = startAddress;
+      // Shift schedule → vehicle earliest_start / latest_end
+      if (scheduledStart) {
+        payload.scheduled_start = new Date(
+          scheduledStart,
+        ).toISOString();
       }
-      if (useCustomEnd && endLat && endLon) {
-        payload.end_latitude = endLat;
-        payload.end_longitude = endLon;
-        payload.end_address = endAddress;
+      if (scheduledEnd) {
+        payload.scheduled_end = new Date(
+          scheduledEnd,
+        ).toISOString();
+      }
+
+      // Start at warehouse override
+      if (startAtWarehouse && warehouse) {
+        payload.start_latitude = warehouse.latitude;
+        payload.start_longitude = warehouse.longitude;
+        payload.start_address = warehouse.address;
       }
 
       const API_URL =
@@ -267,7 +268,8 @@ export function CustomShiftDrawer({
       );
 
       if (!response.ok) {
-        let errorMessage = `Failed to create shift (${response.status})`;
+        let errorMessage =
+          `Failed to create shift (${response.status})`;
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
@@ -314,17 +316,6 @@ export function CustomShiftDrawer({
           </button>
         </div>
 
-        {/* Info Banner */}
-        <div className="px-6 pt-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-xs text-blue-800">
-              Create a one-off shift with service stops.
-              Route will be optimized automatically using
-              time windows.
-            </p>
-          </div>
-        </div>
-
         {/* Form */}
         <form
           onSubmit={handleSubmit}
@@ -350,7 +341,8 @@ export function CustomShiftDrawer({
             {/* Driver Selection */}
             <div>
               <label className="text-sm font-semibold text-gray-900 mb-2 block">
-                Driver <span className="text-red-500">*</span>
+                Driver{' '}
+                <span className="text-red-500">*</span>
               </label>
               <div
                 className="relative"
@@ -449,61 +441,73 @@ export function CustomShiftDrawer({
               </div>
             </div>
 
-            {/* Custom Start Location */}
-            <div className="border border-gray-200 rounded-lg p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Navigation className="w-4 h-4 text-green-600" />
-                  <span className="text-sm font-semibold text-gray-900">
-                    Start Location
-                  </span>
-                </div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <span className="text-xs text-gray-500">
-                    {useCustomStart
-                      ? 'Custom'
-                      : 'Warehouse'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setUseCustomStart(!useCustomStart)
-                    }
-                    className={`relative w-9 h-5 rounded-full transition-colors ${
-                      useCustomStart
-                        ? 'bg-blue-600'
-                        : 'bg-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                        useCustomStart
-                          ? 'translate-x-4'
-                          : ''
-                      }`}
-                    />
-                  </button>
-                </label>
+            {/* Shift Schedule */}
+            <div className="border border-blue-200 rounded-lg p-4 bg-blue-50/30">
+              <div className="flex items-center gap-2 mb-3">
+                <CalendarClock className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-semibold text-gray-900">
+                  Shift Schedule{' '}
+                  <span className="text-red-500">*</span>
+                </span>
               </div>
-              {useCustomStart ? (
-                <HerePlacesAutocomplete
-                  value={startAddress}
-                  onChange={setStartAddress}
-                  onPlaceSelect={(place) => {
-                    setStartAddress(
-                      place.formattedAddress,
-                    );
-                    setStartLat(place.latitude);
-                    setStartLon(place.longitude);
-                  }}
-                  placeholder="Start address..."
-                />
-              ) : (
-                <p className="text-xs text-gray-500">
-                  {warehouse?.address || 'Warehouse (default)'}
-                </p>
-              )}
+              <p className="text-xs text-gray-500 mb-3">
+                When can the driver start and when must
+                they finish? The optimizer will plan the
+                route within this window.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1 block">
+                    Start time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={scheduledStart}
+                    onChange={(e) =>
+                      setScheduledStart(e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1 block">
+                    End time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={scheduledEnd}
+                    onChange={(e) =>
+                      setScheduledEnd(e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                </div>
+              </div>
             </div>
+
+            {/* Start at Warehouse */}
+            <label className="flex items-center gap-3 px-4 py-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-fast">
+              <input
+                type="checkbox"
+                checked={startAtWarehouse}
+                onChange={(e) =>
+                  setStartAtWarehouse(e.target.checked)
+                }
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500/20"
+              />
+              <Warehouse className="w-4 h-4 text-gray-500" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  Start at warehouse
+                </p>
+                <p className="text-xs text-gray-500">
+                  {startAtWarehouse
+                    ? warehouse?.address ||
+                      'Warehouse location'
+                    : "Driver starts from their current location"}
+                </p>
+              </div>
+            </label>
 
             {/* Service Stops */}
             <div>
@@ -555,63 +559,6 @@ export function CustomShiftDrawer({
                 <Plus className="w-4 h-4" />
                 Add Stop
               </button>
-            </div>
-
-            {/* Custom End Location */}
-            <div className="border border-gray-200 rounded-lg p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-red-500" />
-                  <span className="text-sm font-semibold text-gray-900">
-                    End Location
-                  </span>
-                </div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <span className="text-xs text-gray-500">
-                    {useCustomEnd
-                      ? 'Custom'
-                      : 'Optimize'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setUseCustomEnd(!useCustomEnd)
-                    }
-                    className={`relative w-9 h-5 rounded-full transition-colors ${
-                      useCustomEnd
-                        ? 'bg-blue-600'
-                        : 'bg-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                        useCustomEnd
-                          ? 'translate-x-4'
-                          : ''
-                      }`}
-                    />
-                  </button>
-                </label>
-              </div>
-              {useCustomEnd ? (
-                <HerePlacesAutocomplete
-                  value={endAddress}
-                  onChange={setEndAddress}
-                  onPlaceSelect={(place) => {
-                    setEndAddress(
-                      place.formattedAddress,
-                    );
-                    setEndLat(place.latitude);
-                    setEndLon(place.longitude);
-                  }}
-                  placeholder="End address..."
-                />
-              ) : (
-                <p className="text-xs text-gray-500">
-                  Route will end at the most efficient
-                  location
-                </p>
-              )}
             </div>
 
             {/* Error */}
@@ -807,7 +754,7 @@ function ServiceStopCard({
             </div>
           </div>
 
-          {/* Time Window */}
+          {/* Time Window (per-stop) */}
           <div>
             <label className="flex items-center gap-2 cursor-pointer mb-2">
               <input
@@ -822,7 +769,10 @@ function ServiceStopCard({
               />
               <Clock className="w-3.5 h-3.5 text-gray-500" />
               <span className="text-xs text-gray-700">
-                Time window
+                Arrival window
+              </span>
+              <span className="text-xs text-gray-400">
+                (optional constraint for this stop)
               </span>
             </label>
 
