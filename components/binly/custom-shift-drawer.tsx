@@ -14,6 +14,7 @@ import {
   ChevronUp,
   Warehouse,
   CalendarClock,
+  MapPin,
 } from 'lucide-react';
 import { useDrivers } from '@/lib/hooks/use-drivers';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
@@ -71,6 +72,13 @@ export function CustomShiftDrawer({
 
   // Start location — simple checkbox
   const [startAtWarehouse, setStartAtWarehouse] =
+    useState(false);
+
+  // Final destination
+  const [endAddress, setEndAddress] = useState('');
+  const [endLat, setEndLat] = useState(0);
+  const [endLon, setEndLon] = useState(0);
+  const [endAtWarehouse, setEndAtWarehouse] =
     useState(false);
 
   // Shift deadline (vehicle latest_end constraint)
@@ -242,6 +250,17 @@ export function CustomShiftDrawer({
         payload.start_latitude = warehouse.latitude;
         payload.start_longitude = warehouse.longitude;
         payload.start_address = warehouse.address;
+      }
+
+      // Final destination
+      if (endAtWarehouse && warehouse) {
+        payload.end_latitude = warehouse.latitude;
+        payload.end_longitude = warehouse.longitude;
+        payload.end_address = warehouse.address;
+      } else if (endLat && endLon) {
+        payload.end_latitude = endLat;
+        payload.end_longitude = endLon;
+        payload.end_address = endAddress;
       }
 
       const API_URL =
@@ -530,6 +549,54 @@ export function CustomShiftDrawer({
                 <Plus className="w-4 h-4" />
                 Add Stop
               </button>
+            </div>
+
+            {/* Final Destination */}
+            <div>
+              <label className="text-sm font-semibold text-gray-900 mb-2 block">
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-red-500" />
+                  Final Destination
+                </span>
+              </label>
+              <label className="flex items-center gap-2 mb-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={endAtWarehouse}
+                  onChange={(e) => {
+                    setEndAtWarehouse(e.target.checked);
+                    if (e.target.checked) {
+                      setEndAddress('');
+                      setEndLat(0);
+                      setEndLon(0);
+                    }
+                  }}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500/20"
+                />
+                <span className="text-sm text-gray-700">
+                  Return to warehouse
+                </span>
+              </label>
+              {!endAtWarehouse && (
+                <HerePlacesAutocomplete
+                  value={endAddress}
+                  onChange={setEndAddress}
+                  onPlaceSelect={(place) => {
+                    setEndAddress(
+                      place.formattedAddress,
+                    );
+                    setEndLat(place.latitude);
+                    setEndLon(place.longitude);
+                  }}
+                  placeholder="Where should the driver end up?"
+                />
+              )}
+              {endAtWarehouse && (
+                <p className="text-xs text-gray-500">
+                  {warehouse?.address ||
+                    'Warehouse location'}
+                </p>
+              )}
             </div>
 
             {/* Error */}
