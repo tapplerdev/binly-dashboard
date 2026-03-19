@@ -424,6 +424,14 @@ export interface ShiftHistoryEntry {
   move_requests_completed: number;
   total_skipped: number;
   warehouse_stops: number;
+  optimization_metadata?: {
+    total_distance_miles: number;
+    total_distance_km?: number;
+    total_duration_seconds: number;
+    total_duration_formatted: string;
+    optimized_at: string;
+    estimated_completion: string;
+  } | null;
 }
 
 export interface ShiftHistoryResponse {
@@ -486,6 +494,11 @@ export interface ShiftHistoryTask {
   // Warehouse
   warehouse_action: string | null;
   bins_to_load: number | null;
+  // Service
+  task_label: string | null;
+  task_description: string | null;
+  completion_notes: string | null;
+  photo_required: boolean;
 }
 
 export async function getShiftHistoryTasks(shiftId: string): Promise<ShiftHistoryTask[]> {

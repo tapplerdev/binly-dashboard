@@ -5,7 +5,8 @@
 export type ShiftStatus = 'scheduled' | 'active' | 'completed' | 'cancelled';
 
 export interface OptimizationMetadata {
-  total_distance_km: number;
+  total_distance_miles: number;
+  total_distance_km?: number; // Legacy field
   total_duration_seconds: number;
   total_duration_formatted: string; // e.g., "2h 30m"
   optimized_at: string; // ISO timestamp

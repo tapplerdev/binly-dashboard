@@ -2120,6 +2120,7 @@ function CreateShiftDrawer({
     let pickups = 0;
     let dropoffs = 0;
     let warehouseStops = 0;
+    let services = 0;
 
     tasks.forEach(task => {
       if (task.type === 'collection') collections++;
@@ -2129,9 +2130,10 @@ function CreateShiftDrawer({
         else if (task.move_type === 'dropoff') dropoffs++;
       }
       else if (task.type === 'warehouse_stop') warehouseStops++;
+      else if (task.type === 'service') services++;
     });
 
-    return { collections, placements, pickups, dropoffs, warehouseStops, total: tasks.length };
+    return { collections, placements, pickups, dropoffs, warehouseStops, services, total: tasks.length };
   }, [tasks]);
 
   // Calculate capacity flow for each task (hybrid approach)
@@ -3367,6 +3369,12 @@ function CreateShiftDrawer({
                     <span className="text-blue-700">Warehouse Stops:</span>
                     <span className="font-semibold text-blue-900">{shiftAnalysis.warehouseStops}</span>
                   </div>
+                  {shiftAnalysis.services > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-blue-700">Service Stops:</span>
+                      <span className="font-semibold text-blue-900">{shiftAnalysis.services}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Capacity Preview - Commented out to save space */}

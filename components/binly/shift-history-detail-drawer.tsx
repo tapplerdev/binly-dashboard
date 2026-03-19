@@ -8,9 +8,10 @@ import {
   X, Package, MapPin, ArrowRightLeft, Warehouse, SkipForward,
   CheckCircle2, XCircle, Clock, ChevronRight, Hash, Loader2,
   AlertTriangle, MoveRight, ArrowRight, Trash2, ChevronDown, ChevronUp,
+  ClipboardCheck,
 } from 'lucide-react';
 
-type FilterType = 'all' | 'collections' | 'placements' | 'moves' | 'timeline' | 'removed';
+type FilterType = 'all' | 'collections' | 'placements' | 'moves' | 'services' | 'timeline' | 'removed';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,7 @@ const TASK_CONFIG: Record<string, { label: string; icon: React.ElementType; colo
   pickup:        { label: 'Move Pickup',   icon: ArrowRightLeft, color: 'text-purple-600', borderColor: 'border-l-purple-500' },
   dropoff:       { label: 'Move Dropoff',  icon: MoveRight,      color: 'text-violet-600', borderColor: 'border-l-violet-500' },
   warehouse_stop:{ label: 'Warehouse',     icon: Warehouse,      color: 'text-teal-600',   borderColor: 'border-l-teal-500' },
+  service:       { label: 'Service',      icon: ClipboardCheck, color: 'text-blue-600',   borderColor: 'border-l-blue-500' },
 };
 
 // ── Task Card ──────────────────────────────────────────────────────────────
@@ -58,7 +60,7 @@ function TaskCard({ task, index }: { task: ShiftHistoryTask; index: number }) {
         <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-gray-50 border border-gray-200`}>
           <Icon className={`w-4 h-4 ${cfg.color}`} />
         </div>
-        <span className={`text-sm font-semibold text-gray-900 flex-1`}>{cfg.label}</span>
+        <span className={`text-sm font-semibold text-gray-900 flex-1`}>{task.task_type === 'service' && task.task_label ? task.task_label : cfg.label}</span>
         {/* Status - show WHO did it */}
         {skipped ? (
           <div className="text-right">
@@ -166,6 +168,30 @@ function TaskCard({ task, index }: { task: ShiftHistoryTask; index: number }) {
             <Row label="Action" value={task.warehouse_action ?? '—'} />
             {task.bins_to_load != null && (
               <Row label="Bins to load" value={String(task.bins_to_load)} />
+            )}
+          </>
+        )}
+
+        {/* ── Service ──────────────────────────────────────── */}
+        {task.task_type === 'service' && (
+          <>
+            <Row label="Address" value={task.address ?? '—'} />
+            {task.task_description && (
+              <Row label="Instructions" value={task.task_description} />
+            )}
+            {task.completion_notes && (
+              <Row label="Driver notes" value={task.completion_notes} />
+            )}
+            {task.photo_url && (
+              <div className="pt-2">
+                <div className="relative w-full h-40 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(task.photo_url!, '_blank')}>
+                  <img
+                    src={task.photo_url}
+                    alt="Service task photo"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
             )}
           </>
         )}
@@ -453,6 +479,7 @@ export function ShiftHistoryDetailDrawer({ shift, onClose }: Props) {
   const dropoffs     = activeTasks.filter(t => t.task_type === 'dropoff');
   const moves        = [...pickups, ...dropoffs].sort((a, b) => a.sequence_order - b.sequence_order);
   const warehouses   = activeTasks.filter(t => t.task_type === 'warehouse_stop');
+  const services     = activeTasks.filter(t => t.task_type === 'service');
 
   // Get filtered tasks based on active filter
   const getFilteredTasks = () => {
@@ -460,6 +487,7 @@ export function ShiftHistoryDetailDrawer({ shift, onClose }: Props) {
       case 'collections': return collections;
       case 'placements': return placements;
       case 'moves': return moves;
+      case 'services': return services;
       case 'timeline': return [];  // Timeline is a special view
       case 'removed': return deletedTasks;
       case 'all':
@@ -514,6 +542,44 @@ export function ShiftHistoryDetailDrawer({ shift, onClose }: Props) {
           {shift.incidents_reported > 0 && <Pill label="Incidents" value={String(shift.incidents_reported)} color="text-red-500" />}
         </div>
 
+        {/* Route Optimization Metrics */}
+        {shift.optimization_metadata && (
+          <div className="px-5 py-3 border-b border-gray-100 shrink-0 bg-blue-50">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-white rounded-lg p-2.5 border border-blue-200">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <Clock className="w-3.5 h-3.5 text-blue-500" />
+                  <span className="text-[11px] text-gray-500">Route Duration</span>
+                </div>
+                <p className="text-sm font-semibold text-gray-900">
+                  {shift.optimization_metadata.total_duration_formatted ||
+                    `${Math.floor(shift.optimization_metadata.total_duration_seconds / 3600)}h ${Math.floor((shift.optimization_metadata.total_duration_seconds % 3600) / 60)}m`}
+                </p>
+              </div>
+              <div className="bg-white rounded-lg p-2.5 border border-blue-200">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <MapPin className="w-3.5 h-3.5 text-blue-500" />
+                  <span className="text-[11px] text-gray-500">Route Distance</span>
+                </div>
+                <p className="text-sm font-semibold text-gray-900">
+                  {(shift.optimization_metadata.total_distance_miles
+                    ?? (shift.optimization_metadata.total_distance_km ? shift.optimization_metadata.total_distance_km * 0.621371 : 0)
+                  ).toFixed(1)} mi
+                </p>
+              </div>
+              <div className="bg-white rounded-lg p-2.5 border border-blue-200">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <ChevronRight className="w-3.5 h-3.5 text-blue-500" />
+                  <span className="text-[11px] text-gray-500">Optimized</span>
+                </div>
+                <p className="text-sm font-semibold text-gray-900">
+                  {new Date(shift.optimization_metadata.optimized_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Tab Navigation */}
         <div className="border-b border-gray-200 shrink-0">
           <div className="flex gap-1 px-5 overflow-x-auto scrollbar-hide">
@@ -547,6 +613,15 @@ export function ShiftHistoryDetailDrawer({ shift, onClose }: Props) {
                 count={moves.length}
               >
                 Move Requests
+              </TabButton>
+            )}
+            {services.length > 0 && (
+              <TabButton
+                active={activeFilter === 'services'}
+                onClick={() => setActiveFilter('services')}
+                count={services.length}
+              >
+                Services
               </TabButton>
             )}
             <TabButton

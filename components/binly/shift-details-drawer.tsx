@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, ArrowUp, ArrowDown, Warehouse, SkipForward, AlertTriangle, ChevronDown, ChevronUp, Navigation, Hash, Image as ImageIcon } from 'lucide-react';
+import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, ArrowUp, ArrowDown, Warehouse, SkipForward, AlertTriangle, ChevronDown, ChevronUp, Navigation, Hash, Image as ImageIcon, ClipboardCheck } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shift';
 import { getShiftById, getShiftTasks, cancelShift, removeTasksFromShift, getShiftTasksWithHistory } from '@/lib/api/shifts';
 import { RouteTask, getTaskLabel, getTaskSubtitle, getTaskColor, getTaskBgColor } from '@/lib/types/route-task';
@@ -352,13 +352,6 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
           </div>
 
           {/* Optimization Metrics */}
-          {(() => {
-            console.log('🔍 [SHIFT DRAWER RENDER] Checking optimization_metadata:', {
-              exists: !!shift.optimization_metadata,
-              value: shift.optimization_metadata,
-            });
-            return null;
-          })()}
           {shift.optimization_metadata && (
             <div className="p-6 border-b border-gray-100 bg-blue-50">
               <h3 className="text-sm font-semibold text-gray-700 mb-3">Route Optimization</h3>
@@ -380,9 +373,10 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                     <span className="text-xs text-gray-500">Est. Distance</span>
                   </div>
                   <p className="text-lg font-semibold text-gray-900">
-                    {shift.total_distance_miles
-                      ? shift.total_distance_miles.toFixed(1)
-                      : (shift.optimization_metadata.total_distance_km * 0.621371).toFixed(1)} mi
+                    {(shift.total_distance_miles
+                      ?? shift.optimization_metadata.total_distance_miles
+                      ?? (shift.optimization_metadata.total_distance_km ? shift.optimization_metadata.total_distance_km * 0.621371 : 0)
+                    ).toFixed(1)} mi
                   </p>
                 </div>
 
@@ -595,6 +589,7 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                       task.task_type === 'pickup' ? ArrowUp :
                       task.task_type === 'dropoff' ? ArrowDown :
                       task.task_type === 'warehouse_stop' ? Warehouse :
+                      task.task_type === 'service' ? ClipboardCheck :
                       Circle;
 
                     return (
