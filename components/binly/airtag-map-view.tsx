@@ -200,7 +200,7 @@ function AirTagMarkerLayer({
   );
 
   useEffect(() => {
-    if (!map) return;
+    if (!map || !google.maps.marker?.AdvancedMarkerElement) return;
 
     const prevMarkers = markersRef.current;
     const newIds = new Set(locations.map((l) => l.id));
@@ -516,7 +516,7 @@ export function AirTagMapView() {
       </div>
 
       {/* Google Map */}
-      <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
+      <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''} libraries={['marker']}>
         <Map
           mapId="binly-airtag-map"
           defaultCenter={DEFAULT_CENTER}

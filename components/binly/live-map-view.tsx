@@ -188,7 +188,7 @@ function BinClusterLayer({
   );
 
   useEffect(() => {
-    if (!map) return;
+    if (!map || !google.maps.marker?.AdvancedMarkerElement) return;
 
     // Clustering disabled — markers render individually on the map
     // (To re-enable clustering, restore MarkerClusterer initialisation here)
@@ -841,7 +841,7 @@ export function LiveMapView() {
 
 
       {/* Google Map */}
-      <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
+      <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''} libraries={['marker']}>
         <Map
           mapId="binly-live-map"
           defaultCenter={DEFAULT_CENTER}
