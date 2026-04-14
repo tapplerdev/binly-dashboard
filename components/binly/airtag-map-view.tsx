@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps';
-import { Loader2, Radio, AlertCircle, BatteryWarning, Search, RefreshCw } from 'lucide-react';
+import { Loader2, Radio, AlertCircle, BatteryWarning, Search, RefreshCw, ChevronDown, HelpCircle } from 'lucide-react';
 import { useAirTags, useSyncAirTags } from '@/lib/hooks/use-airtags';
 import type { AirTagLocation } from '@/lib/api/airtags';
 import { AirTagDetailDrawer } from './airtag-detail-drawer';
@@ -290,7 +290,9 @@ function AirTagMarkerLayer({
 export function AirTagMapView() {
   const { data, isLoading, isError, error } = useAirTags();
   const locations = data?.locations ?? [];
+  const unmatched = data?.unmatched ?? [];
   const lastSyncAt = data?.lastSyncAt ?? null;
+  const [showUnmatched, setShowUnmatched] = useState(false);
   const { mutate: triggerSync, isPending: isSyncing } = useSyncAirTags();
   const [selectedLocation, setSelectedLocation] = useState<AirTagLocation | null>(null);
   const [targetLocation, setTargetLocation] = useState<{
@@ -451,6 +453,41 @@ export function AirTagMapView() {
           lastSyncAt={lastSyncAt}
           onClose={() => setSelectedLocation(null)}
         />
+      )}
+
+      {/* Unmatched Tags Panel */}
+      {unmatched.length > 0 && (
+        <div className="absolute bottom-6 left-4 z-30 max-w-xs">
+          <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-md overflow-hidden">
+            <button
+              onClick={() => setShowUnmatched(!showUnmatched)}
+              className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 transition-colors"
+            >
+              <HelpCircle className="w-3.5 h-3.5 text-amber-500" />
+              <span className="text-xs font-semibold text-gray-700">
+                {unmatched.length} Unmatched Tag{unmatched.length !== 1 ? 's' : ''}
+              </span>
+              <ChevronDown
+                className={`w-3 h-3 text-gray-400 ml-auto transition-transform ${showUnmatched ? 'rotate-180' : ''}`}
+              />
+            </button>
+            {showUnmatched && (
+              <div className="border-t border-gray-100 max-h-48 overflow-y-auto">
+                {unmatched.map((tag) => (
+                  <div
+                    key={tag.id}
+                    className="px-3 py-2 border-b border-gray-50 last:border-b-0"
+                  >
+                    <p className="text-xs font-medium text-gray-800">{tag.name}</p>
+                    <p className="text-[10px] text-gray-400">
+                      {tag.city || 'No address'} &middot; {formatLastSeen(tag.last_seen)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Legend */}

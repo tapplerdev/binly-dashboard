@@ -6,21 +6,20 @@ export const airtagKeys = {
 };
 
 /**
- * Fetch all AirTag locations from the FindMy bridge service
+ * Fetch all AirTag locations from the FindMy bridge service.
  *
- * Cache strategy:
- * - staleTime: 60s (bridge syncs every 15 min, data is relatively stable)
- * - refetchInterval: 5 min (poll bridge periodically for fresh data)
- * - refetchOnWindowFocus: true (refetch when user returns to tab)
+ * Bridge syncs with Apple every 5 min, so we poll every 5 min to match.
+ * "Sync Now" invalidates the cache for an immediate refresh.
  */
 export function useAirTags() {
   return useQuery({
     queryKey: airtagKeys.all,
     queryFn: getAirTagLocations,
-    staleTime: 30 * 1000,
-    refetchInterval: 3 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
     select: (data: AirTagLocationsResponse) => ({
       locations: data.data,
+      unmatched: data.unmatched ?? [],
       lastSyncAt: data.last_sync_at,
     }),
   });

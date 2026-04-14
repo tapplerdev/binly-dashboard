@@ -39,6 +39,8 @@ export interface AirTagLocation {
 export interface AirTagLocationsResponse {
   data: AirTagLocation[];
   count: number;
+  unmatched: AirTagLocation[];
+  unmatched_count: number;
   last_sync_at: string | null;
 }
 
