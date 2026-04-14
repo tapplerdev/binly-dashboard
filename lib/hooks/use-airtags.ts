@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { getAirTagLocations, type AirTagLocationsResponse } from '@/lib/api/airtags';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getAirTagLocations, syncAirTags, type AirTagLocationsResponse } from '@/lib/api/airtags';
 
 export const airtagKeys = {
   all: ['airtag-locations'] as const,
@@ -20,5 +20,20 @@ export function useAirTags() {
     staleTime: 30 * 1000,
     refetchInterval: 3 * 60 * 1000,
     select: (data: AirTagLocationsResponse) => data.data,
+  });
+}
+
+/**
+ * Trigger an immediate AirTag location sync.
+ * On success, invalidates the location cache so fresh data is fetched.
+ */
+export function useSyncAirTags() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: syncAirTags,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: airtagKeys.all });
+    },
   });
 }

@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps';
-import { Loader2, Radio, X, MapPin, Clock, AlertCircle, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Search } from 'lucide-react';
-import { useAirTags } from '@/lib/hooks/use-airtags';
+import { Loader2, Radio, X, MapPin, Clock, AlertCircle, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Search, RefreshCw } from 'lucide-react';
+import { useAirTags, useSyncAirTags } from '@/lib/hooks/use-airtags';
 import type { AirTagLocation } from '@/lib/api/airtags';
 
 // Default map center (San Jose, CA area - center of bin operations)
@@ -288,6 +288,7 @@ function AirTagMarkerLayer({
 
 export function AirTagMapView() {
   const { data: locations = [], isLoading, isError, error } = useAirTags();
+  const { mutate: triggerSync, isPending: isSyncing } = useSyncAirTags();
   const [selectedLocation, setSelectedLocation] = useState<AirTagLocation | null>(null);
   const [targetLocation, setTargetLocation] = useState<{
     lat: number;
@@ -384,6 +385,16 @@ export function AirTagMapView() {
               <span className="text-xs font-medium text-gray-700">{lowBatteryCount} Low Battery</span>
             </div>
           )}
+          <button
+            onClick={() => triggerSync()}
+            disabled={isSyncing}
+            className="bg-white/95 backdrop-blur-sm rounded-full shadow-md px-3 py-1.5 flex items-center gap-1.5 hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-primary ${isSyncing ? 'animate-spin' : ''}`} />
+            <span className="text-xs font-medium text-gray-700">
+              {isSyncing ? 'Syncing...' : 'Sync Now'}
+            </span>
+          </button>
         </div>
       </div>
 

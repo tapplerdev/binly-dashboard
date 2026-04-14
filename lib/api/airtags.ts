@@ -58,3 +58,26 @@ export async function getAirTagLocations(): Promise<AirTagLocationsResponse> {
 
   return response.json();
 }
+
+export interface SyncResponse {
+  status: string;
+  fetched: number;
+  total: number;
+  duration?: string;
+}
+
+/**
+ * Trigger an immediate AirTag location sync on the FindMy bridge
+ */
+export async function syncAirTags(): Promise<SyncResponse> {
+  const response = await fetch(`${API_URL}/api/manager/airtag-sync`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to trigger AirTag sync: ${response.statusText}`);
+  }
+
+  return response.json();
+}
