@@ -471,39 +471,45 @@ export function AirTagMapView() {
       )}
 
       {/* Unmatched Tags Panel */}
-      {unmatched.length > 0 && (
-        <div className="absolute bottom-6 left-4 z-30 max-w-xs">
-          <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-md overflow-hidden">
-            <button
-              onClick={() => setShowUnmatched(!showUnmatched)}
-              className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 transition-colors"
-            >
+      <div className="absolute bottom-6 left-4 z-30 max-w-xs">
+        <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-md overflow-hidden">
+          <button
+            onClick={() => unmatched.length > 0 && setShowUnmatched(!showUnmatched)}
+            className={`w-full px-3 py-2 flex items-center gap-2 transition-colors ${unmatched.length > 0 ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-default'}`}
+          >
+            {unmatched.length > 0 ? (
               <HelpCircle className="w-3.5 h-3.5 text-amber-500" />
-              <span className="text-xs font-semibold text-gray-700">
-                {unmatched.length} Unmatched Tag{unmatched.length !== 1 ? 's' : ''}
-              </span>
+            ) : (
+              <Radio className="w-3.5 h-3.5 text-green-500" />
+            )}
+            <span className="text-xs font-semibold text-gray-700">
+              {unmatched.length === 0
+                ? 'All Tags Matched'
+                : `${unmatched.length} Unmatched Tag${unmatched.length !== 1 ? 's' : ''}`}
+            </span>
+            {unmatched.length > 0 && (
               <ChevronDown
                 className={`w-3 h-3 text-gray-400 ml-auto transition-transform ${showUnmatched ? 'rotate-180' : ''}`}
               />
-            </button>
-            {showUnmatched && (
-              <div className="border-t border-gray-100 max-h-48 overflow-y-auto">
-                {unmatched.map((tag) => (
-                  <div
-                    key={tag.id}
-                    className="px-3 py-2 border-b border-gray-50 last:border-b-0"
-                  >
-                    <p className="text-xs font-medium text-gray-800">{tag.name}</p>
-                    <p className="text-[10px] text-gray-400">
-                      {tag.city || 'No address'} &middot; {formatLastSeen(tag.last_seen)}
-                    </p>
-                  </div>
-                ))}
-              </div>
             )}
-          </div>
+          </button>
+          {showUnmatched && unmatched.length > 0 && (
+            <div className="border-t border-gray-100 max-h-48 overflow-y-auto">
+              {unmatched.map((tag) => (
+                <div
+                  key={tag.id}
+                  className="px-3 py-2 border-b border-gray-50 last:border-b-0"
+                >
+                  <p className="text-xs font-medium text-gray-800">{tag.name}</p>
+                  <p className="text-[10px] text-gray-400">
+                    {tag.city || 'No address'} &middot; {formatLastSeen(tag.last_seen)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Legend */}
       <div className="absolute bottom-6 right-4 z-30">
