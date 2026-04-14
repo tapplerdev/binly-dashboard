@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps';
-import { Loader2, Radio, AlertCircle, BatteryWarning, Search, RefreshCw, ChevronDown, HelpCircle } from 'lucide-react';
+import { Loader2, Radio, AlertCircle, BatteryWarning, BatteryFull, Search, RefreshCw, ChevronDown, HelpCircle } from 'lucide-react';
 import { useAirTags, useSyncAirTags } from '@/lib/hooks/use-airtags';
 import type { AirTagLocation } from '@/lib/api/airtags';
 import { AirTagDetailDrawer } from './airtag-detail-drawer';
@@ -323,6 +323,10 @@ export function AirTagMapView() {
     const diff = Date.now() - new Date(l.last_seen).getTime();
     return diff < 30 * 60000; // last 30 min
   }).length;
+  const agingCount = filteredLocations.filter((l) => {
+    const diff = Date.now() - new Date(l.last_seen).getTime();
+    return diff >= 30 * 60000 && diff <= 2 * 60 * 60000; // 30 min – 2 hr
+  }).length;
   const staleCount = filteredLocations.filter((l) => {
     const diff = Date.now() - new Date(l.last_seen).getTime();
     return diff > 2 * 60 * 60000; // over 2 hours
@@ -384,9 +388,14 @@ export function AirTagMapView() {
         </button>
       </div>
 
-      {/* Row 2: Battery filters + Stats */}
+      {/* Row 2: Battery filter + Last Seen stats */}
       <div className="absolute top-[68px] left-4 right-4 z-30 flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
+        {/* Battery filter */}
+        <div className="flex items-center gap-1.5 bg-white/95 backdrop-blur-sm rounded-full shadow-md px-1.5 py-1">
+          <div className="flex items-center gap-1 pl-2 pr-1">
+            <BatteryFull className="w-3.5 h-3.5 text-gray-400" />
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Battery</span>
+          </div>
           {([
             { value: null, label: 'All', color: '#6B7280' },
             { value: 0, label: 'Full', color: getBatteryColor(0) },
@@ -402,10 +411,10 @@ export function AirTagMapView() {
               <button
                 key={chip.label}
                 onClick={() => setBatteryFilter(chip.value)}
-                className={`backdrop-blur-sm rounded-full shadow-md px-2.5 py-1 flex items-center gap-1.5 transition-all text-xs font-medium border ${
+                className={`rounded-full px-2.5 py-1 flex items-center gap-1.5 transition-all text-xs font-medium ${
                   isActive
-                    ? 'bg-white border-gray-300 text-gray-900'
-                    : 'bg-white/80 border-transparent text-gray-500 hover:bg-white/95'
+                    ? 'bg-gray-100 text-gray-900'
+                    : 'text-gray-500 hover:bg-gray-50'
                 }`}
               >
                 {chip.value !== null && (
@@ -418,28 +427,34 @@ export function AirTagMapView() {
           })}
         </div>
 
-        <div className="hidden md:flex items-center gap-3 bg-white/95 backdrop-blur-sm rounded-full shadow-md px-3 py-1.5">
+        {/* Last Seen stats */}
+        <div className="hidden md:flex items-center gap-2.5 bg-white/95 backdrop-blur-sm rounded-full shadow-md px-3.5 py-1.5">
           <span className="text-xs text-gray-500">
-            <span className="font-medium text-gray-700">{totalTags}</span> Tags
+            <span className="font-semibold text-gray-700">{totalTags}</span> Tags
           </span>
-          <span className="text-xs text-gray-300">|</span>
-          <span className="text-xs text-gray-500">
-            <span className="font-medium text-green-600">{recentCount}</span> Recent
+          <span className="text-gray-200">|</span>
+          <span className="text-xs text-gray-500 flex items-center gap-1" title="Seen in the last 30 minutes">
+            <div className="w-2 h-2 rounded-full bg-green-500" />
+            <span className="font-medium text-green-600">{recentCount}</span>
+            <span className="hidden lg:inline">&lt;30m</span>
           </span>
-          {staleCount > 0 && (
+          {agingCount > 0 && (
             <>
-              <span className="text-xs text-gray-300">|</span>
-              <span className="text-xs text-gray-500">
-                <span className="font-medium text-red-500">{staleCount}</span> Stale
+              <span className="text-gray-200">|</span>
+              <span className="text-xs text-gray-500 flex items-center gap-1" title="Seen 30 min – 2 hours ago">
+                <div className="w-2 h-2 rounded-full bg-amber-500" />
+                <span className="font-medium text-amber-600">{agingCount}</span>
+                <span className="hidden lg:inline">30m–2h</span>
               </span>
             </>
           )}
-          {lowBatteryCount > 0 && (
+          {staleCount > 0 && (
             <>
-              <span className="text-xs text-gray-300">|</span>
-              <span className="text-xs text-gray-500 flex items-center gap-1">
-                <BatteryWarning className="w-3 h-3 text-amber-500" />
-                <span className="font-medium text-amber-600">{lowBatteryCount}</span>
+              <span className="text-gray-200">|</span>
+              <span className="text-xs text-gray-500 flex items-center gap-1" title="Not seen for over 2 hours">
+                <div className="w-2 h-2 rounded-full bg-red-500" />
+                <span className="font-medium text-red-500">{staleCount}</span>
+                <span className="hidden lg:inline">&gt;2h</span>
               </span>
             </>
           )}
