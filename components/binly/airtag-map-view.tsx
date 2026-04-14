@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps';
-import { Loader2, Radio, X, MapPin, Clock, AlertCircle, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Search, RefreshCw } from 'lucide-react';
+import { Loader2, Radio, AlertCircle, BatteryWarning, Search, RefreshCw } from 'lucide-react';
 import { useAirTags, useSyncAirTags } from '@/lib/hooks/use-airtags';
 import type { AirTagLocation } from '@/lib/api/airtags';
+import { AirTagDetailDrawer } from './airtag-detail-drawer';
 
 // Default map center (San Jose, CA area - center of bin operations)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -287,7 +288,9 @@ function AirTagMarkerLayer({
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export function AirTagMapView() {
-  const { data: locations = [], isLoading, isError, error } = useAirTags();
+  const { data, isLoading, isError, error } = useAirTags();
+  const locations = data?.locations ?? [];
+  const lastSyncAt = data?.lastSyncAt ?? null;
   const { mutate: triggerSync, isPending: isSyncing } = useSyncAirTags();
   const [selectedLocation, setSelectedLocation] = useState<AirTagLocation | null>(null);
   const [targetLocation, setTargetLocation] = useState<{
@@ -351,160 +354,103 @@ export function AirTagMapView() {
 
   return (
     <div className="relative h-full w-full bg-gray-100">
-      {/* Header Badge */}
-      <div className="absolute top-4 left-4 z-30 flex items-center gap-3">
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg px-4 py-2.5 flex items-center gap-2.5">
+      {/* Row 1: Title badge + Search bar + Sync button */}
+      <div className="absolute top-4 left-4 right-4 z-30 flex items-center gap-3">
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg px-4 py-2.5 flex items-center gap-2.5 shrink-0">
           <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
             <Radio className="w-4 h-4 text-primary" />
           </div>
-          <div>
+          <div className="hidden sm:block">
             <h2 className="text-sm font-semibold text-gray-900">AirTag Tracker</h2>
             <p className="text-xs text-gray-500">FindMy Network</p>
           </div>
         </div>
 
-        {/* Stats Pills */}
-        <div className="hidden md:flex items-center gap-2">
-          <div className="bg-white/95 backdrop-blur-sm rounded-full shadow-md px-3 py-1.5 flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-primary" />
-            <span className="text-xs font-medium text-gray-700">{totalTags} Tags</span>
-          </div>
-          <div className="bg-white/95 backdrop-blur-sm rounded-full shadow-md px-3 py-1.5 flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-green-500" />
-            <span className="text-xs font-medium text-gray-700">{recentCount} Recent</span>
-          </div>
+        <div className="flex-1 max-w-md">
+          <AirTagSearchBar locations={filteredLocations} onSelect={handleSearchSelect} />
+        </div>
+
+        <button
+          onClick={() => triggerSync()}
+          disabled={isSyncing}
+          className="bg-white/95 backdrop-blur-sm rounded-full shadow-md px-3 py-2 flex items-center gap-1.5 hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 text-primary ${isSyncing ? 'animate-spin' : ''}`} />
+          <span className="text-xs font-medium text-gray-700 hidden sm:inline">
+            {isSyncing ? 'Syncing...' : 'Sync Now'}
+          </span>
+        </button>
+      </div>
+
+      {/* Row 2: Battery filters + Stats */}
+      <div className="absolute top-[68px] left-4 right-4 z-30 flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          {([
+            { value: null, label: 'All', color: '#6B7280' },
+            { value: 0, label: 'Full', color: getBatteryColor(0) },
+            { value: 1, label: 'Medium', color: getBatteryColor(1) },
+            { value: 2, label: 'Low', color: getBatteryColor(2) },
+            { value: 3, label: 'Critical', color: getBatteryColor(3) },
+          ] as const).map((chip) => {
+            const isActive = batteryFilter === chip.value;
+            const count = chip.value === null
+              ? locations.length
+              : locations.filter((l) => l.battery_status === chip.value).length;
+            return (
+              <button
+                key={chip.label}
+                onClick={() => setBatteryFilter(chip.value)}
+                className={`backdrop-blur-sm rounded-full shadow-md px-2.5 py-1 flex items-center gap-1.5 transition-all text-xs font-medium border ${
+                  isActive
+                    ? 'bg-white border-gray-300 text-gray-900'
+                    : 'bg-white/80 border-transparent text-gray-500 hover:bg-white/95'
+                }`}
+              >
+                {chip.value !== null && (
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: chip.color }} />
+                )}
+                <span>{chip.label}</span>
+                <span className="text-gray-400">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="hidden md:flex items-center gap-3 bg-white/95 backdrop-blur-sm rounded-full shadow-md px-3 py-1.5">
+          <span className="text-xs text-gray-500">
+            <span className="font-medium text-gray-700">{totalTags}</span> Tags
+          </span>
+          <span className="text-xs text-gray-300">|</span>
+          <span className="text-xs text-gray-500">
+            <span className="font-medium text-green-600">{recentCount}</span> Recent
+          </span>
           {staleCount > 0 && (
-            <div className="bg-white/95 backdrop-blur-sm rounded-full shadow-md px-3 py-1.5 flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-red-500" />
-              <span className="text-xs font-medium text-gray-700">{staleCount} Stale</span>
-            </div>
+            <>
+              <span className="text-xs text-gray-300">|</span>
+              <span className="text-xs text-gray-500">
+                <span className="font-medium text-red-500">{staleCount}</span> Stale
+              </span>
+            </>
           )}
           {lowBatteryCount > 0 && (
-            <div className="bg-white/95 backdrop-blur-sm rounded-full shadow-md px-3 py-1.5 flex items-center gap-1.5">
-              <BatteryWarning className="w-3.5 h-3.5 text-amber-500" />
-              <span className="text-xs font-medium text-gray-700">{lowBatteryCount} Low Battery</span>
-            </div>
+            <>
+              <span className="text-xs text-gray-300">|</span>
+              <span className="text-xs text-gray-500 flex items-center gap-1">
+                <BatteryWarning className="w-3 h-3 text-amber-500" />
+                <span className="font-medium text-amber-600">{lowBatteryCount}</span>
+              </span>
+            </>
           )}
-          <button
-            onClick={() => triggerSync()}
-            disabled={isSyncing}
-            className="bg-white/95 backdrop-blur-sm rounded-full shadow-md px-3 py-1.5 flex items-center gap-1.5 hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 text-primary ${isSyncing ? 'animate-spin' : ''}`} />
-            <span className="text-xs font-medium text-gray-700">
-              {isSyncing ? 'Syncing...' : 'Sync Now'}
-            </span>
-          </button>
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 w-full max-w-md px-4">
-        <AirTagSearchBar locations={filteredLocations} onSelect={handleSearchSelect} />
-      </div>
-
-      {/* Battery Filter Chips */}
-      <div className="absolute top-[60px] left-4 z-30 flex items-center gap-1.5">
-        {([
-          { value: null, label: 'All', color: '#6B7280' },
-          { value: 0, label: 'Full', color: getBatteryColor(0) },
-          { value: 1, label: 'Medium', color: getBatteryColor(1) },
-          { value: 2, label: 'Low', color: getBatteryColor(2) },
-          { value: 3, label: 'Critical', color: getBatteryColor(3) },
-        ] as const).map((chip) => {
-          const isActive = batteryFilter === chip.value;
-          const count = chip.value === null
-            ? locations.length
-            : locations.filter((l) => l.battery_status === chip.value).length;
-          return (
-            <button
-              key={chip.label}
-              onClick={() => setBatteryFilter(chip.value)}
-              className={`backdrop-blur-sm rounded-full shadow-md px-2.5 py-1 flex items-center gap-1.5 transition-all text-xs font-medium border ${
-                isActive
-                  ? 'bg-white border-gray-300 text-gray-900'
-                  : 'bg-white/80 border-transparent text-gray-500 hover:bg-white/95'
-              }`}
-            >
-              {chip.value !== null && (
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: chip.color }} />
-              )}
-              <span>{chip.label}</span>
-              <span className="text-gray-400">{count}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Info Card (shown on marker click) */}
+      {/* Detail Drawer (shown on marker click) */}
       {selectedLocation && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 animate-scale-in">
-          <div className="bg-white rounded-2xl shadow-xl p-4 min-w-[300px] max-w-[380px] border border-gray-100">
-            {/* Close button */}
-            <button
-              onClick={() => setSelectedLocation(null)}
-              className="absolute top-3 right-3 w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
-            >
-              <X className="w-3.5 h-3.5 text-gray-500" />
-            </button>
-
-            {/* Header */}
-            <div className="flex items-center gap-3 mb-3">
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md"
-                style={{ backgroundColor: AIRTAG_MARKER_COLOR }}
-              >
-                {selectedLocation.bin_number}
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900">{selectedLocation.name}</h3>
-                <div
-                  className="flex items-center gap-1"
-                >
-                  <div
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: getLastSeenColor(selectedLocation.last_seen) }}
-                  />
-                  <span className="text-xs text-gray-500">
-                    {formatLastSeen(selectedLocation.last_seen)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Details */}
-            <div className="space-y-2 border-t border-gray-100 pt-3">
-              <div className="flex items-start gap-2.5">
-                <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm text-gray-700">{selectedLocation.address}</p>
-                  <p className="text-xs text-gray-400">{selectedLocation.city}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <p className="text-xs text-gray-500">
-                  Last seen {formatLastSeen(selectedLocation.last_seen)}
-                </p>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <Radio className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <p className="text-xs text-gray-500">
-                  {selectedLocation.latitude.toFixed(6)}, {selectedLocation.longitude.toFixed(6)}
-                </p>
-              </div>
-              <div className="flex items-center gap-2.5">
-                {selectedLocation.battery_status === 0 && <BatteryFull className="w-4 h-4 flex-shrink-0" style={{ color: getBatteryColor(0) }} />}
-                {selectedLocation.battery_status === 1 && <BatteryMedium className="w-4 h-4 flex-shrink-0" style={{ color: getBatteryColor(1) }} />}
-                {selectedLocation.battery_status === 2 && <BatteryLow className="w-4 h-4 flex-shrink-0" style={{ color: getBatteryColor(2) }} />}
-                {selectedLocation.battery_status === 3 && <BatteryWarning className="w-4 h-4 flex-shrink-0" style={{ color: getBatteryColor(3) }} />}
-                <p className="text-xs text-gray-500" style={{ color: getBatteryColor(selectedLocation.battery_status) }}>
-                  Battery: {getBatteryLabel(selectedLocation.battery_status)}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <AirTagDetailDrawer
+          location={selectedLocation}
+          lastSyncAt={lastSyncAt}
+          onClose={() => setSelectedLocation(null)}
+        />
       )}
 
       {/* Legend */}

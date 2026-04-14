@@ -19,7 +19,10 @@ export function useAirTags() {
     queryFn: getAirTagLocations,
     staleTime: 30 * 1000,
     refetchInterval: 3 * 60 * 1000,
-    select: (data: AirTagLocationsResponse) => data.data,
+    select: (data: AirTagLocationsResponse) => ({
+      locations: data.data,
+      lastSyncAt: data.last_sync_at,
+    }),
   });
 }
 
