@@ -12,6 +12,7 @@ import {
   Users,
   ShieldAlert,
   Radio,
+  Lightbulb,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -19,6 +20,7 @@ export interface NavItem {
   title: string;
   path?: string;
   icon?: React.ReactNode;
+  external?: boolean;
   children: NavItem[];
 }
 
@@ -138,6 +140,21 @@ export const sidebarNavItems: NavItem[] = [
         key: 'team',
         title: 'Team',
         icon: <Users className="w-5 h-5" />,
+        children: [],
+      },
+    ],
+  },
+  {
+    key: 'product-vision',
+    title: 'Product Vision',
+    icon: null,
+    children: [
+      {
+        path: '/docs/product-vision',
+        key: 'vision',
+        title: 'Product Vision',
+        icon: <Lightbulb className="w-5 h-5" />,
+        external: true,
         children: [],
       },
     ],

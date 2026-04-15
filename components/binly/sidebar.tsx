@@ -110,31 +110,52 @@ export function Sidebar() {
                 <ul className="space-y-1">
                   {section.children.map((item) => (
                     <li key={item.key}>
-                      <Link
-                        href={item.path || '#'}
-                        className={cn(
-                          'flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200',
-                          collapsed && 'justify-center',
-                          isActive(item.path)
-                            ? 'bg-[#EDF0FF] text-[#4880FF] font-bold'
-                            : 'text-[#809FB8] font-medium hover:bg-[#EDF0FF]'
-                        )}
-                        title={collapsed ? item.title : undefined}
-                      >
-                        {item.icon && (
-                          <span
-                            className={cn(
-                              'transition-colors duration-200',
-                              isActive(item.path)
-                                ? 'text-[#4880FF]'
-                                : 'text-[#809FB8]'
-                            )}
-                          >
-                            {item.icon}
-                          </span>
-                        )}
-                        {!collapsed && <span className="text-base transition-all duration-200">{item.title}</span>}
-                      </Link>
+                      {item.external ? (
+                        <a
+                          href={item.path || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={cn(
+                            'flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200',
+                            collapsed && 'justify-center',
+                            'text-[#809FB8] font-medium hover:bg-[#EDF0FF]'
+                          )}
+                          title={collapsed ? item.title : undefined}
+                        >
+                          {item.icon && (
+                            <span className="transition-colors duration-200 text-[#809FB8]">
+                              {item.icon}
+                            </span>
+                          )}
+                          {!collapsed && <span className="text-base transition-all duration-200">{item.title}</span>}
+                        </a>
+                      ) : (
+                        <Link
+                          href={item.path || '#'}
+                          className={cn(
+                            'flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200',
+                            collapsed && 'justify-center',
+                            isActive(item.path)
+                              ? 'bg-[#EDF0FF] text-[#4880FF] font-bold'
+                              : 'text-[#809FB8] font-medium hover:bg-[#EDF0FF]'
+                          )}
+                          title={collapsed ? item.title : undefined}
+                        >
+                          {item.icon && (
+                            <span
+                              className={cn(
+                                'transition-colors duration-200',
+                                isActive(item.path)
+                                  ? 'text-[#4880FF]'
+                                  : 'text-[#809FB8]'
+                              )}
+                            >
+                              {item.icon}
+                            </span>
+                          )}
+                          {!collapsed && <span className="text-base transition-all duration-200">{item.title}</span>}
+                        </Link>
+                      )}
                     </li>
                   ))}
                 </ul>
