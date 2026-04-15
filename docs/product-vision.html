@@ -144,6 +144,35 @@
     .stat-value { font-size: 2.2rem; font-weight: 900; margin-bottom: 4px; }
     .stat-label { font-size: 0.82rem; color: var(--text-muted); font-weight: 600; }
 
+    /* Example flow timeline */
+    .flow-timeline { position: relative; padding-left: 36px; }
+    .flow-step { position: relative; margin-bottom: 28px; }
+    .flow-step::before { content: ''; position: absolute; left: -28px; top: 28px; bottom: -28px; width: 2px; background: var(--border); }
+    .flow-step:last-child::before { display: none; }
+    .flow-time { position: absolute; left: -36px; top: 0; width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--primary); background: white; z-index: 1; }
+    .flow-time.green { border-color: var(--green); }
+    .flow-time.amber { border-color: var(--amber); }
+    .flow-time.red { border-color: var(--red); }
+    .flow-time.purple { border-color: var(--purple); }
+    .flow-card { background: white; border-radius: 12px; border: 1px solid var(--border); padding: 16px 20px; }
+    .flow-card:hover { border-color: var(--primary); box-shadow: 0 2px 8px rgba(72,128,255,0.08); }
+    .flow-label { display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 4px; margin-bottom: 6px; }
+    .flow-label.pulse { background: var(--green-bg); color: #059669; }
+    .flow-label.ops { background: var(--blue-bg); color: #1D4ED8; }
+    .flow-label.assets { background: var(--red-bg); color: #DC2626; }
+    .flow-label.intel { background: var(--purple-bg); color: #6D28D9; }
+    .flow-label.team { background: var(--amber-bg); color: #92400E; }
+    .flow-label.settings { background: #F1F5F9; color: #475569; }
+    .flow-card h5 { font-size: 0.88rem; font-weight: 800; margin-bottom: 4px; }
+    .flow-card p { font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin: 0; }
+    .flow-card .detail { font-size: 0.78rem; color: var(--text-muted); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); line-height: 1.5; }
+    .example-toggle { display: flex; gap: 12px; margin-bottom: 28px; flex-wrap: wrap; }
+    .example-tab { padding: 10px 20px; border-radius: 10px; font-size: 0.85rem; font-weight: 700; cursor: pointer; border: 2px solid var(--border); background: white; transition: all 0.2s; }
+    .example-tab:hover { border-color: var(--primary); color: var(--primary); }
+    .example-tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+    .example-scenario { display: none; }
+    .example-scenario.active { display: block; }
+
     .footer { background: #0f172a; color: #64748B; padding: 40px; text-align: center; font-size: 0.82rem; }
     .footer strong { color: white; }
   </style>
@@ -153,10 +182,10 @@
 <!-- HERO -->
 <div class="hero">
   <div class="hero-badge">PRODUCT VISION 2026–2027</div>
-  <h1>Binly: The <span>AI-Powered</span><br>Waste Logistics OS</h1>
+  <h1>Binly: The <span>AI-Powered</span><br>Field Operations Platform</h1>
   <p class="subtitle">
-    From route optimization to predictive intelligence — the roadmap to make Binly
-    the most comprehensive field operations platform in the waste industry.
+    Purpose-built for waste management. Configurable for any field service.
+    Route optimization, asset tracking, driver management, and predictive intelligence — one platform for every vertical.
   </p>
 </div>
 
@@ -165,14 +194,18 @@
   <div class="nav-inner">
     <a href="#today">Where We Are</a>
     <a href="#vision">The Vision</a>
+    <a href="#platform">Configurable Platform</a>
+    <a href="#analytics">Analytics</a>
     <a href="#pillar-1">AI Routes</a>
     <a href="#pillar-2">Vision AI</a>
     <a href="#pillar-3">Smart Ops</a>
     <a href="#pillar-4">Driver Experience</a>
-    <a href="#pillar-5">Customer Layer</a>
-    <a href="#pillar-6">Asset Security</a>
-    <a href="#pillar-7">Sustainability</a>
+    <a href="#pillar-5">Asset Security</a>
+    <a href="#pillar-6">Sustainability</a>
     <a href="#roadmap">Roadmap</a>
+    <a href="#structure">Dashboard</a>
+    <a href="#examples">Examples</a>
+    <a href="#landscape">Competitors</a>
     <a href="#moat">The Moat</a>
   </div>
 </div>
@@ -189,27 +222,27 @@
       <div class="pillar-card">
         <div class="pillar-icon" style="background: var(--green-bg); color: var(--green);">&#9776;</div>
         <h3>Route Optimization</h3>
-        <p>Mapbox v2 API with 6 task types (collect, place, pickup, dropoff, warehouse, service), capacity constraints, time windows, and custom start/end locations.</p>
+        <p>Smart route optimization that handles all task types — collections, placements, pickups, dropoffs, and warehouse stops. Supports truck capacity limits, time windows, and flexible start/end locations.</p>
       </div>
       <div class="pillar-card">
         <div class="pillar-icon" style="background: var(--blue-bg); color: var(--primary);">&#9906;</div>
         <h3>AirTag Asset Tracking</h3>
-        <p>72+ bins tracked via Apple FindMy at $29/tag with zero monthly fees. 3-account staggered polling refreshing every ~1.7 minutes. Drift detection alerts.</p>
+        <p>72+ assets tracked with Apple AirTags at $29/tag — zero monthly fees. Location refreshes every few minutes. Automatic alerts when an asset drifts from its assigned spot.</p>
       </div>
       <div class="pillar-card">
         <div class="pillar-icon" style="background: var(--purple-bg); color: var(--purple);">&#9041;</div>
         <h3>Driver Mobile App</h3>
-        <p>Flutter app with Google Navigation SDK, real-time GPS via Centrifugo WebSocket, photo capture, incident reporting, and shift management.</p>
+        <p>Full-featured mobile app with turn-by-turn navigation, real-time location tracking, photo capture, incident reporting, and shift management. Works on iOS and Android.</p>
       </div>
       <div class="pillar-card">
         <div class="pillar-icon" style="background: var(--amber-bg); color: var(--amber);">&#9881;</div>
         <h3>Manager Dashboard</h3>
-        <p>Next.js command center with live map, shift scheduling, bin inventory, move requests, No-Go Zones, driver leaderboards, and real-time fleet tracking.</p>
+        <p>Web-based command center with live map, shift scheduling, asset inventory, move requests, No-Go Zones, driver leaderboards, and real-time fleet tracking.</p>
       </div>
       <div class="pillar-card">
         <div class="pillar-icon" style="background: var(--red-bg); color: var(--red);">&#9888;</div>
         <h3>No-Go Zone Management</h3>
-        <p>Geographic conflict tracking with incident reporting, conflict scores, zone merging, risk overrides, and auto-creation from move requests. Only Binly has this.</p>
+        <p>Mark risky or problematic locations to protect drivers and assets. Tracks incident history, risk levels, and automatically flags new trouble spots. Only Binly has this.</p>
       </div>
       <div class="pillar-card">
         <div class="pillar-icon" style="background: var(--cyan-bg); color: var(--cyan);">&#9733;</div>
@@ -228,29 +261,185 @@
     </p>
 
     <div class="callout callout-purple">
-      <div class="callout-title">The Operating System for Waste Logistics</div>
+      <div class="callout-title">The Operating System for Field Operations</div>
       <p>
-        No competitor combines all of these: route optimization + physical asset GPS + workforce management + field service + AI dispatch + computer vision + customer portal + sustainability reporting.
-        The platform that integrates all of these becomes the <strong>operating system</strong> that waste companies can't operate without — and that's what Binly becomes.
+        Binly starts as the best waste logistics platform — then opens up to <strong>any industry with assets in the field</strong>.
+        Bitcoin ATMs, vending machines, solar panels, construction equipment, medical devices. Same engine: route optimization + asset GPS + workforce management + AI intelligence.
+        Different labels, different check-in forms, same powerful platform. No competitor does this.
       </p>
     </div>
 
     <div class="stats-row">
       <div class="stat-card">
-        <div class="stat-value" style="color: var(--primary);">7</div>
-        <div class="stat-label">Innovation Pillars</div>
+        <div class="stat-value" style="color: var(--primary);">3</div>
+        <div class="stat-label">Focused Phases</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value" style="color: var(--green);">30+</div>
-        <div class="stat-label">New Features Identified</div>
+        <div class="stat-value" style="color: var(--green);">20+</div>
+        <div class="stat-label">Prioritized Features</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value" style="color: var(--purple);">$5.8B</div>
-        <div class="stat-label">Smart Waste Market by 2030</div>
+        <div class="stat-value" style="color: var(--purple);">$29.9B</div>
+        <div class="stat-label">Field Service Market by 2031</div>
       </div>
       <div class="stat-card">
         <div class="stat-value" style="color: var(--amber);">0</div>
         <div class="stat-label">Competitors with All Features</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- CONFIGURABLE PLATFORM                      -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section" id="platform">
+    <div class="feature-block">
+      <div class="feature-header">
+        <div class="feature-number" style="background: linear-gradient(135deg, #0EA5E9, #0284C7);">&#9881;</div>
+        <div>
+          <h3>Configurable Multi-Vertical Platform</h3>
+          <p style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">One platform, any field service industry — waste, ATMs, vending, solar, and beyond</p>
+        </div>
+        <span class="tag" style="background: var(--cyan-bg); color: #0E7490;">PLATFORM PLAY</span>
+      </div>
+      <div class="feature-body">
+        <p>Binly's core value — route optimization, asset GPS tracking, driver management — isn't waste-specific. A Bitcoin ATM operator has the same problem: hundreds of assets, drivers visiting them daily, needing optimized routes and check-ins. The only difference is vocabulary and workflow. <strong>Make the platform configurable, and the TAM jumps from $5.8B (smart waste) to $29.9B (field service management).</strong></p>
+
+        <!-- Vertical Comparison Table -->
+        <div style="overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); margin: 20px 0;">
+          <table class="compare-table" style="font-size: 0.82rem;">
+            <thead>
+              <tr>
+                <th>Concept</th>
+                <th style="background: var(--green); text-align:center;">Waste Mgmt</th>
+                <th style="background: #F59E0B; text-align:center;">Bitcoin ATMs</th>
+                <th style="background: var(--purple); text-align:center;">Vending</th>
+                <th style="background: #0EA5E9; text-align:center;">Solar/HVAC</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Asset</td><td style="text-align:center;">Bin</td><td style="text-align:center;">ATM</td><td style="text-align:center;">Machine</td><td style="text-align:center;">Unit / Panel</td></tr>
+              <tr><td>Primary Task</td><td style="text-align:center;">Collection</td><td style="text-align:center;">Cash Pickup</td><td style="text-align:center;">Restock</td><td style="text-align:center;">Inspection</td></tr>
+              <tr><td>Check-in Data</td><td style="text-align:center;">Fill %, photo</td><td style="text-align:center;">Cash level, error codes</td><td style="text-align:center;">Stock count, expiry</td><td style="text-align:center;">Condition, output</td></tr>
+              <tr><td>Incident Type</td><td style="text-align:center;">Overflow, vandalism</td><td style="text-align:center;">Malfunction, tamper</td><td style="text-align:center;">Jam, out of stock</td><td style="text-align:center;">Damage, outage</td></tr>
+              <tr><td>Key Metric</td><td style="text-align:center;">Tons collected</td><td style="text-align:center;">$ collected</td><td style="text-align:center;">Units restocked</td><td style="text-align:center;">Sites inspected</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="feature-grid">
+          <div class="sub-feature">
+            <h4>&#127991; Workspace Terminology Config</h4>
+            <p>Admin settings page where the customer defines what they call things: "Asset" → "ATM", "Collection" → "Cash Pickup", "Fill Level" → "Cash Level." The entire UI — dashboard, mobile app, notifications — dynamically reflects these labels. One database column rename in the settings table, not the schema.</p>
+          </div>
+          <div class="sub-feature">
+            <h4>&#128203; Configurable Check-in Forms</h4>
+            <p><strong>This is the biggest unlock.</strong> A simple form builder where admins define what drivers fill out at each stop. Drag-and-drop fields: number inputs, dropdowns, text, photo capture, checkboxes. Waste: "fill %" + photo. ATM: "cash count" + "receipt stock" + "error code" + photo. The mobile app automatically displays the right form for each task type. Unlocks every vertical.</p>
+          </div>
+          <div class="sub-feature">
+            <h4>&#128736; Custom Fields on Assets</h4>
+            <p>Let admins add their own fields to assets. A bin has "waste type" and "capacity." An ATM has "model number", "cash capacity", "network provider." Simple key-value store on the asset table with type validation (text, number, dropdown, date). Filterable and searchable in the dashboard.</p>
+          </div>
+          <div class="sub-feature">
+            <h4>&#128260; Custom Task Types</h4>
+            <p>Beyond the built-in collect/place/move. Admins define task types: "Inspection", "Restocking", "Maintenance", "Cash Pickup" — whatever their workflow needs. Each task type maps to its own check-in form and has its own icon/color in the app. Routes optimize across all task types the same way.</p>
+          </div>
+          <div class="sub-feature">
+            <h4>&#9776; Module Toggles</h4>
+            <p>Not every vertical needs every feature. ATM operators don't need No-Go Zones. Vending companies don't need location scouting. Simple on/off switches per workspace: Route Optimization, Asset GPS, Fill Monitoring, No-Go Zones, Location Scouting, Photo Check-ins. Sidebar and dashboard adapt automatically.</p>
+          </div>
+          <div class="sub-feature">
+            <h4>&#127919; Go-to-Market: Vertical First, Horizontal Second</h4>
+            <p>Market Binly as "the waste logistics OS" — that's where the domain expertise lives. But when an ATM operator, vending company, or solar installer shows up, onboard them with custom config. ServiceTitan does exactly this: markets to HVAC/plumbing, but the platform works for any home service. <strong>Vertical focus, horizontal capability.</strong></p>
+          </div>
+        </div>
+
+        <div class="callout callout-blue" style="margin-top: 20px;">
+          <div class="callout-title">Real Example: Bitcoin ATM Operator</div>
+          <p>
+            Your friend runs 200+ Bitcoin ATMs with drivers doing daily cash pickups. He currently pays OptimoRoute <strong>$35–44/driver/month</strong> for route optimization alone — no asset tracking, no check-in forms, no GPS on ATMs.
+            With Binly configured for ATMs: he gets route optimization + AirTag GPS on every ATM + configurable check-in forms (cash count, error codes, photo) + driver management + analytics. <strong>More features, one platform, replaces OptimoRoute entirely.</strong>
+          </p>
+        </div>
+
+        <div class="impact-row">
+          <span class="impact-chip">$5.8B → $29.9B TAM</span>
+          <span class="impact-chip amber">~3 weeks to build config layer</span>
+          <span class="impact-chip blue">Zero backend changes needed</span>
+          <span class="impact-chip purple">Unlimited verticals</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- ANALYTICS & REPORTING                      -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section" id="analytics">
+    <div class="feature-block">
+      <div class="feature-header">
+        <div class="feature-number" style="background: linear-gradient(135deg, #6366F1, #4F46E5);">&#128202;</div>
+        <div>
+          <h3>Analytics &amp; Reporting</h3>
+          <p style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">Turn operational data you already have into actionable dashboards</p>
+        </div>
+        <span class="tag" style="background: var(--primary-light); color: var(--primary);">PHASE 1</span>
+      </div>
+      <div class="feature-body">
+        <p>Binly already collects massive amounts of data — every route, every collection, every driver GPS ping, every photo. Right now that data sits unused. Phase 1 turns it into clear dashboards and reports. Phase 2 layers on <strong>AI-driven insights</strong> that surface patterns and recommendations automatically.</p>
+
+        <div class="feature-grid">
+          <div class="sub-feature">
+            <h4>&#128200; Operations Dashboard</h4>
+            <p>Collections per driver/day/week/month. Tasks completed vs assigned. Skip rates and reasons. Average time per stop. Route completion percentages. Filterable by driver, date range, area, and asset type.</p>
+          </div>
+          <div class="sub-feature">
+            <h4>&#128663; Route Efficiency Metrics</h4>
+            <p>Planned miles vs actual miles driven. Planned time vs actual time. Out-of-order stops. Idle time. Dead miles (driving without a task). Before/after comparisons when route optimization is enabled. Cost per mile and cost per collection.</p>
+          </div>
+          <div class="sub-feature">
+            <h4>&#9981; Asset Utilization</h4>
+            <p>Bins/assets sorted by collection frequency, fill rate trends, and revenue generated. Identify underperforming assets (rarely full, low collection frequency) and overperforming ones (always full, high priority). Heatmaps by geography — where are your busiest assets?</p>
+          </div>
+          <div class="sub-feature">
+            <h4>&#128176; Financial Overview</h4>
+            <p>Fuel spend over time using real-time gas prices. Cost per route, cost per collection, cost per driver. Revenue per route and per area. Overtime tracking. Fleet operating cost trends — weekly, monthly, quarterly views with export to CSV/PDF.</p>
+          </div>
+          <div class="sub-feature">
+            <h4>&#128101; Driver Performance</h4>
+            <p>Leaderboard data as trends over time: safety scores, efficiency scores, tasks completed, photos taken, incidents reported. Compare drivers side-by-side. Identify training needs. Feed into gamification system.</p>
+          </div>
+          <div class="sub-feature">
+            <h4>&#128196; Scheduled Reports</h4>
+            <p>Auto-email weekly/monthly PDF reports to managers: operations summary, fleet costs, driver rankings, asset utilization. Configurable — pick which metrics matter to you. One-click export for any dashboard view.</p>
+          </div>
+          <div class="sub-feature">
+            <h4>&#128250; Route Replay</h4>
+            <p>Replay any completed shift on the map: see the driver's actual path vs the planned route, where they stopped, how long at each stop, where they deviated. Great for training new drivers, investigating complaints, proving service to customers, and spotting inefficiencies.</p>
+          </div>
+          <div class="sub-feature">
+            <h4>&#128205; Live ETA Sharing</h4>
+            <p>"Driver is 3 stops away, ~25 min out." Managers (and optionally customers) can see real-time estimated arrival for any stop. Calculated from the driver's live location and remaining route. Reduces "where's my driver?" calls significantly.</p>
+          </div>
+          <div class="sub-feature">
+            <h4>&#129302; AI-Driven Insights (Phase 2)</h4>
+            <p>AI analyzes patterns across all your data and surfaces recommendations automatically. "Bin 23 is trending toward overflow by Thursday — schedule early pickup." "Driver A is 20% more efficient on Route 7 than Driver B — consider reassigning." "Area downtown has 3x more incidents than last month — review No-Go Zone candidates." Turns dashboards from passive reporting into proactive decision-making.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-green" style="margin-top: 20px;">
+          <div class="callout-title">Why This Is Phase 1</div>
+          <p>
+            Every data point for these dashboards <strong>already exists</strong> — tasks, GPS logs, shift records, fuel prices. No new data collection needed, no new hardware. Just presenting the information you already have in a clear, actionable way. High value, low effort. Every customer — waste, ATM, vending — needs analytics from day one.
+          </p>
+        </div>
+
+        <div class="impact-row">
+          <span class="impact-chip">100% existing data</span>
+          <span class="impact-chip amber">Every vertical needs this</span>
+          <span class="impact-chip blue">CSV/PDF export</span>
+          <span class="impact-chip purple">Scheduled auto-reports</span>
+        </div>
       </div>
     </div>
   </div>
@@ -269,12 +458,12 @@
         <span class="tag" style="background: var(--blue-bg); color: #1D4ED8;">HIGH IMPACT</span>
       </div>
       <div class="feature-body">
-        <p>Today, Mapbox v2 optimizes stop order at shift start. Tomorrow, AI decides <em>which bins to visit</em>, <em>when to visit them</em>, and <em>re-optimizes on the fly</em> as conditions change.</p>
+        <p>Today, routes are optimized once at shift start. Tomorrow, AI decides <em>which assets to visit</em>, <em>when to visit them</em>, and <em>re-optimizes on the fly</em> as conditions change throughout the day.</p>
 
         <div class="feature-grid">
           <div class="sub-feature">
             <h4>&#128200; Predictive Fill-Level Forecasting</h4>
-            <p>ML models (XGBoost/LSTM) trained on historical collection data — timestamps, fill %, bin location, season, day of week — predict when each bin will be full. No IoT sensors needed. Industry studies show <strong>24.8% reduction</strong> in redundant trips and <strong>30.2% fewer overflow incidents</strong>.</p>
+            <p>AI trained on historical collection data — timestamps, fill levels, location, season, day of week — predicts when each asset will need service. No sensors needed. Industry studies show <strong>24.8% reduction</strong> in redundant trips and <strong>30.2% fewer overflow incidents</strong>.</p>
           </div>
           <div class="sub-feature">
             <h4>&#127775; High-Performer Bin Prioritization</h4>
@@ -282,19 +471,15 @@
           </div>
           <div class="sub-feature">
             <h4>&#128260; Dynamic Mid-Shift Re-Optimization</h4>
-            <p>The code already exists (ReoptimizeActiveShift) but is commented out. Enable it: when tasks are added/removed mid-shift, grab driver's current GPS from Redis, rebuild the Mapbox problem with remaining tasks, and send an updated route. Driver sees new stop order in real-time via Centrifugo.</p>
+            <p>When tasks are added or removed mid-shift, the system grabs the driver's current location, recalculates the best route for remaining stops, and pushes the updated route to the driver's phone in real-time. No manual intervention needed.</p>
           </div>
           <div class="sub-feature">
             <h4>&#129302; "Smart Shifts" — AI Auto-Generation</h4>
             <p>Every morning at 6am, AI analyzes predicted fill levels, driver availability, truck capacity, and pending move requests to auto-generate optimal shifts. Manager just reviews and approves. Eliminates 30–60 min of daily manual shift planning.</p>
           </div>
           <div class="sub-feature">
-            <h4>&#128176; Cost-Aware Routing</h4>
-            <p>Factor in fuel cost, dump fees, driver wages, overtime risk, and toll roads into the optimization objective. Docket's IronRouteAI does this — Binly should too. Use Mapbox v2's <code>min-schedule-completion-time</code> objective + custom cost weighting.</p>
-          </div>
-          <div class="sub-feature">
-            <h4>&#128640; Multi-Day Route Planning</h4>
-            <p>Plan routes across a full week: "Collect high-priority bins Mon/Wed/Fri, low-priority bins Tue/Thu." AI distributes workload evenly and ensures no bin goes more than X days uncollected.</p>
+            <h4>&#128176; Cost-Aware Routing + Real-Time Fuel Pricing</h4>
+            <p>Factor in fuel cost, dump fees, driver wages, overtime risk, and toll roads when building routes. <strong>Live fuel prices</strong> from public gas price feeds update cost calculations automatically. Routes aren't just fast — they're the cheapest option. Docket's IronRouteAI does this — Binly should too, but with real-time gas pricing no one else has.</p>
           </div>
         </div>
 
@@ -327,11 +512,7 @@
         <div class="feature-grid">
           <div class="sub-feature">
             <h4>&#128247; AI Fill-Level Estimation from Driver Photos</h4>
-            <p>When a driver takes a bin check photo, Claude/GPT-4V analyzes it and estimates fill level (±5–10%). No hardware needed — the driver's phone IS the sensor. Compology charges $30/camera/month for this. Binly gets it from photos already being taken. <strong>Cost: ~$0.01 per analysis via API.</strong></p>
-          </div>
-          <div class="sub-feature">
-            <h4>&#128465; Contamination Detection</h4>
-            <p>AI identifies non-compliant materials in bin photos: plastic bags in recycling, hazardous items, construction debris. Auto-generates contamination alerts for the bin's assigned area. Prairie Robotics charges $1.8M+ for truck-mounted camera systems — Binly can do basic contamination detection from existing check photos at near-zero cost.</p>
+            <p>When a driver takes a check-in photo, AI vision analyzes it and estimates fill level (±5–10%). No extra hardware needed — the driver's phone IS the sensor. Compology charges $30/camera/month for dedicated sensors. Binly gets the same insights from photos already being taken. <strong>Cost: ~$0.01 per photo.</strong></p>
           </div>
           <div class="sub-feature">
             <h4>&#128295; Bin Condition Assessment</h4>
@@ -372,14 +553,6 @@
 
         <div class="feature-grid">
           <div class="sub-feature">
-            <h4>&#128172; Natural Language Dispatch</h4>
-            <p>"Schedule bin 46 for pickup tomorrow morning" → AI creates the shift, assigns the nearest available driver, and optimizes the route. Uses Claude API for intent parsing. TrashLab and Hauler Hero are building this — Binly should have it too.</p>
-          </div>
-          <div class="sub-feature">
-            <h4>&#128736; No-Code Automation Rules</h4>
-            <p>Visual rule builder: "IF bin fill > 80% AND last service > 3 days THEN schedule urgent pickup." No competitor in waste management offers drag-and-drop automation rules — this is a wide-open gap. Managers configure alerts, auto-scheduling, and escalation without code.</p>
-          </div>
-          <div class="sub-feature">
             <h4>&#128200; Predictive No-Go Zones</h4>
             <p>ML analyzes incident patterns to predict which bins/areas will become No-Go Zones before complaints arrive. "Bin 23 has had 3 incidents in 60 days — pattern matches vandalism escalation. Recommend proactive relocation." Auto-generates move request suggestions.</p>
           </div>
@@ -390,10 +563,6 @@
           <div class="sub-feature">
             <h4>&#128197; Demand Forecasting</h4>
             <p>Predict seasonal waste volume patterns: holidays, summer events, construction seasons. Auto-suggest adding bins to high-demand areas or reducing service frequency in slow periods. Feed forecasts into shift auto-generation.</p>
-          </div>
-          <div class="sub-feature">
-            <h4>&#129309; AI Copilot for Managers</h4>
-            <p>Chat-based assistant in the dashboard: "Which bins haven't been checked in 7 days?" "Show me the most efficient route for the 10 highest-priority bins." "What would happen if I moved bin 46 to Oak Street?" Powered by Claude API with full access to Binly data.</p>
           </div>
         </div>
       </div>
@@ -421,28 +590,12 @@
             <p>One-tap emergency alert that sends GPS coordinates to managers and optionally local authorities. Records audio/video automatically. Essential safety feature for drivers working in unfamiliar or high-risk neighborhoods.</p>
           </div>
           <div class="sub-feature">
-            <h4>&#127942; Advanced Gamification</h4>
-            <p>Beyond basic leaderboards: point system (100 base/day for safe driving, bonus for efficiency, fill accuracy), achievement badges, monthly safety bonuses ($100–300), quarterly awards. Fleets using gamification see <strong>85% higher engagement</strong> and <strong>45% fewer safety incidents</strong>.</p>
-          </div>
-          <div class="sub-feature">
-            <h4>&#127908; Voice Commands</h4>
-            <p>"Mark bin complete" / "Skip this stop — no access" / "Report incident — vandalism." Hands-free operation while driving. Text-to-speech for route instructions (already partially built with Flutter TTS).</p>
-          </div>
-          <div class="sub-feature">
-            <h4>&#128225; Driver Support Chat</h4>
-            <p>In-app chat with dispatch/managers for real-time support. "Can't access bin 46, gate is locked" → Manager sees location + photo → Responds with instructions. Reduces phone calls and radio chatter.</p>
-          </div>
-          <div class="sub-feature">
-            <h4>&#128564; Break &amp; Fatigue Reminders</h4>
-            <p>Smart break suggestions based on drive time, task completion rate, and time of day. "You've been driving 3 hours — suggested 15-min break at Starbucks 0.5mi ahead." Integrates with Mapbox vehicle breaks in optimization.</p>
+            <h4>&#127942; Gamification &amp; Leaderboards</h4>
+            <p>Point system based on efficiency, safety scoring, and fill accuracy. Achievement badges and weekly leaderboards. Fleets using gamification see <strong>85% higher engagement</strong> and <strong>45% fewer safety incidents</strong>. Start simple — expand rewards later based on driver feedback.</p>
           </div>
           <div class="sub-feature">
             <h4>&#128663; Driver Safety Scoring</h4>
             <p>Composite score from GPS data: acceleration smoothness, braking gentleness, cornering stability, speed compliance, idle time. Aggressive driving lowers fuel economy by <strong>15–30%</strong>. Score feeds into leaderboard and gamification rewards.</p>
-          </div>
-          <div class="sub-feature">
-            <h4>&#128246; Offline Mode</h4>
-            <p>Pre-download route data and maps. Complete tasks offline (queued for sync). Essential for rural areas or underground parking structures. FleetRabbit already offers this — Binly should match.</p>
           </div>
           <div class="sub-feature">
             <h4>&#128203; Pre-Trip Inspection Checklist</h4>
@@ -454,74 +607,37 @@
   </div>
 
   <!-- ═══════════════════════════════════════════ -->
-  <!-- PILLAR 5: CUSTOMER LAYER                   -->
+  <!-- PILLAR 5: ASSET & SITE SECURITY            -->
   <!-- ═══════════════════════════════════════════ -->
   <div class="section" id="pillar-5">
     <div class="feature-block">
       <div class="feature-header">
-        <div class="feature-number" style="background: linear-gradient(135deg, #EC4899, #DB2777);">5</div>
+        <div class="feature-number" style="background: linear-gradient(135deg, #EF4444, #DC2626);">5</div>
         <div>
-          <h3>Customer Portal &amp; Billing</h3>
-          <p style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">The #1 gap vs competitors — close it and own the full stack</p>
-        </div>
-        <span class="tag" style="background: var(--red-bg); color: var(--red);">CRITICAL GAP</span>
-      </div>
-      <div class="feature-body">
-        <p>Hauler Hero, CurbWaste, CRO, and Docket all have billing + customer management. Binly doesn't. Adding this layer turns Binly from "field ops tool" into "the only platform you need."</p>
-
-        <div class="feature-grid">
-          <div class="sub-feature">
-            <h4>&#127760; Customer Portal</h4>
-            <p>Landlords/businesses log in to see their bins: status, last collected, fill history, service photos. Request pickups, schedule moves, report issues. Reduces inbound calls by <strong>20%+</strong> (Routeware data).</p>
-          </div>
-          <div class="sub-feature">
-            <h4>&#128179; Automated Invoicing</h4>
-            <p>Generate invoices from actual collections performed. Per-pickup billing, monthly flat rate, or hybrid. QuickBooks/Xero integration. Auto-email invoices with service proof (photos, GPS timestamps).</p>
-          </div>
-          <div class="sub-feature">
-            <h4>&#128233; QR Codes on Bins</h4>
-            <p>Physical QR stickers on bins. Residents scan to: report issues (overflowing, damaged, illegally dumped), view collection schedule, request extra pickup. Reports auto-route to the right team with GPS data. Simple to implement, bridges physical bins to digital platform.</p>
-          </div>
-          <div class="sub-feature">
-            <h4>&#128202; SLA Monitoring Dashboard</h4>
-            <p>Track and report on service commitments: "99% of bins collected within 24 hours of predicted full." Auto-generate compliance reports for contracts. Photo + GPS proof that service was performed.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════════ -->
-  <!-- PILLAR 6: ASSET SECURITY                   -->
-  <!-- ═══════════════════════════════════════════ -->
-  <div class="section" id="pillar-6">
-    <div class="feature-block">
-      <div class="feature-header">
-        <div class="feature-number" style="background: linear-gradient(135deg, #EF4444, #DC2626);">6</div>
-        <div>
-          <h3>Enhanced Asset Security</h3>
-          <p style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">Know where every bin is and catch problems before they escalate</p>
+          <h3>Asset &amp; Site Security</h3>
+          <p style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">No-Go Zones, geofencing, theft detection, and incident reporting — one security system</p>
         </div>
         <span class="tag" style="background: var(--red-bg); color: var(--red);">TRUST</span>
       </div>
       <div class="feature-body">
+        <p>Binly already has unique security features (No-Go Zones, AirTag GPS, driver incident reporting). This pillar unifies them into a single <strong>asset &amp; site security system</strong> that works across verticals — waste bins, ATMs, vending machines, anything with an AirTag.</p>
 
         <div class="feature-grid">
           <div class="sub-feature">
-            <h4>&#128205; Geofencing Alerts</h4>
-            <p>Define a zone around each bin's assigned location. If AirTag GPS shows it moving outside the zone → instant notification. "Bin 46 has moved 800m from its assigned location at 2:15 AM." Already have the AirTag data — just need the fence logic.</p>
+            <h4>&#128683; No-Go Zones (Already Built)</h4>
+            <p>Location-level risk flags with incident history, conflict scores, zone merging, and risk overrides. Drivers see warnings before arriving. Managers see a risk heatmap. Auto-created from incident patterns. <strong>No competitor has this.</strong></p>
+          </div>
+          <div class="sub-feature">
+            <h4>&#128205; Geofence Auto Check-in &amp; Alerts</h4>
+            <p>Two-way geofencing. <strong>For drivers:</strong> when a driver enters ~100m of their next stop, the app auto-detects arrival and triggers the check-in flow — no manual action needed. <strong>For assets:</strong> if an AirTag-tracked asset moves outside its assigned zone, instant alert. "ATM 12 has moved 800m from its location at 2:15 AM."</p>
           </div>
           <div class="sub-feature">
             <h4>&#128270; Theft Pattern Detection</h4>
-            <p>Correlate AirTag movement with shift schedules. If a bin moves and no driver shift is active → suspicious. Cross-reference with No-Go Zone incident history. Auto-escalate to manager with location trail map.</p>
+            <p>Correlate AirTag movement with active shift schedules. Asset moves + no driver shift active = suspicious. Auto-escalate to manager with location trail map. Cross-reference with No-Go Zone incident history.</p>
           </div>
           <div class="sub-feature">
-            <h4>&#128274; Chain of Custody Audit Trail</h4>
-            <p>Full cryptographic log of every bin state change: placed, collected, moved, stored, retired. Who, when, where, with photo proof. Compliance-ready for municipal contracts and insurance claims.</p>
-          </div>
-          <div class="sub-feature">
-            <h4>&#128663; Fleet Security Dashboard</h4>
-            <p>Overview of all asset positions with anomaly highlighting. Bins that haven't reported location in 24+ hours. AirTags with critical battery. Bins in No-Go Zones. Missing bin alerts.</p>
+            <h4>&#128221; Driver Incident Reporting (Already Built)</h4>
+            <p>Drivers already report Missing, Damaged, Vandalized, or Inaccessible assets with photo evidence + notes at each stop. Skip-with-reason is mandatory. This data feeds into No-Go Zone risk scores and location risk profiles automatically.</p>
           </div>
         </div>
       </div>
@@ -529,12 +645,12 @@
   </div>
 
   <!-- ═══════════════════════════════════════════ -->
-  <!-- PILLAR 7: SUSTAINABILITY                   -->
+  <!-- PILLAR 6: SUSTAINABILITY                   -->
   <!-- ═══════════════════════════════════════════ -->
-  <div class="section" id="pillar-7">
+  <div class="section" id="pillar-6">
     <div class="feature-block">
       <div class="feature-header">
-        <div class="feature-number" style="background: linear-gradient(135deg, #10B981, #047857);">7</div>
+        <div class="feature-number" style="background: linear-gradient(135deg, #10B981, #047857);">6</div>
         <div>
           <h3>Sustainability &amp; ESG Reporting</h3>
           <p style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">Automatically prove environmental impact from operational data</p>
@@ -542,32 +658,23 @@
         <span class="tag" style="background: var(--green-bg); color: #059669;">DIFFERENTIATOR</span>
       </div>
       <div class="feature-body">
-        <p>ESG reporting is shifting from voluntary to <strong>mandatory</strong> (EU PPWR, CBAM). Binly already has the operational data — miles driven, collections performed, routes taken. Auto-generating sustainability metrics from this data is low-hanging fruit with high value.</p>
+        <p>Binly already has the operational data — miles driven, collections performed, routes taken. Auto-generating sustainability metrics from this data is low-hanging fruit with high value for municipal contracts.</p>
 
         <div class="feature-grid">
           <div class="sub-feature">
             <h4>&#127811; Carbon Footprint Tracking</h4>
-            <p>Calculate CO2 savings from optimized routes vs unoptimized. A 50-truck fleet saving 125,000 gallons/year prevents <strong>1,272 metric tons of CO2</strong>. Show before/after comparisons per shift, per week, per month.</p>
+            <p>Calculate CO2 savings from optimized routes vs unoptimized. A 50-truck fleet saving 125,000 gallons/year prevents <strong>1,272 metric tons of CO2</strong>. Show before/after comparisons per shift, per week, per month. Data already exists — just needs calculation layer.</p>
           </div>
           <div class="sub-feature">
-            <h4>&#128202; Green Route Optimization</h4>
-            <p>2026 research introduces emission-capacitated routing that factors in how truck weight changes as bins are collected, affecting fuel consumption. Lighter truck = less fuel per mile. Route in a way that reduces load-dependent emissions.</p>
-          </div>
-          <div class="sub-feature">
-            <h4>&#128196; Auto-Generated ESG Reports</h4>
-            <p>One-click PDF/CSV reports: miles saved, fuel reduced, CO2 prevented, diversion rates, service frequency. Ready for municipal contracts, investor decks, and regulatory filings.</p>
-          </div>
-          <div class="sub-feature">
-            <h4>&#127793; Diversion Rate Monitoring</h4>
-            <p>Track recycling vs landfill across all bins. Vision AI contamination data feeds into diversion rate calculations. Show customers their sustainability metrics on the customer portal.</p>
+            <h4>&#128196; Auto-Generated Sustainability Reports</h4>
+            <p>One-click PDF/CSV reports: miles saved, fuel reduced, CO2 prevented, service frequency. Ready for municipal contracts and investor decks. Derived from existing operational data with no additional input needed.</p>
           </div>
         </div>
 
         <div class="impact-row">
           <span class="impact-chip">-20% CO2 emissions</span>
           <span class="impact-chip">-30% fuel consumption</span>
-          <span class="impact-chip blue">Auto regulatory compliance</span>
-          <span class="impact-chip purple">Customer ESG dashboards</span>
+          <span class="impact-chip blue">Municipal contract proof</span>
         </div>
       </div>
     </div>
@@ -581,21 +688,35 @@
     <div class="section-title">Product Roadmap</div>
     <p class="section-desc">Phased delivery, starting with highest-impact, lowest-effort features first.</p>
 
+    <div class="callout callout-blue" style="margin-bottom: 28px;">
+      <div class="callout-title">Prioritization Philosophy</div>
+      <p>
+        Features are categorized into <strong>Must Have</strong> (core value, ship first), <strong>Innovative</strong> (differentiators, build next), and <strong>Deferred</strong> (nice-to-have, revisit later based on demand). We cut 10+ features from the original wishlist to stay focused.
+      </p>
+    </div>
+
     <div class="roadmap">
       <!-- Phase 1 -->
       <div class="roadmap-phase">
         <div class="phase-dot" style="background: var(--green);">P1</div>
         <div class="phase-content">
-          <h4>Phase 1 — Quick Wins</h4>
-          <div class="timeline">Month 1–2 &middot; Low effort, high impact</div>
+          <h4>Phase 1 — Foundation &amp; Quick Wins</h4>
+          <div class="timeline">Month 1–4 &middot; Low effort, high impact, immediate value</div>
           <div class="phase-items">
+            <span class="phase-item next">Analytics &amp; reporting dashboards</span>
+            <span class="phase-item next">Workspace terminology config</span>
+            <span class="phase-item next">Configurable check-in forms</span>
+            <span class="phase-item next">Custom fields on assets</span>
+            <span class="phase-item next">Module toggles</span>
             <span class="phase-item next">Enable mid-shift re-optimization</span>
-            <span class="phase-item next">Geofencing alerts for bins</span>
+            <span class="phase-item next">Geofence auto check-in &amp; alerts</span>
             <span class="phase-item next">AI fill estimation from driver photos</span>
+            <span class="phase-item next">High-performer asset prioritization</span>
+            <span class="phase-item next">Real-time fuel cost tracking</span>
+            <span class="phase-item next">Live ETA sharing</span>
             <span class="phase-item next">SOS emergency button</span>
-            <span class="phase-item next">Break/fatigue reminders</span>
-            <span class="phase-item next">QR codes on bins</span>
             <span class="phase-item next">Driver safety scoring from GPS</span>
+            <span class="phase-item next">Recurring route templates</span>
           </div>
         </div>
       </div>
@@ -605,15 +726,19 @@
         <div class="phase-dot" style="background: var(--primary);">P2</div>
         <div class="phase-content">
           <h4>Phase 2 — Intelligence Layer</h4>
-          <div class="timeline">Month 3–5 &middot; ML models, AI integrations</div>
+          <div class="timeline">Month 5–8 &middot; AI-powered predictions and automation</div>
           <div class="phase-items">
+            <span class="phase-item next">Custom task types</span>
             <span class="phase-item next">Predictive fill-level forecasting (ML)</span>
-            <span class="phase-item next">High-performer bin prioritization</span>
             <span class="phase-item next">Smart Shifts — AI auto-generation</span>
+            <span class="phase-item next">Cost-aware routing (fuel + wages + tolls)</span>
             <span class="phase-item next">Theft pattern detection</span>
             <span class="phase-item next">Predictive No-Go Zones</span>
-            <span class="phase-item next">Advanced gamification system</span>
-            <span class="phase-item next">Carbon footprint tracking</span>
+            <span class="phase-item next">Smart notifications &amp; escalation</span>
+            <span class="phase-item next">Gamification &amp; leaderboards</span>
+            <span class="phase-item next">Route replay</span>
+            <span class="phase-item next">AI-driven analytics insights</span>
+            <span class="phase-item next">Scheduled auto-reports (email)</span>
           </div>
         </div>
       </div>
@@ -622,37 +747,1130 @@
       <div class="roadmap-phase">
         <div class="phase-dot" style="background: var(--purple);">P3</div>
         <div class="phase-content">
-          <h4>Phase 3 — Platform Expansion</h4>
-          <div class="timeline">Month 6–9 &middot; New modules, customer-facing</div>
+          <h4>Phase 3 — Scale &amp; Intelligence</h4>
+          <div class="timeline">Month 9–12 &middot; Advanced features, sustainability</div>
           <div class="phase-items">
-            <span class="phase-item next">Customer portal (view bins, request service)</span>
-            <span class="phase-item next">Automated invoicing + QuickBooks</span>
-            <span class="phase-item next">Natural language dispatch</span>
-            <span class="phase-item next">AI Copilot for managers</span>
-            <span class="phase-item next">No-code automation rules</span>
-            <span class="phase-item next">ESG reporting module</span>
-            <span class="phase-item next">Contamination detection from photos</span>
+            <span class="phase-item next">Pre-trip inspection checklist</span>
+            <span class="phase-item next">Carbon footprint tracking</span>
+            <span class="phase-item next">Demand forecasting</span>
+            <span class="phase-item next">Auto-generated sustainability reports</span>
+            <span class="phase-item next">Chain of custody audit trail</span>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Deferred Features -->
+    <div class="callout callout-amber" style="margin-top: 12px;">
+      <div class="callout-title">Deferred Features — Revisit Based on Demand</div>
+      <p>
+        These features were evaluated and intentionally deferred. High potential but need the core platform solid first:
+      </p>
+      <p style="margin-top: 12px; font-size: 0.85rem;">
+        <strong>Natural language dispatch</strong> — "Schedule bin 46 for pickup tomorrow" → AI creates shift, assigns driver, optimizes route. Cool but managers are fine with clicks for now. Revisit when AI intent parsing is more reliable. &middot;
+        <strong>No-code automation rules</strong> — Visual rule builder: "IF fill > 80% AND last service > 3 days THEN schedule urgent pickup." Wide-open gap in the market, but heavy engineering. Build after core analytics prove which rules customers actually want. &middot;
+        <strong>AI Copilot chat</strong> — Dashboard assistant: "Which ATMs haven't been checked in 7 days?" / "Show me the most efficient route for the 10 highest-priority assets." High value for quick answers from operational data. Defer until analytics dashboards are solid (the copilot needs good data to query).
+      </p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- DASHBOARD STRUCTURE — DETAILED             -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section" id="structure">
+    <div class="section-label" style="color: var(--cyan);">Platform Architecture</div>
+    <div class="section-title">Dashboard — Section-by-Section Blueprint</div>
+    <p class="section-desc">Every page in the dashboard, what's already built, and what's coming in each phase. This is the full development scope organized by where features live in the UI.</p>
+
+    <!-- ── THE PULSE ── -->
+    <div class="feature-block" style="margin-bottom: 24px;">
+      <div class="feature-header" style="border-bottom-color: var(--green);">
+        <div class="feature-number" style="background: var(--green);">&#9889;</div>
+        <div>
+          <h3>The Pulse — Home Dashboard</h3>
+          <p style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">At-a-glance command center. Open the app, know everything in 5 seconds.</p>
+        </div>
+      </div>
+      <div class="feature-body">
+        <div class="feature-grid">
+          <div class="sub-feature" style="border-left: 3px solid var(--green);">
+            <h4>&#10003; Already Built</h4>
+            <p>KPI cards (total collections, fleet status, critical assets, response needed) with click-through navigation. Tactical map preview. Real-time activity feed showing driver updates, move requests, and system events. Global search bar.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid var(--primary);">
+            <h4>&#128736; Planned Enhancements</h4>
+            <p><strong>P1:</strong> Live fuel cost ticker. Asset health summary (how many assets overdue for service). Quick-action buttons ("Create Shift," "View Alerts," "Today's Routes").<br>
+            <strong>P2:</strong> AI-powered daily briefing: "3 high-priority assets need service. Driver A has the lightest load. 2 No-Go Zone incidents reported overnight." One paragraph that replaces 10 minutes of manual checking.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── OPERATIONS ── -->
+    <div class="feature-block" style="margin-bottom: 24px;">
+      <div class="feature-header" style="border-bottom-color: var(--primary);">
+        <div class="feature-number" style="background: linear-gradient(135deg, #3B82F6, #1D4ED8);">&#9881;</div>
+        <div>
+          <h3>Operations</h3>
+          <p style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">What's happening right now — managing today's work across all drivers and routes</p>
+        </div>
+      </div>
+      <div class="feature-body">
+
+        <!-- Live Map -->
+        <h4 style="font-size: 1rem; font-weight: 800; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);">&#128506; Live Map</h4>
+        <div class="feature-grid" style="margin-bottom: 24px;">
+          <div class="sub-feature" style="border-left: 3px solid var(--green);">
+            <h4>&#10003; Already Built</h4>
+            <p>Real-time driver locations on map with auto-refresh. Bin/asset markers color-coded by status. No-Go Zone overlays. Driver follow mode. Zone and bin detail drawers on click. Search for any asset, driver, or location.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid var(--primary);">
+            <h4>&#128736; Planned</h4>
+            <p><strong>P1:</strong> Live ETA sharing — "Driver is 3 stops away, ~25 min out" visible on the map for any selected stop. Click any active driver to see their remaining route with ETAs per stop.<br>
+            <strong>P2:</strong> Urgent stop insertion — click anywhere on the map, "Add urgent stop," system finds the nearest active driver and shows the time/cost impact of inserting it into their route. One-click dispatch.</p>
+          </div>
+        </div>
+
+        <!-- Routes -->
+        <h4 style="font-size: 1rem; font-weight: 800; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);">&#128739; Routes</h4>
+        <div class="feature-grid" style="margin-bottom: 24px;">
+          <div class="sub-feature" style="border-left: 3px solid var(--green);">
+            <h4>&#10003; Already Built</h4>
+            <p>Route creation with asset assignment (collections, placements, move requests, service tasks). Map-based asset selection. Route templates. Active route monitoring with task completion tracking. Route detail view with stop sequence and driver assignment.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid var(--primary);">
+            <h4>&#128736; Planned — Phase 1</h4>
+            <p><strong>Drag-and-drop stops between routes</strong> — two-panel view (Route A ↔ Route B), select stops and move them. Map updates in real-time showing the impact. Exactly like Hauler Hero's dispatch board but with live optimization feedback.<br><br>
+            <strong>Reorder stops within a route</strong> — drag to rearrange sequence manually. After reorder, show cost impact: "Your custom order adds 12 min and 4.2 miles vs optimized order." Let managers override the algorithm when they know better.<br><br>
+            <strong>Per-stop time windows</strong> — set "must arrive between 9-11am" (strict) or "prefer morning" (soft) on any stop. The optimizer respects these constraints when building the route. Business hours stored per asset auto-feed as default time windows.<br><br>
+            <strong>Workload balancing view</strong> — side-by-side: "Driver A: 28 stops, est. 6.2 hrs. Driver B: 14 stops, est. 3.1 hrs." Visual imbalance bar. One-click "Auto-Balance" redistributes stops evenly while respecting geography.<br><br>
+            <strong>Recurring route templates</strong> — "Route 7 runs Mon/Wed/Fri at 8am, assigned to Driver A." Auto-creates shifts on schedule. Manager reviews and approves, or fully automatic if trusted. Service frequency per asset: "This asset needs 3x/week" → auto-distributed across the week.</p>
+          </div>
+        </div>
+        <div class="feature-grid" style="margin-bottom: 24px;">
+          <div class="sub-feature" style="border-left: 3px solid var(--purple);">
+            <h4>&#128736; Planned — Phase 2</h4>
+            <p><strong>"What-If" mode</strong> — experiment with stop assignments and see cost/time impact BEFORE saving. "Moving 5 stops to Driver B adds 18 min to his route but saves Driver A 25 min. Net: -7 min, -$4.20 fuel." Play with scenarios risk-free.<br><br>
+            <strong>Optimization objective picker</strong> — choose what matters most per route: "Fastest" (min drive time), "Cheapest" (factor fuel + tolls + overtime), "Balanced" (even workload), or "Priority-First" (high-priority stops early). Different routes can use different objectives.<br><br>
+            <strong>AI-recommended assignments</strong> — when creating a new shift, AI suggests: "Based on location clusters, driver home locations, and past efficiency, here's the optimal split across 3 drivers." Accept, tweak, or reject.<br><br>
+            <strong>Route replay</strong> — replay any completed route on the map: actual path vs planned route, where the driver stopped, how long at each stop, deviations. Great for training and investigating complaints.<br><br>
+            <strong>Bulk map selection</strong> — hold shift and lasso-select stops on the map, assign to a route in one click. Faster than picking from lists for geographic assignments.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid #64748B;">
+            <h4>&#128736; Planned — Phase 3</h4>
+            <p><strong>Route comparison</strong> — compare today's routes vs last week for the same area. Fewer miles? Fewer skips? Better completion rate?<br><br>
+            <strong>Unserviced asset alerts</strong> — "These 8 assets haven't been on any route in 7 days." Auto-suggests a route to cover them. Prevents forgotten assets.<br><br>
+            <strong>Holiday/exception handling</strong> — mark days off on a calendar. Scheduled routes skip or redistribute to adjacent days.<br><br>
+            <strong>Post-optimization summary</strong> — after optimization runs, show total miles, estimated fuel cost, stops per driver, and any stops that couldn't fit (capacity exceeded, time violations). Explain WHY the optimizer made certain choices.</p>
+          </div>
+        </div>
+
+        <!-- Shifts -->
+        <h4 style="font-size: 1rem; font-weight: 800; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);">&#128197; Shifts</h4>
+        <div class="feature-grid" style="margin-bottom: 24px;">
+          <div class="sub-feature" style="border-left: 3px solid var(--green);">
+            <h4>&#10003; Already Built</h4>
+            <p>Full shift lifecycle: create, assign driver, assign route, start, pause, end, cancel. Task management within shifts (add/remove tasks mid-shift). Shift history with completion stats. Custom shift builder for ad-hoc work. Driver accepts/rejects shifts from mobile app. Real-time shift status tracking.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid var(--primary);">
+            <h4>&#128736; Planned</h4>
+            <p><strong>P1:</strong> Enable mid-shift re-optimization — when tasks change mid-shift, auto-recalculate the best route for remaining stops and push to driver. Already coded, just needs to be turned on.<br><br>
+            <strong>P1:</strong> Urgent stop insertion — manager adds a stop mid-shift, system finds the optimal insertion point in the active route, driver gets updated route instantly.<br><br>
+            <strong>P2:</strong> Smart Shifts — AI auto-generates optimal shifts every morning based on predicted fill levels, driver availability, and pending move requests. Manager just reviews and approves. Eliminates 30-60 min of daily manual planning.<br><br>
+            <strong>P2:</strong> Driver availability calendar — drivers mark their schedule for the week (available, off, half-day). Visible when building shifts so managers don't have to guess or call.</p>
+          </div>
+        </div>
+
+        <!-- Field Reports -->
+        <h4 style="font-size: 1rem; font-weight: 800; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);">&#128221; Field Reports <span style="font-size: 0.75rem; color: var(--amber); font-weight: 600;">(renamed from "Issues")</span></h4>
+        <div class="feature-grid" style="margin-bottom: 24px;">
+          <div class="sub-feature" style="border-left: 3px solid var(--amber);">
+            <h4>&#9888; Current State</h4>
+            <p>Placeholder page in the dashboard. However, incident data IS being collected — drivers report Missing, Damaged, Vandalized, or Inaccessible with photo + notes via the mobile app. Skip reasons are captured with mandatory text. This data exists in the database but isn't surfaced in a dedicated view yet.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid var(--primary);">
+            <h4>&#128736; Planned</h4>
+            <p><strong>P1:</strong> Build the actual Field Reports page — filterable feed of all driver-reported incidents, skip reasons, and field notes. Filter by type, driver, date, area, severity. Click any report to see GPS location, photos, driver notes, and the asset it's linked to.<br><br>
+            <strong>P2:</strong> Incident trend analytics — "Vandalism reports up 40% in Area 3 this month." Auto-suggest No-Go Zone candidates from incident clusters. Link incidents to specific assets and show per-asset incident history timeline.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ASSETS & SECURITY ── -->
+    <div class="feature-block" style="margin-bottom: 24px;">
+      <div class="feature-header" style="border-bottom-color: var(--red);">
+        <div class="feature-number" style="background: linear-gradient(135deg, #EF4444, #DC2626);">&#128274;</div>
+        <div>
+          <h3>Assets &amp; Security</h3>
+          <p style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">Everything about your field assets — inventory, tracking, protection, and risk management</p>
+        </div>
+      </div>
+      <div class="feature-body">
+
+        <!-- Inventory -->
+        <h4 style="font-size: 1rem; font-weight: 800; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);">&#128230; Inventory</h4>
+        <div class="feature-grid" style="margin-bottom: 24px;">
+          <div class="sub-feature" style="border-left: 3px solid var(--green);">
+            <h4>&#10003; Already Built</h4>
+            <p>Full asset management with tabbed views: Active Assets, Potential Locations, and Move Requests. Asset creation (single + bulk), editing, retirement. Filtering by status, area, and priority. Detailed asset drawer with check history, move history, incident history, and photos. Map-based asset selection for routes.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid var(--primary);">
+            <h4>&#128736; Planned</h4>
+            <p><strong>P1:</strong> Custom fields on assets — admins add fields like "cash capacity," "model number," "contract ID." Filterable and searchable.<br><br>
+            <strong>P1:</strong> Geofence theft detection — set a default geofence radius for all assets in bulk (e.g., 50m), then override per asset if needed (tighter radius for high-risk locations). When an AirTag-tracked asset moves outside its radius, instant alert to manager with location trail. Theft events auto-create incidents that feed into No-Go Zone scoring.<br><br>
+            <strong>P2:</strong> Service frequency per asset — "This asset needs 3x/week." Visual indicator when overdue. Auto-feeds into route scheduling.<br><br>
+            <strong>P2:</strong> Asset priority scoring — AI scores assets by fill rate, revenue, and service frequency. High-priority assets get served first. Low-performers flagged for relocation.<br><br>
+            <strong>P3:</strong> Unserviced asset alerts — "8 assets haven't been visited in 7+ days." Auto-suggest a catch-up route.</p>
+          </div>
+        </div>
+
+        <!-- No-Go Zones -->
+        <h4 style="font-size: 1rem; font-weight: 800; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);">&#128683; No-Go Zones</h4>
+        <div class="feature-grid" style="margin-bottom: 24px;">
+          <div class="sub-feature" style="border-left: 3px solid var(--green);">
+            <h4>&#10003; Already Built</h4>
+            <p>Full No-Go Zone management: create zones manually or auto-generate from incidents. Conflict scores per zone. Zone merging when overlapping. Risk overrides for managers. Incident reporting linked to zones. Map overlay showing all active zones. Drivers see zone warnings in the mobile app before arriving. <strong>No competitor has this feature.</strong></p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid var(--primary);">
+            <h4>&#128736; Planned</h4>
+            <p><strong>P2:</strong> Predictive No-Go Zones — AI detects patterns: "3 incidents in 60 days at this location, matches vandalism escalation pattern. Recommend creating a No-Go Zone." Auto-suggest before problems escalate.<br><br>
+            <strong>P2:</strong> Risk heatmap overlay — color-coded map showing risk density across the entire service area. Click any zone to drill into incident history, trend charts, and affected assets.</p>
+          </div>
+        </div>
+
+        <!-- Warehouse -->
+        <h4 style="font-size: 1rem; font-weight: 800; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);">&#127970; Warehouse</h4>
+        <div class="feature-grid" style="margin-bottom: 24px;">
+          <div class="sub-feature" style="border-left: 3px solid var(--amber);">
+            <h4>&#9888; Current State</h4>
+            <p>Placeholder page. Warehouse location is configured in Settings and used by the route optimizer (auto-inserts warehouse stops when truck capacity is exceeded). Assets can be moved to "warehouse storage" status via move requests.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid var(--primary);">
+            <h4>&#128736; Planned</h4>
+            <p><strong>P2:</strong> Warehouse inventory view — which assets are currently in storage, how long they've been there, condition notes. Check-in/check-out log with timestamps.<br><br>
+            <strong>P3:</strong> Staging area management — group assets for upcoming placements. "These 12 assets are staged for tomorrow's Route 4 placements." Track readiness status.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── INTELLIGENCE ── -->
+    <div class="feature-block" style="margin-bottom: 24px;">
+      <div class="feature-header" style="border-bottom-color: var(--purple);">
+        <div class="feature-number" style="background: linear-gradient(135deg, #8B5CF6, #6D28D9);">&#128202;</div>
+        <div>
+          <h3>Intelligence</h3>
+          <p style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">Show me the data — analytics dashboards, AI-powered insights, and demand planning</p>
+        </div>
+      </div>
+      <div class="feature-body">
+
+        <!-- Analytics -->
+        <h4 style="font-size: 1rem; font-weight: 800; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);">&#128200; Analytics</h4>
+        <div class="feature-grid" style="margin-bottom: 24px;">
+          <div class="sub-feature" style="border-left: 3px solid var(--amber);">
+            <h4>&#9888; Current State</h4>
+            <p>"Coming Soon" placeholder page. All the data needed for analytics already exists in the database — tasks, GPS logs, shift records, driver activity, asset check-ins, photos.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid var(--primary);">
+            <h4>&#128736; Planned — Phase 1</h4>
+            <p><strong>Operations dashboard</strong> — collections per driver/day/week/month, tasks completed vs assigned, skip rates and reasons, average time per stop, route completion percentages. Filterable by driver, date, area, asset type.<br><br>
+            <strong>Route efficiency metrics</strong> — planned miles vs actual miles, planned time vs actual time, out-of-order stops, idle time, dead miles (driving without a task). Cost per mile and cost per collection.<br><br>
+            <strong>Asset utilization</strong> — assets sorted by collection frequency, fill rate trends, and revenue generated. Identify underperformers and overperformers. Geographic heatmaps showing busiest areas.<br><br>
+            <strong>Financial overview</strong> — fuel spend over time using real-time gas prices, cost per route, cost per driver, overtime tracking. Weekly/monthly/quarterly trends with CSV/PDF export.<br><br>
+            <strong>Driver performance</strong> — safety scores, efficiency scores, tasks completed, photos taken, incidents reported. Compare drivers side-by-side. Identify training needs.</p>
+          </div>
+        </div>
+        <div class="feature-grid" style="margin-bottom: 24px;">
+          <div class="sub-feature" style="border-left: 3px solid var(--purple);">
+            <h4>&#128736; Planned — Phase 2</h4>
+            <p><strong>Route replay</strong> — replay any completed shift on the map. See actual path vs planned, stop durations, deviations. Training tool and proof of service.<br><br>
+            <strong>Scheduled auto-reports</strong> — auto-email weekly/monthly PDF reports: operations summary, fleet costs, driver rankings, asset utilization. Pick which metrics matter. One-click export for any view.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid #64748B;">
+            <h4>&#128736; Planned — Phase 3</h4>
+            <p><strong>Carbon footprint tracking</strong> — calculate CO2 saved from optimized routes. Before/after comparisons per shift, week, month. Ready for municipal contracts.<br><br>
+            <strong>Auto-generated sustainability reports</strong> — one-click PDF: miles saved, fuel reduced, CO2 prevented. Ready for investor decks and regulatory filings.</p>
+          </div>
+        </div>
+
+        <!-- AI Insights -->
+        <h4 style="font-size: 1rem; font-weight: 800; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);">&#129302; AI Insights</h4>
+        <div class="feature-grid" style="margin-bottom: 24px;">
+          <div class="sub-feature" style="border-left: 3px solid var(--amber);">
+            <h4>&#9888; Current State</h4>
+            <p>"Coming Soon" placeholder page. No AI/predictive features currently active.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid var(--primary);">
+            <h4>&#128736; Planned</h4>
+            <p><strong>P1:</strong> AI fill-level estimation from driver photos — every check-in photo gets analyzed automatically. Fill level estimate shown on asset detail and trends charted over time.<br><br>
+            <strong>P2:</strong> Predictive fill-level forecasting — AI predicts when each asset will need service based on historical patterns (day of week, season, location). "Bin 23 will be full by Thursday."<br><br>
+            <strong>P2:</strong> AI-driven recommendations — "Driver A is 20% more efficient on Route 7 than Driver B — consider reassigning." "Area downtown has 3x more incidents this month — review No-Go Zone candidates." "These 5 assets are consistently underfilled — consider relocation."<br><br>
+            <strong>P2:</strong> Anomaly detection — unusual patterns flagged automatically: sudden spike in skip rates, driver taking 3x longer than usual, asset fill rates changing dramatically.</p>
+          </div>
+        </div>
+
+        <!-- Demand Planner -->
+        <h4 style="font-size: 1rem; font-weight: 800; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);">&#128640; Demand Planner</h4>
+        <div class="feature-grid" style="margin-bottom: 24px;">
+          <div class="sub-feature" style="border-left: 3px solid var(--amber);">
+            <h4>&#9888; Current State</h4>
+            <p>"Coming Soon" placeholder page. Location scouting data (driver-suggested new locations) is already being collected.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid var(--primary);">
+            <h4>&#128736; Planned</h4>
+            <p><strong>P2:</strong> Demand forecasting — predict seasonal volume patterns (holidays, summer events, construction seasons). Auto-suggest adding assets to high-demand areas or reducing frequency in slow periods.<br><br>
+            <strong>P3:</strong> Expansion planner — map overlay showing: where existing assets are, where scouted locations are, coverage gaps, and AI-recommended new placement locations based on population density, waste generation data, and existing asset performance.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TEAM & DRIVERS ── -->
+    <div class="feature-block" style="margin-bottom: 24px;">
+      <div class="feature-header" style="border-bottom-color: var(--amber);">
+        <div class="feature-number" style="background: linear-gradient(135deg, #F59E0B, #D97706);">&#128101;</div>
+        <div>
+          <h3>Team &amp; Drivers</h3>
+          <p style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">Everything about your people — roster, performance, gamification, and safety</p>
+        </div>
+      </div>
+      <div class="feature-body">
+
+        <!-- Team -->
+        <h4 style="font-size: 1rem; font-weight: 800; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);">&#128100; Team</h4>
+        <div class="feature-grid" style="margin-bottom: 24px;">
+          <div class="sub-feature" style="border-left: 3px solid var(--green);">
+            <h4>&#10003; Already Built</h4>
+            <p>Driver and admin roster with creation, editing, and role assignment. Driver detail view showing assigned routes, active shifts, and contact info. Assign/unassign drivers to shifts.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid var(--primary);">
+            <h4>&#128736; Planned</h4>
+            <p><strong>P2:</strong> Driver availability calendar — drivers mark their schedule for the week (available, off, half-day). Managers see availability when building shifts. Reduces back-and-forth scheduling.<br><br>
+            <strong>P2:</strong> Driver profile enrichment — license info, vehicle assignment, certifications, hire date, performance history summary. Everything a manager needs about a driver in one place.</p>
+          </div>
+        </div>
+
+        <!-- Leaderboard -->
+        <h4 style="font-size: 1rem; font-weight: 800; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);">&#127942; Leaderboard</h4>
+        <div class="feature-grid" style="margin-bottom: 24px;">
+          <div class="sub-feature" style="border-left: 3px solid var(--amber);">
+            <h4>&#9888; Current State</h4>
+            <p>"Coming Soon" placeholder page. The mobile app has basic driver comparison data, but no dedicated leaderboard UI in the dashboard.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid var(--primary);">
+            <h4>&#128736; Planned</h4>
+            <p><strong>P2:</strong> Gamification system — point-based scoring: efficiency (tasks/hour), safety score, fill accuracy (photo AI match), route adherence. Weekly and monthly rankings. Achievement badges. Visible to drivers in the mobile app and managers in the dashboard. Start simple, expand rewards based on driver feedback.</p>
+          </div>
+        </div>
+
+        <!-- Driver Safety -->
+        <h4 style="font-size: 1rem; font-weight: 800; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);">&#128663; Driver Safety</h4>
+        <div class="feature-grid" style="margin-bottom: 24px;">
+          <div class="sub-feature" style="border-left: 3px solid var(--red);">
+            <h4>&#9733; New Page</h4>
+            <p>Does not exist yet. This is a new addition to the dashboard.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid var(--primary);">
+            <h4>&#128736; Planned</h4>
+            <p><strong>P1:</strong> Safety scoring from GPS — composite score: acceleration smoothness, braking, cornering stability, speed compliance, idle time. Aggressive driving lowers fuel economy by 15-30%. Score trends over time per driver.<br><br>
+            <strong>P1:</strong> SOS emergency button — driver taps SOS, GPS coordinates sent to managers instantly. Logged with timestamp and location for incident documentation.<br><br>
+            <strong>P2:</strong> Training recommendations — AI identifies drivers with declining safety scores or high incident rates and suggests training focus areas. "Driver C's hard braking events increased 40% this month."</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SETTINGS ── -->
+    <div class="feature-block" style="margin-bottom: 24px;">
+      <div class="feature-header" style="border-bottom-color: #64748B;">
+        <div class="feature-number" style="background: linear-gradient(135deg, #64748B, #475569);">&#9881;</div>
+        <div>
+          <h3>Settings</h3>
+          <p style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">Platform configuration — set up once, rarely touch. This is where multi-vertical customization lives.</p>
+        </div>
+      </div>
+      <div class="feature-body">
+        <div class="feature-grid">
+          <div class="sub-feature" style="border-left: 3px solid var(--green);">
+            <h4>&#10003; Account (Already Built)</h4>
+            <p>User notification preferences — toggle which events trigger push/email notifications. Notification categories with granular control. User profile editing.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid var(--primary);">
+            <h4>&#128736; Workspace (Phase 1 — New)</h4>
+            <p>Organization name, asset terminology ("Bin" → "ATM"), task label customization ("Collection" → "Cash Pickup"), module toggles (enable/disable No-Go Zones, Location Scouting, Fill Monitoring per workspace). The entire UI dynamically reflects these settings.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid var(--primary);">
+            <h4>&#128736; Check-in Forms (Phase 1 — New)</h4>
+            <p>Visual form builder where admins define what drivers fill out at each stop. Drag-and-drop fields: number inputs, dropdowns, text, photo capture, checkboxes. Different forms per task type. Waste: "fill %" + photo. ATM: "cash count" + "receipt stock" + "error code" + photo.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid var(--primary);">
+            <h4>&#128736; Custom Fields (Phase 1 — New)</h4>
+            <p>Add custom data fields to assets: "cash capacity," "model number," "contract ID," "waste type." Field types: text, number, dropdown, date. All custom fields are filterable and searchable in Inventory. Exports include custom field data.</p>
+          </div>
+          <div class="sub-feature" style="border-left: 3px solid var(--purple);">
+            <h4>&#128736; Task Types (Phase 2 — New)</h4>
+            <p>Define custom task types beyond the built-in ones. Pick a name ("Cash Pickup"), icon, color, and behavior: single-stop (go there, do task, leave) or two-stop (pick up → deliver). Each task type links to its own check-in form. Routes optimize across all task types the same way.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- EXAMPLE FLOWS                              -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section" id="examples">
+    <div class="section-label" style="color: var(--green);">See It In Action</div>
+    <div class="section-title">Example Flows — A Full Day, Start to Finish</div>
+    <p class="section-desc">Two real-world scenarios showing how every section of the dashboard works together. Same platform, different industries — just different labels and check-in forms.</p>
+
+    <div class="example-toggle">
+      <div class="example-tab active" onclick="switchExample('waste')">&#9851; Waste Management</div>
+      <div class="example-tab" onclick="switchExample('atm')">&#128179; Bitcoin ATMs</div>
+    </div>
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- EXAMPLE 1: WASTE MANAGEMENT           -->
+    <!-- ══════════════════════════════════════ -->
+    <div class="example-scenario active" id="example-waste">
+      <div class="callout callout-green" style="margin-bottom: 28px;">
+        <div class="callout-title">Scenario: GreenCity Waste Services</div>
+        <p>Sarah manages 847 bins across 3 city zones with 6 drivers. She uses Binly to plan routes, track collections, monitor bin health, and keep her team safe. Here's her Tuesday.</p>
       </div>
 
-      <!-- Phase 4 -->
-      <div class="roadmap-phase">
-        <div class="phase-dot" style="background: var(--amber);">P4</div>
-        <div class="phase-content">
-          <h4>Phase 4 — Market Domination</h4>
-          <div class="timeline">Month 10–12 &middot; Advanced features, scale</div>
-          <div class="phase-items">
-            <span class="phase-item next">Multi-day route planning</span>
-            <span class="phase-item next">Cost-aware routing (fuel, wages, fees)</span>
-            <span class="phase-item next">Demand forecasting &amp; capacity planning</span>
-            <span class="phase-item next">Voice commands for drivers</span>
-            <span class="phase-item next">SLA monitoring dashboard</span>
-            <span class="phase-item next">Offline mode</span>
-            <span class="phase-item next">Green route optimization (emission-aware)</span>
+      <div class="flow-timeline">
+
+        <!-- Setup -->
+        <div class="flow-step">
+          <div class="flow-time green"></div>
+          <div class="flow-card">
+            <span class="flow-label settings">SETTINGS</span>
+            <h5>One-Time Setup (already done)</h5>
+            <p>Sarah configured her workspace when she first signed up. This only needs to happen once — everything below flows from these settings.</p>
+            <div class="detail">
+              <strong>Workspace:</strong> Organization name "GreenCity Waste Services." Asset terminology set to <strong>"Bins"</strong> (so the entire UI says "Bins" instead of "Assets"). Task labels: "Collection," "Placement," "Move," "Inspection."<br><br>
+              <strong>Check-in Forms:</strong> Sarah built a custom form for Collections: <em>Photo (required)</em> → <em>Fill Level % (dropdown: 0-25%, 25-50%, 50-75%, 75-100%)</em> → <em>Condition (dropdown: Good / Damaged / Needs Repair)</em> → <em>Notes (optional text)</em>. A different form for Placements: <em>Photo of placed bin</em> → <em>Landlord signature confirmation</em> → <em>GPS pin verified</em>.<br><br>
+              <strong>Custom Fields:</strong> Added "Bin Size" (dropdown: 2yd, 4yd, 6yd, 8yd), "Waste Type" (dropdown: General, Recycling, Organic), and "Landlord Name" (text) to every bin record. These show up in Inventory filters and exports.<br><br>
+              <strong>Geofencing:</strong> Default 50m radius applied to all 847 bins in bulk. High-theft area bins (Zone 3) overridden to 25m for tighter monitoring.<br><br>
+              <strong>Module Toggles:</strong> No-Go Zones enabled, Location Scouting enabled, Fill Monitoring enabled. All modules active for waste operations.
+            </div>
           </div>
         </div>
+
+        <!-- 7:00 AM -->
+        <div class="flow-step">
+          <div class="flow-time green"></div>
+          <div class="flow-card">
+            <span class="flow-label pulse">THE PULSE</span>
+            <h5>7:00 AM — Sarah opens the dashboard</h5>
+            <p>Morning command center. Everything she needs to know in 5 seconds.</p>
+            <div class="detail">
+              KPI cards show: <strong>847 active bins</strong>, <strong>6/6 drivers available</strong>, <strong>12 critical bins</strong> (>80% fill, need service today), <strong>3 field reports</strong> unread from yesterday's evening shift.<br><br>
+              The AI daily briefing says: <em>"12 high-priority bins need service — 8 in Zone 1, 4 in Zone 2. Driver Mike had the highest efficiency yesterday (18 stops/hr). 2 vandalism incidents reported in the Elm Street area overnight — consider reviewing No-Go Zone candidates."</em><br><br>
+              Activity feed shows: "Driver Tom completed evening shift: 22/24 stops, 2 skips (access blocked)." Sarah clicks the skip to see Tom's photo and notes — a car was parked in front of the bin.
+            </div>
+          </div>
+        </div>
+
+        <!-- 7:15 AM -->
+        <div class="flow-step">
+          <div class="flow-time"></div>
+          <div class="flow-card">
+            <span class="flow-label ops">OPERATIONS &rsaquo; ROUTES</span>
+            <h5>7:15 AM — Building today's routes</h5>
+            <p>Sarah creates optimized routes for the morning shift. AI does the heavy lifting, she fine-tunes.</p>
+            <div class="detail">
+              Sarah clicks "Create Route" and selects 42 bins that need service today (12 critical + 30 scheduled). She assigns 3 drivers: Mike, Ana, and Tom.<br><br>
+              <strong>AI recommends the split:</strong> "Based on location clusters and driver home addresses — Mike: 16 stops (Zone 1 east), Ana: 14 stops (Zone 1 west), Tom: 12 stops (Zone 2). Est. total: 127 miles, $48.60 fuel."<br><br>
+              <strong>She adjusts:</strong> Workload view shows Mike is heavy (est. 5.8 hrs) vs Tom (est. 3.4 hrs). She drags 3 stops from Mike's route to Tom's — the map updates live, showing the new paths. Cost impact: "+6 min for Tom, -22 min for Mike. Net: -16 min, -$3.20 fuel."<br><br>
+              <strong>Time window:</strong> Bin #89 is at a restaurant that opens at 10am — she sets "must arrive after 10:00am" as a strict constraint. The optimizer repositions it in Tom's sequence automatically.<br><br>
+              <strong>Optimization objective:</strong> She picks "Cheapest" for Zone 1 routes (longer area, fuel matters) and "Fastest" for Zone 2 (compact area, time matters more). Saves all three routes.
+            </div>
+          </div>
+        </div>
+
+        <!-- 7:30 AM -->
+        <div class="flow-step">
+          <div class="flow-time"></div>
+          <div class="flow-card">
+            <span class="flow-label ops">OPERATIONS &rsaquo; SHIFTS</span>
+            <h5>7:30 AM — Shifts go live</h5>
+            <p>Recurring templates did most of the work. Sarah just reviews and assigns the routes she built.</p>
+            <div class="detail">
+              Mike's shift was auto-created by his <strong>recurring template</strong> (Mon/Wed/Fri at 8am). Sarah assigns his Route 1 to it and approves. For Ana and Tom, she creates new shifts, assigns their routes, and sends. All three drivers get push notifications on their phones: <em>"New shift ready — 16 stops, start at 8:00 AM. Tap to view route."</em>
+            </div>
+          </div>
+        </div>
+
+        <!-- 8:00 AM -->
+        <div class="flow-step">
+          <div class="flow-time green"></div>
+          <div class="flow-card">
+            <span class="flow-label ops">OPERATIONS &rsaquo; LIVE MAP</span>
+            <h5>8:00 AM — Drivers start their shifts</h5>
+            <p>Mike opens the app, accepts his shift, and starts driving. Sarah watches from the Live Map.</p>
+            <div class="detail">
+              The Live Map shows all 3 drivers as moving dots with their remaining routes drawn on the map. Sarah clicks Mike and sees: <em>"Mike — 16 stops remaining, est. 5.1 hrs, next stop: Bin #247 (ETA 8:12 AM)."</em><br><br>
+              <strong>Live ETA sharing:</strong> If a landlord calls asking "when is the truck coming?" Sarah can see exactly where Mike is and his ETA to any specific bin on his route. No guessing, no calling the driver.
+            </div>
+          </div>
+        </div>
+
+        <!-- 8:15 AM -->
+        <div class="flow-step">
+          <div class="flow-time green"></div>
+          <div class="flow-card">
+            <span class="flow-label ops">GEOFENCE AUTO CHECK-IN</span>
+            <h5>8:15 AM — Mike arrives at his first stop</h5>
+            <p>No QR codes, no manual check-in buttons. The geofence does it automatically.</p>
+            <div class="detail">
+              Mike's truck enters the 50m radius around Bin #247. The app auto-triggers the check-in flow. His custom form appears: <em>Take photo → Select fill level (he picks "75-100%") → Condition: "Good" → No notes.</em> He empties the bin, marks task complete, and the app navigates him to the next stop.<br><br>
+              Back on the dashboard, Sarah sees the task turn green in real-time. The AI analyzes Mike's photo and estimates 82% fill — close to his manual selection, which builds confidence in the AI model over time.
+            </div>
+          </div>
+        </div>
+
+        <!-- 10:30 AM -->
+        <div class="flow-step">
+          <div class="flow-time red"></div>
+          <div class="flow-card">
+            <span class="flow-label assets">ASSETS &rsaquo; INCIDENT</span>
+            <h5>10:30 AM — Mike finds a damaged bin</h5>
+            <p>Not everything goes smoothly. Bin #112 is tipped over and cracked. Mike reports it from the app.</p>
+            <div class="detail">
+              Mike arrives at Bin #112 and finds it on its side, cracked. He can't service it. He taps "Report Issue" → selects <strong>"Damaged"</strong> → takes 2 photos showing the damage → adds notes: <em>"Bin tipped over, large crack on left side, contents spilled. Looks intentional."</em> → submits.<br><br>
+              Sarah gets an instant notification. She opens the Field Report — sees Mike's GPS location, photos, and notes. This is the <strong>3rd incident on Elm Street in 60 days</strong>. The system flags it: <em>"Incident cluster detected — 3 events within 200m in 60 days. Recommend creating a No-Go Zone."</em>
+            </div>
+          </div>
+        </div>
+
+        <!-- 10:35 AM -->
+        <div class="flow-step">
+          <div class="flow-time red"></div>
+          <div class="flow-card">
+            <span class="flow-label assets">ASSETS &rsaquo; NO-GO ZONES</span>
+            <h5>10:35 AM — Sarah creates a No-Go Zone</h5>
+            <p>The system recommended it, Sarah approves. Future routes will avoid placing new bins in this area.</p>
+            <div class="detail">
+              Sarah clicks "Create No-Go Zone" from the alert. The system auto-draws a zone around the 3 incident locations. She adjusts the radius slightly, adds a note: <em>"Recurring vandalism — do not place new bins. Review existing bin relocations."</em> Saves.<br><br>
+              The 2 existing bins inside this zone are now flagged with a warning icon in Inventory. Future route optimization will deprioritize this area. Drivers approaching this zone will see a warning in their app: <em>"Caution: No-Go Zone ahead — vandalism reported."</em>
+            </div>
+          </div>
+        </div>
+
+        <!-- 11:00 AM -->
+        <div class="flow-step">
+          <div class="flow-time amber"></div>
+          <div class="flow-card">
+            <span class="flow-label ops">OPERATIONS &rsaquo; URGENT STOP</span>
+            <h5>11:00 AM — Emergency call from a landlord</h5>
+            <p>An overflowing bin at a shopping center. Sarah needs someone there fast.</p>
+            <div class="detail">
+              A landlord calls: "Bin is overflowing, tenants are complaining." Sarah clicks the location on the Live Map → "Add Urgent Stop." The system calculates: <em>"Insert into Mike's route — he's 1.2 miles away, adds 8 min. Insert into Ana's route — she's 3.4 miles away, adds 18 min."</em><br><br>
+              Sarah picks Mike. One click — Mike gets an updated route with the new stop inserted at the optimal position. He gets a push notification: <em>"Urgent stop added: Bin #340 at Oak Plaza. Navigate now."</em> His app re-routes automatically.
+            </div>
+          </div>
+        </div>
+
+        <!-- 2:00 PM -->
+        <div class="flow-step">
+          <div class="flow-time amber"></div>
+          <div class="flow-card">
+            <span class="flow-label assets">ASSETS &rsaquo; THEFT ALERT</span>
+            <h5>2:00 PM — Geofence theft alert fires</h5>
+            <p>An AirTag-tracked bin moved 300m from its assigned location. Nobody was scheduled to move it.</p>
+            <div class="detail">
+              Sarah gets a push notification: <em>"Bin #501 moved outside its 50m geofence at 1:47 PM. Current location: 300m southeast, near Highway 9 on-ramp."</em> She opens Inventory, clicks the bin — sees its location trail on the map showing it was dragged from the sidewalk to a pickup truck loading area.<br><br>
+              No driver was assigned to this bin today. Sarah marks it as <strong>"Suspected Theft"</strong> — this auto-creates an incident that feeds into No-Go Zone scoring for that area. She screenshots the location trail for the police report.
+            </div>
+          </div>
+        </div>
+
+        <!-- 3:30 PM -->
+        <div class="flow-step">
+          <div class="flow-time green"></div>
+          <div class="flow-card">
+            <span class="flow-label ops">OPERATIONS &rsaquo; SHIFTS</span>
+            <h5>3:30 PM — Shifts end</h5>
+            <p>All three drivers complete their shifts. Results are in.</p>
+            <div class="detail">
+              Mike: <strong>17/17 stops</strong> (16 original + 1 urgent), 4.8 hrs, 38 miles. Ana: <strong>14/14 stops</strong>, 3.9 hrs, 29 miles. Tom: <strong>14/15 stops</strong>, 4.1 hrs, 31 miles — 1 skip (Bin #112, the damaged one Mike reported). Shift summaries auto-generate with all stats.
+            </div>
+          </div>
+        </div>
+
+        <!-- 4:00 PM -->
+        <div class="flow-step">
+          <div class="flow-time purple"></div>
+          <div class="flow-card">
+            <span class="flow-label intel">INTELLIGENCE &rsaquo; ANALYTICS</span>
+            <h5>4:00 PM — Sarah reviews the numbers</h5>
+            <p>Daily performance review. How did the team do? Where can she improve?</p>
+            <div class="detail">
+              <strong>Route efficiency:</strong> Planned 127 miles, actual 104 miles (the optimization + mid-route adjustment saved 23 miles). Fuel cost: $39.80 (vs $48.60 estimated before she rebalanced workloads — saved $8.80 just by dragging 3 stops).<br><br>
+              <strong>Driver performance:</strong> Mike: 96% efficiency, 3.5 min avg per stop, safety score 92 (one hard brake). Ana: 98% efficiency, 3.1 min avg, safety score 97. Tom: 88% efficiency (the skip + detour around the No-Go Zone added time).<br><br>
+              Sarah exports the weekly PDF report — operations summary, fuel costs, driver rankings, skip reasons — and emails it to her boss. One click.
+            </div>
+          </div>
+        </div>
+
+        <!-- 4:15 PM -->
+        <div class="flow-step">
+          <div class="flow-time purple"></div>
+          <div class="flow-card">
+            <span class="flow-label intel">INTELLIGENCE &rsaquo; AI INSIGHTS</span>
+            <h5>4:15 PM — AI flags two things Sarah should know</h5>
+            <p>Patterns the AI caught that Sarah wouldn't have noticed manually.</p>
+            <div class="detail">
+              <strong>Insight 1:</strong> <em>"Bin #501 fill rate jumped 3x this month (from 1 collection/week to needing 3). Foot traffic in that area increased due to new construction. Recommend increasing service frequency from 2x to 3x/week."</em> Sarah clicks "Apply" — the recurring route template auto-adjusts.<br><br>
+              <strong>Insight 2:</strong> <em>"Mike is 23% more efficient on Zone 1 East routes than Tom (18 stops/hr vs 14.6). Consider permanently assigning Mike to this area."</em> Sarah notes this for next week's schedule.
+            </div>
+          </div>
+        </div>
+
+        <!-- 4:30 PM -->
+        <div class="flow-step">
+          <div class="flow-time amber"></div>
+          <div class="flow-card">
+            <span class="flow-label team">TEAM &rsaquo; LEADERBOARD</span>
+            <h5>4:30 PM — Weekly leaderboard updates</h5>
+            <p>Drivers can see their rankings in the mobile app. Healthy competition.</p>
+            <div class="detail">
+              <strong>This week's standings:</strong> #1 Ana (98% efficiency, 0 skips, safety 97), #2 Mike (96%, 0 skips, safety 92), #3 Tom (91%, 2 skips, safety 95). Mike moved up from #3 last week. Drivers see their points, badges, and where they rank vs the team — all visible in the mobile app.
+            </div>
+          </div>
+        </div>
+
       </div>
+    </div>
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- EXAMPLE 2: BITCOIN ATMs               -->
+    <!-- ══════════════════════════════════════ -->
+    <div class="example-scenario" id="example-atm">
+      <div class="callout callout-blue" style="margin-bottom: 28px;">
+        <div class="callout-title">Scenario: CoinVault ATM Network</div>
+        <p>Marcus operates 312 Bitcoin ATMs across the metro area with 4 field technicians. He switched from OptimoRoute to Binly because he needed asset tracking (AirTags on every ATM), custom check-in forms for cash handling, and geofence theft alerts. Here's his Wednesday.</p>
+      </div>
+
+      <div class="flow-timeline">
+
+        <!-- Setup -->
+        <div class="flow-step">
+          <div class="flow-time green"></div>
+          <div class="flow-card">
+            <span class="flow-label settings">SETTINGS</span>
+            <h5>One-Time Setup (already done)</h5>
+            <p>Marcus configured Binly for ATM operations. The entire platform now speaks his language — no "bins" anywhere.</p>
+            <div class="detail">
+              <strong>Workspace:</strong> Organization name "CoinVault." Asset terminology set to <strong>"ATMs"</strong> — the entire UI says "ATMs" everywhere. Task labels customized: "Cash Pickup" (replaces "Collection"), "Restocking" (replaces "Placement"), "Repair Visit" (replaces "Inspection"), "Relocation" (replaces "Move").<br><br>
+              <strong>Check-in Forms:</strong> Marcus built 3 custom forms:<br>
+              &bull; <em>Cash Pickup:</em> Photo of cash cassette → Cash amount collected (number input) → Receipt paper level (dropdown: Full / Half / Low / Empty) → Error codes displayed (multi-select: None, Paper Jam, Bill Acceptor, Network Error, Screen Issue) → Notes<br>
+              &bull; <em>Restocking:</em> Photo before → Cash loaded amount (number) → Receipt paper replaced? (checkbox) → Photo after → Seal number (text)<br>
+              &bull; <em>Repair Visit:</em> Photo of issue → Error code (text) → Parts replaced (multi-select from list) → Repair status (Fixed / Needs Parts / Escalate) → Photo after repair<br><br>
+              <strong>Custom Fields on ATMs:</strong> "Model" (dropdown: Genesis Coin, General Bytes, BitAccess), "Cash Capacity" (number: $15K, $25K, $50K), "Location Type" (dropdown: Gas Station, Convenience Store, Mall, Laundromat), "Monthly Revenue" (number), "Lease Expires" (date), "Store Contact" (text with phone number).<br><br>
+              <strong>Geofencing:</strong> Default 30m radius on all 312 ATMs (ATMs are indoors, tighter radius needed). High-value ATMs ($50K capacity) set to 15m with instant alerts.<br><br>
+              <strong>Module Toggles:</strong> No-Go Zones <em>disabled</em> (not relevant for ATMs — machines are inside businesses). Location Scouting <em>enabled</em> (techs scout new locations). Fill Monitoring <em>disabled</em> (cash levels tracked via check-in forms instead of photos).
+            </div>
+          </div>
+        </div>
+
+        <!-- 6:00 AM -->
+        <div class="flow-step">
+          <div class="flow-time green"></div>
+          <div class="flow-card">
+            <span class="flow-label pulse">THE PULSE</span>
+            <h5>6:00 AM — Marcus checks the dashboard</h5>
+            <p>Early start — ATMs run 24/7 and overnight issues need to be caught first thing.</p>
+            <div class="detail">
+              KPI cards show: <strong>312 active ATMs</strong>, <strong>4/4 techs available</strong>, <strong>8 ATMs flagged critical</strong> (last cash pickup was 3+ days ago — likely running low), <strong>2 field reports</strong> from yesterday (1 repair needed, 1 location scout submitted).<br><br>
+              AI briefing: <em>"8 ATMs need cash pickups today — 3 are high-revenue machines averaging $4K/day in transactions. ATM #178 at QuikStop reported 'Bill Acceptor' error overnight via remote monitoring. Tech Ray is closest — estimated 12 min drive."</em><br><br>
+              Marcus clicks the repair alert. Sees the error history: this ATM has had 3 bill acceptor errors in 30 days. He decides to send Ray with a replacement part.
+            </div>
+          </div>
+        </div>
+
+        <!-- 6:20 AM -->
+        <div class="flow-step">
+          <div class="flow-time"></div>
+          <div class="flow-card">
+            <span class="flow-label ops">OPERATIONS &rsaquo; ROUTES</span>
+            <h5>6:20 AM — Building today's routes</h5>
+            <p>Cash pickup routes are time-sensitive — full ATMs stop accepting bills, which means lost revenue.</p>
+            <div class="detail">
+              Marcus selects the 8 critical ATMs + 14 scheduled pickups = 22 total stops. Assigns 2 techs for pickups (Ray and Jen), 1 tech for restocking runs (Carlos), 1 tech on standby for repairs (Lisa).<br><br>
+              <strong>AI recommends:</strong> "Ray: 12 stops (north), Jen: 10 stops (south). Est. 94 miles total, $36.20 fuel." Marcus checks the workload view — balanced enough.<br><br>
+              <strong>Time windows:</strong> ATM #045 is inside a mall that doesn't open until 9am — strict constraint set. ATM #201 is at a gas station open 24/7 — no constraint. The optimizer sequences Ray's route so the mall ATM is his 4th stop, perfectly timed.<br><br>
+              <strong>Priority:</strong> The 3 high-revenue ATMs ($4K/day) are marked "High Priority." Optimization objective set to "Priority-First" — these get served in the first 2 hours to minimize revenue loss.
+            </div>
+          </div>
+        </div>
+
+        <!-- 6:40 AM -->
+        <div class="flow-step">
+          <div class="flow-time"></div>
+          <div class="flow-card">
+            <span class="flow-label ops">OPERATIONS &rsaquo; SHIFTS</span>
+            <h5>6:40 AM — Shifts dispatched</h5>
+            <p>Recurring templates handle the routine. Marcus just assigns today's routes.</p>
+            <div class="detail">
+              Ray and Jen have <strong>recurring shift templates</strong> (Mon-Fri at 7am). Carlos has a restocking template (Tue/Thu at 8am — today is Wednesday, so Marcus creates a manual shift for a special restocking run). Lisa is on-call — no shift unless a repair is needed.<br><br>
+              All techs get push notifications with their routes. Ray also gets a note: <em>"ATM #178 at QuikStop — bring replacement bill acceptor module (Part #GA-204)."</em>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7:15 AM -->
+        <div class="flow-step">
+          <div class="flow-time green"></div>
+          <div class="flow-card">
+            <span class="flow-label ops">GEOFENCE AUTO CHECK-IN</span>
+            <h5>7:15 AM — Ray arrives at his first ATM</h5>
+            <p>Same auto check-in flow, but with a completely different form than waste management.</p>
+            <div class="detail">
+              Ray walks into the convenience store. His phone enters the 30m geofence around ATM #312 — the app auto-triggers the Cash Pickup check-in form:<br><br>
+              &bull; <em>Photo of cash cassette</em> — Ray snaps a photo of the cassette as he removes it<br>
+              &bull; <em>Cash amount collected:</em> he types <strong>$8,420</strong><br>
+              &bull; <em>Receipt paper level:</em> selects <strong>"Low"</strong><br>
+              &bull; <em>Error codes displayed:</em> selects <strong>"None"</strong><br>
+              &bull; <em>Notes:</em> "Store owner mentioned ATM screen was flickering yesterday but seems fine now. Will monitor."<br><br>
+              Task complete. Back on the dashboard, Marcus sees the pickup logged with the exact cash amount. This feeds into the Financial Overview — daily cash collected per route, per tech, per ATM.
+            </div>
+          </div>
+        </div>
+
+        <!-- 9:30 AM -->
+        <div class="flow-step">
+          <div class="flow-time"></div>
+          <div class="flow-card">
+            <span class="flow-label ops">OPERATIONS &rsaquo; REPAIR</span>
+            <h5>9:30 AM — Ray handles the repair stop</h5>
+            <p>The bill acceptor replacement at ATM #178 — a different check-in form auto-loads for repair tasks.</p>
+            <div class="detail">
+              Ray arrives at QuikStop. The app recognizes this is a <strong>Repair Visit</strong> task, so a different check-in form loads:<br><br>
+              &bull; <em>Photo of issue:</em> Ray photographs the "Bill Acceptor Error" on screen<br>
+              &bull; <em>Error code:</em> "E-204 — Bill path obstruction"<br>
+              &bull; <em>Parts replaced:</em> selects "Bill Acceptor Module"<br>
+              &bull; <em>Repair status:</em> <strong>"Fixed"</strong><br>
+              &bull; <em>Photo after repair:</em> ATM showing normal home screen, accepting bills<br><br>
+              Marcus sees the repair completed in real-time. The ATM's incident history now shows: repair logged, part replaced, downtime was 14 hours (from overnight error to 9:30 AM fix).
+            </div>
+          </div>
+        </div>
+
+        <!-- 11:00 AM -->
+        <div class="flow-step">
+          <div class="flow-time red"></div>
+          <div class="flow-card">
+            <span class="flow-label assets">ASSETS &rsaquo; THEFT ALERT</span>
+            <h5>11:00 AM — Geofence alert fires</h5>
+            <p>ATM #088 at a laundromat moved outside its 30m radius. No tech was scheduled there today.</p>
+            <div class="detail">
+              Marcus gets an instant alert: <em>"ATM #088 moved outside geofence at 10:52 AM. Last known position: 150m east of assigned location, moving."</em> He opens Inventory, clicks the ATM — the AirTag location trail shows it was moved from inside the laundromat to a vehicle in the parking lot.<br><br>
+              This is a <strong>$50K capacity machine</strong> (one of the high-value units with the 15m tight geofence). Marcus immediately: calls the police with the live GPS coordinates, calls the store owner, and marks it as "Suspected Theft" in the system. The location trail from the AirTag becomes evidence.<br><br>
+              The incident auto-logs. In the analytics, this ATM's record will permanently show the theft event, helping Marcus build insurance claims and track which locations have security issues.
+            </div>
+          </div>
+        </div>
+
+        <!-- 1:00 PM -->
+        <div class="flow-step">
+          <div class="flow-time"></div>
+          <div class="flow-card">
+            <span class="flow-label ops">OPERATIONS &rsaquo; LIVE MAP</span>
+            <h5>1:00 PM — Midday check-in</h5>
+            <p>Marcus glances at the Live Map between meetings.</p>
+            <div class="detail">
+              Ray: 10/12 stops done, on track to finish by 2:30 PM. Jen: 7/10 stops done, running 20 min behind (traffic on I-95). Carlos: restocking 4 ATMs, 2 done, currently at ATM #156.<br><br>
+              Marcus clicks Jen's route and sees her ETA to the remaining 3 stops. The last one is ATM #045 at the mall — she'll arrive at 3:10 PM, well within mall hours. No intervention needed.
+            </div>
+          </div>
+        </div>
+
+        <!-- 3:30 PM -->
+        <div class="flow-step">
+          <div class="flow-time green"></div>
+          <div class="flow-card">
+            <span class="flow-label ops">SHIFTS COMPLETE</span>
+            <h5>3:30 PM — All shifts wrapped up</h5>
+            <p>Ray, Jen, and Carlos are done. Lisa wasn't needed today (no emergency repairs beyond Ray's stop).</p>
+            <div class="detail">
+              <strong>Ray:</strong> 12/12 stops + 1 repair, 5.2 hrs, 52 miles, <strong>$38,640 cash collected</strong>.<br>
+              <strong>Jen:</strong> 10/10 stops, 4.8 hrs, 44 miles, <strong>$27,210 cash collected</strong>.<br>
+              <strong>Carlos:</strong> 4/4 restocks, 3.1 hrs, 28 miles, <strong>$120,000 cash loaded</strong>.
+            </div>
+          </div>
+        </div>
+
+        <!-- 4:00 PM -->
+        <div class="flow-step">
+          <div class="flow-time purple"></div>
+          <div class="flow-card">
+            <span class="flow-label intel">INTELLIGENCE &rsaquo; ANALYTICS</span>
+            <h5>4:00 PM — Marcus reviews the numbers</h5>
+            <p>Different metrics than waste — cash collected, revenue per ATM, cost per pickup.</p>
+            <div class="detail">
+              <strong>Today's totals:</strong> $65,850 cash collected across 22 pickups. $120,000 restocked across 4 ATMs. Fuel cost: $34.10. Cost per pickup: $1.55.<br><br>
+              <strong>Asset utilization:</strong> Top 5 ATMs by revenue this month — ATM #312 leads ($42K), followed by #045 ($38K). Bottom 5 ATMs — ATM #267 averages only $200/day. Marcus filters by "Monthly Revenue" (his custom field) and sees 8 ATMs consistently below $500/day. These are relocation candidates.<br><br>
+              <strong>Weekly PDF report</strong> auto-emailed to Marcus and his business partner: total cash handled, pickups per tech, repair frequency by ATM model, fuel costs, revenue per location.
+            </div>
+          </div>
+        </div>
+
+        <!-- 4:15 PM -->
+        <div class="flow-step">
+          <div class="flow-time purple"></div>
+          <div class="flow-card">
+            <span class="flow-label intel">INTELLIGENCE &rsaquo; AI INSIGHTS</span>
+            <h5>4:15 PM — AI flags patterns</h5>
+            <p>Things Marcus wouldn't notice looking at spreadsheets.</p>
+            <div class="detail">
+              <strong>Insight 1:</strong> <em>"ATM #312 at Circle K processes 40% more cash on Fridays and Saturdays. Current pickup schedule is Mon/Wed/Fri — consider adding Saturday to prevent full cassette lockouts on the highest-revenue day."</em><br><br>
+              <strong>Insight 2:</strong> <em>"General Bytes ATMs have 3.2x more error codes than Genesis Coin models. 6 of your 8 repair visits this month were General Bytes units. Consider prioritizing Genesis Coin for new deployments."</em><br><br>
+              <strong>Insight 3:</strong> <em>"Tech Ray completes cash pickups 18% faster than Jen (avg 12 min vs 14.6 min per stop) but Jen has zero errors in cash count reconciliation vs Ray's 3 discrepancies. Consider having Ray focus on high-volume routes while Jen handles high-value machines."</em>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function switchExample(type) {
+      document.querySelectorAll('.example-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.example-scenario').forEach(s => s.classList.remove('active'));
+      document.getElementById('example-' + type).classList.add('active');
+      event.target.classList.add('active');
+    }
+  </script>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- COMPETITIVE LANDSCAPE                      -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section" id="landscape">
+    <div class="section-label" style="color: var(--amber);">Market Analysis</div>
+    <div class="section-title">Competitive Landscape — How Binly Fits</div>
+    <p class="section-desc">Every competitor solves a piece of the puzzle. None of them solve the whole thing. Here's where everyone sits and where the gap is.</p>
+
+    <!-- Competitor Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 32px;">
+
+      <div style="background: white; border-radius: 14px; border: 1px solid var(--border); padding: 20px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+          <div style="width: 36px; height: 36px; border-radius: 8px; background: #1D4ED8; display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 0.75rem;">OR</div>
+          <div>
+            <h4 style="font-size: 0.9rem; font-weight: 800; margin: 0;">OptimoRoute</h4>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">$35–49/driver/month</span>
+          </div>
+        </div>
+        <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin: 0;">
+          <strong>What it does:</strong> Route optimization, live GPS tracking, proof of delivery (photos + signatures), analytics, driver mobile app.<br>
+          <strong>What it doesn't do:</strong> No field asset tracking. No asset inventory. No geofence theft detection. No custom check-in forms on Lite plan.<br>
+          <strong>Target:</strong> SMBs with 10–50 drivers doing deliveries or field service visits. Horizontal — any industry with stops.<br>
+          <strong>The gap:</strong> Zero awareness of what's at the stops. Tracks drivers, not assets. If your ATM gets stolen, OptimoRoute has no idea.
+        </p>
+      </div>
+
+      <div style="background: white; border-radius: 14px; border: 1px solid var(--border); padding: 20px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+          <div style="width: 36px; height: 36px; border-radius: 8px; background: #059669; display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 0.75rem;">HH</div>
+          <div>
+            <h4 style="font-size: 0.9rem; font-weight: 800; margin: 0;">Hauler Hero <span style="font-size: 0.72rem; color: var(--green); font-weight: 600;">$27M raised</span></h4>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">Pricing not public</span>
+          </div>
+        </div>
+        <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin: 0;">
+          <strong>What it does:</strong> Route optimization, AI dispatch, drag-and-drop stop management, customer portal, billing, truck-mounted cameras for fill detection.<br>
+          <strong>What it doesn't do:</strong> No physical asset GPS tracking. No configurable check-in forms. No multi-vertical support. Waste-only, forever.<br>
+          <strong>Target:</strong> Small to mid waste haulers with 5–50 trucks. Residential and commercial waste collection.<br>
+          <strong>The gap:</strong> Locked to waste. Will never serve ATM operators or vending companies. No asset-level tracking (tracks trucks, not bins).
+        </p>
+      </div>
+
+      <div style="background: white; border-radius: 14px; border: 1px solid var(--border); padding: 20px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+          <div style="width: 36px; height: 36px; border-radius: 8px; background: #7C3AED; display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 0.75rem;">FL</div>
+          <div>
+            <h4 style="font-size: 0.9rem; font-weight: 800; margin: 0;">Fleetio</h4>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">$4–10/vehicle/month</span>
+          </div>
+        </div>
+        <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin: 0;">
+          <strong>What it does:</strong> Fleet maintenance management, vehicle inspections (custom DVIR forms), fuel tracking, GPS via integrations, geofencing, tool checkout tracking.<br>
+          <strong>What it doesn't do:</strong> No route optimization. No dispatching. No field asset tracking at locations (tracks tools assigned to people, not assets deployed at sites). No native GPS.<br>
+          <strong>Target:</strong> Mid-market fleets (50–500 vehicles) in construction, landscaping, transportation. Vehicle-centric.<br>
+          <strong>The gap:</strong> Manages your trucks, not your work. Knows where vehicles are but has no concept of "this bin at this address needs servicing."
+        </p>
+      </div>
+
+      <div style="background: white; border-radius: 14px; border: 1px solid var(--border); padding: 20px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+          <div style="width: 36px; height: 36px; border-radius: 8px; background: #DC2626; display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 0.75rem;">RW</div>
+          <div>
+            <h4 style="font-size: 0.9rem; font-weight: 800; margin: 0;">Routeware</h4>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">$50K+/year</span>
+          </div>
+        </div>
+        <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin: 0;">
+          <strong>What it does:</strong> Enterprise waste management. Route optimization, RFID container tracking, compliance reporting, government/municipal integrations, billing.<br>
+          <strong>What it doesn't do:</strong> No multi-vertical. No configurable forms. No AI vision. No AirTag-level asset GPS. Too expensive and heavy for small operators.<br>
+          <strong>Target:</strong> Large waste companies and municipalities. 50+ trucks. Long government contracts.<br>
+          <strong>The gap:</strong> Overkill for a 6-driver operation. 6-month implementation. Priced out of reach for SMBs.
+        </p>
+      </div>
+
+      <div style="background: white; border-radius: 14px; border: 1px solid var(--border); padding: 20px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+          <div style="width: 36px; height: 36px; border-radius: 8px; background: #0891B2; display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 0.75rem;">SM</div>
+          <div>
+            <h4 style="font-size: 0.9rem; font-weight: 800; margin: 0;">Samsara</h4>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">$27–60/vehicle/month · 3-year contract</span>
+          </div>
+        </div>
+        <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin: 0;">
+          <strong>What it does:</strong> GPS telematics, AI dashcams, route optimization (100+ stops), field asset tracking (3 device types), custom forms, ELD compliance, geofencing, driver safety.<br>
+          <strong>What it doesn't do:</strong> No multi-vertical configuration. No check-in workflows per task type. No No-Go Zones. No location scouting. No gamification. Enterprise pricing and contracts.<br>
+          <strong>Target:</strong> Mid to large fleets (50–500+ vehicles). Trucking, construction, logistics. Companies that need compliance and dashcams.<br>
+          <strong>The gap:</strong> Powerful but heavy. 3-year lock-in. Requires their hardware. Built for fleet managers, not field operations managers who care about what's at each stop.
+        </p>
+      </div>
+
+      <div style="background: white; border-radius: 14px; border: 1px solid var(--border); padding: 20px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+          <div style="width: 36px; height: 36px; border-radius: 8px; background: #64748B; display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 0.75rem;">VC</div>
+          <div>
+            <h4 style="font-size: 0.9rem; font-weight: 800; margin: 0;">Verizon Connect</h4>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">$20–200/vehicle/month · 3-year contract</span>
+          </div>
+        </div>
+        <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin: 0;">
+          <strong>What it does:</strong> GPS fleet tracking, AI dashcams, route optimization, asset trackers (battery + powered), geofencing, DVIR inspections, ELD compliance.<br>
+          <strong>What it doesn't do:</strong> No multi-vertical. No configurable task workflows. No custom check-in forms. No No-Go Zones. Enterprise contracts and hardware requirements.<br>
+          <strong>Target:</strong> Mid to large fleets (50–200+ vehicles). Construction, field service, transportation, utilities, government.<br>
+          <strong>The gap:</strong> Same as Samsara — enterprise-grade, 3-year lock-in, requires their proprietary hardware. A 4-driver ATM operator would never sign up.
+        </p>
+      </div>
+
+    </div>
+
+    <!-- The Gap Callout -->
+    <div class="callout callout-purple" style="margin-bottom: 28px;">
+      <div class="callout-title">The Gap Nobody Fills</div>
+      <p>
+        Every competitor above solves a piece: OptimoRoute does routes. Fleetio manages trucks. Samsara and Verizon Connect track everything but require 3-year enterprise contracts and proprietary hardware. Hauler Hero does waste but nothing else. <strong>None of them are built for this pattern:</strong>
+      </p>
+      <p style="font-size: 1rem; font-weight: 800; color: #5B21B6; margin-top: 12px; text-align: center;">
+        "I own physical assets deployed at locations I don't own, serviced by field workers on recurring schedules — and I need to track, protect, and optimize all of it in one place."
+      </p>
+      <p style="margin-top: 12px;">
+        That's waste bins on someone else's sidewalk. ATMs in someone else's store. Vending machines in someone else's office. Porta-potties at someone else's construction site. Propane tanks at someone else's house. The operators running these businesses are stitching together 2–3 tools today: OptimoRoute for routes + spreadsheets for asset tracking + paper forms for check-ins. <strong>Binly replaces all three.</strong>
+      </p>
+    </div>
+
+    <!-- Full Comparison Table -->
+    <h4 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 16px;">Feature-by-Feature Comparison</h4>
+    <div style="overflow-x: auto; border-radius: 16px; border: 1px solid var(--border); margin-bottom: 28px;">
+      <table class="compare-table" style="min-width: 900px;">
+        <thead>
+          <tr>
+            <th style="min-width: 180px;">Capability</th>
+            <th class="binly-col" style="min-width: 120px;">Binly</th>
+            <th style="min-width: 100px;">OptimoRoute</th>
+            <th style="min-width: 100px;">Hauler Hero</th>
+            <th style="min-width: 100px;">Fleetio</th>
+            <th style="min-width: 100px;">Samsara</th>
+            <th style="min-width: 110px;">Verizon Connect</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Route Optimization</strong></td>
+            <td class="yes" style="background:var(--primary-light); text-align:center;">&#10003; + AI</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+            <td class="yes" style="text-align:center;">&#10003; AI</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+          </tr>
+          <tr>
+            <td><strong>Live GPS Tracking</strong></td>
+            <td class="yes" style="background:var(--primary-light); text-align:center;">&#10003;</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+            <td style="text-align:center; color: var(--amber);">Via integrations</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+          </tr>
+          <tr>
+            <td><strong>Field Asset GPS Tracking</strong></td>
+            <td class="yes" style="background:var(--primary-light); text-align:center;">&#10003; AirTags</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="yes" style="text-align:center;">&#10003; Own HW</td>
+            <td class="yes" style="text-align:center;">&#10003; Own HW</td>
+          </tr>
+          <tr>
+            <td><strong>Asset Inventory Management</strong></td>
+            <td class="yes" style="background:var(--primary-light); text-align:center;">&#10003;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td style="text-align:center; color: var(--amber);">Tools only</td>
+            <td style="text-align:center; color: var(--amber);">Basic</td>
+            <td style="text-align:center; color: var(--amber);">Basic</td>
+          </tr>
+          <tr>
+            <td><strong>Custom Check-in Forms</strong></td>
+            <td class="planned" style="background:var(--primary-light); text-align:center;">Planned P1</td>
+            <td style="text-align:center; color: var(--amber);">Pro only</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td style="text-align:center; color: var(--amber);">DVIR only</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+            <td style="text-align:center; color: var(--amber);">DVIR only</td>
+          </tr>
+          <tr>
+            <td><strong>Multi-Vertical Configurable</strong></td>
+            <td class="planned" style="background:var(--primary-light); text-align:center;">Planned P1</td>
+            <td style="text-align:center; color: var(--amber);">Horizontal</td>
+            <td class="no" style="text-align:center;">Waste only</td>
+            <td style="text-align:center; color: var(--amber);">Vehicle only</td>
+            <td class="no" style="text-align:center;">Fleet only</td>
+            <td class="no" style="text-align:center;">Fleet only</td>
+          </tr>
+          <tr>
+            <td><strong>Geofence Theft Detection</strong></td>
+            <td class="planned" style="background:var(--primary-light); text-align:center;">Planned P1</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td style="text-align:center; color: var(--amber);">Vehicles only</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+          </tr>
+          <tr>
+            <td><strong>Geofence Auto Check-in</strong></td>
+            <td class="planned" style="background:var(--primary-light); text-align:center;">Planned P1</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+          </tr>
+          <tr>
+            <td><strong>Vision AI (photo analysis)</strong></td>
+            <td class="planned" style="background:var(--primary-light); text-align:center;">Planned P1</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td style="text-align:center; color: var(--amber);">Truck cams</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td style="text-align:center; color: var(--amber);">Dashcams</td>
+            <td style="text-align:center; color: var(--amber);">Dashcams</td>
+          </tr>
+          <tr>
+            <td><strong>No-Go Zone Management</strong></td>
+            <td class="yes" style="background:var(--primary-light); text-align:center;">&#10003;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+          </tr>
+          <tr>
+            <td><strong>Location Scouting</strong></td>
+            <td class="yes" style="background:var(--primary-light); text-align:center;">&#10003;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+          </tr>
+          <tr>
+            <td><strong>Driver Gamification</strong></td>
+            <td class="planned" style="background:var(--primary-light); text-align:center;">Planned P2</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+          </tr>
+          <tr>
+            <td><strong>Predictive Forecasting</strong></td>
+            <td class="planned" style="background:var(--primary-light); text-align:center;">Planned P2</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+          </tr>
+          <tr>
+            <td><strong>Smart Shift Auto-Generation</strong></td>
+            <td class="planned" style="background:var(--primary-light); text-align:center;">Planned P2</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+            <td class="no" style="text-align:center;">&#10005;</td>
+          </tr>
+          <tr>
+            <td><strong>Analytics &amp; Reporting</strong></td>
+            <td class="planned" style="background:var(--primary-light); text-align:center;">Planned P1</td>
+            <td style="text-align:center; color: var(--amber);">Pro only</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+          </tr>
+          <tr>
+            <td><strong>Mobile Driver App</strong></td>
+            <td class="yes" style="background:var(--primary-light); text-align:center;">&#10003;</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+            <td class="yes" style="text-align:center;">&#10003;</td>
+          </tr>
+          <tr style="background: #F8FAFC;">
+            <td><strong>Min Contract</strong></td>
+            <td style="background:var(--primary-light); text-align:center; font-weight: 700; color: var(--green);">None</td>
+            <td style="text-align:center; color: var(--green);">None</td>
+            <td style="text-align:center; color: var(--text-muted);">Unknown</td>
+            <td style="text-align:center; color: var(--green);">None</td>
+            <td style="text-align:center; color: var(--red); font-weight: 600;">3 years</td>
+            <td style="text-align:center; color: var(--red); font-weight: 600;">3 years</td>
+          </tr>
+          <tr style="background: #F8FAFC;">
+            <td><strong>Requires Proprietary HW</strong></td>
+            <td style="background:var(--primary-light); text-align:center; font-weight: 700; color: var(--green);">No (AirTags)</td>
+            <td style="text-align:center; color: var(--green);">No</td>
+            <td style="text-align:center; color: var(--text-muted);">Optional</td>
+            <td style="text-align:center; color: var(--amber);">Via partners</td>
+            <td style="text-align:center; color: var(--red); font-weight: 600;">Yes</td>
+            <td style="text-align:center; color: var(--red); font-weight: 600;">Yes</td>
+          </tr>
+          <tr style="background: #F8FAFC;">
+            <td><strong>Best For</strong></td>
+            <td style="background:var(--primary-light); text-align:center; font-size: 0.75rem; font-weight: 600; color: var(--primary);">Field asset operators (any industry)</td>
+            <td style="text-align:center; font-size: 0.75rem;">Delivery &amp; field visits</td>
+            <td style="text-align:center; font-size: 0.75rem;">Waste haulers</td>
+            <td style="text-align:center; font-size: 0.75rem;">Vehicle maintenance</td>
+            <td style="text-align:center; font-size: 0.75rem;">Enterprise fleets</td>
+            <td style="text-align:center; font-size: 0.75rem;">Enterprise fleets</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Target Audience -->
+    <div class="callout callout-blue">
+      <div class="callout-title">Binly's Target Audience</div>
+      <p>
+        <strong>Companies that own 50–1,000+ physical assets deployed at locations they don't own, serviced by 3–20 field workers on recurring schedules.</strong><br><br>
+        Industries: waste management, ATM operators, vending machines, portable sanitation, propane exchange, medical waste, linen services, EV charging, construction equipment rental, solar panel maintenance.<br><br>
+        These operators are currently stitching together 2–3 tools: OptimoRoute (or similar) for routes + spreadsheets for asset inventory + paper forms or Google Forms for check-ins. <strong>Binly replaces all three in one platform — with no 3-year contracts and no proprietary hardware.</strong>
+      </p>
     </div>
   </div>
 
@@ -667,50 +1885,17 @@
     <div class="callout callout-amber">
       <div class="callout-title">The Data Flywheel</div>
       <p>
-        Every collection generates a photo → Vision AI extracts fill level → ML model gets smarter → Route optimization improves → Fewer redundant trips → Lower costs → More customers → More data → Better predictions. This flywheel <strong>accelerates with every collection</strong>. Competitors who start later will always be behind on data quality.
+        Every collection generates a photo → AI extracts fill level → Predictions get smarter → Route optimization improves → Fewer wasted trips → Lower costs → More customers → More data → Even better predictions. This flywheel <strong>accelerates with every collection</strong>. Competitors who start later will always be behind on data quality.
       </p>
-    </div>
-
-    <div style="overflow-x: auto; border-radius: 16px; border: 1px solid var(--border);">
-      <table class="compare-table">
-        <thead>
-          <tr>
-            <th>Capability</th>
-            <th class="binly-col">Binly (with roadmap)</th>
-            <th>Hauler Hero ($27M)</th>
-            <th>Routeware</th>
-            <th>FleetRabbit</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>Route Optimization</td><td class="yes" style="background:var(--primary-light); text-align:center;">&#10003; + AI predictive</td><td class="yes">&#10003; AI</td><td class="yes">&#10003;</td><td class="yes">&#10003; AI</td></tr>
-          <tr><td>Physical Bin GPS</td><td class="yes" style="background:var(--primary-light); text-align:center;">&#10003; AirTags</td><td class="no">&#10005;</td><td class="no">RFID</td><td class="no">&#10005;</td></tr>
-          <tr><td>Vision AI (fill/contamination)</td><td class="planned" style="background:var(--primary-light); text-align:center;">Planned P1</td><td class="yes">Truck cameras</td><td class="no">&#10005;</td><td class="no">&#10005;</td></tr>
-          <tr><td>Predictive Fill Forecasting</td><td class="planned" style="background:var(--primary-light); text-align:center;">Planned P2</td><td class="no">&#10005;</td><td class="no">&#10005;</td><td class="no">&#10005;</td></tr>
-          <tr><td>Smart Shift Auto-Generation</td><td class="planned" style="background:var(--primary-light); text-align:center;">Planned P2</td><td class="no">&#10005;</td><td class="no">&#10005;</td><td class="no">&#10005;</td></tr>
-          <tr><td>No-Go Zone Management</td><td class="yes" style="background:var(--primary-light); text-align:center;">&#10003;</td><td class="no">&#10005;</td><td class="no">&#10005;</td><td class="no">&#10005;</td></tr>
-          <tr><td>Location Scouting</td><td class="yes" style="background:var(--primary-light); text-align:center;">&#10003;</td><td class="no">&#10005;</td><td class="no">&#10005;</td><td class="no">&#10005;</td></tr>
-          <tr><td>Natural Language Dispatch</td><td class="planned" style="background:var(--primary-light); text-align:center;">Planned P3</td><td class="no">Building</td><td class="no">&#10005;</td><td class="no">&#10005;</td></tr>
-          <tr><td>No-Code Automation Rules</td><td class="planned" style="background:var(--primary-light); text-align:center;">Planned P3</td><td class="no">&#10005;</td><td class="no">&#10005;</td><td class="no">&#10005;</td></tr>
-          <tr><td>Customer Portal</td><td class="planned" style="background:var(--primary-light); text-align:center;">Planned P3</td><td class="yes">&#10003;</td><td class="no">&#10005;</td><td class="no">&#10005;</td></tr>
-          <tr><td>Billing / Invoicing</td><td class="planned" style="background:var(--primary-light); text-align:center;">Planned P3</td><td class="yes">&#10003;</td><td class="no">Partial</td><td class="no">&#10005;</td></tr>
-          <tr><td>ESG / Sustainability Reports</td><td class="planned" style="background:var(--primary-light); text-align:center;">Planned P3</td><td class="no">&#10005;</td><td class="no">&#10005;</td><td class="no">&#10005;</td></tr>
-          <tr><td>Driver Gamification</td><td class="planned" style="background:var(--primary-light); text-align:center;">Planned P2</td><td class="no">&#10005;</td><td class="no">&#10005;</td><td class="no">Scorecards</td></tr>
-          <tr><td>QR Codes on Bins</td><td class="planned" style="background:var(--primary-light); text-align:center;">Planned P1</td><td class="no">&#10005;</td><td class="no">&#10005;</td><td class="no">&#10005;</td></tr>
-          <tr><td>Geofencing Alerts</td><td class="planned" style="background:var(--primary-light); text-align:center;">Planned P1</td><td class="no">&#10005;</td><td class="no">&#10005;</td><td class="no">&#10005;</td></tr>
-          <tr><td>Mid-Shift Re-Optimization</td><td class="planned" style="background:var(--primary-light); text-align:center;">Planned P1</td><td class="no">&#10005;</td><td class="no">&#10005;</td><td class="no">&#10005;</td></tr>
-        </tbody>
-      </table>
     </div>
 
     <div class="callout callout-blue" style="margin-top: 28px;">
       <div class="callout-title">The Endgame</div>
       <p>
-        When all 7 pillars are built, Binly will be the <strong>only platform in the US market</strong> that combines:
-        AI-predicted routing + physical asset GPS tracking + computer vision fill estimation + driver gamification +
-        customer self-service portal + automated billing + No-Go Zone management + location scouting +
-        natural language dispatch + sustainability reporting — all in a single, integrated platform.
-        No competitor has this. Not Hauler Hero ($27M). Not Routeware ($50K/yr). Not Rubicon ($687M revenue). <strong>Nobody.</strong>
+        With 3 focused phases, Binly becomes the <strong>only configurable field operations platform</strong> that combines:
+        multi-vertical workspace config + configurable check-in forms + analytics dashboards + AI-predicted routing + live fuel cost optimization + physical asset GPS tracking + computer vision fill estimation +
+        geofence auto check-in + driver gamification + No-Go Zone management + location scouting — all in a single, integrated platform that works across industries.
+        No competitor does this. Hauler Hero ($27M) is waste-only. Routeware ($50K/yr) is waste-only. OptimoRoute has no asset tracking. <strong>Binly is the only platform that works for waste, ATMs, vending, solar, and beyond.</strong>
       </p>
     </div>
   </div>
@@ -720,7 +1905,7 @@
 <!-- Footer -->
 <div class="footer">
   <p><strong>Binly</strong> — Product Vision &amp; Roadmap &middot; April 2026 &middot; Internal</p>
-  <p style="margin-top: 8px;">Research based on competitive analysis of 22 companies, Mapbox v2 API documentation, and 2025–2026 industry reports.</p>
+  <p style="margin-top: 8px;">Research based on competitive analysis of 22 companies, 2025–2026 industry reports, and multi-vertical market analysis.</p>
 </div>
 
 </body>
