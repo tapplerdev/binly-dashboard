@@ -1,0 +1,2556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Binly — Competitive Landscape Analysis</title>
+  <style>
+    :root {
+      --primary: #4880FF;
+      --primary-light: #EDF0FF;
+      --bg: #F4F5F9;
+      --card: #FFFFFF;
+      --text: #1a1a2e;
+      --text-muted: #6B7280;
+      --border: #E5E7EB;
+      --green: #10B981;
+      --green-bg: #ECFDF5;
+      --red: #EF4444;
+      --red-bg: #FEF2F2;
+      --amber: #F59E0B;
+      --amber-bg: #FFFBEB;
+      --purple: #8B5CF6;
+      --purple-bg: #F5F3FF;
+      --blue-bg: #EFF6FF;
+      --tier1: #DC2626;
+      --tier2: #F59E0B;
+      --tier3: #3B82F6;
+      --tier4: #6B7280;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    /* Header */
+    .hero {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+      color: white;
+      padding: 60px 40px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(72,128,255,0.15) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      margin-bottom: 12px;
+      position: relative;
+    }
+    .hero .subtitle {
+      font-size: 1.15rem;
+      color: #94A3B8;
+      max-width: 700px;
+      position: relative;
+    }
+    .hero .date {
+      position: absolute;
+      top: 20px;
+      right: 40px;
+      font-size: 0.85rem;
+      color: #64748B;
+    }
+    .hero .badge {
+      display: inline-block;
+      background: var(--primary);
+      color: white;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      letter-spacing: 0.5px;
+    }
+
+    /* Navigation */
+    .nav {
+      background: white;
+      border-bottom: 1px solid var(--border);
+      padding: 0 40px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .nav-inner {
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .nav a {
+      display: block;
+      padding: 14px 18px;
+      text-decoration: none;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      font-weight: 600;
+      white-space: nowrap;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+    }
+    .nav a:hover {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    /* Container */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px;
+    }
+
+    /* Section */
+    .section {
+      margin-bottom: 48px;
+    }
+    .section-title {
+      font-size: 1.6rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .section-title .num {
+      background: var(--primary);
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .section-desc {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 24px;
+      margin-left: 48px;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-bottom: 20px;
+      transition: box-shadow 0.2s;
+    }
+    .card:hover {
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+
+    /* Competitor Card */
+    .competitor-card {
+      background: var(--card);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-bottom: 24px;
+      transition: box-shadow 0.2s;
+    }
+    .competitor-card:hover {
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+    .competitor-header {
+      padding: 24px 28px 20px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .competitor-header-left {
+      flex: 1;
+    }
+    .competitor-name {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .competitor-url {
+      font-size: 0.8rem;
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .competitor-url:hover { text-decoration: underline; }
+    .competitor-tagline {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+    .competitor-badges {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .tier-badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+    }
+    .tier-1 { background: #FEF2F2; color: #DC2626; }
+    .tier-2 { background: #FFFBEB; color: #B45309; }
+    .tier-3 { background: #EFF6FF; color: #2563EB; }
+    .tier-4 { background: #F3F4F6; color: #6B7280; }
+
+    .funding-badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      background: var(--green-bg);
+      color: #059669;
+    }
+    .threat-badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      background: var(--red-bg);
+      color: var(--red);
+    }
+
+    .competitor-body {
+      padding: 24px 28px;
+    }
+    .competitor-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 768px) {
+      .competitor-grid { grid-template-columns: 1fr; }
+    }
+
+    .info-block {
+      margin-bottom: 16px;
+    }
+    .info-block:last-child { margin-bottom: 0; }
+    .info-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .info-value {
+      font-size: 0.9rem;
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    /* Capability Tags */
+    .cap-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .cap-tag {
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .cap-has { background: var(--green-bg); color: #059669; }
+    .cap-partial { background: var(--amber-bg); color: #B45309; }
+    .cap-missing { background: #F3F4F6; color: #9CA3AF; text-decoration: line-through; }
+
+    /* Diff section */
+    .diff-section {
+      background: #F8FAFC;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-top: 16px;
+      border-left: 4px solid var(--primary);
+    }
+    .diff-section .diff-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .diff-section p {
+      font-size: 0.88rem;
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    /* Feature Matrix */
+    .matrix-wrapper {
+      overflow-x: auto;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: white;
+    }
+    .matrix {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      min-width: 900px;
+    }
+    .matrix thead {
+      background: #0f172a;
+      color: white;
+    }
+    .matrix th {
+      padding: 14px 12px;
+      text-align: left;
+      font-weight: 700;
+      font-size: 0.78rem;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+    .matrix th:first-child {
+      padding-left: 20px;
+      min-width: 200px;
+    }
+    .matrix th.binly-col {
+      background: var(--primary);
+      text-align: center;
+    }
+    .matrix td {
+      padding: 12px 12px;
+      border-bottom: 1px solid #F1F5F9;
+      text-align: center;
+      font-size: 0.82rem;
+    }
+    .matrix td:first-child {
+      text-align: left;
+      padding-left: 20px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .matrix tr:hover td {
+      background: #F8FAFC;
+    }
+    .matrix .yes { color: var(--green); font-weight: 700; }
+    .matrix .partial { color: var(--amber); font-weight: 600; }
+    .matrix .no { color: #D1D5DB; }
+    .matrix .binly-cell {
+      background: var(--primary-light);
+      font-weight: 700;
+      color: var(--primary);
+    }
+    .matrix .category-row td {
+      background: #F1F5F9;
+      font-weight: 800;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      padding: 10px 12px;
+    }
+    .matrix .category-row td:first-child {
+      padding-left: 20px;
+    }
+
+    /* Unique Features */
+    .unique-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .unique-card {
+      background: white;
+      border: 2px solid var(--primary);
+      border-radius: 14px;
+      padding: 24px;
+      position: relative;
+    }
+    .unique-card::before {
+      content: 'ONLY BINLY';
+      position: absolute;
+      top: -10px;
+      right: 16px;
+      background: var(--primary);
+      color: white;
+      font-size: 0.65rem;
+      font-weight: 800;
+      padding: 3px 10px;
+      border-radius: 10px;
+      letter-spacing: 0.8px;
+    }
+    .unique-card h4 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .unique-card p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Market Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .stat-card {
+      background: white;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      padding: 24px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+    .stat-label {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .stat-sub {
+      font-size: 0.75rem;
+      color: #9CA3AF;
+      margin-top: 4px;
+    }
+
+    /* Pricing Table */
+    .pricing-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .pricing-table th {
+      background: #F8FAFC;
+      padding: 14px 20px;
+      text-align: left;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .pricing-table td {
+      padding: 14px 20px;
+      font-size: 0.88rem;
+      border-bottom: 1px solid #F1F5F9;
+    }
+    .pricing-table tr:last-child td { border-bottom: none; }
+    .pricing-table tr:hover td { background: #FAFBFC; }
+    .price-range {
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    /* SWOT */
+    .swot-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 768px) {
+      .swot-grid { grid-template-columns: 1fr; }
+    }
+    .swot-card {
+      border-radius: 14px;
+      padding: 24px;
+      border: 1px solid var(--border);
+    }
+    .swot-card h4 {
+      font-size: 0.85rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 12px;
+    }
+    .swot-card ul {
+      list-style: none;
+      padding: 0;
+    }
+    .swot-card li {
+      padding: 6px 0;
+      font-size: 0.88rem;
+      color: var(--text);
+      line-height: 1.5;
+      padding-left: 20px;
+      position: relative;
+    }
+    .swot-card li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 14px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .swot-strengths { background: #ECFDF5; }
+    .swot-strengths h4 { color: #059669; }
+    .swot-strengths li::before { background: #10B981; }
+    .swot-weaknesses { background: #FEF2F2; }
+    .swot-weaknesses h4 { color: #DC2626; }
+    .swot-weaknesses li::before { background: #EF4444; }
+    .swot-opportunities { background: #EFF6FF; }
+    .swot-opportunities h4 { color: #2563EB; }
+    .swot-opportunities li::before { background: #3B82F6; }
+    .swot-threats { background: #FFFBEB; }
+    .swot-threats h4 { color: #B45309; }
+    .swot-threats li::before { background: #F59E0B; }
+
+    /* Quick Reference Table */
+    .quick-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+    .quick-table th {
+      background: #F8FAFC;
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .quick-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #F1F5F9;
+      vertical-align: top;
+    }
+    .quick-table tr:last-child td { border-bottom: none; }
+
+    /* Collapsible */
+    .collapsible-header {
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .collapsible-header .arrow {
+      transition: transform 0.2s;
+      font-size: 0.8rem;
+    }
+    .collapsible-content {
+      display: none;
+    }
+    .collapsible-content.open {
+      display: block;
+    }
+
+    /* Positioning Diagram */
+    .positioning {
+      background: white;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      padding: 32px;
+    }
+    .positioning-grid {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 0;
+      align-items: center;
+      margin: 24px 0;
+    }
+    .pos-left, .pos-right {
+      text-align: center;
+    }
+    .pos-arrow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 24px;
+    }
+    .pos-arrow .line {
+      width: 120px;
+      height: 3px;
+      background: linear-gradient(90deg, #DC2626, #F59E0B, #10B981);
+      border-radius: 2px;
+      position: relative;
+    }
+    .pos-arrow .line::before {
+      content: '◄';
+      position: absolute;
+      left: -12px;
+      top: -8px;
+      color: #DC2626;
+      font-size: 0.8rem;
+    }
+    .pos-arrow .line::after {
+      content: '►';
+      position: absolute;
+      right: -12px;
+      top: -8px;
+      color: #10B981;
+      font-size: 0.8rem;
+    }
+    .pos-binly {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--primary);
+      color: white;
+      padding: 8px 20px;
+      border-radius: 24px;
+      font-weight: 800;
+      font-size: 0.95rem;
+      margin-top: 12px;
+    }
+    .pos-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .pos-companies {
+      font-size: 0.82rem;
+      color: var(--text);
+      line-height: 1.8;
+    }
+
+    /* Footer */
+    .footer {
+      background: #0f172a;
+      color: #64748B;
+      padding: 40px;
+      text-align: center;
+      font-size: 0.82rem;
+    }
+    .footer strong { color: white; }
+
+    /* Highlight callout */
+    .callout {
+      background: var(--amber-bg);
+      border: 1px solid #FDE68A;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+    }
+    .callout-title {
+      font-weight: 800;
+      font-size: 0.9rem;
+      color: #92400E;
+      margin-bottom: 6px;
+    }
+    .callout p {
+      font-size: 0.88rem;
+      color: #78350F;
+      line-height: 1.5;
+    }
+
+    .callout-red {
+      background: var(--red-bg);
+      border-color: #FECACA;
+    }
+    .callout-red .callout-title { color: #991B1B; }
+    .callout-red p { color: #7F1D1D; }
+
+    .callout-green {
+      background: var(--green-bg);
+      border-color: #A7F3D0;
+    }
+    .callout-green .callout-title { color: #065F46; }
+    .callout-green p { color: #064E3B; }
+
+    .callout-blue {
+      background: var(--blue-bg);
+      border-color: #BFDBFE;
+    }
+    .callout-blue .callout-title { color: #1E40AF; }
+    .callout-blue p { color: #1E3A5F; }
+  </style>
+</head>
+<body>
+
+<!-- ─── HERO ─── -->
+<div class="hero">
+  <div class="date">Research Date: April 2026</div>
+  <div class="badge">INTERNAL RESEARCH</div>
+  <h1>Binly — Competitive Landscape</h1>
+  <p class="subtitle">
+    A comprehensive analysis of the US-based competitive landscape for Binly's field operations platform.
+    22 companies researched, 15 US-based competitors profiled, feature-by-feature comparison.
+  </p>
+</div>
+
+<!-- ─── NAV ─── -->
+<div class="nav">
+  <div class="nav-inner">
+    <a href="#executive-summary">Summary</a>
+    <a href="#market-size">Market</a>
+    <a href="#positioning">Positioning</a>
+    <a href="#unique-features">Only Binly</a>
+    <a href="#tier-1">Tier 1 — Direct</a>
+    <a href="#tier-2">Tier 2 — Partial</a>
+    <a href="#tier-3">Tier 3 — IoT/Sensor</a>
+    <a href="#tier-4">Tier 4 — Adjacent</a>
+    <a href="#feature-matrix">Feature Matrix</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#swot">SWOT</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- EXECUTIVE SUMMARY                          -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section" id="executive-summary">
+    <div class="section-title">
+      <div class="num">1</div>
+      Executive Summary
+    </div>
+    <p class="section-desc">The TL;DR of where Binly stands in the competitive landscape.</p>
+
+    <div class="callout-green callout">
+      <div class="callout-title">Key Finding</div>
+      <p>
+        <strong>No single US-based competitor covers all of Binly's capabilities.</strong>
+        The market is fragmented between route optimizers, fleet trackers, IoT sensor companies, billing platforms, and field service tools.
+        Binly's integrated approach — combining route optimization, physical asset GPS tracking (via AirTags), workforce management, field service operations,
+        dispatch logistics, No-Go Zone management, and driver location scouting — is genuinely differentiated in the US market.
+      </p>
+    </div>
+
+    <div class="callout-red callout">
+      <div class="callout-title">Biggest Threat</div>
+      <p>
+        <strong>Hauler Hero</strong> — raised $27M+ (Series A in Feb 2026), AI-focused, targeting the same small-to-mid hauler segment,
+        already processing 4.5M pickups/month. They're CRM/billing-first though, while Binly is operations-first. Watch closely.
+      </p>
+    </div>
+
+    <div class="callout-blue callout">
+      <div class="callout-title">Binly's Sweet Spot</div>
+      <p>
+        Mid-market waste companies that are <strong>too small</strong> for enterprise ERPs like AMCS/Routeware ($50K+/year),
+        but <strong>too operationally complex</strong> for simple dispatch tools like CurbWaste or Docket.
+        These companies need actual field operations management with real-time asset tracking — not just billing software.
+      </p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- MARKET SIZE                                -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section" id="market-size">
+    <div class="section-title">
+      <div class="num">2</div>
+      Market Size &amp; Opportunity
+    </div>
+    <p class="section-desc">The waste management industry is massive and underserved by modern software.</p>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">$1.5T</div>
+        <div class="stat-label">Global Waste Management Market</div>
+        <div class="stat-sub">2025 estimate, growing 5.6% CAGR</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">$2.95B</div>
+        <div class="stat-label">Smart Waste Management</div>
+        <div class="stat-sub">→ $5.81B by 2030 (14.4% CAGR)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">$2.27B</div>
+        <div class="stat-label">Waste Routing AI Market</div>
+        <div class="stat-sub">→ $5.42B by 2030</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">61.8%</div>
+        <div class="stat-label">Collection Services Share</div>
+        <div class="stat-sub">Of total waste management market</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- POSITIONING                                -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section" id="positioning">
+    <div class="section-title">
+      <div class="num">3</div>
+      Market Positioning
+    </div>
+    <p class="section-desc">Where Binly fits relative to the competition.</p>
+
+    <div class="positioning">
+      <div style="text-align:center; margin-bottom: 24px;">
+        <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px;">
+          Complexity &amp; Price Spectrum
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; text-align: center;">
+        <div style="background: #FEF2F2; border-radius: 12px; padding: 20px;">
+          <div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #DC2626; margin-bottom: 12px;">
+            Too Simple
+          </div>
+          <div style="font-size: 0.82rem; color: var(--text); line-height: 1.8;">
+            CurbWaste<br>Docket<br>Dispatcher.com<br>EagleEye
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 12px;">
+            Dispatch + billing only.<br>No asset tracking, no field ops.
+          </div>
+        </div>
+
+        <div style="background: var(--primary-light); border: 2px solid var(--primary); border-radius: 12px; padding: 20px;">
+          <div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--primary); margin-bottom: 12px;">
+            Binly's Sweet Spot
+          </div>
+          <div style="display: inline-block; background: var(--primary); color: white; padding: 6px 18px; border-radius: 20px; font-weight: 800; font-size: 0.95rem;">
+            BINLY
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 12px;">
+            Full field ops platform.<br>Route + asset + workforce + GPS.<br>Accessible pricing.
+          </div>
+        </div>
+
+        <div style="background: #F8FAFC; border-radius: 12px; padding: 20px;">
+          <div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #6B7280; margin-bottom: 12px;">
+            Too Complex / Expensive
+          </div>
+          <div style="font-size: 0.82rem; color: var(--text); line-height: 1.8;">
+            Routeware<br>Safe Fleet<br>RouteSmart
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 12px;">
+            $50K+/yr enterprise ERPs.<br>Hardware-heavy, long deployments.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- UNIQUE FEATURES                            -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section" id="unique-features">
+    <div class="section-title">
+      <div class="num">4</div>
+      Features Only Binly Has
+    </div>
+    <p class="section-desc">Across all 15 US-based competitors researched, these features exist in zero other products.</p>
+
+    <div class="unique-grid">
+      <div class="unique-card">
+        <h4>No-Go Zone Management</h4>
+        <p>
+          Geographic conflict areas (vandalism, theft, landlord complaints) tracked with conflict scores, incident history, risk overrides, and resolution workflows.
+          Auto-created from move requests. Zero competitors offer this.
+        </p>
+      </div>
+      <div class="unique-card">
+        <h4>Location Scouting by Drivers</h4>
+        <p>
+          Drivers in the field suggest new bin placement locations. Managers review, approve, and convert to active bins — driving community-powered expansion.
+          No competitor has this feedback loop.
+        </p>
+      </div>
+      <div class="unique-card">
+        <h4>Apple AirTag Bin GPS Tracking</h4>
+        <p>
+          Continuous GPS tracking of physical bins using consumer-grade Apple AirTags at ~$29/tag.
+          Competitors either use expensive industrial GPS ($100+/device + monthly fees) or have no bin-level GPS tracking at all.
+        </p>
+      </div>
+      <div class="unique-card">
+        <h4>Driver Leaderboards</h4>
+        <p>
+          Gamified driver performance tracking with collection metrics, completion rates, and rankings.
+          Only generic fleet platforms (Samsara) offer driver scoring — none in a waste-specific context.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- TIER 1: DIRECT COMPETITORS                 -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section" id="tier-1">
+    <div class="section-title">
+      <div class="num">5</div>
+      Tier 1 — Direct Competitors
+    </div>
+    <p class="section-desc">Companies with the highest feature overlap with Binly. These are the ones to watch.</p>
+
+    <!-- Hauler Hero -->
+    <div class="competitor-card">
+      <div class="competitor-header">
+        <div class="competitor-header-left">
+          <div class="competitor-name">Hauler Hero</div>
+          <a class="competitor-url" href="https://www.haulerhero.com" target="_blank">haulerhero.com</a>
+          <div class="competitor-tagline">
+            AI-powered waste management operating system with CRM, billing, dispatch, driver app, and AI vision features.
+            The fastest-growing competitor in Binly's segment. Recently raised $16M Series A (Feb 2026, $27M+ total).
+            Processes 4.5M pickups/month and $300M+ annualized GMV.
+          </div>
+        </div>
+        <div class="competitor-badges">
+          <span class="tier-badge tier-1">Tier 1</span>
+          <span class="threat-badge">Biggest Threat</span>
+          <span class="funding-badge">$27M Raised</span>
+        </div>
+      </div>
+      <div class="competitor-body">
+        <div class="competitor-grid">
+          <div>
+            <div class="info-block">
+              <div class="info-label">Target Market</div>
+              <div class="info-value">Small to mid-sized waste haulers (residential and commercial). US-focused.</div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Key Products</div>
+              <div class="info-value">
+                <strong>Hero Vision:</strong> AI camera-based service verification (contamination detection, missed pickups).<br>
+                <strong>Hero Chat:</strong> AI-powered customer support automation.<br>
+                <strong>Hero Route:</strong> AI route optimization considering traffic, weather, capacity.<br>
+                <strong>Dispatch Board:</strong> Real-time fleet management with GPS tracking.<br>
+                <strong>Driver Tablet App:</strong> In-cab navigation and task management.
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Pricing</div>
+              <div class="info-value">SaaS pricing (not publicly disclosed). Positioned as accessible to small-mid haulers — likely $200–$500/truck/month range.</div>
+            </div>
+          </div>
+          <div>
+            <div class="info-block">
+              <div class="info-label">Capabilities They Have</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-has">Route Optimization (AI)</span>
+                <span class="cap-tag cap-has">Fleet GPS Tracking</span>
+                <span class="cap-tag cap-has">Driver Tablet App</span>
+                <span class="cap-tag cap-has">Dispatch</span>
+                <span class="cap-tag cap-has">CRM + Billing</span>
+                <span class="cap-tag cap-has">AI Vision (cameras)</span>
+                <span class="cap-tag cap-has">Dashboard</span>
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Capabilities They're Missing</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-missing">Physical Bin GPS</span>
+                <span class="cap-tag cap-missing">No-Go Zones</span>
+                <span class="cap-tag cap-missing">Location Scouting</span>
+                <span class="cap-tag cap-missing">Workforce Scheduling</span>
+                <span class="cap-tag cap-missing">Driver Leaderboards</span>
+                <span class="cap-tag cap-missing">Warehouse Mgmt</span>
+                <span class="cap-tag cap-missing">Bin Asset Tracking</span>
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Driver App + Dashboard?</div>
+              <div class="info-value">Yes — driver tablet app + web management dashboard.</div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Physical Bin GPS Tracking?</div>
+              <div class="info-value">No. Uses truck-mounted cameras for service verification, not bin-level GPS tracking.</div>
+            </div>
+          </div>
+        </div>
+        <div class="diff-section">
+          <div class="diff-title">How Binly Differentiates</div>
+          <p>
+            Hauler Hero is CRM/billing-first with AI bolt-ons — their core value is automating customer management and invoicing.
+            Binly is operations-first — the core value is managing what happens in the field: driver tasks, bin logistics, physical asset tracking with AirTags, and zone-level conflict management.
+            Hauler Hero doesn't know <em>where your bins physically are</em>. Binly does.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rubicon -->
+    <div class="competitor-card">
+      <div class="competitor-header">
+        <div class="competitor-header-left">
+          <div class="competitor-name">Rubicon Technologies</div>
+          <a class="competitor-url" href="https://www.rubicon.com" target="_blank">rubicon.com</a>
+          <div class="competitor-tagline">
+            Digital marketplace and software platform connecting waste generators with 8,000+ independent hauler partners.
+            Publicly traded (NYSE: RBT). ~$687M trailing revenue. Based in Atlanta, GA.
+            Offers fleet GPS tracking, route optimization, dispatch, driver app, and sustainability reporting.
+          </div>
+        </div>
+        <div class="competitor-badges">
+          <span class="tier-badge tier-1">Tier 1</span>
+          <span class="funding-badge">Public (RBT)</span>
+        </div>
+      </div>
+      <div class="competitor-body">
+        <div class="competitor-grid">
+          <div>
+            <div class="info-block">
+              <div class="info-label">Target Market</div>
+              <div class="info-value">Fortune 500 companies, mid-market businesses, and municipal governments. Asset-light marketplace model connecting waste generators with haulers.</div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Key Products</div>
+              <div class="info-value">
+                <strong>RUBICONConnect:</strong> Hauler app for drivers and fleet tracking.<br>
+                <strong>RUBICONSmartCity:</strong> Municipal waste intelligence platform.<br>
+                <strong>Sustainability:</strong> Carbon footprint tracking, diversion reporting.<br>
+                <strong>Marketplace:</strong> Matching waste generators with independent haulers.
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Pricing</div>
+              <div class="info-value">Custom. Marketplace commission model for haulers + SaaS for enterprise. Likely $1K–$10K+/month for enterprise clients.</div>
+            </div>
+          </div>
+          <div>
+            <div class="info-block">
+              <div class="info-label">Capabilities They Have</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-has">Route Optimization</span>
+                <span class="cap-tag cap-has">Fleet GPS Tracking</span>
+                <span class="cap-tag cap-has">Driver App</span>
+                <span class="cap-tag cap-has">Dispatch</span>
+                <span class="cap-tag cap-has">Photo Documentation</span>
+                <span class="cap-tag cap-has">Dashboard Analytics</span>
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Capabilities They're Missing</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-missing">Physical Bin GPS</span>
+                <span class="cap-tag cap-missing">No-Go Zones</span>
+                <span class="cap-tag cap-missing">Location Scouting</span>
+                <span class="cap-tag cap-missing">Workforce Scheduling</span>
+                <span class="cap-tag cap-missing">Bin Inventory Mgmt</span>
+                <span class="cap-tag cap-missing">Warehouse Mgmt</span>
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Physical Bin GPS Tracking?</div>
+              <div class="info-value">No.</div>
+            </div>
+          </div>
+        </div>
+        <div class="diff-section">
+          <div class="diff-title">How Binly Differentiates</div>
+          <p>
+            Rubicon is primarily a <strong>marketplace/broker</strong> — they connect waste generators with haulers and take a cut.
+            Binly is an <strong>operations platform for the hauler itself</strong> to manage its own field operations.
+            Fundamentally different business models. Rubicon doesn't manage your drivers, your bins, or your field tasks — they just find you customers.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Routeware -->
+    <div class="competitor-card">
+      <div class="competitor-header">
+        <div class="competitor-header-left">
+          <div class="competitor-name">Routeware</div>
+          <a class="competitor-url" href="https://routeware.com" target="_blank">routeware.com</a>
+          <div class="competitor-tagline">
+            Comprehensive waste management technology including route optimization, fleet tracking, dispatch,
+            smart truck automation (on-board computers, 360° cameras, RFID, fork scales), and equipment tracking.
+            Based in Portland, OR. Recently merged with the Rubicon driver/hauler ecosystem.
+          </div>
+        </div>
+        <div class="competitor-badges">
+          <span class="tier-badge tier-1">Tier 1</span>
+        </div>
+      </div>
+      <div class="competitor-body">
+        <div class="competitor-grid">
+          <div>
+            <div class="info-block">
+              <div class="info-label">Target Market</div>
+              <div class="info-value">Mid-to-large waste haulers and municipalities. Enterprise deployments with hardware+software bundles.</div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Key Products</div>
+              <div class="info-value">
+                <strong>ReCollect:</strong> Route management and optimization.<br>
+                <strong>On-Board Computers:</strong> In-cab tablets with GPS, RFID, camera integration.<br>
+                <strong>360° Cameras:</strong> Service verification and safety monitoring.<br>
+                <strong>RFID Cart Identification:</strong> Tag-based container tracking at service time.<br>
+                <strong>Fork Scales:</strong> Weight measurement during collection.<br>
+                <strong>Dispatch Board:</strong> Real-time fleet management and dispatching.
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Pricing</div>
+              <div class="info-value">Custom enterprise pricing. Estimated $50,000+/year including hardware, implementation, and software licenses.</div>
+            </div>
+          </div>
+          <div>
+            <div class="info-block">
+              <div class="info-label">Capabilities They Have</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-has">Route Optimization</span>
+                <span class="cap-tag cap-has">Fleet GPS Tracking</span>
+                <span class="cap-tag cap-has">Dispatch</span>
+                <span class="cap-tag cap-has">Driver Tablet</span>
+                <span class="cap-tag cap-partial">Asset Tracking (RFID)</span>
+                <span class="cap-tag cap-has">Photo/Video (360° cameras)</span>
+                <span class="cap-tag cap-has">Dashboard</span>
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Capabilities They're Missing</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-missing">Physical Bin GPS</span>
+                <span class="cap-tag cap-missing">No-Go Zones</span>
+                <span class="cap-tag cap-missing">Location Scouting</span>
+                <span class="cap-tag cap-missing">Workforce Scheduling</span>
+                <span class="cap-tag cap-missing">Driver Leaderboards</span>
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Physical Bin GPS Tracking?</div>
+              <div class="info-value">RFID container tagging for service verification only — not continuous GPS location tracking of bins.</div>
+            </div>
+          </div>
+        </div>
+        <div class="diff-section">
+          <div class="diff-title">How Binly Differentiates</div>
+          <p>
+            Routeware is <strong>hardware-heavy</strong> — on-board truck computers, 360° cameras, RFID readers, fork scales.
+            Deployment is expensive and complex. Binly is <strong>software-first</strong> with a lightweight mobile app for drivers.
+            No special truck hardware required. Binly's AirTag GPS tracking costs ~$29/bin vs Routeware's RFID infrastructure.
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- TIER 2: PARTIAL OVERLAP                    -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section" id="tier-2">
+    <div class="section-title">
+      <div class="num">6</div>
+      Tier 2 — Partial Overlap
+    </div>
+    <p class="section-desc">Companies that compete in specific areas but lack the full integrated operations platform.</p>
+
+    <!-- CurbWaste -->
+    <div class="competitor-card">
+      <div class="competitor-header">
+        <div class="competitor-header-left">
+          <div class="competitor-name">CurbWaste</div>
+          <a class="competitor-url" href="https://www.curbwaste.com" target="_blank">curbwaste.com</a>
+          <div class="competitor-tagline">
+            All-in-one operations platform for waste haulers covering customer management, order management,
+            dispatch (3 views: map/board/list), GPS tracking, driver app (iOS + Android), invoicing, reporting,
+            customer portal, and QuickBooks integration.
+          </div>
+        </div>
+        <div class="competitor-badges">
+          <span class="tier-badge tier-2">Tier 2</span>
+        </div>
+      </div>
+      <div class="competitor-body">
+        <div class="competitor-grid">
+          <div>
+            <div class="info-block">
+              <div class="info-label">Target Market</div>
+              <div class="info-value">Small to mid-sized waste haulers (residential and commercial). US-focused.</div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Pricing</div>
+              <div class="info-value">SaaS pricing (not publicly disclosed). Positioned for small-mid haulers.</div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Key Strength</div>
+              <div class="info-value">Customer/order management and billing workflows — the back-office side of waste operations that Binly currently doesn't cover.</div>
+            </div>
+          </div>
+          <div>
+            <div class="info-block">
+              <div class="info-label">Has</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-has">Dispatch</span>
+                <span class="cap-tag cap-has">Fleet GPS</span>
+                <span class="cap-tag cap-has">Driver App</span>
+                <span class="cap-tag cap-has">Billing</span>
+                <span class="cap-tag cap-has">Dashboard</span>
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Missing</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-missing">Bin GPS</span>
+                <span class="cap-tag cap-missing">Fill Levels</span>
+                <span class="cap-tag cap-missing">Route Optimization (AI)</span>
+                <span class="cap-tag cap-missing">No-Go Zones</span>
+                <span class="cap-tag cap-missing">Location Scouting</span>
+                <span class="cap-tag cap-missing">Workforce Scheduling</span>
+                <span class="cap-tag cap-missing">Warehouse Mgmt</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="diff-section">
+          <div class="diff-title">How Binly Differentiates</div>
+          <p>CurbWaste is back-office/billing-focused. No asset tracking, no field operations depth, no route optimization AI. Binly wins on the operations side.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- CRO Software -->
+    <div class="competitor-card">
+      <div class="competitor-header">
+        <div class="competitor-header-left">
+          <div class="competitor-name">CRO Software</div>
+          <a class="competitor-url" href="https://crosoftware.com" target="_blank">crosoftware.com</a>
+          <div class="competitor-tagline">
+            Purpose-built for waste, recycling, and roll-off industries. Real-time dispatching (drag-and-drop),
+            bin tracking with lat/long + photo verification, route optimization, fleet tracking, billing, and analytics.
+          </div>
+        </div>
+        <div class="competitor-badges">
+          <span class="tier-badge tier-2">Tier 2</span>
+        </div>
+      </div>
+      <div class="competitor-body">
+        <div class="competitor-grid">
+          <div>
+            <div class="info-block">
+              <div class="info-label">Target Market</div>
+              <div class="info-value">Roll-off dumpster rental and commercial waste companies.</div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Key Strength</div>
+              <div class="info-value">Roll-off dumpster rental workflows: delivery, swap, pickup cycles. Tracks bin locations via driver GPS check-in (not real-time GPS on bins).</div>
+            </div>
+          </div>
+          <div>
+            <div class="info-block">
+              <div class="info-label">Has</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-has">Dispatch</span>
+                <span class="cap-tag cap-has">Fleet GPS</span>
+                <span class="cap-tag cap-has">Route Optimization</span>
+                <span class="cap-tag cap-partial">Bin Location (via driver)</span>
+                <span class="cap-tag cap-has">Photo Verification</span>
+                <span class="cap-tag cap-has">Billing</span>
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Missing</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-missing">Real-time Bin GPS</span>
+                <span class="cap-tag cap-missing">No-Go Zones</span>
+                <span class="cap-tag cap-missing">Location Scouting</span>
+                <span class="cap-tag cap-missing">Workforce Scheduling</span>
+                <span class="cap-tag cap-missing">Fill Monitoring</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="diff-section">
+          <div class="diff-title">How Binly Differentiates</div>
+          <p>CRO is built for roll-off dumpster <em>rental</em> operations (delivery/swap/pickup). Binly handles ongoing collection routes, neighborhood-level bin management, and broader field operations with real-time asset GPS.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- FleetRabbit -->
+    <div class="competitor-card">
+      <div class="competitor-header">
+        <div class="competitor-header-left">
+          <div class="competitor-name">FleetRabbit</div>
+          <a class="competitor-url" href="https://fleetrabbit.com" target="_blank">fleetrabbit.com</a>
+          <div class="competitor-tagline">
+            Waste fleet management platform with dynamic AI route optimization (real-time traffic/weather adjustment),
+            auto-dispatch (nearest driver), driver mobile app (offline-capable, photo/signature capture),
+            container tracking, telematics integration hub (Samsara, Geotab, Verizon Connect), and driver performance scorecards.
+            500+ US haulers.
+          </div>
+        </div>
+        <div class="competitor-badges">
+          <span class="tier-badge tier-2">Tier 2</span>
+        </div>
+      </div>
+      <div class="competitor-body">
+        <div class="competitor-grid">
+          <div>
+            <div class="info-block">
+              <div class="info-label">Target Market</div>
+              <div class="info-value">Mid-sized waste haulers. 500+ US haulers currently using the platform.</div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Pricing</div>
+              <div class="info-value">SaaS — estimated $100–$500/truck/month based on features.</div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Key Strength</div>
+              <div class="info-value">Dynamic AI route optimization that adjusts in real-time based on traffic, weather, and capacity. Strong telematics integrations (plugs into existing GPS hardware).</div>
+            </div>
+          </div>
+          <div>
+            <div class="info-block">
+              <div class="info-label">Has</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-has">Route Optimization (AI)</span>
+                <span class="cap-tag cap-has">Fleet GPS</span>
+                <span class="cap-tag cap-has">Dispatch</span>
+                <span class="cap-tag cap-has">Driver App (offline)</span>
+                <span class="cap-tag cap-has">Photo Capture</span>
+                <span class="cap-tag cap-partial">Driver Scorecards</span>
+                <span class="cap-tag cap-has">Dashboard</span>
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Missing</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-missing">Physical Bin GPS</span>
+                <span class="cap-tag cap-missing">No-Go Zones</span>
+                <span class="cap-tag cap-missing">Location Scouting</span>
+                <span class="cap-tag cap-missing">Shift Scheduling</span>
+                <span class="cap-tag cap-missing">Warehouse Mgmt</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="diff-section">
+          <div class="diff-title">How Binly Differentiates</div>
+          <p>FleetRabbit is fleet-management-centric — strong on routing and telematics, weak on bin-level asset management. Binly is more holistic: bin inventory, move requests, No-Go Zones, location scouting, warehouse management, and physical GPS on every bin.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Docket -->
+    <div class="competitor-card">
+      <div class="competitor-header">
+        <div class="competitor-header-left">
+          <div class="competitor-name">Docket (formerly Docket Dumpster Software)</div>
+          <a class="competitor-url" href="https://www.yourdocket.com" target="_blank">yourdocket.com</a>
+          <div class="competitor-tagline">
+            Software for roll-off dumpster rentals + commercial/residential trash routes. Features dispatch,
+            driver mobile app (one-tap stop completion, issue reporting), asset tracking (dumpster locations),
+            billing, online ordering, and IronRouteAI — an AI route optimizer that factors profitability, fuel costs,
+            driver wages, overtime, dump fees, material restrictions, and live inventory.
+          </div>
+        </div>
+        <div class="competitor-badges">
+          <span class="tier-badge tier-2">Tier 2</span>
+        </div>
+      </div>
+      <div class="competitor-body">
+        <div class="competitor-grid">
+          <div>
+            <div class="info-block">
+              <div class="info-label">Target Market</div>
+              <div class="info-value">Dumpster rental companies and small-mid waste haulers.</div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Key Strength</div>
+              <div class="info-value">IronRouteAI is unique — optimizes routes based on <em>profitability</em> (factoring fuel, wages, overtime, dump fees), not just distance. Smart for cost-conscious haulers.</div>
+            </div>
+          </div>
+          <div>
+            <div class="info-block">
+              <div class="info-label">Has</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-has">Dispatch</span>
+                <span class="cap-tag cap-has">Driver App</span>
+                <span class="cap-tag cap-partial">Asset Tracking (via driver)</span>
+                <span class="cap-tag cap-has">Route Optimization (AI/profit)</span>
+                <span class="cap-tag cap-has">Billing</span>
+                <span class="cap-tag cap-has">Issue Reporting</span>
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Missing</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-missing">Physical Bin GPS</span>
+                <span class="cap-tag cap-missing">Fill Monitoring</span>
+                <span class="cap-tag cap-missing">Live Fleet GPS</span>
+                <span class="cap-tag cap-missing">No-Go Zones</span>
+                <span class="cap-tag cap-missing">Location Scouting</span>
+                <span class="cap-tag cap-missing">Workforce Scheduling</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="diff-section">
+          <div class="diff-title">How Binly Differentiates</div>
+          <p>Docket is centered on dumpster <em>rental</em> profitability (delivery/swap/removal + cost optimization). Binly handles ongoing collection operations and broader field management. Docket doesn't even have live fleet GPS.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TrashFlow -->
+    <div class="competitor-card">
+      <div class="competitor-header">
+        <div class="competitor-header-left">
+          <div class="competitor-name">TrashFlow</div>
+          <a class="competitor-url" href="https://www.trashflow.com" target="_blank">trashflow.com</a>
+          <div class="competitor-tagline">
+            Legacy waste management software for haulers. Covers billing, routing, container tracking, customer management, and reporting.
+            Established player with a large install base of small-mid haulers.
+          </div>
+        </div>
+        <div class="competitor-badges">
+          <span class="tier-badge tier-2">Tier 2</span>
+        </div>
+      </div>
+      <div class="competitor-body">
+        <div class="competitor-grid">
+          <div>
+            <div class="info-block">
+              <div class="info-label">Target Market</div>
+              <div class="info-value">Small to mid-sized waste haulers. Legacy install base.</div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Key Strength</div>
+              <div class="info-value">Established billing and customer management for haulers. Large existing user base. Trusted brand in the industry.</div>
+            </div>
+          </div>
+          <div>
+            <div class="info-block">
+              <div class="info-label">Has</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-has">Billing</span>
+                <span class="cap-tag cap-has">Routing</span>
+                <span class="cap-tag cap-partial">Container Tracking</span>
+                <span class="cap-tag cap-has">Customer Mgmt</span>
+                <span class="cap-tag cap-has">Reporting</span>
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Missing</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-missing">Bin GPS</span>
+                <span class="cap-tag cap-missing">AI Route Optimization</span>
+                <span class="cap-tag cap-missing">Live Fleet GPS</span>
+                <span class="cap-tag cap-missing">Driver App</span>
+                <span class="cap-tag cap-missing">Field Service Ops</span>
+                <span class="cap-tag cap-missing">No-Go Zones</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="diff-section">
+          <div class="diff-title">How Binly Differentiates</div>
+          <p>TrashFlow is legacy back-office software — billing, customer lists, basic routing. No modern field operations, no mobile app, no real-time anything. Binly is a generational leap forward in operations technology.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ServiceCore -->
+    <div class="competitor-card">
+      <div class="competitor-header">
+        <div class="competitor-header-left">
+          <div class="competitor-name">ServiceCore</div>
+          <a class="competitor-url" href="https://servicecore.com" target="_blank">servicecore.com</a>
+          <div class="competitor-tagline">
+            Software for portable toilet and roll-off dumpster companies. CRM, billing, dispatch, route optimization,
+            inventory management, driver app, and customer portal.
+          </div>
+        </div>
+        <div class="competitor-badges">
+          <span class="tier-badge tier-2">Tier 2</span>
+        </div>
+      </div>
+      <div class="competitor-body">
+        <div class="competitor-grid">
+          <div>
+            <div class="info-block">
+              <div class="info-label">Target Market</div>
+              <div class="info-value">Portable toilet and roll-off dumpster companies. Different asset type than Binly's collection bins.</div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Key Strength</div>
+              <div class="info-value">Well-established in the portable toilet/roll-off niche. Good dispatch and billing workflows for rental-based asset management.</div>
+            </div>
+          </div>
+          <div>
+            <div class="info-block">
+              <div class="info-label">Has</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-has">Dispatch</span>
+                <span class="cap-tag cap-has">Route Optimization</span>
+                <span class="cap-tag cap-has">Driver App</span>
+                <span class="cap-tag cap-has">Asset Inventory</span>
+                <span class="cap-tag cap-has">Billing/CRM</span>
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Missing</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-missing">Bin GPS</span>
+                <span class="cap-tag cap-missing">Live Fleet GPS</span>
+                <span class="cap-tag cap-missing">No-Go Zones</span>
+                <span class="cap-tag cap-missing">Location Scouting</span>
+                <span class="cap-tag cap-missing">Fill Monitoring</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="diff-section">
+          <div class="diff-title">How Binly Differentiates</div>
+          <p>ServiceCore targets portable toilets and roll-off rentals — a different asset class with different workflows (delivery/swap/pickup cycles). Binly manages ongoing collection operations for stationary waste bins.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- TIER 3: IoT / SENSOR                      -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section" id="tier-3">
+    <div class="section-title">
+      <div class="num">7</div>
+      Tier 3 — IoT / Sensor Specialists
+    </div>
+    <p class="section-desc">Companies focused on smart hardware and fill-level monitoring. Complementary to Binly rather than directly competitive.</p>
+
+    <!-- Compology -->
+    <div class="competitor-card">
+      <div class="competitor-header">
+        <div class="competitor-header-left">
+          <div class="competitor-name">Compology</div>
+          <a class="competitor-url" href="https://compology.com" target="_blank">compology.com</a>
+          <div class="competitor-tagline">
+            AI-powered waste metering using military-grade cameras installed inside dumpsters. Takes photos ~5x/day,
+            AI analyzes fullness (±5% accuracy), contamination levels, and material types. 60M+ images processed.
+            Clients include McDonald's. Based in San Francisco, CA.
+          </div>
+        </div>
+        <div class="competitor-badges">
+          <span class="tier-badge tier-3">Tier 3</span>
+        </div>
+      </div>
+      <div class="competitor-body">
+        <div class="competitor-grid">
+          <div>
+            <div class="info-block">
+              <div class="info-label">Target Market</div>
+              <div class="info-value">Commercial waste generators (restaurants, retail, multifamily housing) and haulers.</div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Pricing</div>
+              <div class="info-value"><strong>$30/camera/month</strong> subscription. Average client saves $1,800/dumpster/year in reduced hauling frequency.</div>
+            </div>
+          </div>
+          <div>
+            <div class="info-block">
+              <div class="info-label">Has</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-has">Fill-Level Monitoring (AI camera)</span>
+                <span class="cap-tag cap-has">Contamination Detection</span>
+                <span class="cap-tag cap-has">Analytics Dashboard</span>
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Missing</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-missing">Route Optimization</span>
+                <span class="cap-tag cap-missing">Fleet Tracking</span>
+                <span class="cap-tag cap-missing">Driver App</span>
+                <span class="cap-tag cap-missing">Dispatch</span>
+                <span class="cap-tag cap-missing">Workforce Mgmt</span>
+                <span class="cap-tag cap-missing">Bin GPS</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="diff-section">
+          <div class="diff-title">Relationship to Binly</div>
+          <p>Complementary, not competitive. Compology provides fill-level data that could feed into Binly's route optimization. Binly could potentially integrate Compology cameras as a premium fill-monitoring add-on in the future.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SmartEnds -->
+    <div class="competitor-card">
+      <div class="competitor-header">
+        <div class="competitor-header-left">
+          <div class="competitor-name">SmartEnds VisnLine</div>
+          <a class="competitor-url" href="https://smartends.com" target="_blank">smartends.com</a>
+          <div class="competitor-tagline">
+            In-dumpster cameras with AI for fill-level detection (98% accuracy, 5–10 images/day),
+            contamination detection (95% accuracy), and predictive analytics. Used by 150+ businesses and municipalities.
+          </div>
+        </div>
+        <div class="competitor-badges">
+          <span class="tier-badge tier-3">Tier 3</span>
+        </div>
+      </div>
+      <div class="competitor-body">
+        <div class="competitor-grid">
+          <div>
+            <div class="info-block">
+              <div class="info-label">Pricing</div>
+              <div class="info-value">Sensors pay for themselves in 6–9 months. Average savings of $1,200–$1,800/dumpster/year.</div>
+            </div>
+          </div>
+          <div>
+            <div class="info-block">
+              <div class="info-label">Has</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-has">Fill Monitoring (AI camera)</span>
+                <span class="cap-tag cap-has">Contamination Detection</span>
+                <span class="cap-tag cap-has">Predictive Analytics</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="diff-section">
+          <div class="diff-title">Relationship to Binly</div>
+          <p>Pure monitoring/analytics layer. Could be a future integration partner for Binly — feed fill-level data into route priority scoring.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bigbelly -->
+    <div class="competitor-card">
+      <div class="competitor-header">
+        <div class="competitor-header-left">
+          <div class="competitor-name">Bigbelly</div>
+          <a class="competitor-url" href="https://bigbelly.com" target="_blank">bigbelly.com</a>
+          <div class="competitor-tagline">
+            Smart, solar-powered trash compacting bins (5x capacity) with fill-level sensors, GPS location,
+            and CLEAN management console. Reduces collections by 80%+ and emissions by 70%.
+            Based in Needham, MA.
+          </div>
+        </div>
+        <div class="competitor-badges">
+          <span class="tier-badge tier-3">Tier 3</span>
+        </div>
+      </div>
+      <div class="competitor-body">
+        <div class="competitor-grid">
+          <div>
+            <div class="info-block">
+              <div class="info-label">Target Market</div>
+              <div class="info-value">Public spaces — municipalities, universities, corporate campuses, venues. Completely different segment from Binly's commercial dumpster operations.</div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Pricing</div>
+              <div class="info-value">Hardware purchase/lease + software subscription. Sold primarily to municipalities/campuses. Premium pricing (smart bins cost $3,000–$5,000+ each).</div>
+            </div>
+          </div>
+          <div>
+            <div class="info-block">
+              <div class="info-label">Has</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-has">Smart Bins (solar compaction)</span>
+                <span class="cap-tag cap-has">Fill Monitoring</span>
+                <span class="cap-tag cap-has">Bin GPS (embedded)</span>
+                <span class="cap-tag cap-has">Dashboard</span>
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Missing</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-missing">Route Optimization</span>
+                <span class="cap-tag cap-missing">Driver App</span>
+                <span class="cap-tag cap-missing">Fleet Tracking</span>
+                <span class="cap-tag cap-missing">Dispatch</span>
+                <span class="cap-tag cap-missing">Workforce Mgmt</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="diff-section">
+          <div class="diff-title">Relationship to Binly</div>
+          <p>Different market entirely. Bigbelly sells expensive smart bins for public spaces (parks, campuses). Binly manages commercial dumpster operations for haulers. No direct competition.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Geoforce -->
+    <div class="competitor-card">
+      <div class="competitor-header">
+        <div class="competitor-header-left">
+          <div class="competitor-name">Geoforce</div>
+          <a class="competitor-url" href="https://www.geoforce.com" target="_blank">geoforce.com</a>
+          <div class="competitor-tagline">
+            Industrial GPS asset trackers for dumpsters, roll-offs, and portable toilets.
+            Devices use satellite + cellular networks with 10+ year battery life.
+            Geofencing alerts, service verification, and utilization tracking. Based in Dallas, TX.
+          </div>
+        </div>
+        <div class="competitor-badges">
+          <span class="tier-badge tier-3">Tier 3</span>
+        </div>
+      </div>
+      <div class="competitor-body">
+        <div class="competitor-grid">
+          <div>
+            <div class="info-block">
+              <div class="info-label">Key Products</div>
+              <div class="info-value">
+                <strong>GT0, GT1, GT2:</strong> Industrial GPS trackers with satellite/cellular connectivity, IP68 rated, 10+ year battery.<br>
+                <strong>Track and Trace Platform:</strong> Web dashboard for asset visibility, geofencing, utilization reports.
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Pricing</div>
+              <div class="info-value">Hardware ($100–$300/device) + monthly subscription ($15–$30/device/month). Significantly more expensive than AirTags ($29 one-time).</div>
+            </div>
+          </div>
+          <div>
+            <div class="info-block">
+              <div class="info-label">Has</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-has">Physical Asset GPS (industrial)</span>
+                <span class="cap-tag cap-has">Geofencing</span>
+                <span class="cap-tag cap-has">Service Verification</span>
+                <span class="cap-tag cap-has">Dashboard</span>
+              </div>
+            </div>
+            <div class="info-block">
+              <div class="info-label">Missing</div>
+              <div class="cap-tags">
+                <span class="cap-tag cap-missing">Route Optimization</span>
+                <span class="cap-tag cap-missing">Driver App</span>
+                <span class="cap-tag cap-missing">Fleet Tracking</span>
+                <span class="cap-tag cap-missing">Dispatch</span>
+                <span class="cap-tag cap-missing">Workforce Mgmt</span>
+                <span class="cap-tag cap-missing">Field Service</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="diff-section">
+          <div class="diff-title">Relationship to Binly</div>
+          <p>
+            Pure asset tracking hardware. Geoforce trackers are more durable and reliable than AirTags (satellite connectivity, IP68, 10-year battery)
+            but cost 10–20x more per device plus monthly fees. Binly's AirTag approach trades some reliability for dramatically lower cost and easier deployment.
+            No software platform competition — Geoforce is hardware-only.
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- TIER 4: ADJACENT                           -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section" id="tier-4">
+    <div class="section-title">
+      <div class="num">8</div>
+      Tier 4 — Adjacent Platforms
+    </div>
+    <p class="section-desc">General fleet management and field service platforms that serve waste among other industries.</p>
+
+    <!-- Safe Fleet -->
+    <div class="competitor-card">
+      <div class="competitor-header">
+        <div class="competitor-header-left">
+          <div class="competitor-name">Safe Fleet (FleetMind)</div>
+          <a class="competitor-url" href="https://www.safefleet.net/markets/commercial-vehicle/waste-recycling/" target="_blank">safefleet.net</a>
+          <div class="competitor-tagline">
+            Smart truck automation with on-board computers, 360° cameras (8 inputs), RFID cart identification,
+            fork scale integration, driver tablets, route management, and dispatch. Hardware-heavy solution for large fleets.
+          </div>
+        </div>
+        <div class="competitor-badges">
+          <span class="tier-badge tier-4">Tier 4</span>
+        </div>
+      </div>
+      <div class="competitor-body">
+        <div class="competitor-grid">
+          <div>
+            <div class="info-block">
+              <div class="info-label">Target Market</div>
+              <div class="info-value">Large enterprise fleet operators. Requires significant hardware investment per truck.</div>
+            </div>
+          </div>
+          <div>
+            <div class="info-block">
+              <div class="info-label">Key Difference</div>
+              <div class="info-value">Hardware-focused (on-board truck computers, cameras, scales, RFID readers). Very different deployment model and price point from Binly's software-first approach.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RouteSmart -->
+    <div class="competitor-card">
+      <div class="competitor-header">
+        <div class="competitor-header-left">
+          <div class="competitor-name">RouteSmart Technologies</div>
+          <a class="competitor-url" href="https://www.routesmart.com" target="_blank">routesmart.com</a>
+          <div class="competitor-tagline">
+            Specialized route optimization and planning software for waste collection. Products include RouteSmart Optimize,
+            RouteSmart Plan, and RouteSmart Engine. SmartSuite Mobile for in-cab navigation.
+          </div>
+        </div>
+        <div class="competitor-badges">
+          <span class="tier-badge tier-4">Tier 4</span>
+        </div>
+      </div>
+      <div class="competitor-body">
+        <div class="competitor-grid">
+          <div>
+            <div class="info-block">
+              <div class="info-label">Target Market</div>
+              <div class="info-value">Municipal and enterprise waste haulers needing deep route optimization.</div>
+            </div>
+          </div>
+          <div>
+            <div class="info-block">
+              <div class="info-label">Key Difference</div>
+              <div class="info-value">Pure route optimization specialist. No asset tracking, no field service, no workforce management, no dispatch. Solves one problem very well but doesn't compete with Binly's breadth.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Samsara / Verizon Connect -->
+    <div class="competitor-card">
+      <div class="competitor-header">
+        <div class="competitor-header-left">
+          <div class="competitor-name">Samsara / Verizon Connect</div>
+          <a class="competitor-url" href="https://www.samsara.com" target="_blank">samsara.com</a>&nbsp;&nbsp;
+          <a class="competitor-url" href="https://www.verizonconnect.com" target="_blank">verizonconnect.com</a>
+          <div class="competitor-tagline">
+            Broad fleet management platforms with GPS tracking, dash cams, driver safety scoring, ELD compliance,
+            maintenance scheduling, and telematics. Samsara specifically has waste-specific solutions.
+            Both are massive platforms serving all fleet industries.
+          </div>
+        </div>
+        <div class="competitor-badges">
+          <span class="tier-badge tier-4">Tier 4</span>
+        </div>
+      </div>
+      <div class="competitor-body">
+        <div class="competitor-grid">
+          <div>
+            <div class="info-block">
+              <div class="info-label">Pricing</div>
+              <div class="info-value"><strong>$30–$60/vehicle/month</strong> + hardware ($100–$300/device).</div>
+            </div>
+          </div>
+          <div>
+            <div class="info-block">
+              <div class="info-label">Key Difference</div>
+              <div class="info-value">Horizontal fleet platforms serving all industries (trucking, construction, delivery, waste). They lack waste-specific features like bin management, fill monitoring, No-Go Zones, and collection-specific workflows. They're "GPS for trucks," not "operations for waste companies."</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dispatcher.com / EagleEye -->
+    <div class="competitor-card">
+      <div class="competitor-header">
+        <div class="competitor-header-left">
+          <div class="competitor-name">Dispatcher.com / EagleEye Tracking</div>
+          <a class="competitor-url" href="https://www.dispatcher.com" target="_blank">dispatcher.com</a>&nbsp;&nbsp;
+          <a class="competitor-url" href="https://eagleeyetracking.com" target="_blank">eagleeyetracking.com</a>
+          <div class="competitor-tagline">
+            Basic dispatch and GPS tracking tools for waste haulers. Dispatcher.com focuses on dumpster rental dispatch + asset tracking.
+            EagleEye offers GPS dispatch + geofencing for waste haulers.
+          </div>
+        </div>
+        <div class="competitor-badges">
+          <span class="tier-badge tier-4">Tier 4</span>
+        </div>
+      </div>
+      <div class="competitor-body">
+        <div class="info-block">
+          <div class="info-label">Key Difference</div>
+          <div class="info-value">Basic dispatch/tracking tools. Limited features compared to Binly's comprehensive platform. No AI, no asset GPS, no field service depth, no workforce management.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- FEATURE MATRIX                             -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section" id="feature-matrix">
+    <div class="section-title">
+      <div class="num">9</div>
+      Feature Comparison Matrix
+    </div>
+    <p class="section-desc">Side-by-side comparison of Binly vs all US-based competitors across every capability.</p>
+
+    <div class="matrix-wrapper">
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th class="binly-col">Binly</th>
+            <th>Hauler Hero</th>
+            <th>Rubicon</th>
+            <th>Routeware</th>
+            <th>CurbWaste</th>
+            <th>FleetRabbit</th>
+            <th>CRO</th>
+            <th>Docket</th>
+            <th>Compology</th>
+            <th>Geoforce</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="category-row"><td colspan="11">Core Operations</td></tr>
+          <tr>
+            <td>Route Optimization</td>
+            <td class="binly-cell yes">&#10003;</td>
+            <td class="yes">&#10003; AI</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="no">&#10005;</td>
+            <td class="yes">&#10003; AI</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003; AI</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+          </tr>
+          <tr>
+            <td>Fleet GPS Tracking</td>
+            <td class="binly-cell yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+          </tr>
+          <tr>
+            <td>Dispatch & Logistics</td>
+            <td class="binly-cell yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+          </tr>
+          <tr>
+            <td>Driver Mobile App</td>
+            <td class="binly-cell yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+          </tr>
+          <tr>
+            <td>Manager Dashboard</td>
+            <td class="binly-cell yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+
+          <tr class="category-row"><td colspan="11">Asset & Inventory Management</td></tr>
+          <tr>
+            <td>Bin Asset Inventory</td>
+            <td class="binly-cell yes">&#10003;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="partial">Partial</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="partial">Partial</td>
+            <td class="partial">Partial</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+          </tr>
+          <tr>
+            <td>Physical Bin GPS (AirTag)</td>
+            <td class="binly-cell yes">&#10003;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="yes">&#10003; Industrial</td>
+          </tr>
+          <tr>
+            <td>Fill-Level Monitoring</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="yes">&#10003; AI Camera</td>
+            <td class="no">&#10005;</td>
+          </tr>
+          <tr>
+            <td>Warehouse Management</td>
+            <td class="binly-cell yes">&#10003;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+          </tr>
+          <tr>
+            <td>Move Request Scheduling</td>
+            <td class="binly-cell yes">&#10003;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+          </tr>
+
+          <tr class="category-row"><td colspan="11">Workforce & Field Service</td></tr>
+          <tr>
+            <td>Shift Scheduling</td>
+            <td class="binly-cell yes">&#10003;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+          </tr>
+          <tr>
+            <td>Flexible Task Types</td>
+            <td class="binly-cell yes">&#10003; 6 types</td>
+            <td class="partial">Basic</td>
+            <td class="partial">Basic</td>
+            <td class="partial">Basic</td>
+            <td class="partial">Basic</td>
+            <td class="partial">Basic</td>
+            <td class="partial">Basic</td>
+            <td class="partial">Basic</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+          </tr>
+          <tr>
+            <td>Photo/Incident Reporting</td>
+            <td class="binly-cell yes">&#10003;</td>
+            <td class="yes">&#10003; AI</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003; AI</td>
+            <td class="no">&#10005;</td>
+          </tr>
+          <tr>
+            <td>Driver Leaderboards</td>
+            <td class="binly-cell yes">&#10003;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="partial">Scorecards</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+          </tr>
+          <tr>
+            <td>Turn-by-Turn Navigation</td>
+            <td class="binly-cell yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="partial">Basic</td>
+            <td class="yes">&#10003;</td>
+            <td class="partial">Basic</td>
+            <td class="yes">&#10003;</td>
+            <td class="partial">Basic</td>
+            <td class="partial">Basic</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+          </tr>
+          <tr>
+            <td>Real-Time WebSocket Updates</td>
+            <td class="binly-cell yes">&#10003;</td>
+            <td class="partial">Polling</td>
+            <td class="partial">Polling</td>
+            <td class="partial">Polling</td>
+            <td class="partial">Polling</td>
+            <td class="partial">Polling</td>
+            <td class="partial">Polling</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+          </tr>
+
+          <tr class="category-row"><td colspan="11">Unique Features</td></tr>
+          <tr>
+            <td>No-Go Zone Management</td>
+            <td class="binly-cell yes">&#10003;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+          </tr>
+          <tr>
+            <td>Location Scouting (Drivers)</td>
+            <td class="binly-cell yes">&#10003;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+          </tr>
+          <tr>
+            <td>Potential Location Conversion</td>
+            <td class="binly-cell yes">&#10003;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+          </tr>
+
+          <tr class="category-row"><td colspan="11">Business Operations</td></tr>
+          <tr>
+            <td>CRM / Billing</td>
+            <td class="no">&#10005;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="partial">Partial</td>
+            <td class="yes">&#10003;</td>
+            <td class="no">&#10005;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+          </tr>
+          <tr>
+            <td>Customer Portal</td>
+            <td class="no">&#10005;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="no">&#10005;</td>
+            <td class="yes">&#10003;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+            <td class="yes">&#10003;</td>
+            <td class="no">&#10005;</td>
+            <td class="no">&#10005;</td>
+          </tr>
+          <tr>
+            <td>Push Notifications (FCM)</td>
+            <td class="binly-cell yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="partial">Basic</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="partial">Basic</td>
+            <td class="partial">Basic</td>
+            <td class="no">&#10005;</td>
+            <td class="partial">Email/SMS</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- PRICING                                    -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section" id="pricing">
+    <div class="section-title">
+      <div class="num">10</div>
+      Pricing Landscape
+    </div>
+    <p class="section-desc">How the market prices waste management software.</p>
+
+    <table class="pricing-table">
+      <thead>
+        <tr>
+          <th>Pricing Tier</th>
+          <th>Range</th>
+          <th>Examples</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Enterprise ERP</td>
+          <td class="price-range">$50,000+/year</td>
+          <td>Routeware, Safe Fleet</td>
+          <td>Includes hardware, implementation, training. 12–18 month deployment cycles.</td>
+        </tr>
+        <tr>
+          <td>Per-Truck SaaS</td>
+          <td class="price-range">$100–$500/truck/month</td>
+          <td>FleetRabbit, CRO, CurbWaste</td>
+          <td>Most common model for mid-market. Scales with fleet size.</td>
+        </tr>
+        <tr>
+          <td>Per-User SaaS</td>
+          <td class="price-range">$30–$100/user/month</td>
+          <td>Smaller platforms</td>
+          <td>Less common in waste. More typical for generic field service.</td>
+        </tr>
+        <tr>
+          <td>Flat Monthly</td>
+          <td class="price-range">$300–$1,000+/month</td>
+          <td>Docket, TrashFlow</td>
+          <td>Simple pricing for small haulers. May limit trucks/users.</td>
+        </tr>
+        <tr>
+          <td>IoT Sensor Subscription</td>
+          <td class="price-range">$30/device/month</td>
+          <td>Compology</td>
+          <td>Per-sensor pricing. ROI typically within 6–9 months.</td>
+        </tr>
+        <tr>
+          <td>GPS Asset Tracker</td>
+          <td class="price-range">$15–$30/device/month + hardware</td>
+          <td>Geoforce</td>
+          <td>Industrial GPS devices $100–$300 each + monthly cellular/satellite fees.</td>
+        </tr>
+        <tr>
+          <td>Fleet Telematics</td>
+          <td class="price-range">$30–$60/vehicle/month</td>
+          <td>Samsara, Verizon Connect</td>
+          <td>Hardware ($100–$300/device) + monthly subscription. Horizontal, not waste-specific.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout" style="margin-top: 20px;">
+      <div class="callout-title">Binly's Pricing Advantage: AirTags</div>
+      <p>
+        While competitors charge $100–$300 per GPS device + $15–$30/month per device for physical asset tracking,
+        Binly uses Apple AirTags at <strong>$29 per tag with zero monthly fees</strong> — leveraging Apple's crowdsourced FindMy network
+        of 1 billion+ iPhones for location updates. For a fleet of 100 bins, that's <strong>$2,900 total</strong> vs
+        $10,000–$30,000 hardware + $18,000–$36,000/year in subscription fees with traditional GPS trackers.
+      </p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SWOT                                       -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section" id="swot">
+    <div class="section-title">
+      <div class="num">11</div>
+      SWOT Analysis — Binly vs Market
+    </div>
+    <p class="section-desc">Strengths, weaknesses, opportunities, and threats based on competitive research.</p>
+
+    <div class="swot-grid">
+      <div class="swot-card swot-strengths">
+        <h4>Strengths</h4>
+        <ul>
+          <li>Only platform combining route optimization + physical bin GPS + workforce management + field service in one product</li>
+          <li>AirTag tracking at 10–20x lower cost than industrial GPS competitors</li>
+          <li>No-Go Zone management — zero competitors offer this</li>
+          <li>Driver location scouting — community-powered bin expansion is unique</li>
+          <li>Flexible task system (6 types: collect, place, pickup, dropoff, warehouse, service)</li>
+          <li>Real-time WebSocket updates vs polling used by competitors</li>
+          <li>Software-first approach — no truck hardware required, fast deployment</li>
+          <li>Modern tech stack (Flutter, Next.js, Go) vs legacy competitors (TrashFlow, etc.)</li>
+        </ul>
+      </div>
+
+      <div class="swot-card swot-weaknesses">
+        <h4>Weaknesses</h4>
+        <ul>
+          <li>No fill-level sensor integration — Compology, SmartEnds, and Bigbelly all have this</li>
+          <li>No billing/invoicing module — most competitors include CRM and billing (Hauler Hero, CurbWaste, CRO, Docket)</li>
+          <li>AirTag reliability vs industrial GPS: shorter battery life (~1 year vs 10+ years), relies on iPhone density for coverage, no satellite fallback</li>
+          <li>No customer portal for waste generators to manage their own accounts</li>
+          <li>Smaller brand awareness compared to established players (Rubicon, Routeware)</li>
+        </ul>
+      </div>
+
+      <div class="swot-card swot-opportunities">
+        <h4>Opportunities</h4>
+        <ul>
+          <li>Mid-market gap — too complex for CurbWaste/Docket, too small for Routeware/Safe Fleet. Large underserved segment.</li>
+          <li>Fill-level sensor integration — partner with or integrate Compology/SmartEnds cameras for premium tier</li>
+          <li>Add billing module — would make Binly a complete all-in-one platform, eliminating need for separate back-office tools</li>
+          <li>AI-powered route optimization — enhance with ML-based predictions (fill forecasting, optimal timing)</li>
+          <li>Smart waste management market growing at 14.4% CAGR ($2.95B → $5.81B by 2030)</li>
+          <li>Municipal contracts — government waste programs need modern field ops tools</li>
+          <li>Expand beyond waste — the field operations platform could serve other asset-heavy industries (portable toilets, construction equipment)</li>
+        </ul>
+      </div>
+
+      <div class="swot-card swot-threats">
+        <h4>Threats</h4>
+        <ul>
+          <li><strong>Hauler Hero</strong> — $27M raised, AI-focused, same target market. Growing fast with 4.5M pickups/month. Could add field ops features.</li>
+          <li>Rubicon could move from marketplace to operations software — they have the brand and customer base</li>
+          <li>Apple could restrict FindMy API access or change AirTag policies, impacting Binly's GPS tracking approach</li>
+          <li>Enterprise players (Routeware, Safe Fleet) could launch a "light" mid-market product</li>
+          <li>Generic fleet management platforms (Samsara, Verizon Connect) could add waste-specific features</li>
+          <li>New AI-native startups could emerge with next-gen route optimization and field ops</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SUMMARY TABLE                              -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">
+      <div class="num">12</div>
+      Quick Reference — All US Competitors
+    </div>
+    <p class="section-desc">Every US-based competitor at a glance.</p>
+
+    <div class="matrix-wrapper">
+      <table class="quick-table">
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Tier</th>
+            <th>Focus</th>
+            <th>Target Market</th>
+            <th>Bin GPS?</th>
+            <th>Key Differentiator from Binly</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Hauler Hero</strong></td>
+            <td><span class="tier-badge tier-1">1</span></td>
+            <td>AI waste OS + CRM + billing</td>
+            <td>Small-mid haulers</td>
+            <td class="no">No</td>
+            <td>CRM/billing-first, not operations-first. $27M raised.</td>
+          </tr>
+          <tr>
+            <td><strong>Rubicon</strong></td>
+            <td><span class="tier-badge tier-1">1</span></td>
+            <td>Marketplace / broker</td>
+            <td>Enterprise + municipalities</td>
+            <td class="no">No</td>
+            <td>Marketplace model — connects generators with haulers, doesn't manage ops.</td>
+          </tr>
+          <tr>
+            <td><strong>Routeware</strong></td>
+            <td><span class="tier-badge tier-1">1</span></td>
+            <td>Enterprise waste tech + hardware</td>
+            <td>Mid-large haulers</td>
+            <td class="partial">RFID only</td>
+            <td>Hardware-heavy (truck computers, cameras, scales). $50K+/yr.</td>
+          </tr>
+          <tr>
+            <td><strong>CurbWaste</strong></td>
+            <td><span class="tier-badge tier-2">2</span></td>
+            <td>Dispatch + billing</td>
+            <td>Small-mid haulers</td>
+            <td class="no">No</td>
+            <td>Back-office/billing focus, no asset tracking depth.</td>
+          </tr>
+          <tr>
+            <td><strong>CRO Software</strong></td>
+            <td><span class="tier-badge tier-2">2</span></td>
+            <td>Roll-off dumpster rental</td>
+            <td>Roll-off companies</td>
+            <td class="partial">Via driver</td>
+            <td>Rental workflows, not ongoing collection routes.</td>
+          </tr>
+          <tr>
+            <td><strong>FleetRabbit</strong></td>
+            <td><span class="tier-badge tier-2">2</span></td>
+            <td>Fleet mgmt + AI routing</td>
+            <td>Mid-sized haulers</td>
+            <td class="no">No</td>
+            <td>Fleet-centric, no bin asset management.</td>
+          </tr>
+          <tr>
+            <td><strong>Docket</strong></td>
+            <td><span class="tier-badge tier-2">2</span></td>
+            <td>Dumpster rental + profitability AI</td>
+            <td>Dumpster rental companies</td>
+            <td class="no">No</td>
+            <td>Rental model, optimizes for profitability not operations.</td>
+          </tr>
+          <tr>
+            <td><strong>TrashFlow</strong></td>
+            <td><span class="tier-badge tier-2">2</span></td>
+            <td>Legacy billing + routing</td>
+            <td>Small-mid haulers</td>
+            <td class="no">No</td>
+            <td>Legacy software. No mobile app, no real-time features.</td>
+          </tr>
+          <tr>
+            <td><strong>ServiceCore</strong></td>
+            <td><span class="tier-badge tier-2">2</span></td>
+            <td>Portable toilet + roll-off</td>
+            <td>Portable toilet companies</td>
+            <td class="no">No</td>
+            <td>Different asset type (portables). Rental workflow focus.</td>
+          </tr>
+          <tr>
+            <td><strong>Compology</strong></td>
+            <td><span class="tier-badge tier-3">3</span></td>
+            <td>AI fill-level cameras</td>
+            <td>Commercial waste generators</td>
+            <td class="no">No</td>
+            <td>Monitoring only. Complementary to Binly, not competitive.</td>
+          </tr>
+          <tr>
+            <td><strong>SmartEnds</strong></td>
+            <td><span class="tier-badge tier-3">3</span></td>
+            <td>AI fill-level cameras</td>
+            <td>Businesses + municipalities</td>
+            <td class="no">No</td>
+            <td>Monitoring only. Complementary to Binly.</td>
+          </tr>
+          <tr>
+            <td><strong>Bigbelly</strong></td>
+            <td><span class="tier-badge tier-3">3</span></td>
+            <td>Smart compacting bins</td>
+            <td>Public spaces</td>
+            <td class="yes">Embedded</td>
+            <td>Hardware company. Public spaces only, not commercial ops.</td>
+          </tr>
+          <tr>
+            <td><strong>Geoforce</strong></td>
+            <td><span class="tier-badge tier-3">3</span></td>
+            <td>Industrial GPS trackers</td>
+            <td>Dumpster + roll-off companies</td>
+            <td class="yes">Industrial</td>
+            <td>Hardware only. No software platform. 10-20x more expensive than AirTags.</td>
+          </tr>
+          <tr>
+            <td><strong>Safe Fleet</strong></td>
+            <td><span class="tier-badge tier-4">4</span></td>
+            <td>Smart truck hardware</td>
+            <td>Large enterprise fleets</td>
+            <td class="partial">RFID</td>
+            <td>Hardware-focused (in-cab computers, cameras, scales).</td>
+          </tr>
+          <tr>
+            <td><strong>RouteSmart</strong></td>
+            <td><span class="tier-badge tier-4">4</span></td>
+            <td>Route optimization only</td>
+            <td>Municipal + enterprise</td>
+            <td class="no">No</td>
+            <td>Pure route optimization specialist. Single-purpose.</td>
+          </tr>
+          <tr>
+            <td><strong>Samsara</strong></td>
+            <td><span class="tier-badge tier-4">4</span></td>
+            <td>General fleet telematics</td>
+            <td>All industries</td>
+            <td class="partial">Asset trackers</td>
+            <td>Horizontal platform. Not waste-specific.</td>
+          </tr>
+          <tr>
+            <td><strong>Verizon Connect</strong></td>
+            <td><span class="tier-badge tier-4">4</span></td>
+            <td>General fleet telematics</td>
+            <td>All industries</td>
+            <td class="no">No</td>
+            <td>Horizontal platform. Not waste-specific.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  <p><strong>Binly</strong> — Competitive Landscape Analysis &middot; April 2026 &middot; Internal Use Only</p>
+  <p style="margin-top: 8px;">Research compiled from public sources, product pages, press releases, and industry reports.</p>
+</div>
+
+</body>
+</html>
