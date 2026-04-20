@@ -175,9 +175,36 @@
 
     .footer { background: #0f172a; color: #64748B; padding: 40px; text-align: center; font-size: 0.82rem; }
     .footer strong { color: white; }
+
+    /* Download PDF button */
+    .pdf-btn {
+      position: fixed; top: 20px; right: 20px; z-index: 1000;
+      background: var(--primary); color: white; border: none;
+      padding: 10px 20px; border-radius: 10px; font-size: 0.85rem;
+      font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(72,128,255,0.3);
+      transition: all 0.2s;
+    }
+    .pdf-btn:hover { background: var(--primary-dark); box-shadow: 0 6px 16px rgba(72,128,255,0.4); }
+
+    /* Print styles */
+    @media print {
+      .pdf-btn, .nav, .example-toggle { display: none !important; }
+      .hero { padding: 40px 20px 30px; }
+      body { font-size: 11px; }
+      .section { padding: 20px; break-inside: avoid; }
+      .feature-block { break-inside: avoid; }
+      .flow-step { break-inside: avoid; }
+      .callout { break-inside: avoid; }
+      .compare-table { font-size: 9px; }
+      .example-scenario { display: block !important; }
+      .example-scenario + .example-scenario { page-break-before: always; }
+      .footer { padding: 20px; }
+    }
   </style>
 </head>
 <body>
+
+<button class="pdf-btn" onclick="window.print()">&#128196; Download PDF</button>
 
 <!-- HERO -->
 <div class="hero">
