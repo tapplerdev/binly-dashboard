@@ -188,17 +188,77 @@
 
     /* Print styles */
     @media print {
+      /* Force backgrounds and colors to print */
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+
+      /* Hide interactive elements */
       .pdf-btn, .nav, .example-toggle { display: none !important; }
-      .hero { padding: 40px 20px 30px; }
-      body { font-size: 11px; }
-      .section { padding: 20px; break-inside: avoid; }
-      .feature-block { break-inside: avoid; }
-      .flow-step { break-inside: avoid; }
-      .callout { break-inside: avoid; }
-      .compare-table { font-size: 9px; }
+
+      /* Page setup */
+      @page { margin: 0.5in; size: A4; }
+      body { font-size: 10pt; background: white !important; }
+
+      /* Hero - keep the dark background */
+      .hero { padding: 40px 30px 30px !important; background: #0f172a !important; color: white !important; }
+      .hero::before, .hero::after { display: none !important; }
+      .hero h1 { font-size: 2rem !important; }
+      .hero h1 span { -webkit-text-fill-color: #60A5FA !important; }
+      .hero .subtitle { color: #94A3B8 !important; }
+      .hero-badge { background: #4880FF !important; }
+
+      /* Sections - tighten spacing */
+      .section { padding: 24px 20px !important; }
+      .section-title { font-size: 1.3rem !important; }
+
+      /* Cards - keep borders, reduce spacing */
+      .pillar-card { break-inside: avoid; margin-bottom: 8px !important; }
+      .feature-block { break-inside: avoid; page-break-inside: avoid; margin-bottom: 16px !important; }
+      .feature-grid { gap: 8px !important; }
+      .sub-feature { break-inside: avoid; }
+
+      /* Callouts - keep colored backgrounds */
+      .callout { break-inside: avoid; page-break-inside: avoid; }
+      .callout-blue { background: #EFF6FF !important; border-color: #BFDBFE !important; }
+      .callout-green { background: #ECFDF5 !important; border-color: #A7F3D0 !important; }
+      .callout-purple { background: #F5F3FF !important; border-color: #C4B5FD !important; }
+      .callout-amber { background: #FFFBEB !important; border-color: #FDE68A !important; }
+
+      /* Stat cards */
+      .stats-row { gap: 8px !important; }
+      .stat-card { break-inside: avoid; }
+      .stat-value { font-size: 1.6rem !important; }
+
+      /* Tables - keep header colors */
+      .compare-table { font-size: 8pt !important; }
+      .compare-table th { background: #0f172a !important; color: white !important; }
+      .compare-table th.binly-col { background: #4880FF !important; }
+
+      /* Roadmap */
+      .roadmap-phase { break-inside: avoid; page-break-inside: avoid; }
+      .phase-dot { background: var(--green) !important; }
+      .phase-item.next { background: #EDF0FF !important; color: #4880FF !important; }
+
+      /* Flow timeline */
+      .flow-step { break-inside: avoid; page-break-inside: avoid; margin-bottom: 16px !important; }
+      .flow-card { page-break-inside: avoid; }
+      .flow-label { background: #F1F5F9 !important; }
+      .flow-label.pulse { background: #ECFDF5 !important; color: #059669 !important; }
+      .flow-label.ops { background: #EFF6FF !important; color: #1D4ED8 !important; }
+      .flow-label.assets { background: #FEF2F2 !important; color: #DC2626 !important; }
+      .flow-label.intel { background: #F5F3FF !important; color: #6D28D9 !important; }
+      .flow-label.team { background: #FFFBEB !important; color: #92400E !important; }
+      .flow-label.settings { background: #F1F5F9 !important; color: #475569 !important; }
+
+      /* Show both example scenarios */
       .example-scenario { display: block !important; }
       .example-scenario + .example-scenario { page-break-before: always; }
-      .footer { padding: 20px; }
+
+      /* Competitor cards */
+      .section#landscape > div[style*="grid"] > div { break-inside: avoid; page-break-inside: avoid; }
+
+      /* Footer */
+      .footer { background: #0f172a !important; color: #64748B !important; padding: 20px !important; }
+      .footer strong { color: white !important; }
     }
   </style>
 </head>
