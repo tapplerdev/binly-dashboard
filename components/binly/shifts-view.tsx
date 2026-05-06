@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Calendar, List, User, X, Search, ChevronDown, Filter, MapPin, Loader2, Trash2, GripVertical, Package, MapPinned, Warehouse, MoveRight, Plus, Pencil, ArrowUp, ArrowDown, ClipboardCheck } from 'lucide-react';
+import { Calendar, List, User, X, Search, ChevronDown, ChevronUp, Filter, MapPin, Loader2, Trash2, GripVertical, Package, MapPinned, Warehouse, MoveRight, Plus, Pencil, ArrowUp, ArrowDown, ClipboardCheck, Settings, CalendarClock, Camera, Clock } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel, ShiftStatus } from '@/lib/types/shift';
 import { ShiftDetailsDrawer } from './shift-details-drawer';
 import { BinSelectionMap } from './bin-selection-map';
@@ -26,7 +26,8 @@ import { LiveOpsMap } from './live-ops-map';
 import { ShiftHistoryView } from './shift-history-view';
 import { useAuthStore } from '@/lib/auth/store';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
-import { CustomShiftDrawer } from './custom-shift-drawer';
+import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
+import { HerePlaceDetails } from '@/lib/services/geocoding.service';
 
 type ViewMode = 'list' | 'timeline' | 'live' | 'history';
 
@@ -54,8 +55,6 @@ export function ShiftsView() {
   // Local state
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
-  const [isCustomShiftDrawerOpen, setIsCustomShiftDrawerOpen] = useState(false);
-  const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [shiftToEdit, setShiftToEdit] = useState<Shift | null>(null);
   const [filters, setFilters] = useState<ShiftFilters>({
@@ -252,51 +251,14 @@ export function ShiftsView() {
             <div className="flex items-center justify-between mb-3 md:mb-4">
               <h1 className="text-xl md:text-2xl font-semibold text-gray-900">Shifts</h1>
               {viewMode !== 'live' && (
-                <div className="relative">
-                  <button
-                    onClick={() => setIsCreateMenuOpen(!isCreateMenuOpen)}
-                    className="bg-green-600 hover:bg-green-700 text-white px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-fast shadow-sm flex items-center gap-1"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span className="hidden sm:inline">Create Shift</span>
-                    <span className="sm:hidden">Create</span>
-                    <ChevronDown className="w-3 h-3 ml-0.5" />
-                  </button>
-                  {isCreateMenuOpen && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setIsCreateMenuOpen(false)} />
-                      <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden animate-slide-in-down">
-                        <button
-                          onClick={() => {
-                            setIsCreateDrawerOpen(true);
-                            setIsCreateMenuOpen(false);
-                          }}
-                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-fast text-left"
-                        >
-                          <Package className="w-4 h-4 text-green-600" />
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">Standard Shift</p>
-                            <p className="text-xs text-gray-500">Bins, placements, moves</p>
-                          </div>
-                        </button>
-                        <div className="border-t border-gray-100" />
-                        <button
-                          onClick={() => {
-                            setIsCustomShiftDrawerOpen(true);
-                            setIsCreateMenuOpen(false);
-                          }}
-                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-fast text-left"
-                        >
-                          <ClipboardCheck className="w-4 h-4 text-blue-600" />
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">Custom Shift</p>
-                            <p className="text-xs text-gray-500">Service stops, inspections</p>
-                          </div>
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
+                <button
+                  onClick={() => setIsCreateDrawerOpen(true)}
+                  className="bg-green-600 hover:bg-green-700 text-white px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-fast shadow-sm flex items-center gap-1"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">Create Shift</span>
+                  <span className="sm:hidden">Create</span>
+                </button>
               )}
             </div>
 
@@ -405,13 +367,6 @@ export function ShiftsView() {
             setIsCreateDrawerOpen(false);
             setShiftToEdit(null); // Clear edit mode
           }}
-        />
-      )}
-
-      {/* Custom Shift Drawer */}
-      {isCustomShiftDrawerOpen && (
-        <CustomShiftDrawer
-          onClose={() => setIsCustomShiftDrawerOpen(false)}
         />
       )}
 
@@ -1407,6 +1362,14 @@ interface ShiftTask {
   isCompleted?: boolean; // True if task was completed
   isSkipped?: boolean; // True if task was skipped
   isInProgress?: boolean; // True if driver is currently on this task
+  // Service task fields
+  task_label?: string;
+  task_description?: string;
+  photo_required?: boolean;
+  service_duration_seconds?: number;
+  earliest_arrival?: string;
+  latest_arrival?: string;
+  time_window_type?: 'soft' | 'hard';
   // Common fields
   latitude: number;
   longitude: number;
@@ -1473,6 +1436,20 @@ function CreateShiftDrawer({
   const [deployAddress, setDeployAddress] = useState('');
   const [deployLat, setDeployLat] = useState('');
   const [deployLon, setDeployLon] = useState('');
+
+  // Shift options (merged from CustomShiftDrawer)
+  const [shiftLabel, setShiftLabel] = useState('');
+  const [showShiftOptions, setShowShiftOptions] = useState(false);
+  const [startLocationMode, setStartLocationMode] = useState<'driver' | 'warehouse' | 'custom'>('driver');
+  const [customStartAddress, setCustomStartAddress] = useState('');
+  const [customStartLat, setCustomStartLat] = useState(0);
+  const [customStartLon, setCustomStartLon] = useState(0);
+  const [endLocationMode, setEndLocationMode] = useState<'none' | 'warehouse' | 'custom'>('none');
+  const [customEndAddress, setCustomEndAddress] = useState('');
+  const [customEndLat, setCustomEndLat] = useState(0);
+  const [customEndLon, setCustomEndLon] = useState(0);
+  const [finishBy, setFinishBy] = useState('');
+  const [showServiceStopForm, setShowServiceStopForm] = useState(false);
 
   // Proximity warning state
   const [showProximityWarning, setShowProximityWarning] = useState(false);
@@ -1698,6 +1675,14 @@ function CreateShiftDrawer({
           } else if (task.task_type === 'warehouse_stop') {
             baseTask.warehouse_action = task.warehouse_action;
             baseTask.bins_to_load = task.bins_to_load;
+          } else if (task.task_type === 'service') {
+            baseTask.task_label = task.task_label || undefined;
+            baseTask.task_description = task.task_description || undefined;
+            baseTask.photo_required = task.photo_required ?? true;
+            baseTask.service_duration_seconds = task.service_duration_seconds || undefined;
+            baseTask.earliest_arrival = task.earliest_arrival || undefined;
+            baseTask.latest_arrival = task.latest_arrival || undefined;
+            baseTask.time_window_type = task.time_window_type || undefined;
           }
 
           return baseTask;
@@ -2721,7 +2706,11 @@ function CreateShiftDrawer({
       if (!driverId) {
         throw new Error('Please select a driver');
       }
-      if (!truckCapacity || parseInt(truckCapacity) <= 0) {
+      const hasOperationalTasks = tasks.some(t =>
+        t.type === 'collection' || t.type === 'placement' ||
+        t.type === 'pickup' || t.type === 'dropoff'
+      );
+      if (hasOperationalTasks && (!truckCapacity || parseInt(truckCapacity) <= 0)) {
         throw new Error('Please enter a valid truck capacity');
       }
       if (tasks.length === 0) {
@@ -2754,6 +2743,14 @@ function CreateShiftDrawer({
             baseTask.destination_longitude = task.destination_longitude;
             baseTask.destination_address = task.destination_address;
             baseTask.move_type = task.move_type;
+          } else if (task.type === 'service') {
+            baseTask.task_label = task.task_label;
+            baseTask.task_description = task.task_description;
+            baseTask.photo_required = task.photo_required;
+            baseTask.service_duration_seconds = task.service_duration_seconds;
+            if (task.earliest_arrival) baseTask.earliest_arrival = task.earliest_arrival;
+            if (task.latest_arrival) baseTask.latest_arrival = task.latest_arrival;
+            if (task.time_window_type) baseTask.time_window_type = task.time_window_type;
           }
 
           return baseTask;
@@ -2770,15 +2767,43 @@ function CreateShiftDrawer({
         address: warehouse?.address || 'Warehouse'
       });
 
-      const payload = {
+      const isCustomShift = !!(shiftLabel || startLocationMode !== 'driver' || endLocationMode !== 'none' || finishBy || tasks.some(t => t.type === 'service'));
+
+      const payload: Record<string, unknown> = {
         driver_id: driverId,
-        truck_bin_capacity: parseInt(truckCapacity),
+        truck_bin_capacity: hasOperationalTasks ? parseInt(truckCapacity) : 0,
         warehouse_latitude: warehouse?.latitude || 0,
         warehouse_longitude: warehouse?.longitude || 0,
         warehouse_address: warehouse?.address || 'Warehouse',
         lock_route_order: lockRouteOrder,
         tasks: tasksPayload,
         warehouse_deployments: warehouseDeployments.length > 0 ? warehouseDeployments : undefined,
+        // Custom shift fields (auto-detected)
+        ...(isCustomShift && { shift_type: 'custom' }),
+        ...(shiftLabel && { shift_label: shiftLabel }),
+        ...(finishBy && { scheduled_end: new Date(finishBy).toISOString() }),
+        // Start location override
+        ...(startLocationMode === 'warehouse' && warehouse && {
+          start_latitude: warehouse.latitude,
+          start_longitude: warehouse.longitude,
+          start_address: warehouse.address,
+        }),
+        ...(startLocationMode === 'custom' && customStartLat && customStartLon && {
+          start_latitude: customStartLat,
+          start_longitude: customStartLon,
+          start_address: customStartAddress,
+        }),
+        // End location override
+        ...(endLocationMode === 'warehouse' && warehouse && {
+          end_latitude: warehouse.latitude,
+          end_longitude: warehouse.longitude,
+          end_address: warehouse.address,
+        }),
+        ...(endLocationMode === 'custom' && customEndLat && customEndLon && {
+          end_latitude: customEndLat,
+          end_longitude: customEndLon,
+          end_address: customEndAddress,
+        }),
       };
 
       // Log the complete shift object before creating
@@ -2790,10 +2815,10 @@ function CreateShiftDrawer({
       console.log('📊 Shift Summary:');
       console.log(`   Driver ID: ${payload.driver_id}`);
       console.log(`   Truck Capacity: ${payload.truck_bin_capacity} bins`);
-      console.log(`   Total Tasks: ${payload.tasks.length}`);
+      console.log(`   Total Tasks: ${tasksPayload.length}`);
       console.log(`   Task Breakdown:`);
-      const taskCounts = payload.tasks.reduce((acc, task) => {
-        acc[task.task_type] = (acc[task.task_type] || 0) + 1;
+      const taskCounts = tasksPayload.reduce((acc: Record<string, number>, task) => {
+        acc[task.task_type as string] = (acc[task.task_type as string] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
       Object.entries(taskCounts).forEach(([type, count]) => {
@@ -2946,7 +2971,7 @@ function CreateShiftDrawer({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">
-            {isEditMode ? 'Edit Shift' : 'Build Custom Shift'}
+            {isEditMode ? 'Edit Shift' : 'Create Shift'}
           </h2>
           <button
             onClick={onClose}
@@ -2980,6 +3005,19 @@ function CreateShiftDrawer({
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-6">
+            {/* Shift Name (optional) */}
+            <div>
+              <label className="text-sm font-semibold text-gray-900 mb-2 block">Shift Name</label>
+              <input
+                type="text"
+                value={shiftLabel}
+                onChange={(e) => setShiftLabel(e.target.value)}
+                placeholder="e.g. Monday inspections"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+              <p className="text-xs text-gray-400 mt-1">Optional. Give this shift a descriptive name.</p>
+            </div>
+
             {/* Driver Selection */}
             <div>
               <label className="text-sm font-semibold text-gray-900 mb-3 block">Driver</label>
@@ -3045,21 +3083,22 @@ function CreateShiftDrawer({
               </div>
             </div>
 
-            {/* Truck Capacity */}
-            <div>
-              <label className="text-sm font-semibold text-gray-900 mb-3 block">
-                Truck Bin Capacity <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={truckCapacity}
-                onChange={(e) => setTruckCapacity(e.target.value)}
-                placeholder="Enter number of bins truck can hold"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                required
-              />
-            </div>
+            {/* Truck Capacity — only required when operational tasks exist */}
+            {(tasks.length === 0 || tasks.some(t => ['collection', 'placement', 'pickup', 'dropoff', 'warehouse_stop'].includes(t.type))) && (
+              <div>
+                <label className="text-sm font-semibold text-gray-900 mb-3 block">
+                  Truck Bin Capacity {tasks.some(t => ['collection', 'placement', 'pickup', 'dropoff'].includes(t.type)) && <span className="text-red-500">*</span>}
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={truckCapacity}
+                  onChange={(e) => setTruckCapacity(e.target.value)}
+                  placeholder="Enter number of bins truck can hold"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+            )}
 
             {/* Lock Route Order Checkbox */}
             <div className="flex items-start gap-3 p-4 bg-gray-50 border border-gray-200 rounded-lg">
@@ -3078,6 +3117,125 @@ function CreateShiftDrawer({
                   When enabled, the driver will follow your exact task sequence. When disabled, the system will optimize the route using real-time traffic and dynamic warehouse insertion for maximum efficiency.
                 </p>
               </label>
+            </div>
+
+            {/* Shift Options (collapsible) */}
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowShiftOptions(!showShiftOptions)}
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-fast text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm font-semibold text-gray-900">Shift Options</span>
+                  {(startLocationMode !== 'driver' || endLocationMode !== 'none' || finishBy) && (
+                    <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                      {[startLocationMode !== 'driver', endLocationMode !== 'none', !!finishBy].filter(Boolean).length} set
+                    </span>
+                  )}
+                </div>
+                {showShiftOptions ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+              </button>
+
+              {showShiftOptions && (
+                <div className="px-4 pb-4 space-y-5 border-t border-gray-100 pt-4">
+                  {/* Start Location */}
+                  <div>
+                    <label className="text-sm font-semibold text-gray-900 mb-2 block flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-green-600" />
+                      Start Location
+                    </label>
+                    <div className="space-y-2">
+                      {(['driver', 'warehouse', 'custom'] as const).map((mode) => (
+                        <label key={mode} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="startLocation"
+                            checked={startLocationMode === mode}
+                            onChange={() => setStartLocationMode(mode)}
+                            className="w-4 h-4 text-primary border-gray-300 focus:ring-primary/20"
+                          />
+                          <span className="text-sm text-gray-700">
+                            {mode === 'driver' && "Driver's current location"}
+                            {mode === 'warehouse' && 'Warehouse'}
+                            {mode === 'custom' && 'Custom address'}
+                          </span>
+                        </label>
+                      ))}
+                      {startLocationMode === 'custom' && (
+                        <div className="ml-6 mt-1">
+                          <HerePlacesAutocomplete
+                            value={customStartAddress}
+                            onChange={setCustomStartAddress}
+                            onPlaceSelect={(place: HerePlaceDetails) => {
+                              setCustomStartAddress(place.formattedAddress);
+                              setCustomStartLat(place.latitude);
+                              setCustomStartLon(place.longitude);
+                            }}
+                            placeholder="Search start address..."
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* End Location */}
+                  <div>
+                    <label className="text-sm font-semibold text-gray-900 mb-2 block flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-red-500" />
+                      End Location
+                    </label>
+                    <div className="space-y-2">
+                      {(['none', 'warehouse', 'custom'] as const).map((mode) => (
+                        <label key={mode} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="endLocation"
+                            checked={endLocationMode === mode}
+                            onChange={() => setEndLocationMode(mode)}
+                            className="w-4 h-4 text-primary border-gray-300 focus:ring-primary/20"
+                          />
+                          <span className="text-sm text-gray-700">
+                            {mode === 'none' && 'No preference'}
+                            {mode === 'warehouse' && 'Return to warehouse'}
+                            {mode === 'custom' && 'Custom address'}
+                          </span>
+                        </label>
+                      ))}
+                      {endLocationMode === 'custom' && (
+                        <div className="ml-6 mt-1">
+                          <HerePlacesAutocomplete
+                            value={customEndAddress}
+                            onChange={setCustomEndAddress}
+                            onPlaceSelect={(place: HerePlaceDetails) => {
+                              setCustomEndAddress(place.formattedAddress);
+                              setCustomEndLat(place.latitude);
+                              setCustomEndLon(place.longitude);
+                            }}
+                            placeholder="Search end address..."
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Finish By */}
+                  <div>
+                    <label className="text-sm font-semibold text-gray-900 mb-2 block flex items-center gap-1.5">
+                      <CalendarClock className="w-3.5 h-3.5 text-orange-500" />
+                      Finish By
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={finishBy}
+                      onChange={(e) => setFinishBy(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Optional. Route will be optimized to finish before this time.</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Quick Add Buttons */}
@@ -3125,6 +3283,14 @@ function CreateShiftDrawer({
                 >
                   <MoveRight className="w-4 h-4" />
                   Move Request
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowServiceStopForm(true)}
+                  className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-blue-300 hover:border-blue-500 hover:bg-blue-50 rounded-lg transition-all text-sm font-medium text-blue-700"
+                >
+                  <ClipboardCheck className="w-4 h-4" />
+                  Service Stop
                 </button>
                 <button
                   type="button"
@@ -3246,6 +3412,17 @@ function CreateShiftDrawer({
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Service Stop Form */}
+            {showServiceStopForm && (
+              <ServiceStopForm
+                onAdd={(task) => {
+                  setTasks(prev => [...prev, task]);
+                  setShowServiceStopForm(false);
+                }}
+                onCancel={() => setShowServiceStopForm(false)}
+              />
             )}
 
             {/* Smart Suggestions — temporarily hidden
@@ -3561,6 +3738,17 @@ function CreateShiftDrawer({
                       <Warehouse className="w-3.5 h-3.5" />
                       Warehouse
                     </button>
+                    <button
+                      onClick={() => setTaskTypeFilter('service')}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-fast flex items-center gap-1.5 ${
+                        taskTypeFilter === 'service'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      <ClipboardCheck className="w-3.5 h-3.5" />
+                      Service
+                    </button>
                   </div>
                 </div>
 
@@ -3634,9 +3822,12 @@ function CreateShiftDrawer({
                           {task.type === 'placement' && <MapPinned className="w-4 h-4 text-purple-600" />}
                           {task.type === 'pickup' && <ArrowUp className="w-4 h-4 text-orange-600" />}
                           {task.type === 'dropoff' && <ArrowDown className="w-4 h-4 text-orange-600" />}
+                          {task.type === 'service' && <ClipboardCheck className="w-4 h-4 text-blue-600" />}
                           <span className="text-sm font-medium capitalize">
                             {(task.type === 'pickup' || task.type === 'dropoff') && task.move_request_id
                               ? `${task.type} (Move Request)`
+                              : task.type === 'service' && task.task_label
+                              ? task.task_label
                               : task.type.replace('_', ' ')}
                           </span>
                           {task.auto_inserted && (
@@ -3720,6 +3911,30 @@ function CreateShiftDrawer({
                             {task.auto_inserted && <span className="ml-2 text-blue-600">(Auto-inserted)</span>}
                           </p>
                         )}
+
+                        {/* Service task metadata */}
+                        {task.type === 'service' && (
+                          <div className="mt-1">
+                            <p className="text-xs text-gray-500">{task.address}</p>
+                            <div className="flex items-center gap-3 mt-1">
+                              {task.photo_required && (
+                                <span className="text-xs text-gray-400 flex items-center gap-0.5">
+                                  <Camera className="w-3 h-3" /> Photo
+                                </span>
+                              )}
+                              {task.service_duration_seconds && (
+                                <span className="text-xs text-gray-400 flex items-center gap-0.5">
+                                  <Clock className="w-3 h-3" /> {Math.round(task.service_duration_seconds / 60)}min
+                                </span>
+                              )}
+                              {task.earliest_arrival && task.latest_arrival && (
+                                <span className="text-xs text-gray-400 flex items-center gap-0.5">
+                                  <CalendarClock className="w-3 h-3" /> Time window
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         {canDeleteTask(task) && (
@@ -3770,7 +3985,7 @@ function CreateShiftDrawer({
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting || !driverId || !truckCapacity || tasks.length === 0}
+                disabled={isSubmitting || !driverId || tasks.length === 0 || (tasks.some(t => ['collection', 'placement', 'pickup', 'dropoff'].includes(t.type)) && !truckCapacity)}
                 className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-all flex items-center gap-2"
               >
                 {isSubmitting ? (
@@ -3829,8 +4044,9 @@ function CreateShiftDrawer({
                         {type === 'placement' && <MapPinned className="w-4 h-4 text-purple-600" />}
                         {type === 'move_request' && <ArrowUp className="w-4 h-4 text-orange-600" />}
                         {type === 'warehouse_stop' && <Warehouse className="w-4 h-4 text-blue-600" />}
+                        {type === 'service' && <ClipboardCheck className="w-4 h-4 text-blue-600" />}
                         <span className="text-sm font-medium text-gray-900 capitalize">
-                          {type === 'move_request' ? 'Move Requests' : type.replace('_', ' ')}
+                          {type === 'move_request' ? 'Move Requests' : type === 'service' ? 'Service Stops' : type.replace('_', ' ')}
                           <span className="ml-1 text-gray-500">({typeTasks.length})</span>
                         </span>
                       </div>
@@ -4380,6 +4596,187 @@ function DriverCard({
         {driver.currentLocation?.speed !== undefined && (
           <span className="text-gray-600">{Math.round(driver.currentLocation.speed)} km/h</span>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Service Stop Form — inline form for adding service tasks to a shift
+function ServiceStopForm({
+  onAdd,
+  onCancel,
+}: {
+  onAdd: (task: ShiftTask) => void;
+  onCancel: () => void;
+}) {
+  const [taskLabel, setTaskLabel] = useState('');
+  const [address, setAddress] = useState('');
+  const [latitude, setLatitude] = useState(0);
+  const [longitude, setLongitude] = useState(0);
+  const [taskDescription, setTaskDescription] = useState('');
+  const [photoRequired, setPhotoRequired] = useState(true);
+  const [serviceDurationMinutes, setServiceDurationMinutes] = useState(5);
+  const [hasTimeWindow, setHasTimeWindow] = useState(false);
+  const [earliestArrival, setEarliestArrival] = useState('');
+  const [latestArrival, setLatestArrival] = useState('');
+
+  const handleAdd = () => {
+    if (!taskLabel.trim()) return;
+    if (!latitude || !longitude) return;
+
+    const task: ShiftTask = {
+      id: `temp-${Date.now()}-service`,
+      type: 'service',
+      latitude,
+      longitude,
+      address,
+      task_label: taskLabel.trim(),
+      task_description: taskDescription.trim() || undefined,
+      photo_required: photoRequired,
+      service_duration_seconds: serviceDurationMinutes * 60,
+      earliest_arrival: hasTimeWindow && earliestArrival ? new Date(earliestArrival).toISOString() : undefined,
+      latest_arrival: hasTimeWindow && latestArrival ? new Date(latestArrival).toISOString() : undefined,
+      time_window_type: hasTimeWindow && earliestArrival && latestArrival ? 'soft' : undefined,
+    };
+    onAdd(task);
+  };
+
+  return (
+    <div className="border border-blue-200 rounded-xl bg-blue-50/40 p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+          <ClipboardCheck className="w-4 h-4 text-blue-600" />
+          Add Service Stop
+        </h3>
+        <button type="button" onClick={onCancel} className="text-gray-400 hover:text-gray-600">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Stop Name */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 mb-1 block">
+          Stop Name <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          value={taskLabel}
+          onChange={(e) => setTaskLabel(e.target.value)}
+          placeholder="e.g. Inspect dumpster pad"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/20 focus:border-blue-400"
+        />
+      </div>
+
+      {/* Address */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 mb-1 block">
+          Address <span className="text-red-500">*</span>
+        </label>
+        <HerePlacesAutocomplete
+          value={address}
+          onChange={setAddress}
+          onPlaceSelect={(place: HerePlaceDetails) => {
+            setAddress(place.formattedAddress);
+            setLatitude(place.latitude);
+            setLongitude(place.longitude);
+          }}
+          placeholder="Search address..."
+        />
+      </div>
+
+      {/* Description */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 mb-1 block">Description</label>
+        <textarea
+          value={taskDescription}
+          onChange={(e) => setTaskDescription(e.target.value)}
+          placeholder="Optional instructions for the driver..."
+          rows={2}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/20 focus:border-blue-400 resize-none"
+        />
+      </div>
+
+      {/* Options row */}
+      <div className="flex items-center gap-6">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={photoRequired}
+            onChange={(e) => setPhotoRequired(e.target.checked)}
+            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-400/20"
+          />
+          <span className="text-xs text-gray-700 flex items-center gap-1">
+            <Camera className="w-3.5 h-3.5" />
+            Photo required
+          </span>
+        </label>
+        <div className="flex items-center gap-2">
+          <Clock className="w-3.5 h-3.5 text-gray-500" />
+          <span className="text-xs text-gray-600">Duration:</span>
+          <input
+            type="number"
+            min={1}
+            max={120}
+            value={serviceDurationMinutes}
+            onChange={(e) => setServiceDurationMinutes(parseInt(e.target.value) || 5)}
+            className="w-14 px-2 py-1 border border-gray-300 rounded text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-400/20"
+          />
+          <span className="text-xs text-gray-500">min</span>
+        </div>
+      </div>
+
+      {/* Time Window */}
+      <div>
+        <label className="flex items-center gap-2 cursor-pointer mb-2">
+          <input
+            type="checkbox"
+            checked={hasTimeWindow}
+            onChange={(e) => setHasTimeWindow(e.target.checked)}
+            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-400/20"
+          />
+          <span className="text-xs text-gray-700">Set arrival time window</span>
+        </label>
+        {hasTimeWindow && (
+          <div className="grid grid-cols-2 gap-3 ml-6">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Earliest</label>
+              <input
+                type="datetime-local"
+                value={earliestArrival}
+                onChange={(e) => setEarliestArrival(e.target.value)}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400/20"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Latest</label>
+              <input
+                type="datetime-local"
+                value={latestArrival}
+                onChange={(e) => setLatestArrival(e.target.value)}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400/20"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-2 pt-2">
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={!taskLabel.trim() || !latitude || !longitude}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-fast"
+        >
+          Add Stop
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm font-medium transition-fast"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   );
