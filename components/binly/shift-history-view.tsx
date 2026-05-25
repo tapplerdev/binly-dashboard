@@ -36,13 +36,14 @@ function formatTime(ts: number | null): string {
   });
 }
 
+// List view: simplified labels — "Completed" for all endings, "Cancelled" for manager cancellations
 const END_REASON_LABEL: Record<string, { label: string; color: string; bg: string }> = {
-  completed:           { label: 'Completed',          color: 'text-green-700',  bg: 'bg-green-100' },
-  manual_end:          { label: 'Driver Ended',        color: 'text-blue-700',   bg: 'bg-blue-100' },
-  manager_ended:       { label: 'Manager Ended',       color: 'text-amber-700',  bg: 'bg-amber-100' },
-  manager_cancelled:   { label: 'Cancelled',           color: 'text-red-700',    bg: 'bg-red-100' },
-  driver_disconnected: { label: 'Disconnected',        color: 'text-orange-700', bg: 'bg-orange-100' },
-  system_timeout:      { label: 'Timed Out',           color: 'text-gray-700',   bg: 'bg-gray-100' },
+  completed:           { label: 'Completed',  color: 'text-green-700',  bg: 'bg-green-100' },
+  manual_end:          { label: 'Completed',  color: 'text-green-700',  bg: 'bg-green-100' },
+  manager_ended:       { label: 'Completed',  color: 'text-green-700',  bg: 'bg-green-100' },
+  manager_cancelled:   { label: 'Cancelled',  color: 'text-red-700',    bg: 'bg-red-100' },
+  driver_disconnected: { label: 'Completed',  color: 'text-green-700',  bg: 'bg-green-100' },
+  system_timeout:      { label: 'Completed',  color: 'text-green-700',  bg: 'bg-green-100' },
 };
 
 function completionColor(rate: number): string {
@@ -154,8 +155,8 @@ export function ShiftHistoryView() {
   const [driverFilter, setDriverFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedShift, setSelectedShift] = useState<ShiftHistoryEntry | null>(null);
-  // Default to showing only completed and driver-ended shifts (hide cancelled)
-  const [statusFilter, setStatusFilter] = useState<string[]>(['completed', 'manual_end']);
+  // Default to showing completed shifts (hide cancelled)
+  const [statusFilter, setStatusFilter] = useState<string[]>(['completed', 'manual_end', 'manager_ended', 'driver_disconnected', 'system_timeout']);
 
   const { data: driversData } = useDrivers();
   const drivers = driversData ?? [];
@@ -239,24 +240,24 @@ export function ShiftHistoryView() {
             All
           </button>
           <button
-            onClick={() => setStatusFilter(['completed', 'manual_end'])}
+            onClick={() => setStatusFilter(['completed', 'manual_end', 'manager_ended', 'driver_disconnected', 'system_timeout'])}
             className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-              statusFilter.length === 2 && statusFilter.includes('completed') && statusFilter.includes('manual_end')
+              statusFilter.includes('completed') && !statusFilter.includes('manager_cancelled')
                 ? 'bg-green-100 text-green-700 border border-green-300'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            Completed & Ended
+            Completed
           </button>
           <button
-            onClick={() => setStatusFilter(['manager_cancelled', 'manager_ended', 'driver_disconnected', 'system_timeout'])}
+            onClick={() => setStatusFilter(['manager_cancelled'])}
             className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-              statusFilter.includes('manager_cancelled') && statusFilter.length > 2
+              statusFilter.length === 1 && statusFilter.includes('manager_cancelled')
                 ? 'bg-red-100 text-red-700 border border-red-300'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            Cancelled & Issues
+            Cancelled
           </button>
         </div>
       </div>

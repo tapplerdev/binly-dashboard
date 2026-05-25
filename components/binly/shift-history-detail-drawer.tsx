@@ -453,13 +453,14 @@ interface Props {
   onClose: () => void;
 }
 
+// Detail view: granular labels showing how the shift ended
 const END_REASON_LABEL: Record<string, { label: string; color: string; bg: string }> = {
-  completed:           { label: 'Completed',    color: 'text-green-700',  bg: 'bg-green-100' },
-  manual_end:          { label: 'Driver Ended', color: 'text-blue-700',   bg: 'bg-blue-100' },
-  manager_ended:       { label: 'Mgr Ended',    color: 'text-amber-700',  bg: 'bg-amber-100' },
-  manager_cancelled:   { label: 'Cancelled',    color: 'text-red-700',    bg: 'bg-red-100' },
-  driver_disconnected: { label: 'Disconnected', color: 'text-orange-700', bg: 'bg-orange-100' },
-  system_timeout:      { label: 'Timed Out',    color: 'text-gray-700',   bg: 'bg-gray-100' },
+  completed:           { label: 'Completed',              color: 'text-green-700',  bg: 'bg-green-100' },
+  manual_end:          { label: 'Ended by Driver',        color: 'text-green-700',  bg: 'bg-green-100' },
+  manager_ended:       { label: 'Ended by Manager',       color: 'text-amber-700',  bg: 'bg-amber-100' },
+  manager_cancelled:   { label: 'Cancelled by Manager',   color: 'text-red-700',    bg: 'bg-red-100' },
+  driver_disconnected: { label: 'Ended — Driver Disconnected', color: 'text-orange-700', bg: 'bg-orange-100' },
+  system_timeout:      { label: 'Ended — System Timeout',     color: 'text-gray-700',   bg: 'bg-gray-100' },
 };
 
 export function ShiftHistoryDetailDrawer({ shift, onClose }: Props) {
