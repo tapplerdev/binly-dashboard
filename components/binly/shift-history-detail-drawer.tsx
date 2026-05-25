@@ -523,6 +523,8 @@ export function ShiftHistoryDetailDrawer({ shift, onClose }: Props) {
               {new Date(shift.start_time! * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
               {' → '}
               {new Date(shift.end_time! * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+              {' · '}
+              <span className={reason.color}>{reason.label}</span>
             </p>
           </div>
           <button
