@@ -12,6 +12,7 @@ import { IncidentType, formatIncidentType } from '@/lib/types/zone';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
 import { HerePlaceDetails, hereReverseGeocode } from '@/lib/services/geocoding.service';
+import { MapMarkerPin } from '@/components/ui/map-marker-pin';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -280,12 +281,16 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
 
               {/* Address mode pin */}
               {addressMarkerPos && (
-                <AdvancedMarker position={addressMarkerPos} zIndex={30}>
-                  <div className="flex flex-col items-center">
-                    <div className="w-10 h-10 rounded-full bg-purple-600 border-2 border-white shadow-lg flex items-center justify-center">
-                      <MapPin className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="w-2 h-2 bg-purple-600 rounded-full -mt-0.5 opacity-60" />
+                <AdvancedMarker
+                  position={addressMarkerPos}
+                  zIndex={30}
+                  draggable={true}
+                  onDragEnd={(e) => {
+                    if (e.latLng) handleMapClick(e.latLng.lat(), e.latLng.lng());
+                  }}
+                >
+                  <div className="cursor-grab active:cursor-grabbing animate-bounce">
+                    <MapMarkerPin size={44} color="red" icon="x" />
                   </div>
                 </AdvancedMarker>
               )}

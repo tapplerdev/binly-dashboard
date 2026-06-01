@@ -674,6 +674,71 @@ export async function getShiftTasksWithHistory(shiftId: string): Promise<any[]> 
 }
 
 /**
+ * Add tasks to an existing shift
+ */
+export async function addTasksToShift(
+  shiftId: string,
+  tasks: { task_type: string; bin_id?: string; potential_location_id?: string; move_request_id?: string }[],
+): Promise<any> {
+  const response = await fetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ add_tasks: tasks, reoptimize: true }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to add tasks to shift');
+  }
+
+  return response.json();
+}
+
+/**
+ * Create a new shift with tasks for a driver
+ */
+export async function createShiftWithTasks(
+  driverId: string,
+  tasks: { task_type: string; bin_id?: string; potential_location_id?: string; move_request_id?: string }[],
+): Promise<any> {
+  const response = await fetch(`${API_BASE_URL}/api/manager/shifts/create-with-tasks`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      driver_id: driverId,
+      shift_type: 'standard',
+      truck_bin_capacity: 20,
+      tasks,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to create shift with tasks');
+  }
+
+  return response.json();
+}
+
+/**
+ * Re-optimize a shift's route
+ */
+export async function reoptimizeShift(shiftId: string): Promise<any> {
+  const response = await fetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ reoptimize: true }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to re-optimize shift');
+  }
+
+  return response.json();
+}
+
+/**
  * Driver proximity response from backend
  */
 export interface ShiftDriverProximity {

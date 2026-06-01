@@ -99,7 +99,7 @@ export function MapSearchBar({ bins, zones, onSelectResult }: MapSearchBarProps)
           id: zone.id,
           type: 'zone',
           label: zone.name,
-          sublabel: `Zone • Score: ${zone.conflict_score}`,
+          sublabel: `Incident`,
           data: zone,
           score,
         });

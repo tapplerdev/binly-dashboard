@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { APIProvider, Map as GoogleMap, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
-import { MapPin, X, Loader2, Search, Plus, Layers, FileText, Map as MapIcon, ShieldAlert } from 'lucide-react';
+import { MapPin, X, Loader2, Search, Plus, Layers, FileText, Map as MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 // OLD: Google Places Autocomplete (commented out for rollback)
 // import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
@@ -12,9 +12,11 @@ import { HerePlaceDetails, hereReverseGeocode } from '@/lib/services/geocoding.s
 import { inputStyles, cn } from '@/lib/utils';
 import { useBins } from '@/lib/hooks/use-bins';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
-import { useNoGoZones } from '@/lib/hooks/use-zones';
+import { useNoGoZones, useNearbyIncidents } from '@/lib/hooks/use-zones';
+import { formatIncidentType } from '@/lib/types/zone';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
-import { getZoneColor } from '@/lib/types/zone';
+import { NoGoZonePin } from '@/components/ui/no-go-zone-pin';
+import { MapMarkerPin } from '@/components/ui/map-marker-pin';
 
 interface QueuedLocation {
   street: string;
@@ -100,6 +102,7 @@ export function CreatePotentialLocationDialog({
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [markerPosition, setMarkerPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const { data: nearbyIncidents = [] } = useNearbyIncidents(markerPosition?.lat ?? null, markerPosition?.lng ?? null, 800);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [locationQueue, setLocationQueue] = useState<QueuedLocation[]>([]);
   const [hasInteractedWithMap, setHasInteractedWithMap] = useState(false);
@@ -1134,7 +1137,7 @@ export function CreatePotentialLocationDialog({
                   </AdvancedMarker>
                 ))}
 
-                {/* Current potential location marker (orange, bouncing, draggable) */}
+                {/* Current potential location marker (orange, draggable) */}
                 {markerPosition && (
                   <AdvancedMarker
                     position={markerPosition}
@@ -1146,51 +1149,54 @@ export function CreatePotentialLocationDialog({
                       }
                     }}
                   >
-                    <div className="relative animate-bounce">
-                      <div className="w-10 h-10 rounded-full bg-orange-500 border-4 border-white shadow-xl cursor-move" />
-                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-r-[8px] border-t-[12px] border-l-transparent border-r-transparent border-t-orange-500" />
+                    <div className="cursor-grab active:cursor-grabbing animate-bounce">
+                      <MapMarkerPin size={44} color="orange" icon="plus" />
                     </div>
                   </AdvancedMarker>
                 )}
 
-                {/* No-Go Zone markers — warn when placing near a problem area */}
-                {activeZones.map((zone) => {
-                  const color = getZoneColor(zone.conflict_score);
-                  return (
-                    <AdvancedMarker
-                      key={`zone-${zone.id}`}
-                      position={{ lat: zone.center_latitude, lng: zone.center_longitude }}
-                      zIndex={3}
-                    >
-                      <div className="flex flex-col items-center">
-                        <div
-                          className="rounded-full flex items-center justify-center animate-pulse"
-                          style={{
-                            width: 30,
-                            height: 30,
-                            backgroundColor: color + '99',
-                            border: '2px solid white',
-                            boxShadow: `0 0 0 2px ${color}, 0 2px 8px rgba(0,0,0,0.6)`,
-                          }}
-                        >
-                          <ShieldAlert className="w-3.5 h-3.5 text-white" />
-                        </div>
-                        <div
-                          className="mt-0.5 px-1.5 py-0 rounded text-xs font-bold text-white whitespace-nowrap"
-                          style={{
-                            backgroundColor: color,
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.6)',
-                            fontSize: '10px',
-                          }}
-                        >
-                          {zone.name}
-                        </div>
-                      </div>
-                    </AdvancedMarker>
-                  );
-                })}
+                {/* No-Go Zone markers */}
+                {activeZones.map((zone) => (
+                  <AdvancedMarker
+                    key={`zone-${zone.id}`}
+                    position={{ lat: zone.center_latitude, lng: zone.center_longitude }}
+                    zIndex={3}
+                  >
+                    <div className="pointer-events-none" title={zone.name}>
+                      <NoGoZonePin size={30} />
+                    </div>
+                  </AdvancedMarker>
+                ))}
               </GoogleMap>
             </APIProvider>
+
+            {/* Nearby incidents warning */}
+            {nearbyIncidents.length > 0 && markerPosition && (
+              <div className="absolute bottom-16 left-4 right-4 z-20 bg-amber-50 border border-amber-200 rounded-lg p-3 shadow-lg animate-slide-in-down">
+                <p className="text-xs font-semibold text-amber-800 mb-1.5">
+                  {nearbyIncidents.length} incident{nearbyIncidents.length > 1 ? 's' : ''} reported nearby
+                </p>
+                <div className="space-y-1">
+                  {nearbyIncidents.slice(0, 3).map((inc) => (
+                    <a
+                      key={inc.id}
+                      href={`/operations/no-go-zones?zone=${inc.zone_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-xs text-amber-700 hover:text-amber-900 hover:underline cursor-pointer"
+                    >
+                      <span className="w-1 h-1 rounded-full bg-amber-500 shrink-0" />
+                      <span className="font-medium">{formatIncidentType(inc.incident_type)}</span>
+                      <span className="text-amber-500">— {Math.round(inc.distance_meters)}m away</span>
+                      <span className="text-amber-400 ml-auto">View →</span>
+                    </a>
+                  ))}
+                  {nearbyIncidents.length > 3 && (
+                    <p className="text-xs text-amber-500">+{nearbyIncidents.length - 3} more</p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Search Bar Overlay */}
             <div className="absolute top-4 left-1/2 -translate-x-1/2 w-full max-w-md px-4 z-10">

@@ -183,6 +183,8 @@ export function MoveRequestsList() {
                 return move.move_type === 'store' || move.move_type === 'pickup_only'; // backward compatibility
               case 'relocation':
                 return move.move_type === 'relocation';
+              case 'redeployment':
+                return move.move_type === 'redeployment';
               default:
                 return false;
             }
@@ -627,6 +629,7 @@ export function MoveRequestsList() {
               { value: 'completed', label: 'Completed' },
               { value: 'store', label: 'Store' },
               { value: 'relocation', label: 'Relocation' },
+              { value: 'redeployment', label: 'Redeployment' },
             ]}
             onChange={(values) => setFilters(values as MoveFilterOption[])}
           />
@@ -896,6 +899,11 @@ export function MoveRequestsList() {
                         <Package className="h-4 w-4 text-gray-400" />
                         <span className="text-sm text-gray-900 font-medium">Store</span>
                       </div>
+                    ) : move.move_type === 'redeployment' ? (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-gray-400" />
+                        <span className="text-sm text-gray-900 font-medium">Redeployment</span>
+                      </div>
                     ) : (
                       <div className="flex items-center gap-2">
                         <Package className="h-4 w-4 text-gray-400" />
@@ -1061,6 +1069,11 @@ export function MoveRequestsList() {
                   <>
                     <Package className="h-4 w-4 text-gray-400" />
                     <span className="text-gray-900 font-medium">Store</span>
+                  </>
+                ) : move.move_type === 'redeployment' ? (
+                  <>
+                    <MapPin className="h-4 w-4 text-gray-400" />
+                    <span className="text-gray-900 font-medium">Redeployment</span>
                   </>
                 ) : (
                   <>

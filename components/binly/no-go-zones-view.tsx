@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   ShieldAlert,
   List,
@@ -18,14 +18,14 @@ import { useNoGoZones } from '@/lib/hooks/use-zones';
 import {
   NoGoZone,
   ZoneStatus,
-  getZoneSeverity,
-  getZoneColor,
+  formatIncidentType,
 } from '@/lib/types/zone';
 import { ZoneDetailsDrawer } from '@/components/binly/zone-details-drawer';
+import { NoGoZonePin } from '@/components/ui/no-go-zone-pin';
 import { ReportIncidentModal } from '@/components/binly/report-incident-modal';
 
 type ViewMode = 'list' | 'map';
-type SortField = 'conflict_score' | 'created_at_iso' | 'name';
+type SortField = 'created_at_iso' | 'name';
 type SortDir = 'asc' | 'desc';
 
 const STATUS_TABS: { value: ZoneStatus | 'all'; label: string; icon: React.ReactNode }[] = [
@@ -59,28 +59,6 @@ function statusBadge(status: ZoneStatus) {
         </span>
       );
   }
-}
-
-function severityBadge(score: number) {
-  const sev = getZoneSeverity(score);
-  const color = getZoneColor(score);
-  const cls =
-    sev === 'critical'
-      ? 'bg-red-100 text-red-800'
-      : sev === 'high'
-      ? 'bg-orange-100 text-orange-800'
-      : sev === 'medium'
-      ? 'bg-yellow-100 text-yellow-800'
-      : 'bg-gray-100 text-gray-700';
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${cls}`}>
-      <span
-        className="w-1.5 h-1.5 rounded-full"
-        style={{ backgroundColor: color }}
-      />
-      {sev.charAt(0).toUpperCase() + sev.slice(1)} · {score}
-    </span>
-  );
 }
 
 function SortButton({
@@ -122,12 +100,42 @@ export function NoGoZonesView() {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [statusFilter, setStatusFilter] = useState<ZoneStatus | 'all'>('all');
   const [search, setSearch] = useState('');
-  const [sortField, setSortField] = useState<SortField>('conflict_score');
+  const [sortField, setSortField] = useState<SortField>('created_at_iso');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selectedZone, setSelectedZone] = useState<NoGoZone | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
 
   const { data: zones = [], isLoading, error } = useNoGoZones();
+
+  // Auto-open drawer from ?zone= query param (e.g., linked from proximity warning)
+  const [initialZoneHandled, setInitialZoneHandled] = useState(false);
+  useEffect(() => {
+    if (zones.length === 0 || initialZoneHandled) return;
+    const params = new URLSearchParams(window.location.search);
+    const zoneId = params.get('zone');
+    if (zoneId) {
+      const zone = zones.find(z => z.id === zoneId);
+      if (zone) {
+        setSelectedZone(zone);
+        // Scroll to the row after render (offset for sticky header)
+        setTimeout(() => {
+          const row = document.getElementById(`zone-row-${zoneId}`);
+          if (row) {
+            const container = row.closest('.overflow-y-auto');
+            if (container) {
+              const headerHeight = container.querySelector('thead')?.offsetHeight ?? 40;
+              container.scrollTo({ top: row.offsetTop - headerHeight, behavior: 'smooth' });
+            }
+            row.classList.add('bg-amber-50');
+            setTimeout(() => row.classList.remove('bg-amber-50'), 2000);
+          }
+        }, 200);
+      }
+      setInitialZoneHandled(true);
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [zones, initialZoneHandled]);
 
   // Real-time zone cache updates are handled globally by GlobalCentrifugoSync in the layout.
 
@@ -145,9 +153,7 @@ export function NoGoZonesView() {
 
     list.sort((a, b) => {
       let cmp = 0;
-      if (sortField === 'conflict_score') {
-        cmp = a.conflict_score - b.conflict_score;
-      } else if (sortField === 'created_at_iso') {
+      if (sortField === 'created_at_iso') {
         cmp = new Date(a.created_at_iso).getTime() - new Date(b.created_at_iso).getTime();
       } else {
         cmp = a.name.localeCompare(b.name);
@@ -366,13 +372,9 @@ function ZoneListView({
         <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
           <tr>
             <th className="px-4 py-3 text-left">
-              <SortButton field="name" label="Zone" current={sortField} dir={sortDir} onClick={onSort} />
-            </th>
-            <th className="px-4 py-3 text-left">
-              <SortButton field="conflict_score" label="Severity" current={sortField} dir={sortDir} onClick={onSort} />
+              <SortButton field="name" label="Incident" current={sortField} dir={sortDir} onClick={onSort} />
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Status</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Radius</th>
             <th className="px-4 py-3 text-left">
               <SortButton field="created_at_iso" label="Reported" current={sortField} dir={sortDir} onClick={onSort} />
             </th>
@@ -398,32 +400,21 @@ function ZoneRow({ zone, onSelect }: { zone: NoGoZone; onSelect: (z: NoGoZone) =
 
   return (
     <tr
+      id={`zone-row-${zone.id}`}
       className="hover:bg-gray-50 cursor-pointer transition-colors group"
       onClick={() => onSelect(zone)}
     >
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
-          <div
-            className="w-2.5 h-2.5 rounded-full shrink-0"
-            style={{ backgroundColor: getZoneColor(zone.conflict_score) }}
-          />
+          <div className="w-2.5 h-2.5 rounded-full shrink-0 bg-red-500" />
           <span className="font-medium text-gray-900 group-hover:text-red-600 transition-colors">
             {zone.name}
           </span>
         </div>
       </td>
-      <td className="px-4 py-3">{severityBadge(zone.conflict_score)}</td>
       <td className="px-4 py-3">
-        <div className="flex flex-wrap items-center gap-1">
-          {statusBadge(zone.status)}
-          {zone.resolution_type === 'merged' && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-              Merged
-            </span>
-          )}
-        </div>
+        {statusBadge(zone.status)}
       </td>
-      <td className="px-4 py-3 text-gray-600">{zone.radius_meters}m</td>
       <td className="px-4 py-3 text-gray-500">
         <div className="flex items-center gap-1">
           <Clock className="w-3.5 h-3.5" />
@@ -520,43 +511,13 @@ function ZoneMapMarker({
   AdvancedMarker: React.ComponentType<any>;
   onSelect: (z: NoGoZone) => void;
 }) {
-  const color = getZoneColor(zone.conflict_score);
-  const isActive = zone.status === 'active';
-
   return (
     <AdvancedMarker
       position={{ lat: zone.center_latitude, lng: zone.center_longitude }}
       onClick={() => onSelect(zone)}
     >
-      <div
-        className="flex flex-col items-center cursor-pointer"
-        title={zone.name}
-      >
-        {/* Zone circle with white ring for satellite contrast */}
-        <div
-          className={`rounded-full flex items-center justify-center hover:scale-110 transition-transform ${isActive ? 'animate-pulse' : ''}`}
-          style={{
-            width: 36,
-            height: 36,
-            backgroundColor: color + '99',
-            border: '2px solid white',
-            boxShadow: `0 0 0 2px ${color}, 0 2px 10px rgba(0,0,0,0.7)`,
-          }}
-        >
-          <ShieldAlert
-            className="w-4 h-4 text-white drop-shadow"
-          />
-        </div>
-        {/* Always-visible label with drop shadow for satellite readability */}
-        <div
-          className="mt-1 px-2 py-0.5 rounded text-xs font-bold text-white whitespace-nowrap"
-          style={{
-            backgroundColor: color,
-            boxShadow: '0 1px 4px rgba(0,0,0,0.7)',
-          }}
-        >
-          {zone.name}
-        </div>
+      <div className="cursor-pointer hover:scale-110 transition-transform" title={zone.name}>
+        <NoGoZonePin size={36} />
       </div>
     </AdvancedMarker>
   );

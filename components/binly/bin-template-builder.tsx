@@ -7,7 +7,8 @@ import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { Route } from '@/lib/types/route';
 import { getRoutes, createRoute, updateRoute, deleteRoute } from '@/lib/api/routes';
-import { Loader2, Plus, X, Trash2, Edit2, MapPin, Package, Search, Filter } from 'lucide-react';
+import { Loader2, Plus, X, Trash2, Edit2, MapPin, Package, Search, Filter, Sparkles } from 'lucide-react';
+import { SmartRoutesModal } from './smart-routes-modal';
 import { TemplateEditorModal } from './template-editor-modal';
 import { DeleteConfirmationModal } from './delete-confirmation-modal';
 
@@ -29,6 +30,7 @@ export function BinTemplateBuilder() {
   const [filterArea, setFilterArea] = useState('all');
   const [filterBinCount, setFilterBinCount] = useState('all');
   const [isClosing, setIsClosing] = useState(false);
+  const [showSmartRoutes, setShowSmartRoutes] = useState(false);
   const [isDrawerMounted, setIsDrawerMounted] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<Route | null>(null);
@@ -203,13 +205,22 @@ export function BinTemplateBuilder() {
       <div className="w-80 bg-white border-r border-gray-200 flex flex-col z-10">
         <div className="p-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900 mb-3">Bin Templates</h2>
-          <button
-            onClick={openCreateModal}
-            className="w-full px-4 py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-fast flex items-center justify-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            New Template
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openCreateModal}
+              className="flex-1 px-4 py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-fast flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              New Template
+            </button>
+            <button
+              onClick={() => setShowSmartRoutes(true)}
+              className="px-3 py-2.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg font-medium hover:bg-amber-100 transition-fast flex items-center justify-center gap-1.5"
+              title="Auto-generate routes from bin data"
+            >
+              <Sparkles className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Search Bar */}
@@ -580,6 +591,9 @@ export function BinTemplateBuilder() {
         cancelText="Cancel"
         isDeleting={isDeleting}
       />
+      {showSmartRoutes && (
+        <SmartRoutesModal onClose={() => { setShowSmartRoutes(false); loadTemplates(); }} />
+      )}
     </div>
   );
 }

@@ -161,6 +161,11 @@ export function MoveRequestDetailDrawer({
                       <Package className="h-4 w-4 text-primary" />
                       <span className="text-gray-900 font-semibold">Store in Warehouse</span>
                     </>
+                  ) : moveRequest.move_type === 'redeployment' ? (
+                    <>
+                      <MapPin className="h-4 w-4 text-primary" />
+                      <span className="text-gray-900 font-semibold">Redeployment</span>
+                    </>
                   ) : (
                     <>
                       <Package className="h-4 w-4 text-primary" />

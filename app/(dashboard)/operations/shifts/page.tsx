@@ -1,4 +1,4 @@
-import { ShiftsView } from '@/components/binly/shifts-view';
+import { ShiftsBoardView } from '@/components/binly/shifts-board-view';
 
 export const metadata = {
   title: 'Shifts - Binly Dashboard',
@@ -6,5 +6,5 @@ export const metadata = {
 };
 
 export default function ShiftsPage() {
-  return <ShiftsView />;
+  return <ShiftsBoardView />;
 }

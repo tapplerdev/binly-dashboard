@@ -10,6 +10,9 @@ import { HerePlaceDetails } from '@/lib/services/geocoding.service';
 import { X, MapPin, Calendar, Loader2, Building2, FileText, AlertCircle } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ActiveShiftWarningDialog } from './active-shift-warning-dialog';
+import { MapMarkerPin } from '@/components/ui/map-marker-pin';
+import { useNearbyIncidents } from '@/lib/hooks/use-zones';
+import { formatIncidentType } from '@/lib/types/zone';
 
 // ─── Map auto-fit controller ──────────────────────────────────────────────────
 function MapBoundsController({
@@ -77,6 +80,7 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
   );
   const [destLat, setDestLat] = useState<number | null>(moveRequest.new_latitude ?? null);
   const [destLng, setDestLng] = useState<number | null>(moveRequest.new_longitude ?? null);
+  const { data: nearbyIncidents = [] } = useNearbyIncidents(destPos?.lat ?? null, destPos?.lng ?? null, 800);
   const [geocodingCurrentAddr, setGeocodingCurrentAddr] = useState(false);
   const [reverseGeocoding, setReverseGeocoding] = useState(false);
   const [addressAutoFilled, setAddressAutoFilled] = useState({ street: false, city: false, zip: false });
@@ -343,7 +347,7 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
                     </AdvancedMarker>
                   )}
 
-                  {/* Destination — indigo teardrop pin, draggable (relocation only) */}
+                  {/* Destination — blue pin, draggable (relocation only) */}
                   {isRelocation && destPos && (
                     <AdvancedMarker
                       position={destPos}
@@ -351,16 +355,8 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
                       onDragEnd={handleMarkerDragEnd}
                       zIndex={10}
                     >
-                      <div className="relative cursor-grab active:cursor-grabbing flex flex-col items-center" style={{ transform: 'translateY(-50%)' }}>
-                        {/* Teardrop SVG pin */}
-                        <svg width="32" height="42" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-lg">
-                          <path d="M16 0C7.163 0 0 7.163 0 16c0 11.046 16 26 16 26s16-14.954 16-26C32 7.163 24.837 0 16 0z" fill="#4F46E5"/>
-                          <circle cx="16" cy="16" r="7" fill="white"/>
-                          <circle cx="16" cy="16" r="4" fill="#4F46E5"/>
-                        </svg>
-                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded shadow">
-                          Destination
-                        </div>
+                      <div className="cursor-grab active:cursor-grabbing">
+                        <MapMarkerPin size={44} color="blue" icon="dot" />
                       </div>
                     </AdvancedMarker>
                   )}
@@ -373,6 +369,31 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
                   {reverseGeocoding
                     ? <span className="flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Looking up address...</span>
                     : 'Click anywhere on the map to place destination · or drag the pin · or type an address'}
+                </div>
+              )}
+
+              {/* Nearby incidents warning */}
+              {nearbyIncidents.length > 0 && destPos && isRelocation && (
+                <div className="absolute top-4 right-4 z-20 bg-amber-50 border border-amber-200 rounded-lg p-3 shadow-lg max-w-[250px] animate-slide-in-down">
+                  <p className="text-xs font-semibold text-amber-800 mb-1.5">
+                    {nearbyIncidents.length} incident{nearbyIncidents.length > 1 ? 's' : ''} nearby
+                  </p>
+                  <div className="space-y-1">
+                    {nearbyIncidents.slice(0, 3).map((inc) => (
+                      <a
+                        key={inc.id}
+                        href={`/operations/no-go-zones?zone=${inc.zone_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-xs text-amber-700 hover:text-amber-900 hover:underline cursor-pointer"
+                      >
+                        <span className="w-1 h-1 rounded-full bg-amber-500 shrink-0" />
+                        <span className="font-medium">{formatIncidentType(inc.incident_type)}</span>
+                        <span className="text-amber-500">— {Math.round(inc.distance_meters)}m</span>
+                        <span className="text-amber-400 ml-auto">View →</span>
+                      </a>
+                    ))}
+                  </div>
                 </div>
               )}
 

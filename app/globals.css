@@ -207,6 +207,29 @@
     }
   }
 
+  @keyframes pending-task-pulse {
+    0%, 100% {
+      box-shadow: 0 0 4px rgba(59, 130, 246, 0.2);
+      transform: scale(1);
+    }
+    50% {
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+      transform: scale(1.01);
+    }
+  }
+
+  .animate-pending-task {
+    animation: pending-task-pulse 2s ease-in-out infinite;
+  }
+
+  /* Remove blue focus outlines from all interactive elements */
+  .recharts-wrapper, .recharts-surface,
+  .recharts-wrapper:focus, .recharts-surface:focus,
+  .recharts-wrapper:focus-visible, .recharts-surface:focus-visible,
+  div:focus, div:focus-visible {
+    outline: none !important;
+  }
+
   /* Animation utility classes */
   .animate-fade-in {
     animation: fadeIn 0.3s ease-in-out forwards;

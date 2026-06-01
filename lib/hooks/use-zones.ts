@@ -7,6 +7,7 @@ import {
   verifyFieldObservation,
   getShiftIncidents,
   createManagerIncidentReport,
+  getNearbyIncidents,
 } from '@/lib/api/zones';
 
 // Query keys
@@ -97,6 +98,18 @@ export function useVerifyFieldObservation() {
 /**
  * Submit a manager incident report (phone call → zone creation)
  */
+/**
+ * Fetch nearby active incidents for proximity warnings
+ */
+export function useNearbyIncidents(lat: number | null, lng: number | null, radius: number = 800) {
+  return useQuery({
+    queryKey: ['nearby-incidents', lat, lng, radius],
+    queryFn: () => getNearbyIncidents(lat!, lng!, radius),
+    enabled: lat !== null && lng !== null,
+    staleTime: 30 * 1000,
+  });
+}
+
 export function useCreateManagerIncidentReport() {
   const queryClient = useQueryClient();
 

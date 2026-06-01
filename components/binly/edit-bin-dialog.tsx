@@ -16,6 +16,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
 import { ActiveShiftWarningDialog } from './active-shift-warning-dialog';
 import { PotentialLocationPin } from '@/components/ui/potential-location-pin';
+import { MapMarkerPin } from '@/components/ui/map-marker-pin';
 
 // ─── Reason options by context ──────────────────────────────────────────────
 
@@ -1342,7 +1343,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                   onComplete={() => setMapCenter(null)}
                 />
 
-                {/* Current bin marker (being edited) - draggable standard Google Maps pin */}
+                {/* Current bin marker (being edited) - draggable green pin */}
                 {markerPosition && (
                   <AdvancedMarker
                     position={markerPosition}
@@ -1353,7 +1354,11 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                         handleMarkerDrag(e.latLng.lat(), e.latLng.lng());
                       }
                     }}
-                  />
+                  >
+                    <div className="cursor-grab active:cursor-grabbing">
+                      <MapMarkerPin size={44} color="green" icon="plus" />
+                    </div>
+                  </AdvancedMarker>
                 )}
 
                 {/* Other bins */}

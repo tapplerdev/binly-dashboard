@@ -278,7 +278,7 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
   const statusLabel = getShiftStatusLabel(shift.status);
   const isActive = shift.status === 'active';
   const isCompleted = shift.status === 'completed';
-  const canRemoveTasks = shift.status === 'active' || shift.status === 'ready';
+  const canRemoveTasks = shift.status === 'active' || shift.status === 'scheduled';
 
   // Support both task-based and bin-based systems
   const usingTasks = tasks.length > 0;
@@ -550,29 +550,15 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
               ) : (
                 <div className="space-y-2">
                   {(() => {
-                    console.log('🔍 [SHIFT DETAILS RENDER] About to render', tasks.length, 'tasks');
-                    console.log('🔍 [SHIFT DETAILS RENDER] Tasks data:', JSON.stringify(tasks, null, 2));
-                    return null;
-                  })()}
-                  {(() => {
-                    // Filter out warehouse stops (they're backend-generated and shouldn't be shown in UI)
                     const filteredTasks = tasks.filter(t => t.task_type !== 'warehouse_stop');
-                    console.log(`🔧 [SHIFT DETAILS] Filtered out ${tasks.length - filteredTasks.length} warehouse_stop task(s)`);
-
-                    // Find first uncompleted task index (this is the in-progress task)
-                    const sortedTasks = filteredTasks.sort((a, b) => a.sequence_order - b.sequence_order);
+                    const sortedTasks = [...filteredTasks].sort((a, b) => a.sequence_order - b.sequence_order);
                     const firstUncompletedIndex = sortedTasks.findIndex(
                       t => t.is_completed === 0 && !t.skipped && !t.is_deleted
                     );
 
                     return sortedTasks.map((task, index) => {
-                    console.log('🔍 [SHIFT DETAILS RENDER] Rendering task:', task.id, 'Type:', task.task_type);
-                    console.log('🔍 [SHIFT DETAILS RENDER] Task label:', getTaskLabel(task));
-                    console.log('🔍 [SHIFT DETAILS RENDER] Task subtitle:', getTaskSubtitle(task));
-
                     const isCompleted = task.is_completed === 1;
                     const isSkipped = task.skipped === true;
-                    // Only show "in-progress" for active shifts (not scheduled/ready)
                     const isInProgress = shift.status === 'active' && index === firstUncompletedIndex && !isCompleted && !isSkipped;
                     const completedTime = task.completed_at
                       ? new Date(task.completed_at * 1000).toLocaleTimeString('en-US', {
@@ -582,7 +568,6 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                         })
                       : null;
 
-                    // Get task type icon
                     const TaskIcon =
                       task.task_type === 'collection' ? Trash2 :
                       task.task_type === 'placement' ? MapPin :
@@ -666,9 +651,8 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                           </p>
                         </div>
 
-                        {/* Rich Data Display - varies by task type and completion status */}
+                        {/* Rich Data Display */}
                         <div className="flex-shrink-0 flex items-center gap-3">
-                          {/* Skip Reason */}
                           {isSkipped && (() => {
                             const skipReason = getSkipReason(task.task_data);
                             return skipReason ? (
@@ -681,7 +665,6 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                             ) : null;
                           })()}
 
-                          {/* Placement: Show converted bin number */}
                           {task.task_type === 'placement' && isCompleted && !isSkipped && task.new_bin_number && (
                             <div className="flex items-center gap-2">
                               <span className="text-xs text-gray-500 font-medium">Converted to</span>
@@ -692,10 +675,8 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                             </div>
                           )}
 
-                          {/* Collection: Show photo + fill percentage */}
                           {task.task_type === 'collection' && isCompleted && !isSkipped && (
                             <>
-                              {/* Photo thumbnail */}
                               {task.photo_url && (
                                 <button
                                   onClick={() => setFullscreenPhoto(task.photo_url!)}
@@ -711,8 +692,6 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                                   </div>
                                 </button>
                               )}
-
-                              {/* Fill percentage */}
                               <div className="text-right">
                                 <p className="text-sm font-semibold text-gray-900">
                                   {task.updated_fill_percentage ?? task.fill_percentage}% Fill
@@ -725,6 +704,7 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                     );
                   });
                   })()}
+
 
                   {/* Removed Tasks Collapsible Section */}
                   {(() => {
@@ -998,8 +978,8 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
           </div>
         </div>
 
-        {/* Footer Actions - Show for active, ready, and scheduled shifts */}
-        {(shift.status === 'active' || shift.status === 'ready' || shift.status === 'scheduled') && (
+        {/* Footer Actions - Show for active and scheduled shifts */}
+        {(shift.status === 'active' || shift.status === 'scheduled') && (
           <div className="border-t border-gray-200 p-4 bg-gray-50">
             {cancelError && (
               <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -1174,6 +1154,7 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
           />
         </div>
       )}
+
     </>
   );
 }

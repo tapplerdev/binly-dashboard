@@ -1386,12 +1386,18 @@ interface WarehouseDeploymentItem {
 }
 
 // Create/Edit Shift Drawer Component
-function CreateShiftDrawer({
+export function CreateShiftDrawer({
   shift,
   onClose,
+  defaultDriverId,
+  scheduledDate,
+  onViewExistingShift,
 }: {
   shift?: Shift | null;
   onClose: () => void;
+  defaultDriverId?: string;
+  scheduledDate?: Date;
+  onViewExistingShift?: (shiftCreatedAt: number) => void;
 }) {
   const isEditMode = !!shift;
   const { data: drivers = [], isLoading: loadingDrivers } = useDrivers();
@@ -1399,7 +1405,7 @@ function CreateShiftDrawer({
   const { token } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const [driverId, setDriverId] = useState(shift?.driverId || '');
+  const [driverId, setDriverId] = useState(shift?.driverId || defaultDriverId || '');
   const [truckCapacity, setTruckCapacity] = useState(shift?.truck_bin_capacity?.toString() || '');
   const [lockRouteOrder, setLockRouteOrder] = useState(false);
   const [tasks, setTasks] = useState<ShiftTask[]>([]);
@@ -1422,6 +1428,7 @@ function CreateShiftDrawer({
   const [isDriverDropdownOpen, setIsDriverDropdownOpen] = useState(false);
   const [isDriverClosing, setIsDriverClosing] = useState(false);
   const [showBinSelection, setShowBinSelection] = useState(false);
+  const [conflictShift, setConflictShift] = useState<{ id: string; status: string; created_at: number; active_tasks: number } | null>(null);
   const [allBins, setAllBins] = useState<Bin[]>([]);
   const [showRouteImport, setShowRouteImport] = useState(false);
   const [editingTaskIndex, setEditingTaskIndex] = useState<number | null>(null);
@@ -1449,6 +1456,8 @@ function CreateShiftDrawer({
   const [customEndLat, setCustomEndLat] = useState(0);
   const [customEndLon, setCustomEndLon] = useState(0);
   const [finishBy, setFinishBy] = useState('');
+  const [availableAt, setAvailableAt] = useState<'now' | '1h' | '2h' | 'custom'>('now');
+  const [customAvailableTime, setCustomAvailableTime] = useState('');
   const [showServiceStopForm, setShowServiceStopForm] = useState(false);
 
   // Proximity warning state
@@ -2767,7 +2776,7 @@ function CreateShiftDrawer({
         address: warehouse?.address || 'Warehouse'
       });
 
-      const isCustomShift = !!(shiftLabel || startLocationMode !== 'driver' || endLocationMode !== 'none' || finishBy || tasks.some(t => t.type === 'service'));
+      const isCustomShift = !!(shiftLabel || startLocationMode !== 'driver' || endLocationMode !== 'none' || finishBy || availableAt !== 'now' || tasks.some(t => t.type === 'service'));
 
       const payload: Record<string, unknown> = {
         driver_id: driverId,
@@ -2778,10 +2787,22 @@ function CreateShiftDrawer({
         lock_route_order: lockRouteOrder,
         tasks: tasksPayload,
         warehouse_deployments: warehouseDeployments.length > 0 ? warehouseDeployments : undefined,
+        // Scheduled date
+        scheduled_date: (() => {
+          const d = scheduledDate || new Date();
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        })(),
         // Custom shift fields (auto-detected)
         ...(isCustomShift && { shift_type: 'custom' }),
         ...(shiftLabel && { shift_label: shiftLabel }),
         ...(finishBy && { scheduled_end: new Date(finishBy).toISOString() }),
+        ...(availableAt !== 'now' && {
+          scheduled_start: availableAt === '1h'
+            ? new Date(Date.now() + 60 * 60 * 1000).toISOString()
+            : availableAt === '2h'
+            ? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+            : customAvailableTime ? new Date(customAvailableTime).toISOString() : undefined,
+        }),
         // Start location override
         ...(startLocationMode === 'warehouse' && warehouse && {
           start_latitude: warehouse.latitude,
@@ -2939,6 +2960,17 @@ function CreateShiftDrawer({
       }
 
       if (!response.ok) {
+        // Handle duplicate shift conflict
+        if (response.status === 409) {
+          try {
+            const conflictData = await response.json();
+            if (conflictData.existing_shift) {
+              setConflictShift(conflictData.existing_shift);
+              setIsSubmitting(false);
+              return;
+            }
+          } catch {}
+        }
         let errorMessage = `Failed to ${isEditMode ? 'update' : 'create'} shift (${response.status} ${response.statusText})`;
         try {
           const errorData = await response.json();
@@ -2970,9 +3002,16 @@ function CreateShiftDrawer({
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {isEditMode ? 'Edit Shift' : 'Create Shift'}
-          </h2>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              {isEditMode ? 'Edit Shift' : 'Create Shift'}
+            </h2>
+            {!isEditMode && scheduledDate && (
+              <p className="text-xs text-gray-500">
+                {scheduledDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+              </p>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-fast"
@@ -3119,6 +3158,46 @@ function CreateShiftDrawer({
               </label>
             </div>
 
+            {/* Available At */}
+            {!isEditMode && (
+              <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <label className="text-sm font-semibold text-gray-900 mb-2 block flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-blue-500" />
+                  Available At
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    { value: 'now', label: 'Now' },
+                    { value: '1h', label: 'In 1 hour' },
+                    { value: '2h', label: 'In 2 hours' },
+                    { value: 'custom', label: 'Pick time' },
+                  ] as const).map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setAvailableAt(opt.value)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                        availableAt === opt.value
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {availableAt === 'custom' && (
+                  <input
+                    type="datetime-local"
+                    value={customAvailableTime}
+                    onChange={(e) => setCustomAvailableTime(e.target.value)}
+                    className="mt-2 w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                )}
+                <p className="text-xs text-gray-400 mt-1.5">When the driver can see and start this shift.</p>
+              </div>
+            )}
+
             {/* Shift Options (collapsible) */}
             <div className="border border-gray-200 rounded-xl overflow-hidden">
               <button
@@ -3131,7 +3210,7 @@ function CreateShiftDrawer({
                   <span className="text-sm font-semibold text-gray-900">Shift Options</span>
                   {(startLocationMode !== 'driver' || endLocationMode !== 'none' || finishBy) && (
                     <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">
-                      {[startLocationMode !== 'driver', endLocationMode !== 'none', !!finishBy].filter(Boolean).length} set
+                      {[startLocationMode !== 'driver', endLocationMode !== 'none', !!finishBy].filter(Boolean).length} option{[startLocationMode !== 'driver', endLocationMode !== 'none', !!finishBy].filter(Boolean).length > 1 ? 's' : ''}
                     </span>
                   )}
                 </div>
@@ -3965,12 +4044,60 @@ function CreateShiftDrawer({
 
           {/* Footer */}
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-            {error && (
+            {error && !conflictShift && (
               <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
                 <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
                 <span className="text-sm text-red-800">{error}</span>
+              </div>
+            )}
+
+            {conflictShift && (
+              <div className="mb-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-sm font-semibold text-amber-900 mb-1">Driver already has a shift</p>
+                <p className="text-xs text-amber-700 mb-3">
+                  {conflictShift.active_tasks} task{conflictShift.active_tasks !== 1 ? 's' : ''} · {conflictShift.status} · Created {new Date(conflictShift.created_at * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onViewExistingShift) {
+                        onViewExistingShift(conflictShift.created_at);
+                      } else {
+                        onClose();
+                      }
+                      setConflictShift(null);
+                    }}
+                    className="flex-1 px-3 py-2 text-xs font-medium text-amber-800 bg-white border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors"
+                  >
+                    View Existing Shift
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+                        const token = localStorage.getItem('binly-auth-storage');
+                        const authToken = token ? JSON.parse(token)?.state?.token : null;
+                        await fetch(`${API_URL}/api/manager/shifts/${conflictShift.id}/cancel`, {
+                          method: 'PUT',
+                          headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {},
+                        });
+                        setConflictShift(null);
+                        // Re-submit
+                        handleSubmit(new Event('submit') as any);
+                      } catch {
+                        setError('Failed to cancel existing shift');
+                        setConflictShift(null);
+                      }
+                    }}
+                    className="flex-1 px-3 py-2 text-xs font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition-colors"
+                  >
+                    Cancel Old & Create New
+                  </button>
+                </div>
               </div>
             )}
 

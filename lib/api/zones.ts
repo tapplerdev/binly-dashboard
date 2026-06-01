@@ -2,7 +2,7 @@
  * No-Go Zones API service
  */
 
-import { CreateManagerIncidentRequest, NoGoZone, ZoneIncident } from '@/lib/types/zone';
+import { CreateManagerIncidentRequest, NoGoZone, ZoneIncident, NearbyIncident } from '@/lib/types/zone';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -204,4 +204,26 @@ export async function createManagerIncidentReport(
   }
 
   return response.json();
+}
+
+/**
+ * Get nearby active incidents within a radius of a point
+ * GET /api/incidents/nearby?lat=X&lng=Y&radius=800
+ */
+export async function getNearbyIncidents(
+  lat: number,
+  lng: number,
+  radius: number = 800,
+): Promise<NearbyIncident[]> {
+  try {
+    const response = await fetch(
+      `${API_URL}/api/incidents/nearby?lat=${lat}&lng=${lng}&radius=${radius}`,
+      { headers: { 'Content-Type': 'application/json' }, cache: 'no-store' },
+    );
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data.incidents || [];
+  } catch {
+    return [];
+  }
 }

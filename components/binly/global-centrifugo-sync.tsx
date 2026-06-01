@@ -81,29 +81,6 @@ export function GlobalCentrifugoSync() {
           break;
         }
 
-        case 'zone_merged': {
-          const { consumed_zone_id } = event.data as {
-            consumed_zone_id: string;
-            surviving_zone_id: string;
-          };
-          // Live map: remove the consumed zone circle
-          queryClient.setQueryData<NoGoZone[]>(
-            zoneKeys.byStatus('active'),
-            (old) => old?.filter((z) => z.id !== consumed_zone_id) ?? []
-          );
-          // Zones list view: mark as resolved+merged (keeps it in the resolved tab)
-          queryClient.setQueryData<NoGoZone[]>(
-            zoneKeys.byStatus(undefined),
-            (old) =>
-              old?.map((z) =>
-                z.id === consumed_zone_id
-                  ? { ...z, status: 'resolved' as const, resolution_type: 'merged' as const }
-                  : z
-              ) ?? []
-          );
-          break;
-        }
-
         // ── Potential Location events ──────────────────────────────────────────
 
         case 'potential_location_created': {
@@ -172,9 +149,13 @@ export function GlobalCentrifugoSync() {
         case 'shift_cancelled':
         case 'bulk_shifts_cancelled':
         case 'shift_edited':
-        case 'route_reoptimized': {
+        case 'route_reoptimized':
+        case 'shift_auto_ended':
+        case 'driver_shift_change': {
           console.log(`🔄 [GlobalCentrifugoSync] shift event: ${event.type}`);
           queryClient.invalidateQueries({ queryKey: shiftKeys.all });
+          queryClient.invalidateQueries({ queryKey: ['board-shifts'] });
+          queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === 'board-tasks' });
           break;
         }
 

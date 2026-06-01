@@ -9,7 +9,7 @@ import { Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { useBins } from '@/lib/hooks/use-bins';
 import { useNoGoZones } from '@/lib/hooks/use-zones';
 import { isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
-import { getZoneColorRgba } from '@/lib/types/zone';
+import { NoGoZonePin } from '@/components/ui/no-go-zone-pin';
 
 // Default map center (San Jose, CA area)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -75,14 +75,11 @@ export function TacticalMap({ className }: TacticalMapProps) {
                   zIndex={1}
                 >
                   <div
-                    className="rounded-full shadow-lg cursor-pointer transition-all duration-300 hover:scale-110 animate-scale-in"
-                    style={{
-                      width: '48px',
-                      height: '48px',
-                      backgroundColor: getZoneColorRgba(zone.conflict_score, 0.4),
-                    }}
-                    title={`${zone.name} - Score: ${zone.conflict_score}`}
-                  />
+                    className="cursor-pointer transition-all duration-300 hover:scale-110 animate-scale-in"
+                    title={zone.name}
+                  >
+                    <NoGoZonePin size={36} />
+                  </div>
                 </AdvancedMarker>
               ))}
 

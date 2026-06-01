@@ -442,13 +442,16 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onEdit }: BinDet
                       {/* Move Type and Status */}
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2">
-                          {activeMoveRequest.move_type === 'pickup_only' ? (
+                          {activeMoveRequest.move_type === 'pickup_only' || activeMoveRequest.move_type === 'store' ? (
                             <PackageX className="w-5 h-5 text-blue-600" />
                           ) : (
                             <ArrowRight className="w-5 h-5 text-blue-600" />
                           )}
                           <span className="font-semibold text-gray-900">
-                            {activeMoveRequest.move_type === 'pickup_only' ? 'Pickup Only' : 'Relocation'}
+                            {activeMoveRequest.move_type === 'pickup_only' ? 'Pickup Only'
+                              : activeMoveRequest.move_type === 'store' ? 'Store in Warehouse'
+                              : activeMoveRequest.move_type === 'redeployment' ? 'Redeployment'
+                              : 'Relocation'}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">

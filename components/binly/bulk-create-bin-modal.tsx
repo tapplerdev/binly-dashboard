@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
 import { hereReverseGeocode, HerePlaceDetails } from '@/lib/services/geocoding.service';
 import { Map as GoogleMap, AdvancedMarker, Pin, useMap, InfoWindow } from '@vis.gl/react-google-maps';
+import { MapMarkerPin } from '@/components/ui/map-marker-pin';
 
 interface BinRow {
   id: string;
@@ -111,7 +112,11 @@ const MapContent = React.memo(function MapContent({
                   onMarkerDrag(e.latLng.lat(), e.latLng.lng());
                 }
               }}
-            />
+            >
+              <div className={index === currentRowIndex ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}>
+                <MapMarkerPin size={38} color="green" icon="plus" />
+              </div>
+            </AdvancedMarker>
             {selectedMarkerId === row.id && (
               <InfoWindow
                 position={{ lat, lng }}

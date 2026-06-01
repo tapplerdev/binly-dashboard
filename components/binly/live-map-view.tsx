@@ -17,10 +17,11 @@ import {
   getBinMarkerColor,
   getFillLevelCategory,
 } from '@/lib/types/bin';
-import { NoGoZone, getZoneColor, getZoneColorRgba, getZoneOpacity, getZoneSeverity } from '@/lib/types/zone';
+import { NoGoZone } from '@/lib/types/zone';
 import { PotentialLocation } from '@/lib/api/potential-locations';
 import { Card } from '@/components/ui/card';
-import { Loader2, Filter, ChevronDown, ShieldAlert } from 'lucide-react';
+import { Loader2, Filter, ChevronDown } from 'lucide-react';
+import { NoGoZonePin } from '@/components/ui/no-go-zone-pin';
 import { ZoneDetailsDrawer } from './zone-details-drawer';
 import { BinDetailDrawer } from './bin-detail-drawer';
 import { PotentialLocationDetailsDrawer } from './potential-location-details-drawer';
@@ -100,71 +101,7 @@ function ZoneCircles({
     };
   }, [map, onZoomChange]);
 
-  useEffect(() => {
-    console.log('🗺️ Zone rendering effect triggered:', {
-      hasMap: !!map,
-      showNoGoZones,
-      zonesCount: zones.length,
-      zoom,
-      renderMode: zoom < 14 ? 'pixel-markers' : 'geographic-circles',
-    });
-
-    if (!map || !showNoGoZones) {
-      console.log('⏭️ Skipping zone rendering:', { hasMap: !!map, showNoGoZones });
-      return;
-    }
-
-    const circles: google.maps.Circle[] = [];
-
-    zones.forEach((zone) => {
-      // At high zoom (14+), use accurate geographic circles
-      // At low zoom (<14), circles are handled via AdvancedMarker in JSX below
-      if (zoom >= 14) {
-        // Calculate zoom-dependent radius for smooth scaling
-        const baseRadius = zone.radius_meters;
-        const zoomScaleFactor = Math.pow(2, 15 - zoom);
-        const adjustedRadius = baseRadius * Math.min(zoomScaleFactor, 8); // Cap at 8x for realistic appearance
-
-        console.log('🔴 Creating geographic circle for zone:', {
-          name: zone.name,
-          center: { lat: zone.center_latitude, lng: zone.center_longitude },
-          baseRadius: zone.radius_meters,
-          adjustedRadius: Math.round(adjustedRadius),
-          zoomLevel: zoom,
-          scaleFactor: zoomScaleFactor.toFixed(2),
-          color: getZoneColor(zone.conflict_score),
-          opacity: getZoneOpacity(zone.status),
-          score: zone.conflict_score,
-        });
-
-        const circle = new google.maps.Circle({
-          strokeColor: '#FFFFFF',
-          strokeOpacity: 0.9,
-          strokeWeight: 4,
-          fillColor: getZoneColor(zone.conflict_score),
-          fillOpacity: getZoneOpacity(zone.status),
-          map,
-          center: { lat: zone.center_latitude, lng: zone.center_longitude },
-          radius: adjustedRadius,
-          clickable: true,
-        });
-
-        circle.addListener('click', () => {
-          console.log('🖱️ Zone circle clicked:', zone.name);
-          onZoneClick(zone);
-        });
-
-        circles.push(circle);
-      }
-    });
-
-    console.log(`✅ Total circles created: ${circles.length} (zoom: ${zoom})`);
-
-    return () => {
-      console.log(`🧹 Cleaning up ${circles.length} circles`);
-      circles.forEach((circle) => circle.setMap(null));
-    };
-  }, [map, zones, showNoGoZones, zoom, onZoneClick]);
+  // No circle rendering — zones use pin markers in JSX (handled by parent)
 
   return null;
 }
@@ -879,9 +816,8 @@ export function LiveMapView() {
           onZoomChange={setCurrentZoom}
         />
 
-        {/* Render pixel-based zone markers at low/medium zoom (< 14) */}
+        {/* Render no-go zone pin markers */}
         {showNoGoZones &&
-          currentZoom < 14 &&
           zones.map((zone) => (
             <AdvancedMarker
               key={zone.id}
@@ -896,32 +832,10 @@ export function LiveMapView() {
               }}
             >
               <div
-                className="flex flex-col items-center cursor-pointer"
+                className="cursor-pointer hover:scale-110 transition-transform"
                 title={`${zone.name} · Score: ${zone.conflict_score}`}
               >
-                {/* White ring + colored ring = high contrast on satellite */}
-                <div
-                  className="rounded-full flex items-center justify-center hover:scale-110 transition-transform animate-pulse"
-                  style={{
-                    width: 36,
-                    height: 36,
-                    backgroundColor: getZoneColor(zone.conflict_score) + '99',
-                    border: '2px solid white',
-                    boxShadow: `0 0 0 2px ${getZoneColor(zone.conflict_score)}, 0 2px 10px rgba(0,0,0,0.7)`,
-                  }}
-                >
-                  <ShieldAlert className="w-4 h-4 text-white drop-shadow" />
-                </div>
-                {/* Always-visible label */}
-                <div
-                  className="mt-1 px-2 py-0.5 rounded text-xs font-bold text-white whitespace-nowrap"
-                  style={{
-                    backgroundColor: getZoneColor(zone.conflict_score),
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.7)',
-                  }}
-                >
-                  {zone.name}
-                </div>
+                <NoGoZonePin size={36} />
               </div>
             </AdvancedMarker>
           ))}
