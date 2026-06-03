@@ -471,9 +471,9 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
   return (
     <>
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-        <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] mx-4 overflow-hidden flex flex-col animate-scale-in">
+        <div className="bg-white rounded-2xl w-full max-w-4xl h-[85vh] mx-4 flex flex-col animate-scale-in">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
                 {stagedMove ? `Move Tasks — ${shift.driver_name} → ${stagedMove.targetDriverName}` : `Edit Shift — ${shift.driver_name}`}
@@ -491,13 +491,13 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
           </div>
 
           {/* Sliding content area */}
-          <div className="flex-1 overflow-hidden min-h-0">
-          <div className={`flex h-full min-h-0 transition-transform duration-300 ease-in-out ${showSummary ? '-translate-x-full' : 'translate-x-0'}`}>
+          <div className="flex-1 overflow-hidden" style={{ minHeight: 0 }}>
+          <div className={`flex h-full transition-transform duration-300 ease-in-out ${showSummary ? '-translate-x-full' : 'translate-x-0'}`} style={{ minHeight: 0 }}>
 
           {/* Page 1: Two-panel edit */}
-          <div className="min-w-full h-full flex overflow-hidden min-h-0">
+          <div className="min-w-full h-full flex" style={{ minHeight: 0 }}>
             {/* Left Panel */}
-            <div className="w-1/2 border-r border-gray-200 flex flex-col min-h-0">
+            <div className="w-1/2 border-r border-gray-200 flex flex-col" style={{ minHeight: 0 }}>
               <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-700">{shift.driver_name}'s Tasks ({tasks.length})</h3>
                 {!stagedMove && (
@@ -584,7 +584,7 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
             </div>
 
             {/* Right Panel */}
-            <div className="w-1/2 flex flex-col min-h-0 relative">
+            <div className="w-1/2 flex flex-col relative" style={{ minHeight: 0 }}>
               {/* Merge/Replace choice overlay */}
               {showReassignChoice && (
                 <div className="absolute inset-0 z-10 bg-white/95 flex items-center justify-center p-6">
