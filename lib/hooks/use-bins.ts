@@ -19,10 +19,13 @@ export const binKeys = {
  * - refetchOnWindowFocus: true (refetch when user returns to tab)
  * - refetchInterval: 60s (auto-refetch every minute for real-time updates)
  */
-export function useBins() {
+export function useBins(includeRetired = false) {
   return useQuery({
-    queryKey: binKeys.all,
-    queryFn: getBins,
+    queryKey: [...binKeys.all, { includeRetired }],
+    queryFn: async () => {
+      const bins = await getBins();
+      return includeRetired ? bins : bins.filter(b => b.status !== 'retired');
+    },
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 60 * 1000, // Refetch every minute for fill level updates
   });
