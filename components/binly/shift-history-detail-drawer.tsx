@@ -467,7 +467,13 @@ export function ShiftHistoryDetailDrawer({ shift, onClose }: Props) {
   const { data: tasks, isLoading } = useShiftHistoryTasks(shift.id);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [showRemovedExpanded, setShowRemovedExpanded] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
   const reason = END_REASON_LABEL[shift.end_reason] ?? { label: shift.end_reason, color: 'text-gray-700', bg: 'bg-gray-100' };
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => onClose(), 250);
+  };
 
   // Separate active and deleted tasks
   const activeTasks = tasks?.filter(t => !t.is_deleted) ?? [];
@@ -502,12 +508,12 @@ export function ShiftHistoryDetailDrawer({ shift, onClose }: Props) {
     <>
       {/* Backdrop with fade animation */}
       <div
-        className="fixed inset-0 bg-black/30 z-40 backdrop-blur-[1px] animate-in fade-in duration-200"
-        onClick={onClose}
+        className={`fixed inset-0 bg-black/30 z-40 backdrop-blur-[1px] transition-opacity duration-250 ${isClosing ? 'opacity-0' : 'opacity-100 animate-in fade-in duration-200'}`}
+        onClick={handleClose}
       />
 
       {/* Drawer with slide animation */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
+      <div className={`fixed right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl z-50 flex flex-col transition-transform duration-250 ease-in-out ${isClosing ? 'translate-x-full' : 'animate-in slide-in-from-right duration-300'}`}>
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-200 shrink-0">
           <div className="flex-1 min-w-0">
@@ -528,7 +534,7 @@ export function ShiftHistoryDetailDrawer({ shift, onClose }: Props) {
             </p>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors"
           >
             <X className="w-4 h-4 text-gray-500" />

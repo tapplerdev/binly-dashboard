@@ -92,14 +92,15 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
   const [description, setDescription] = useState('');
   const [success, setSuccess] = useState(false);
 
-  // ── Filtered bins ─────────────────────────────────────────────────────────
+  // ── Filtered bins (exclude retired and missing) ──────────────────────────
+  const activeBins = bins.filter(b => b.status !== 'retired' && b.status !== 'missing');
   const filteredBins = binSearch.trim()
-    ? bins.filter(
+    ? activeBins.filter(
         (b) =>
           String(b.bin_number).includes(binSearch.trim().replace('#', '')) ||
           (b.current_street ?? '').toLowerCase().includes(binSearch.toLowerCase())
       )
-    : bins;
+    : activeBins;
 
   // ── Select a bin ─────────────────────────────────────────────────────────
   function selectBin(bin: Bin) {

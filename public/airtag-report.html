@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Binly — AirTag vs Bin Location Report</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f9fa; color: #1a1a1a; padding: 24px; }
+  h1 { font-size: 24px; margin-bottom: 4px; }
+  .subtitle { color: #666; font-size: 14px; margin-bottom: 24px; }
+  .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
+  .kpi { background: white; border-radius: 12px; padding: 16px; border: 1px solid #e5e7eb; }
+  .kpi .value { font-size: 28px; font-weight: 700; }
+  .kpi .label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+  .kpi.red .value { color: #dc2626; }
+  .kpi.amber .value { color: #d97706; }
+  .kpi.green .value { color: #16a34a; }
+  .kpi.blue .value { color: #2563eb; }
+  .section { background: white; border-radius: 12px; border: 1px solid #e5e7eb; margin-bottom: 16px; overflow: hidden; }
+  .section-header { padding: 16px 20px; border-bottom: 1px solid #f0f0f0; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .section-header .badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
+  .badge-red { background: #fef2f2; color: #dc2626; }
+  .badge-amber { background: #fffbeb; color: #d97706; }
+  .badge-green { background: #f0fdf4; color: #16a34a; }
+  .badge-blue { background: #eff6ff; color: #2563eb; }
+  .badge-gray { background: #f3f4f6; color: #6b7280; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 16px; background: #fafafa; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #eee; }
+  td { padding: 10px 16px; border-bottom: 1px solid #f5f5f5; }
+  tr:hover { background: #fafafa; }
+  .fill-bar { width: 60px; height: 6px; background: #f0f0f0; border-radius: 3px; display: inline-block; vertical-align: middle; margin-right: 6px; }
+  .fill-bar-inner { height: 100%; border-radius: 3px; }
+  .fill-red { background: #ef4444; }
+  .fill-amber { background: #f59e0b; }
+  .fill-blue { background: #3b82f6; }
+  .fill-gray { background: #9ca3af; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .dot-active { background: #22c55e; }
+  .dot-missing { background: #ef4444; }
+  .dot-storage { background: #3b82f6; }
+  .dot-pending { background: #f59e0b; }
+  .distance-alert { color: #dc2626; font-weight: 600; }
+  .distance-ok { color: #16a34a; }
+  .distance-warehouse { color: #6b7280; font-style: italic; }
+  .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }
+  .text-muted { color: #999; }
+  .text-sm { font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>AirTag vs Bin Location Report</h1>
+<p class="subtitle">Generated June 2, 2026 — Binly bin management analytics</p>
+
+<div class="kpi-row">
+  <div class="kpi"><div class="value">77</div><div class="label">Active Bins</div></div>
+  <div class="kpi green"><div class="value">50</div><div class="label">Bins with AirTag</div></div>
+  <div class="kpi amber"><div class="value">27</div><div class="label">Bins without AirTag</div></div>
+  <div class="kpi red"><div class="value">6</div><div class="label">Stale AirTags (30+ days)</div></div>
+  <div class="kpi blue"><div class="value">5</div><div class="label">Bins at Warehouse (unexpected)</div></div>
+</div>
+
+<!-- SECTION: Bins with AirTag far from registered location -->
+<div class="section">
+  <div class="section-header">
+    <span>🚨 Bins with AirTag Far from Registered Location</span>
+    <span class="badge badge-red">Action Required</span>
+  </div>
+  <table>
+    <thead><tr><th>Bin</th><th>Registered Address</th><th>AirTag Location</th><th>Distance</th><th>Last Seen</th><th>Likely Cause</th></tr></thead>
+    <tbody>
+      <tr><td><strong>#81</strong></td><td>978 Lundy Ave, San Jose</td><td>37.713, -122.177</td><td class="distance-alert">28.8 mi</td><td>Jun 2, 4:07 PM</td><td>AirTag at unknown location (not warehouse)</td></tr>
+      <tr><td><strong>#61</strong></td><td>1665 Foxworthy Ave, San Jose</td><td>37.637, -122.127</td><td class="distance-alert">28.0 mi</td><td>Jun 2, 6:17 PM</td><td class="distance-warehouse">🏭 AirTag at warehouse — bin likely collected</td></tr>
+      <tr><td><strong>#78</strong></td><td>1171 Lelong St, San Jose</td><td>37.637, -122.127</td><td class="distance-alert">26.1 mi</td><td>Jun 2, 6:26 PM</td><td class="distance-warehouse">🏭 AirTag at warehouse — bin likely collected</td></tr>
+      <tr><td><strong>#77</strong></td><td>Lelong Street, San Jose</td><td>37.637, -122.127</td><td class="distance-alert">26.1 mi</td><td>Jun 2, 6:24 PM</td><td class="distance-warehouse">🏭 AirTag at warehouse — bin likely collected</td></tr>
+      <tr><td><strong>#85</strong></td><td>263 Race St, San Jose</td><td>37.637, -122.127</td><td class="distance-alert">24.6 mi</td><td>Jun 2, 6:25 PM</td><td class="distance-warehouse">🏭 AirTag at warehouse — bin likely collected</td></tr>
+      <tr><td><strong>#56</strong></td><td>Saratoga Ave, Santa Clara</td><td>37.324, -121.831</td><td class="distance-alert">7.5 mi</td><td>Jun 2, 5:35 PM</td><td>Bin possibly moved/relocated</td></tr>
+      <tr><td><strong>#127</strong></td><td>4199 Hamilton Ave, San Jose</td><td>37.361, -121.873</td><td class="distance-alert">7.3 mi</td><td>Jun 2, 5:18 PM</td><td>Bin possibly moved/relocated</td></tr>
+      <tr><td><strong>#123</strong></td><td>917 El Paseo de Saratoga, San Jose</td><td>37.326, -122.011</td><td class="distance-alert">2.9 mi</td><td>Jun 2, 6:14 PM</td><td>Bin possibly moved/relocated</td></tr>
+      <tr><td><strong>#112</strong></td><td>1317 S Wolfe Rd, Sunnyvale</td><td>37.361, -122.025</td><td class="distance-alert">0.9 mi</td><td>Jun 2, 6:30 PM</td><td>Moderate drift — may have been moved</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION: Stale AirTags (30+ days) -->
+<div class="section">
+  <div class="section-header">
+    <span>⏰ Stale AirTags — No Signal 30+ Days</span>
+    <span class="badge badge-red">Likely Lost/Destroyed</span>
+  </div>
+  <table>
+    <thead><tr><th>Bin</th><th>Address</th><th>Bin Status</th><th>Last Seen</th><th>Days Stale</th><th>Recommendation</th></tr></thead>
+    <tbody>
+      <tr><td><strong>#72</strong></td><td>3478 Depot Rd (Warehouse)</td><td><span class="status-dot dot-storage"></span>In Storage</td><td>Apr 10</td><td>53 days</td><td class="text-muted">Expected — bin in storage, AirTag may be out of range</td></tr>
+      <tr><td><strong>#57</strong></td><td>1365 W San Carlos St, San Jose</td><td><span class="status-dot dot-active"></span>Active</td><td>Apr 13</td><td>50 days</td><td class="distance-alert">Mark as MISSING — likely confiscated</td></tr>
+      <tr><td><strong>#90</strong></td><td>314 Lathrop St, Redwood City</td><td><span class="status-dot dot-missing"></span>Missing</td><td>Apr 16</td><td>48 days</td><td class="text-muted">Already marked missing</td></tr>
+      <tr><td><strong>#52</strong></td><td>524 Woodside Rd, Redwood City</td><td><span class="status-dot dot-active"></span>Active</td><td>Apr 18</td><td>46 days</td><td class="distance-alert">Mark as MISSING — likely confiscated</td></tr>
+      <tr><td><strong>#70</strong></td><td>1093 Broadway, Redwood City</td><td><span class="status-dot dot-active"></span>Active</td><td>Apr 20</td><td>43 days</td><td class="distance-alert">Mark as MISSING — likely confiscated</td></tr>
+      <tr><td><strong>#84</strong></td><td>996 W El Camino Real, Sunnyvale</td><td><span class="status-dot dot-missing"></span>Missing</td><td>May 2</td><td>31 days</td><td class="text-muted">Already marked missing — AirTag last seen 48 mi away (Salinas?)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION: Bins WITHOUT AirTags -->
+<div class="section">
+  <div class="section-header">
+    <span>📡 Active Bins Without AirTag Coverage</span>
+    <span class="badge badge-amber">27 bins untracked</span>
+  </div>
+  <table>
+    <thead><tr><th>Bin</th><th>Address</th><th>City</th></tr></thead>
+    <tbody>
+      <tr><td>#5</td><td>1042 E El Camino Real</td><td>Sunnyvale</td></tr>
+      <tr><td>#7</td><td>5055 Almaden Expy</td><td>San Jose</td></tr>
+      <tr><td>#8</td><td>901 Clark Ave</td><td>Mountain View</td></tr>
+      <tr><td>#10</td><td>3735 El Camino Real</td><td>Santa Clara</td></tr>
+      <tr><td>#11</td><td>91 E Middlefield Rd</td><td>Mountain View</td></tr>
+      <tr><td>#17</td><td>2792 El Camino Real</td><td>Santa Clara</td></tr>
+      <tr><td>#19</td><td>1057 El Monte Ave</td><td>Mountain View</td></tr>
+      <tr><td>#22</td><td>3599 El Camino Real</td><td>Santa Clara</td></tr>
+      <tr><td>#23</td><td>1425 Lafayette St</td><td>Santa Clara</td></tr>
+      <tr><td>#25</td><td>2811 Middlefield Rd</td><td>Palo Alto</td></tr>
+      <tr><td>#26</td><td>861 E El Camino Real</td><td>Sunnyvale</td></tr>
+      <tr><td>#30</td><td>2435 Lafayette St</td><td>Santa Clara</td></tr>
+      <tr><td>#35</td><td>1911 Camden Ave</td><td>San Jose</td></tr>
+      <tr><td><strong>#38</strong></td><td>516 El Camino Real</td><td>Belmont</td></tr>
+      <tr><td><strong>#40</strong></td><td>2220 Bridgepointe Pkwy</td><td>San Mateo ⭐ Top performer</td></tr>
+      <tr><td>#42</td><td>3904 Middlefield Rd</td><td>Palo Alto</td></tr>
+      <tr><td>#43</td><td>2021 The Alameda</td><td>San Jose</td></tr>
+      <tr><td>#44</td><td>4960 Almaden Expy</td><td>San Jose</td></tr>
+      <tr><td>#48</td><td>1185 Campbell Ave</td><td>San Jose</td></tr>
+      <tr><td>#62</td><td>1101 Oak Street</td><td>San Carlos</td></tr>
+      <tr><td>#75</td><td>548 Lawrence Expy</td><td>Sunnyvale</td></tr>
+      <tr><td>#86</td><td>263 Race St</td><td>San Jose</td></tr>
+      <tr><td>#131</td><td>131 N Wolfe Rd</td><td>Sunnyvale</td></tr>
+      <tr><td>#160</td><td>1149 E Julian St</td><td>San Jose</td></tr>
+      <tr><td>#982</td><td>520 Lawrence Expy</td><td>Sunnyvale</td></tr>
+      <tr><td>#987</td><td>1331 S Wolfe Rd</td><td>Sunnyvale</td></tr>
+      <tr><td>#999</td><td>3478 Depot Rd</td><td>(test bin)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION: Healthy bins — AirTag matches location -->
+<div class="section">
+  <div class="section-header">
+    <span>✅ Healthy — AirTag Matches Bin Location (&lt; 0.2 mi)</span>
+    <span class="badge badge-green">41 bins</span>
+  </div>
+  <table>
+    <thead><tr><th>Bin</th><th>Address</th><th>City</th><th>Distance</th><th>Last Seen</th><th>Battery</th></tr></thead>
+    <tbody>
+      <tr><td>#46</td><td>710 Leigh Ave</td><td>San Jose</td><td class="distance-ok">0.04 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#49</td><td>405 Saratoga Ave</td><td>San Jose</td><td class="distance-ok">0.04 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#51</td><td>West Bayshore Rd</td><td>Palo Alto</td><td class="distance-ok">0.03 mi</td><td>Jun 2</td><td>Medium</td></tr>
+      <tr><td>#54</td><td>120 5th Ave</td><td>Redwood City</td><td class="distance-ok">0.01 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#55</td><td>1299 Poplar Ave</td><td>Sunnyvale</td><td class="distance-ok">0.01 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#58</td><td>1231 Franklin Mall</td><td>Santa Clara</td><td class="distance-ok">0.02 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#59</td><td>1709 Tully Rd</td><td>San Jose</td><td class="distance-ok">0.03 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#60</td><td>Peruka Place</td><td>San Jose</td><td class="distance-ok">0.00 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#63</td><td>2232 Middlefield Rd</td><td>Redwood City</td><td class="distance-ok">0.03 mi</td><td>Jun 2</td><td>Medium</td></tr>
+      <tr><td>#64</td><td>10121 Miller Ave</td><td>Cupertino</td><td class="distance-ok">0.06 mi</td><td>Jun 2</td><td>Medium</td></tr>
+      <tr><td>#65</td><td>1000 Lafayette St</td><td>Santa Clara</td><td class="distance-ok">0.03 mi</td><td>Jun 2</td><td>Medium</td></tr>
+      <tr><td>#69</td><td>250 South White Rd</td><td>San Jose</td><td class="distance-ok">0.01 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#74</td><td>900 N 1st St</td><td>San Jose</td><td class="distance-ok">0.03 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#76</td><td>W El Camino Real</td><td>Los Altos</td><td class="distance-ok">0.02 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#79</td><td>226 S Abbott Ave</td><td>Milpitas</td><td class="distance-ok">0.03 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#80</td><td>1200 Benton St</td><td>Santa Clara</td><td class="distance-ok">0.02 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#82</td><td>1285 Lincoln Ave</td><td>San Jose</td><td class="distance-ok">0.04 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#87</td><td>1209 Wildwood Ave</td><td>Sunnyvale</td><td class="distance-ok">0.01 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#88</td><td>2005 Naglee Ave</td><td>San Jose</td><td class="distance-ok">0.02 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#89</td><td>1414 El Camino Real</td><td>San Carlos</td><td class="distance-ok">0.01 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#92</td><td>1125 Old County Rd</td><td>San Carlos</td><td class="distance-ok">0.03 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#93</td><td>2232 Middlefield Rd</td><td>Redwood City</td><td class="distance-ok">0.01 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#96</td><td>2521 E Trimble Rd</td><td>San Jose</td><td class="distance-ok">0.01 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#98</td><td>442 W Calaveras Blvd</td><td>Milpitas</td><td class="distance-ok">0.01 mi</td><td>Jun 2</td><td>Medium</td></tr>
+      <tr><td>#101</td><td>308 El Camino Real</td><td>San Carlos</td><td class="distance-ok">0.03 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#102</td><td>17 Weller Ln</td><td>Milpitas</td><td class="distance-ok">0.03 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#104</td><td>1852 El Camino Real</td><td>Redwood City</td><td class="distance-ok">0.03 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#106</td><td>678 Ralston Ave</td><td>Belmont</td><td class="distance-ok">0.01 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#107</td><td>4100 S El Camino Real</td><td>San Mateo</td><td class="distance-ok">0.03 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#108</td><td>121 E El Camino Real</td><td>Sunnyvale</td><td class="distance-ok">0.02 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#109</td><td>10425 S De Anza Blvd</td><td>Cupertino</td><td class="distance-ok">0.06 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#110</td><td>990 Story Rd</td><td>San Jose</td><td class="distance-ok">0.01 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#111</td><td>640 Concar Dr</td><td>San Mateo</td><td class="distance-ok">0.04 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#115</td><td>1330 Camden Ave</td><td>Campbell</td><td class="distance-ok">0.09 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#116</td><td>1430 Fruitdale Ave</td><td>San Jose</td><td class="distance-ok">0.03 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#117</td><td>730 The Alameda</td><td>San Jose</td><td class="distance-ok">0.02 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#119</td><td>900 Lafayette St</td><td>Santa Clara</td><td class="distance-ok">0.10 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#121</td><td>901 Reed Ave</td><td>Sunnyvale</td><td class="distance-ok">0.03 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#122</td><td>1686 S Wolfe Rd</td><td>Sunnyvale</td><td class="distance-ok">0.04 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#124</td><td>2514 Berryessa Rd</td><td>San Jose</td><td class="distance-ok">0.01 mi</td><td>Jun 2</td><td>Full</td></tr>
+      <tr><td>#125</td><td>471 Chapman Dr</td><td>Campbell</td><td class="distance-ok">0.03 mi</td><td>Jun 2</td><td>Full</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p class="text-sm text-muted" style="margin-top: 24px; text-align: center;">
+  Warehouse location: 3478 Depot Rd, Hayward (37.6368, -122.1269) — Bins showing AirTag at this location are likely in storage.
+</p>
+
+</body>
+</html>

@@ -491,8 +491,8 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
           </div>
 
           {/* Sliding content area */}
-          <div className="flex-1 overflow-hidden">
-          <div className={`flex h-full transition-transform duration-300 ease-in-out ${showSummary ? '-translate-x-full' : 'translate-x-0'}`}>
+          <div className="flex-1 overflow-hidden min-h-0">
+          <div className={`flex h-full min-h-0 transition-transform duration-300 ease-in-out ${showSummary ? '-translate-x-full' : 'translate-x-0'}`}>
 
           {/* Page 1: Two-panel edit */}
           <div className="min-w-full h-full flex overflow-hidden min-h-0">

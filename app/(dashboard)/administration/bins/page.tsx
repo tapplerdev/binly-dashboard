@@ -161,10 +161,9 @@ function BinsPageContent() {
   // Apply client-side filtering for status, filters, search, and sorting
   const bins = allBins
     ?.filter((bin) => {
-      // Status filter
-      if (statusFilter !== 'all' && bin.status !== statusFilter) {
-        return false;
-      }
+      // Status filter: 'all' shows everything except retired
+      if (statusFilter === 'all' && bin.status === 'retired') return false;
+      if (statusFilter !== 'all' && bin.status !== statusFilter) return false;
 
       // Multi-select filters
       if (filters.length > 0) {
@@ -228,11 +227,12 @@ function BinsPageContent() {
   // Show full-screen loader only on initial load (no data yet)
   const isInitialLoading = isLoading && !allBins;
 
-  // Calculate KPI metrics from ALL bins (system-wide, never changes with filters)
-  const totalBins = allBinsForKpis?.length || 0;
-  const criticalBins = allBinsForKpis?.filter((b) => (b.fill_percentage || 0) >= 80).length || 0;
-  const pendingMoves = allBinsForKpis?.filter((b) => b.has_pending_move).length || 0;
-  const needsCheck = allBinsForKpis?.filter((b) => b.has_check_recommendation).length || 0;
+  // Calculate KPI metrics from ALL bins EXCEPT retired (system-wide, never changes with filters)
+  const nonRetiredBins = allBinsForKpis?.filter((b) => b.status !== 'retired') || [];
+  const totalBins = nonRetiredBins.length;
+  const criticalBins = nonRetiredBins.filter((b) => (b.fill_percentage || 0) >= 80).length;
+  const pendingMoves = nonRetiredBins.filter((b) => b.has_pending_move).length;
+  const needsCheck = nonRetiredBins.filter((b) => b.has_check_recommendation).length;
 
   // Get priority badge color and label
   const getCheckStatusBadge = (daysSinceCheck?: number | null) => {
