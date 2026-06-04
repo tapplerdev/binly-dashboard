@@ -8,6 +8,7 @@ import {
   type BinSortOption,
   type BinFilterOption,
   type BinStatusFilter,
+  reactivateBin,
 } from '@/lib/api/bins';
 import { BinWithPriority } from '@/lib/types/bin';
 import { Card } from '@/components/ui/card';
@@ -36,6 +37,10 @@ import {
   MoreVertical,
   X,
   Edit,
+  CheckCircle2,
+  MapPin,
+  Warehouse,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -55,6 +60,9 @@ function BinsPageContent() {
   const [selectedBins, setSelectedBins] = useState<Set<string>>(new Set());
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showRetireModal, setShowRetireModal] = useState(false);
+  const [showReactivateModal, setShowReactivateModal] = useState(false);
+  const [reactivateDestination, setReactivateDestination] = useState<'warehouse' | 'previous' | 'custom'>('warehouse');
+  const [isReactivating, setIsReactivating] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [modalTargetBin, setModalTargetBin] = useState<BinWithPriority | null>(null);
   const [modalTargetBins, setModalTargetBins] = useState<BinWithPriority[]>([]);
@@ -235,7 +243,9 @@ function BinsPageContent() {
   const needsCheck = nonRetiredBins.filter((b) => b.has_check_recommendation).length;
 
   // Get priority badge color and label
-  const getCheckStatusBadge = (daysSinceCheck?: number | null) => {
+  const getCheckStatusBadge = (daysSinceCheck?: number | null, binStatus?: string) => {
+    if (binStatus === 'in_storage') return { label: 'IN STORAGE', color: 'bg-blue-100 text-blue-700 border-blue-200' };
+    if (binStatus === 'retired') return { label: 'RETIRED', color: 'bg-gray-100 text-gray-500 border-gray-200' };
     if (daysSinceCheck == null) return { label: 'UNKNOWN', color: 'bg-gray-100 text-gray-600 border-gray-200' };
     if (daysSinceCheck >= 14) return { label: 'CRITICAL', color: 'bg-red-100 text-red-700 border-red-200' };
     if (daysSinceCheck >= 7) return { label: 'OVERDUE', color: 'bg-orange-100 text-orange-700 border-orange-200' };
@@ -490,7 +500,7 @@ function BinsPageContent() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {bins?.map((bin) => {
-                      const checkStatus = getCheckStatusBadge(bin.days_since_check);
+                      const checkStatus = getCheckStatusBadge(bin.days_since_check, bin.status);
                       const fill = getFillBadge(bin.fill_percentage);
                       const status = getStatusBadge(bin.status);
 
@@ -608,18 +618,34 @@ function BinsPageContent() {
                                       <Calendar className="w-4 h-4" />
                                       Schedule Move
                                     </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setModalTargetBin(bin);
-                                        setShowRetireModal(true);
-                                        setOpenMenuId(null);
-                                      }}
-                                      className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 rounded-b-lg whitespace-nowrap"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                      Retire Bin
-                                    </button>
+                                    {bin.status === 'retired' ? (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setModalTargetBin(bin);
+                                          setReactivateDestination('warehouse');
+                                          setShowReactivateModal(true);
+                                          setOpenMenuId(null);
+                                        }}
+                                        className="w-full px-4 py-2.5 text-left text-sm text-green-600 hover:bg-green-50 transition-colors flex items-center gap-2 rounded-b-lg whitespace-nowrap"
+                                      >
+                                        <CheckCircle2 className="w-4 h-4" />
+                                        Reactivate Bin
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setModalTargetBin(bin);
+                                          setShowRetireModal(true);
+                                          setOpenMenuId(null);
+                                        }}
+                                        className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 rounded-b-lg whitespace-nowrap"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                        Retire Bin
+                                      </button>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -636,7 +662,7 @@ function BinsPageContent() {
             {/* Mobile Card View */}
             <div className="lg:hidden space-y-3">
               {bins?.map((bin) => {
-                const checkStatus = getCheckStatusBadge(bin.days_since_check);
+                const checkStatus = getCheckStatusBadge(bin.days_since_check, bin.status);
                 const fill = getFillBadge(bin.fill_percentage);
                 const status = getStatusBadge(bin.status);
 
@@ -904,6 +930,63 @@ function BinsPageContent() {
             refetch();
           }}
         />
+      )}
+
+      {/* Reactivate Modal */}
+      {showReactivateModal && modalTargetBin && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setShowReactivateModal(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-md mx-4 overflow-hidden animate-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-base font-semibold text-gray-900">Reactivate Bin #{modalTargetBin.bin_number}</h3>
+              <p className="text-sm text-gray-500 mt-0.5">Choose where this bin will be placed</p>
+            </div>
+            <div className="px-6 py-4 space-y-2">
+              <button onClick={() => setReactivateDestination('warehouse')}
+                className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-colors ${reactivateDestination === 'warehouse' ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <div className="flex items-center gap-3">
+                  <Warehouse className="w-5 h-5 text-blue-600" />
+                  <div>
+                    <div className="text-sm font-semibold text-gray-800">At the warehouse</div>
+                    <div className="text-xs text-gray-500">Status: In Storage — ready for redeployment</div>
+                  </div>
+                </div>
+              </button>
+              <button onClick={() => setReactivateDestination('previous')}
+                className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-colors ${reactivateDestination === 'previous' ? 'border-green-400 bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <div className="flex items-center gap-3">
+                  <MapPin className="w-5 h-5 text-green-600" />
+                  <div>
+                    <div className="text-sm font-semibold text-gray-800">At its previous location</div>
+                    <div className="text-xs text-gray-500">{modalTargetBin.current_street || modalTargetBin.address}, {modalTargetBin.city}</div>
+                  </div>
+                </div>
+              </button>
+            </div>
+            <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-2">
+              <button onClick={() => setShowReactivateModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                Cancel
+              </button>
+              <button onClick={async () => {
+                setIsReactivating(true);
+                try {
+                  await reactivateBin(modalTargetBin.id, { destination: reactivateDestination });
+                  setShowReactivateModal(false);
+                  setModalTargetBin(null);
+                  refetch();
+                } catch (e) {
+                  console.error('Failed to reactivate:', e);
+                } finally {
+                  setIsReactivating(false);
+                }
+              }} disabled={isReactivating}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg disabled:opacity-50">
+                {isReactivating ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                {isReactivating ? 'Reactivating...' : 'Reactivate'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <EditBinDialog

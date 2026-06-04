@@ -153,6 +153,29 @@ export async function getBinChangeLog(binId: string): Promise<BinChangeLogEntry[
 }
 
 /**
+ * Reactivate a retired bin
+ */
+export async function reactivateBin(binId: string, params: {
+  destination: 'warehouse' | 'previous' | 'custom';
+  latitude?: number;
+  longitude?: number;
+  street?: string;
+  city?: string;
+  zip?: string;
+}): Promise<{ message: string; status: string; street: string; city: string }> {
+  const response = await fetch(`${API_URL}/api/manager/bins/${binId}/reactivate`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(params),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'Failed to reactivate bin');
+  }
+  return response.json();
+}
+
+/**
  * Update bin details (address, status, fill percentage, coordinates)
  * @param id Bin ID
  * @param data Update data
