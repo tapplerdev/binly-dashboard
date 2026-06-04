@@ -38,7 +38,6 @@ import {
   X,
   Edit,
   CheckCircle2,
-  MapPin,
   Warehouse,
   Loader2,
 } from 'lucide-react';
