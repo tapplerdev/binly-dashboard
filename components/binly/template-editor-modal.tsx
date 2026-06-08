@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { X, Search, Lasso, AlertCircle, Save } from 'lucide-react';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
+import { LassoSelect } from './lasso-select';
 
 // Default map center (San Jose, CA)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -28,73 +29,9 @@ interface TemplateEditorModalProps {
   isEditing?: boolean;
 }
 
-// Drawing Manager Component
-interface DrawingManagerComponentProps {
-  lassoMode: boolean;
-  bins: Bin[];
-  onBinsSelected: (binIds: string[]) => void;
-}
-
-function DrawingManagerComponent({ lassoMode, bins, onBinsSelected }: DrawingManagerComponentProps) {
-  const map = useMap();
-  const [drawingManager, setDrawingManager] = useState<google.maps.drawing.DrawingManager | null>(null);
-
-  useEffect(() => {
-    if (!map || !window.google?.maps?.drawing) return;
-
-    const manager = new google.maps.drawing.DrawingManager({
-      drawingMode: null,
-      drawingControl: false,
-      polygonOptions: {
-        fillColor: '#4880FF',
-        fillOpacity: 0.2,
-        strokeWeight: 2,
-        strokeColor: '#4880FF',
-        clickable: false,
-        editable: false,
-        zIndex: 1,
-      },
-    });
-
-    manager.setMap(map);
-    setDrawingManager(manager);
-
-    google.maps.event.addListener(manager, 'polygoncomplete', (polygon: google.maps.Polygon) => {
-      const selectedBins: string[] = [];
-
-      bins.forEach((bin) => {
-        if (isMappableBin(bin)) {
-          const point = new google.maps.LatLng(bin.latitude, bin.longitude);
-          const isInside = google.maps.geometry.poly.containsLocation(point, polygon);
-
-          if (isInside) {
-            selectedBins.push(bin.id);
-          }
-        }
-      });
-
-      onBinsSelected(selectedBins);
-      polygon.setMap(null);
-      manager.setDrawingMode(null);
-    });
-
-    return () => {
-      manager.setMap(null);
-    };
-  }, [map, bins, onBinsSelected]);
-
-  useEffect(() => {
-    if (!drawingManager) return;
-
-    if (lassoMode) {
-      drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
-    } else {
-      drawingManager.setDrawingMode(null);
-    }
-  }, [lassoMode, drawingManager]);
-
-  return null;
-}
+// Lasso selection now lives in the shared, currently-disabled `LassoSelect` (see ./lasso-select).
+// The old DrawingManager-based implementation was removed — its constructor throws as of
+// Maps JS API v3.65. Re-enable centrally in LassoSelect once we adopt a replacement.
 
 export function TemplateEditorModal({
   onClose,
@@ -244,7 +181,7 @@ export function TemplateEditorModal({
           <div className="flex-1 relative">
             <APIProvider
               apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}
-              libraries={['drawing', 'geometry']}
+              libraries={['geometry']}
             >
               <Map
                 defaultCenter={DEFAULT_CENTER}
@@ -256,7 +193,7 @@ export function TemplateEditorModal({
                 className="w-full h-full"
               >
                 {/* Drawing Manager for Lasso Selection */}
-                <DrawingManagerComponent
+                <LassoSelect
                   lassoMode={lassoMode}
                   bins={mappableBins}
                   onBinsSelected={handleLassoSelection}

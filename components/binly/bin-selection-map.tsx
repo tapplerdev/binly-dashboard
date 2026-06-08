@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { APIProvider, Map as GoogleMap, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
+import { APIProvider, Map as GoogleMap, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { getBins } from '@/lib/api/bins';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { X, Search, Lasso, MapIcon, List, Filter, ChevronDown } from 'lucide-react';
+import { LassoSelect } from './lasso-select';
 
 // Default map center (San Jose, CA area)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -17,82 +18,9 @@ interface BinSelectionMapProps {
   alreadyAddedBinIds?: string[]; // Bins already in the task list — shown as pre-checked with distinct style
 }
 
-// Drawing Manager Component - Must be child of Map to use useMap
-interface DrawingManagerComponentProps {
-  lassoMode: boolean;
-  bins: Bin[];
-  onBinsSelected: (binIds: string[]) => void;
-}
-
-function DrawingManagerComponent({ lassoMode, bins, onBinsSelected }: DrawingManagerComponentProps) {
-  const map = useMap();
-  const [drawingManager, setDrawingManager] = useState<google.maps.drawing.DrawingManager | null>(null);
-
-  useEffect(() => {
-    if (!map || !window.google?.maps?.drawing) return;
-
-    // Initialize DrawingManager
-    const manager = new google.maps.drawing.DrawingManager({
-      drawingMode: null,
-      drawingControl: false,
-      polygonOptions: {
-        fillColor: '#4880FF',
-        fillOpacity: 0.2,
-        strokeWeight: 2,
-        strokeColor: '#4880FF',
-        clickable: false,
-        editable: false,
-        zIndex: 1,
-      },
-    });
-
-    manager.setMap(map);
-    setDrawingManager(manager);
-
-    // Listen for polygon completion
-    google.maps.event.addListener(manager, 'polygoncomplete', (polygon: google.maps.Polygon) => {
-      // Get bins inside the polygon
-      const selectedBins: string[] = [];
-
-      bins.forEach((bin) => {
-        if (isMappableBin(bin)) {
-          const point = new google.maps.LatLng(bin.latitude, bin.longitude);
-          const isInside = google.maps.geometry.poly.containsLocation(point, polygon);
-
-          if (isInside) {
-            selectedBins.push(bin.id);
-          }
-        }
-      });
-
-      // Notify parent component
-      onBinsSelected(selectedBins);
-
-      // Remove the polygon after selection
-      polygon.setMap(null);
-
-      // Exit drawing mode
-      manager.setDrawingMode(null);
-    });
-
-    return () => {
-      manager.setMap(null);
-    };
-  }, [map, bins, onBinsSelected]);
-
-  // Toggle drawing mode based on lassoMode prop
-  useEffect(() => {
-    if (!drawingManager) return;
-
-    if (lassoMode) {
-      drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
-    } else {
-      drawingManager.setDrawingMode(null);
-    }
-  }, [lassoMode, drawingManager]);
-
-  return null;
-}
+// Lasso selection now lives in the shared, currently-disabled `LassoSelect` (see ./lasso-select).
+// The old DrawingManager-based implementation was removed — its constructor throws as of
+// Maps JS API v3.65. Re-enable centrally in LassoSelect once we adopt a replacement.
 
 export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], alreadyAddedBinIds = [] }: BinSelectionMapProps) {
   const [bins, setBins] = useState<Bin[]>([]);
@@ -270,7 +198,7 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
             ) : (
               <APIProvider
                 apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}
-                libraries={['drawing', 'geometry']}
+                libraries={['geometry']}
               >
                 <GoogleMap
                   defaultCenter={DEFAULT_CENTER}
@@ -283,7 +211,7 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                   className="w-full h-full"
                 >
                   {/* Drawing Manager for Lasso Selection */}
-                  <DrawingManagerComponent
+                  <LassoSelect
                     lassoMode={lassoMode}
                     bins={mappableBins}
                     onBinsSelected={handleLassoSelection}
