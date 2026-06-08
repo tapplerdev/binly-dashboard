@@ -7,6 +7,7 @@ import { useBins } from '@/lib/hooks/use-bins';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
+import { LassoSelect } from './lasso-select';
 
 interface CreateRouteModalProps {
   onClose: () => void;
@@ -40,77 +41,9 @@ const formatDuration = (hours: number): string => {
 };
 
 
-// Lasso Selection Component using Google Maps DrawingManager
-interface LassoSelectionProps {
-  allBins: Bin[];
-  onBinsSelected: (bins: Bin[]) => void;
-  isActive: boolean;
-}
-
-function LassoSelection({ allBins, onBinsSelected, isActive }: LassoSelectionProps) {
-  const map = useMap();
-  const [drawingManager, setDrawingManager] = useState<google.maps.drawing.DrawingManager | null>(null);
-
-  useEffect(() => {
-    if (!map || !window.google?.maps?.drawing) return;
-
-    // Initialize DrawingManager
-    const manager = new google.maps.drawing.DrawingManager({
-      drawingMode: null,
-      drawingControl: false,
-      polygonOptions: {
-        fillColor: '#4880FF',
-        fillOpacity: 0.2,
-        strokeWeight: 2,
-        strokeColor: '#4880FF',
-        clickable: false,
-        editable: false,
-        zIndex: 1,
-      },
-    });
-
-    manager.setMap(map);
-    setDrawingManager(manager);
-
-    // Listen for polygon completion
-    google.maps.event.addListener(manager, 'polygoncomplete', (polygon: google.maps.Polygon) => {
-      // Get bins inside the polygon
-      const selectedBins = allBins.filter((bin) => {
-        if (!isMappableBin(bin)) return false;
-        const point = new google.maps.LatLng(bin.latitude, bin.longitude);
-        return google.maps.geometry.poly.containsLocation(point, polygon);
-      });
-
-      // Notify parent component
-      if (selectedBins.length > 0) {
-        onBinsSelected(selectedBins);
-      }
-
-      // Remove the polygon after selection
-      polygon.setMap(null);
-
-      // Exit drawing mode
-      manager.setDrawingMode(null);
-    });
-
-    return () => {
-      manager.setMap(null);
-    };
-  }, [map, allBins, onBinsSelected]);
-
-  // Toggle drawing mode based on isActive prop
-  useEffect(() => {
-    if (!drawingManager) return;
-
-    if (isActive) {
-      drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
-    } else {
-      drawingManager.setDrawingMode(null);
-    }
-  }, [isActive, drawingManager]);
-
-  return null;
-}
+// Lasso selection now lives in the shared, currently-disabled `LassoSelect` (see ./lasso-select).
+// The old DrawingManager-based implementation was removed — its constructor throws as of
+// Maps JS API v3.65. Re-enable centrally in LassoSelect once we adopt a replacement.
 
 // ============================================================================
 // RETIRED CODE - Polyline rendering (2026-01-31)
@@ -375,7 +308,7 @@ function RoutePreview({ bins, onMapReady, lassoMode = false, allBins = [], onLas
     <>
       {/* Lasso Selection Tool */}
       {lassoMode && (
-        <LassoSelection
+        <LassoSelect
           allBins={allBins}
           onBinsSelected={handleLassoSelection}
           isActive={lassoMode}
@@ -1136,7 +1069,7 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
 
           {/* Right Panel - Map (60%) */}
           <div className="flex-1 relative bg-gray-100">
-            <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''} libraries={['drawing', 'geometry']}>
+            <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''} libraries={['geometry']}>
               <Map
                 defaultCenter={DEFAULT_CENTER}
                 defaultZoom={DEFAULT_ZOOM}
