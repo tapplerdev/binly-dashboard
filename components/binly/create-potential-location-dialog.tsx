@@ -1094,6 +1094,7 @@ export function CreatePotentialLocationDialog({
                                       const incomeMatch = loc.notes.match(/income \$(\d+k)/);
                                       const popMatch = loc.notes.match(/pop (\d+k)/);
                                       const trafficMatch = loc.notes.match(/(low|moderate|high) traffic/);
+                                      const areaMatch = loc.notes.match(/(commercial|community|residential|mixed) area/);
                                       return (
                                         <>
                                           {scoreMatch && <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">Score: {scoreMatch[1]}</span>}
@@ -1102,6 +1103,7 @@ export function CreatePotentialLocationDialog({
                                           {incomeMatch && <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">${incomeMatch[1]}</span>}
                                           {popMatch && <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">{popMatch[1]} pop</span>}
                                           {trafficMatch && <span className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full ${trafficMatch[1] === 'high' ? 'bg-red-100 text-red-700' : trafficMatch[1] === 'moderate' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>{trafficMatch[1]} traffic</span>}
+                                          {areaMatch && <span className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full ${areaMatch[1] === 'commercial' ? 'bg-indigo-100 text-indigo-700' : areaMatch[1] === 'community' ? 'bg-cyan-100 text-cyan-700' : 'bg-gray-100 text-gray-600'}`}>{areaMatch[1]}</span>}
                                         </>
                                       );
                                     })()}
