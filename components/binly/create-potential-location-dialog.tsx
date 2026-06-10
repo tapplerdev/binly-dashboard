@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { APIProvider, Map as GoogleMap, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
-import { MapPin, X, Loader2, Search, Plus, Layers, FileText, Map as MapIcon, Sparkles } from 'lucide-react';
+import { MapPin, X, Loader2, Search, Plus, Layers, FileText, Map as MapIcon, Sparkles, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 // OLD: Google Places Autocomplete (commented out for rollback)
 // import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
@@ -124,6 +124,7 @@ export function CreatePotentialLocationDialog({
   });
 
   // AI Suggest state
+  const [showAiExplainer, setShowAiExplainer] = useState(false);
   const [showAiSuggest, setShowAiSuggest] = useState(false);
   const [aiCount, setAiCount] = useState('10');
   const [aiCity, setAiCity] = useState('');
@@ -971,6 +972,16 @@ export function CreatePotentialLocationDialog({
                       <p className="text-sm font-semibold text-gray-900">
                         Queued Locations ({locationQueue.length})
                       </p>
+                      {locationQueue.some(l => l.notes?.startsWith('AI recommended')) && (
+                        <button
+                          type="button"
+                          onClick={() => setShowAiExplainer(!showAiExplainer)}
+                          className="flex items-center gap-1 text-[10px] text-purple-600 hover:text-purple-800 font-medium bg-purple-50 px-2 py-0.5 rounded-full"
+                        >
+                          <Info className="w-3 h-3" />
+                          {showAiExplainer ? 'Hide' : 'How AI scored these'}
+                        </button>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -980,6 +991,25 @@ export function CreatePotentialLocationDialog({
                       Clear All
                     </button>
                   </div>
+
+                  {/* AI Explainer Panel */}
+                  {showAiExplainer && (
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-xs text-gray-700 space-y-2">
+                      <p className="font-semibold text-purple-800">How AI selects these locations</p>
+                      <div className="space-y-1.5">
+                        <p><span className="font-medium text-gray-900">Area fill rate (50% of score)</span> — Cities where existing bins fill fastest indicate higher donation demand. Palo Alto averages 9.6%/day vs San Jose at 7.9%/day.</p>
+                        <p><span className="font-medium text-gray-900">Geographic gap (30% of score)</span> — Finds midpoints between existing bins that are too far apart. Larger gaps in high-demand areas score higher.</p>
+                        <p><span className="font-medium text-gray-900">Neighborhood income (20% of score)</span> — Higher median household income correlates with more clothing donations. Uses census data by zip code.</p>
+                      </div>
+                      <div className="border-t border-purple-200 pt-2 mt-2 space-y-1">
+                        <p className="text-purple-700">Locations are automatically filtered to exclude:</p>
+                        <p>- Active no-go zones (vandalism, theft, complaints)</p>
+                        <p>- Areas near shopping malls or Safeway stores</p>
+                        <p>- Spots within 0.3 miles of an existing bin</p>
+                        <p>- Addresses that couldn't be resolved to a real street</p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Scrollable queue container */}
                   <div className="max-h-[300px] overflow-y-auto space-y-3">
@@ -1041,8 +1071,32 @@ export function CreatePotentialLocationDialog({
 
                           {loc.notes && (
                             <div>
-                              <p className="text-xs font-semibold text-gray-600 mb-1">Notes</p>
-                              <p className="text-xs text-gray-700">{loc.notes}</p>
+                              {loc.notes.startsWith('AI recommended') ? (
+                                <>
+                                  <p className="text-xs font-semibold text-gray-600 mb-1">AI Reasoning</p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {(() => {
+                                      const scoreMatch = loc.notes.match(/Score: ([\d.]+)/);
+                                      const gapMatch = loc.notes.match(/([\d.]+) mi gap/);
+                                      const rateMatch = loc.notes.match(/fill rate ([\d.]+)%/);
+                                      const incomeMatch = loc.notes.match(/income \$(\d+k)/);
+                                      return (
+                                        <>
+                                          {scoreMatch && <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">Score: {scoreMatch[1]}</span>}
+                                          {gapMatch && <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{gapMatch[1]} mi gap</span>}
+                                          {rateMatch && <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">{rateMatch[1]}%/day</span>}
+                                          {incomeMatch && <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">${incomeMatch[1]}</span>}
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <p className="text-xs font-semibold text-gray-600 mb-1">Notes</p>
+                                  <p className="text-xs text-gray-700">{loc.notes}</p>
+                                </>
+                              )}
                             </div>
                           )}
                         </div>
