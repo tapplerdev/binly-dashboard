@@ -35,6 +35,11 @@ export interface AreaStats {
   avg_fill_percentage: number;
   critical_count: number;
   high_count: number;
+  total_incidents: number;
+  clean_bins: number;
+  problematic_bins: number;
+  success_rate: number;
+  area_score: number;
 }
 
 export interface AnalyticsData {
@@ -70,13 +75,18 @@ export async function fetchBinAnalytics(): Promise<AnalyticsData> {
   let areas: AreaStats[] = [];
   if (areasResp.ok) {
     const areasJson = await areasResp.json();
-    areas = (areasJson.data || []).map((a: any) => ({
-      city: a.area || a.city || 'Unknown',
+    areas = (areasJson.areas || areasJson.data || []).map((a: any) => ({
+      city: a.group_value || a.area || a.city || 'Unknown',
       bin_count: a.total_bins || a.bin_count || 0,
       avg_fill_rate: a.avg_fill_percentage || 0,
       avg_fill_percentage: a.avg_fill_percentage || 0,
       critical_count: 0,
       high_count: 0,
+      total_incidents: a.total_incidents || 0,
+      clean_bins: a.clean_bins || 0,
+      problematic_bins: a.problematic_bins || 0,
+      success_rate: a.success_rate || 0,
+      area_score: a.area_score || 0,
     }));
   }
 
