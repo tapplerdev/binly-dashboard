@@ -40,7 +40,7 @@ export interface ChatResponse {
 
 export async function sendChatMessage(message: string, conversationId?: string): Promise<ChatResponse> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+  const timeoutId = setTimeout(() => controller.abort(), 240000); // 4 minute timeout
 
   try {
     const resp = await fetch(`${API_URL}/api/manager/chat`, {
