@@ -1028,16 +1028,26 @@ export function CreatePotentialLocationDialog({
                               Location {index + 1}
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setLocationQueue((prev) => prev.filter((_, i) => i !== index));
-                            }}
-                            className="w-6 h-6 rounded-lg hover:bg-red-100 flex items-center justify-center transition-colors"
-                            title="Remove from queue"
-                          >
-                            <X className="w-4 h-4 text-red-600" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setMapCenter({ lat: loc.latitude, lng: loc.longitude })}
+                              className="w-6 h-6 rounded-lg hover:bg-blue-100 flex items-center justify-center transition-colors"
+                              title="Locate on map"
+                            >
+                              <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLocationQueue((prev) => prev.filter((_, i) => i !== index));
+                              }}
+                              className="w-6 h-6 rounded-lg hover:bg-red-100 flex items-center justify-center transition-colors"
+                              title="Remove from queue"
+                            >
+                              <X className="w-4 h-4 text-red-600" />
+                            </button>
+                          </div>
                         </div>
 
                         {/* Address details */}
