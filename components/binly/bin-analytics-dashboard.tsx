@@ -171,12 +171,21 @@ export function BinAnalyticsDashboard() {
   // Interactive chart state
   const [chartView, setChartView] = useState<'city' | 'subarea' | 'bins'>('subarea');
   const [areaFilter, setAreaFilter] = useState<string | null>(null);
+  const [areaMetric, setAreaMetric] = useState<'fillRate' | 'incidents' | 'successRate'>('fillRate');
 
   // Interactive map state
   const [mapUrgencyFilter, setMapUrgencyFilter] = useState<string | null>(null);
   const [selectedCluster, setSelectedCluster] = useState<any>(null);
   const [selectedBin, setSelectedBin] = useState<BinPerformance | null>(null);
   const [showMapModal, setShowMapModal] = useState(false);
+
+  // Area stats lookup (incidents, success rate) keyed by city name
+  const areaStatsMap = useMemo(() => {
+    if (!data) return {} as Record<string, { total_incidents: number; success_rate: number; clean_bins: number; problematic_bins: number }>;
+    const map: Record<string, { total_incidents: number; success_rate: number; clean_bins: number; problematic_bins: number }> = {};
+    data.areas.forEach(a => { map[a.city] = { total_incidents: a.total_incidents, success_rate: a.success_rate, clean_bins: a.clean_bins, problematic_bins: a.problematic_bins }; });
+    return map;
+  }, [data]);
 
   const sortedBins = useMemo(() => {
     if (!data) return [];
@@ -287,6 +296,11 @@ export function BinAnalyticsDashboard() {
       const variance = c.bins.reduce((s, b) => s + (b.avg_daily_fill_rate - avg) ** 2, 0) / c.bins.length;
       const reliable = c.bins.length >= 5;
 
+      const aStats = areaStatsMap[dominant];
+      // For sub-area clusters, prorate incidents by bin share of the city
+      const cityTotal = data!.bins.filter(b => b.city === dominant).length;
+      const shareRatio = cityTotal > 0 ? c.bins.length / cityTotal : 0;
+
       return {
         city: label.length > 15 ? label.slice(0, 15) + '...' : label,
         fullCity: label,
@@ -294,11 +308,13 @@ export function BinAnalyticsDashboard() {
         avgFillRate: Math.round(avg * 10) / 10,
         avgFill: Math.round(c.bins.reduce((s, b) => s + b.estimated_current_fill, 0) / c.bins.length),
         stddev: Math.round(Math.sqrt(variance) * 10) / 10,
+        incidents: Math.round((aStats?.total_incidents || 0) * shareRatio),
+        successRate: aStats?.success_rate || 0,
         reliable,
         opacity: reliable ? 1 : 0.5,
       };
     }).sort((a, b) => b.avgFillRate - a.avgFillRate);
-  }, [data]);
+  }, [data, areaStatsMap]);
 
   // City-level data for bar chart
   const cityData = useMemo(() => {
@@ -312,15 +328,18 @@ export function BinAnalyticsDashboard() {
     });
     return Object.entries(cityMap).map(([city, stats]) => {
       const avg = stats.totalRate / stats.count;
+      const aStats = areaStatsMap[city];
       return {
         city: city.length > 12 ? city.slice(0, 12) + '...' : city,
         fullCity: city,
         bins: stats.count,
         avgFillRate: Math.round(avg * 10) / 10,
+        incidents: aStats?.total_incidents || 0,
+        successRate: aStats?.success_rate || 0,
         reliable: stats.count >= 5,
       };
     }).sort((a, b) => b.avgFillRate - a.avgFillRate);
-  }, [data]);
+  }, [data, areaStatsMap]);
 
   // Per-bin data for bar chart (filtered by area if set)
   const binChartData = useMemo(() => {
@@ -330,23 +349,33 @@ export function BinAnalyticsDashboard() {
     return [...filtered]
       .sort((a, b) => b.avg_daily_fill_rate - a.avg_daily_fill_rate)
       .slice(0, 20)
-      .map(b => ({
-        city: `#${b.bin_number}`,
-        fullCity: `Bin #${b.bin_number} — ${b.current_street}, ${b.city}`,
-        bins: 1,
-        avgFillRate: b.avg_daily_fill_rate,
-        reliable: true,
-      }));
-  }, [data, areaFilter]);
+      .map(b => {
+        const aStats = areaStatsMap[b.city];
+        return {
+          city: `#${b.bin_number}`,
+          fullCity: `Bin #${b.bin_number} — ${b.current_street}, ${b.city}`,
+          bins: 1,
+          avgFillRate: b.avg_daily_fill_rate,
+          incidents: aStats?.total_incidents || 0,
+          successRate: aStats?.success_rate || 0,
+          reliable: true,
+        };
+      });
+  }, [data, areaFilter, areaStatsMap]);
 
-  // Active chart data based on view
+  // Active chart data based on view, sorted by selected metric
   const activeChartData = useMemo(() => {
     let d = chartView === 'city' ? cityData : chartView === 'bins' ? binChartData : areaData;
     if (areaFilter && chartView === 'subarea') {
       d = d.filter(a => a.fullCity.startsWith(areaFilter));
     }
+    if (areaMetric === 'incidents') {
+      d = [...d].sort((a, b) => (b.incidents ?? 0) - (a.incidents ?? 0));
+    } else if (areaMetric === 'successRate') {
+      d = [...d].sort((a, b) => (b.successRate ?? 0) - (a.successRate ?? 0));
+    }
     return d;
-  }, [chartView, cityData, areaData, binChartData, areaFilter]);
+  }, [chartView, cityData, areaData, binChartData, areaFilter, areaMetric]);
 
   // Unique cities for filter dropdown
   const uniqueCities = useMemo(() => {
@@ -609,17 +638,31 @@ export function BinAnalyticsDashboard() {
                     className="p-1 text-gray-400 hover:text-gray-600 rounded"><ArrowLeft className="w-3.5 h-3.5" /></button>
                 )}
                 <h3 className="text-sm font-semibold text-gray-800">
-                  {chartView === 'city' ? 'Performance by City' : chartView === 'bins' ? `Top Bins${areaFilter ? ` — ${areaFilter}` : ''}` : `Sub-Area Performance${areaFilter ? ` — ${areaFilter}` : ''}`}
+                  {chartView === 'city'
+                    ? areaMetric === 'incidents' ? 'Incidents by City' : areaMetric === 'successRate' ? 'Success Rate by City' : 'Performance by City'
+                    : chartView === 'bins' ? `Top Bins${areaFilter ? ` — ${areaFilter}` : ''}`
+                    : `${areaMetric === 'incidents' ? 'Incidents' : areaMetric === 'successRate' ? 'Success Rate' : 'Sub-Area Performance'}${areaFilter ? ` — ${areaFilter}` : ''}`}
                 </h3>
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex bg-gray-100 rounded-lg p-0.5">
                   {(['city', 'subarea', 'bins'] as const).map(v => (
-                    <button key={v} onClick={() => setChartView(v)}
+                    <button key={v} onClick={() => { setChartView(v); if (v === 'bins' && areaMetric !== 'fillRate') setAreaMetric('fillRate'); }}
                       className={`text-[10px] font-medium px-2 py-1 rounded-md transition-colors ${chartView === v ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}>
                       {v === 'city' ? 'City' : v === 'subarea' ? 'Sub-Area' : 'Bins'}
                     </button>
                   ))}
+                </div>
+                <div className="flex bg-gray-100 rounded-lg p-0.5">
+                  {([['fillRate', 'Fill Rate'], ['incidents', 'Incidents'], ['successRate', 'Success %']] as const).map(([key, label]) => {
+                    const disabled = chartView === 'bins' && key !== 'fillRate';
+                    return (
+                      <button key={key} onClick={() => !disabled && setAreaMetric(key as any)} disabled={disabled}
+                        className={`text-[10px] font-medium px-2 py-1 rounded-md transition-colors ${areaMetric === key ? 'bg-white shadow-sm text-gray-800' : disabled ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-gray-700'}`}>
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
                 <select value={areaFilter || ''} onChange={e => setAreaFilter(e.target.value || null)}
                   className="text-[10px] border border-gray-200 rounded-md px-1.5 py-1 text-gray-600 bg-white">
@@ -639,13 +682,14 @@ export function BinAnalyticsDashboard() {
                     if (area) { setAreaFilter(area.fullCity); setChartView('subarea'); }
                   } else if (chartView === 'subarea') {
                     setChartView('bins');
+                    if (areaMetric !== 'fillRate') setAreaMetric('fillRate');
                   }
                 }}
                 style={{ cursor: chartView !== 'bins' ? 'pointer' : 'default' }}
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="city" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" height={60} />
-                <YAxis tick={{ fontSize: 11 }} unit="%/d" />
+                <YAxis tick={{ fontSize: 11 }} unit={areaMetric === 'fillRate' ? '%/d' : areaMetric === 'incidents' ? '' : '%'} />
                 <Tooltip
                   content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null;
@@ -654,14 +698,16 @@ export function BinAnalyticsDashboard() {
                     return (
                       <div className="bg-white rounded-lg shadow-lg border border-gray-200 px-3 py-2 text-xs">
                         <div className="font-semibold text-gray-800">{area.fullCity}</div>
-                        <div className="text-gray-600 mt-1">{area.avgFillRate}%/day avg fill rate</div>
+                        {areaMetric === 'fillRate' && <div className="text-gray-600 mt-1">{area.avgFillRate}%/day avg fill rate</div>}
+                        {areaMetric === 'incidents' && <div className="text-red-600 mt-1">{area.incidents ?? 0} incident{(area.incidents ?? 0) !== 1 ? 's' : ''}</div>}
+                        {areaMetric === 'successRate' && <div className="text-green-600 mt-1">{area.successRate ?? 0}% clean bins</div>}
                         <div className="text-gray-500">{area.bins} bin{area.bins !== 1 ? 's' : ''}</div>
                         {chartView !== 'bins' && <div className="text-blue-500 mt-1">Click to drill down</div>}
                       </div>
                     );
                   }}
                 />
-                <Bar dataKey="avgFillRate" radius={[4, 4, 0, 0]}
+                <Bar dataKey={areaMetric === 'fillRate' ? 'avgFillRate' : areaMetric === 'incidents' ? 'incidents' : 'successRate'} radius={[4, 4, 0, 0]}
                   label={({ x, y, width, index }: any) => {
                     const entry = activeChartData[index];
                     if (!entry || chartView === 'bins') return null;
@@ -673,7 +719,14 @@ export function BinAnalyticsDashboard() {
                   }}
                 >
                   {activeChartData.map((entry: any, idx: number) => {
-                    const baseColor = entry.avgFillRate >= 10 ? '#ef4444' : entry.avgFillRate >= 7 ? '#f59e0b' : '#4880FF';
+                    let baseColor: string;
+                    if (areaMetric === 'incidents') {
+                      baseColor = (entry.incidents ?? 0) >= 5 ? '#dc2626' : (entry.incidents ?? 0) >= 2 ? '#f59e0b' : '#6b7280';
+                    } else if (areaMetric === 'successRate') {
+                      baseColor = (entry.successRate ?? 0) >= 80 ? '#16a34a' : (entry.successRate ?? 0) >= 50 ? '#f59e0b' : '#ef4444';
+                    } else {
+                      baseColor = entry.avgFillRate >= 10 ? '#ef4444' : entry.avgFillRate >= 7 ? '#f59e0b' : '#4880FF';
+                    }
                     return <Cell key={idx} fill={baseColor} fillOpacity={entry.reliable !== false ? 1 : 0.4} />;
                   })}
                 </Bar>
