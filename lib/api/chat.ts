@@ -39,16 +39,29 @@ export interface ChatResponse {
 }
 
 export async function sendChatMessage(message: string, conversationId?: string): Promise<ChatResponse> {
-  const resp = await fetch(`${API_URL}/api/manager/chat`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify({ message, conversation_id: conversationId }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
 
-  if (!resp.ok) {
-    const errorData = await resp.json().catch(() => ({ error: resp.statusText }));
-    throw new Error(errorData.error || `Chat request failed: ${resp.statusText}`);
+  try {
+    const resp = await fetch(`${API_URL}/api/manager/chat`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ message, conversation_id: conversationId }),
+      signal: controller.signal,
+    });
+
+    if (!resp.ok) {
+      const errorData = await resp.json().catch(() => ({ error: resp.statusText }));
+      throw new Error(errorData.error || `Chat request failed: ${resp.statusText}`);
+    }
+
+    return resp.json();
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('Request timed out — the AI is taking too long. Try a smaller count or specific city.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  return resp.json();
 }
