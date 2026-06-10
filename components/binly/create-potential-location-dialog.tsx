@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { APIProvider, Map as GoogleMap, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
-import { MapPin, X, Loader2, Search, Plus, Layers, FileText, Map as MapIcon } from 'lucide-react';
+import { MapPin, X, Loader2, Search, Plus, Layers, FileText, Map as MapIcon, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 // OLD: Google Places Autocomplete (commented out for rollback)
 // import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
 import { HerePlaceDetails, hereReverseGeocode } from '@/lib/services/geocoding.service';
 import { inputStyles, cn } from '@/lib/utils';
+import { sendChatMessage, LocationRecommendation } from '@/lib/api/chat';
 import { useBins } from '@/lib/hooks/use-bins';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { useNoGoZones, useNearbyIncidents } from '@/lib/hooks/use-zones';
@@ -122,6 +123,13 @@ export function CreatePotentialLocationDialog({
     coordinates: false,
   });
 
+  // AI Suggest state
+  const [showAiSuggest, setShowAiSuggest] = useState(false);
+  const [aiCount, setAiCount] = useState('10');
+  const [aiCity, setAiCity] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
+
   // Ref for coordinate debounce timer
   const coordinateTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -149,6 +157,10 @@ export function CreatePotentialLocationDialog({
       setHasInteractedWithMap(false);
       setIsGeocodingCoordinates(false);
       setViewMode('form');
+      setShowAiSuggest(false);
+      setAiLoading(false);
+      setAiError('');
+      setAiCity('');
       // Clear debounce timer if modal closes
       if (coordinateTimerRef.current) {
         clearTimeout(coordinateTimerRef.current);
@@ -515,6 +527,47 @@ export function CreatePotentialLocationDialog({
 
     console.log('✅ Added location to queue:', newLocation);
   }, [formData]);
+
+  // AI Suggest handler — calls chat API and populates queue
+  const handleAiSuggest = useCallback(async () => {
+    const count = parseInt(aiCount) || 10;
+    if (count < 1 || count > 30) {
+      setAiError('Enter a number between 1 and 30');
+      return;
+    }
+
+    setAiLoading(true);
+    setAiError('');
+
+    try {
+      const prompt = aiCity
+        ? `Recommend ${count} locations for new bins in ${aiCity}`
+        : `Recommend ${count} locations for new bins`;
+
+      const result = await sendChatMessage(prompt);
+
+      if (result.recommendations?.recommendations?.length) {
+        const newLocations: QueuedLocation[] = result.recommendations.recommendations.map((rec: LocationRecommendation) => ({
+          street: rec.address.split(',')[0]?.trim() || rec.address,
+          city: rec.city,
+          zip: rec.zip,
+          latitude: rec.latitude,
+          longitude: rec.longitude,
+          notes: `AI recommended (Score: ${rec.score}) — ${rec.reasoning}`,
+        }));
+
+        setLocationQueue((prev) => [...prev, ...newLocations]);
+        setShowAiSuggest(false);
+        setAiCity('');
+      } else {
+        setAiError('No recommendations returned. Try a different city or count.');
+      }
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Failed to get recommendations');
+    } finally {
+      setAiLoading(false);
+    }
+  }, [aiCount, aiCity]);
 
   // Get auth token from Zustand persist storage
   const getAuthToken = (): string | null => {
@@ -1001,6 +1054,60 @@ export function CreatePotentialLocationDialog({
 
               {/* Actions */}
               <div className="space-y-3 pt-4">
+                {/* AI Suggest */}
+                {!showAiSuggest ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowAiSuggest(true)}
+                    className="w-full gap-2 border-purple-200 text-purple-700 hover:bg-purple-50 hover:border-purple-300"
+                    disabled={loading || aiLoading}
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    AI Suggest Locations
+                  </Button>
+                ) : (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-purple-700 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" /> AI Location Suggestions
+                      </span>
+                      <button onClick={() => { setShowAiSuggest(false); setAiError(''); }} className="text-purple-400 hover:text-purple-600">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="30"
+                        value={aiCount}
+                        onChange={(e) => setAiCount(e.target.value)}
+                        placeholder="Count"
+                        className="w-16 text-sm border border-purple-200 rounded-md px-2 py-1.5 bg-white text-gray-700"
+                      />
+                      <input
+                        type="text"
+                        value={aiCity}
+                        onChange={(e) => setAiCity(e.target.value)}
+                        placeholder="City (optional)"
+                        className="flex-1 text-sm border border-purple-200 rounded-md px-2 py-1.5 bg-white text-gray-700"
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleAiSuggest}
+                        disabled={aiLoading}
+                        size="sm"
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-3"
+                      >
+                        {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Go'}
+                      </Button>
+                    </div>
+                    {aiError && <p className="text-xs text-red-500">{aiError}</p>}
+                    {aiLoading && <p className="text-xs text-purple-500">Analyzing areas, filtering no-go zones, scoring locations...</p>}
+                  </div>
+                )}
+
                 {/* Add to Queue Button - only show if form has data */}
                 {formData.street && formData.city && formData.zip && markerPosition && (
                   <Button

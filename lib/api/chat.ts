@@ -14,10 +14,28 @@ function getAuthHeaders(): HeadersInit {
   }
 }
 
+export interface LocationRecommendation {
+  latitude: number;
+  longitude: number;
+  address: string;
+  city: string;
+  zip: string;
+  score: number;
+  reasoning: string;
+  nearest_bin_number: number;
+  nearest_bin_distance_miles: number;
+  area_avg_fill_rate: number;
+  median_income?: number;
+}
+
 export interface ChatResponse {
   response: string;
   tool_calls_made?: string[];
   conversation_id: string;
+  recommendations?: {
+    count: number;
+    recommendations: LocationRecommendation[];
+  };
 }
 
 export async function sendChatMessage(message: string, conversationId?: string): Promise<ChatResponse> {
