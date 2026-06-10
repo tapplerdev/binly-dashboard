@@ -997,9 +997,11 @@ export function CreatePotentialLocationDialog({
                     <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-xs text-gray-700 space-y-2">
                       <p className="font-semibold text-purple-800">How AI selects these locations</p>
                       <div className="space-y-1.5">
-                        <p><span className="font-medium text-gray-900">Area fill rate (50% of score)</span> — Cities where existing bins fill fastest indicate higher donation demand. Palo Alto averages 9.6%/day vs San Jose at 7.9%/day.</p>
-                        <p><span className="font-medium text-gray-900">Geographic gap (30% of score)</span> — Finds midpoints between existing bins that are too far apart. Larger gaps in high-demand areas score higher.</p>
-                        <p><span className="font-medium text-gray-900">Neighborhood income (20% of score)</span> — Higher median household income correlates with more clothing donations. Uses census data by zip code.</p>
+                        <p><span className="font-medium text-gray-900">Nearest bin fill rate (30%)</span> — Uses the actual fill rate of the closest existing bin, not a city average. A spot near a bin filling at 12%/day scores higher than one near a 3%/day bin.</p>
+                        <p><span className="font-medium text-gray-900">Geographic gap (20%)</span> — Finds midpoints between existing bins that are too far apart. Larger gaps in high-demand areas score higher.</p>
+                        <p><span className="font-medium text-gray-900">Population density (20%)</span> — More people nearby = more potential donors. Uses census population data by zip code.</p>
+                        <p><span className="font-medium text-gray-900">Traffic flow (15%)</span> — Queries real-time road traffic data. Busier streets = higher visibility = more donations.</p>
+                        <p><span className="font-medium text-gray-900">Neighborhood income (15%)</span> — Higher income correlates with more disposable clothing. Uses census median household income.</p>
                       </div>
                       <div className="border-t border-purple-200 pt-2 mt-2 space-y-1">
                         <p className="text-purple-700">Locations are automatically filtered to exclude:</p>
@@ -1090,12 +1092,16 @@ export function CreatePotentialLocationDialog({
                                       const gapMatch = loc.notes.match(/([\d.]+) mi gap/);
                                       const rateMatch = loc.notes.match(/fill rate ([\d.]+)%/);
                                       const incomeMatch = loc.notes.match(/income \$(\d+k)/);
+                                      const popMatch = loc.notes.match(/pop (\d+k)/);
+                                      const trafficMatch = loc.notes.match(/(low|moderate|high) traffic/);
                                       return (
                                         <>
                                           {scoreMatch && <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">Score: {scoreMatch[1]}</span>}
                                           {gapMatch && <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{gapMatch[1]} mi gap</span>}
                                           {rateMatch && <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">{rateMatch[1]}%/day</span>}
                                           {incomeMatch && <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">${incomeMatch[1]}</span>}
+                                          {popMatch && <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">{popMatch[1]} pop</span>}
+                                          {trafficMatch && <span className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full ${trafficMatch[1] === 'high' ? 'bg-red-100 text-red-700' : trafficMatch[1] === 'moderate' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>{trafficMatch[1]} traffic</span>}
                                         </>
                                       );
                                     })()}
