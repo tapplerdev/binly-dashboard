@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, ArrowUp, ArrowDown, Warehouse, SkipForward, AlertTriangle, ChevronDown, ChevronUp, Navigation, Hash, Image as ImageIcon, ClipboardCheck } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shift';
 import { getShiftById, getShiftTasks, cancelShift, removeTasksFromShift, getShiftTasksWithHistory } from '@/lib/api/shifts';
@@ -288,8 +288,45 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
     : bins.filter(b => b.is_completed === 1).length;
 
   const collectedCount = completedItems;
+  const remainingItems = totalItems - completedItems;
   const progressPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
   const totalWeight = 145; // Mock for now - backend doesn't track weight yet
+
+  // Live Est. Complete calculation
+  // Uses actual pace: (time elapsed / tasks completed) × tasks remaining
+  const liveEstCompletion = useMemo(() => {
+    if (!isActive || completedItems === 0 || remainingItems === 0) return null;
+
+    // Find the earliest completed task time and the shift start from optimization metadata
+    const completedTasks = tasks.filter(t => t.is_completed === 1 && t.completed_at);
+    if (completedTasks.length === 0) return null;
+
+    // Use estimated_completion_time to back-calculate start time
+    // Or use the earliest task completion as a baseline
+    const earliestCompletion = Math.min(...completedTasks.map(t => t.completed_at!));
+    const latestCompletion = Math.max(...completedTasks.map(t => t.completed_at!));
+
+    // If only 1 task completed, use optimization metadata for pace estimate
+    if (completedTasks.length === 1) {
+      // Use original optimization estimate as fallback
+      const origDuration = shift.optimization_metadata?.total_duration_seconds;
+      if (origDuration && totalItems > 0) {
+        const avgPerTask = origDuration / totalItems;
+        const remainingSeconds = avgPerTask * remainingItems;
+        return new Date((Date.now()) + remainingSeconds * 1000);
+      }
+      return null;
+    }
+
+    // Multiple tasks completed — calculate actual pace
+    const timeSpan = latestCompletion - earliestCompletion;
+    const tasksInSpan = completedTasks.length - 1; // intervals between completions
+    if (tasksInSpan <= 0) return null;
+
+    const avgSecondsPerTask = timeSpan / tasksInSpan;
+    const remainingSeconds = avgSecondsPerTask * remainingItems;
+    return new Date(Date.now() + remainingSeconds * 1000);
+  }, [tasks, isActive, completedItems, remainingItems, totalItems, shift.optimization_metadata]);
 
   return (
     <>
@@ -386,10 +423,17 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                     <span className="text-xs text-gray-500">Est. Complete</span>
                   </div>
                   <p className="text-sm font-semibold text-gray-900">
-                    {shift.estimated_completion_time
-                      ? new Date(shift.estimated_completion_time * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-                      : new Date(shift.optimization_metadata.estimated_completion).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                    {liveEstCompletion
+                      ? liveEstCompletion.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                      : shift.estimated_completion_time
+                        ? new Date(shift.estimated_completion_time * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                        : shift.optimization_metadata?.estimated_completion
+                          ? new Date(shift.optimization_metadata.estimated_completion).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                          : '—'}
                   </p>
+                  {liveEstCompletion && (
+                    <p className="text-[10px] text-gray-400 mt-0.5">Live estimate</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -436,14 +480,18 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                   </div>
                 )}
 
-                {isActive && shift.estimatedCompletion && (
+                {isActive && (liveEstCompletion || shift.estimatedCompletion) && (
                   <div className="bg-white rounded-lg p-3 border border-gray-200">
                     <div className="flex items-center gap-2 mb-1">
                       <TrendingUp className="w-4 h-4 text-gray-400" />
                       <span className="text-xs text-gray-500">Est. Complete</span>
                     </div>
                     <p className="text-sm font-semibold text-gray-900">
-                      {new Date(shift.estimatedCompletion).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                      {liveEstCompletion
+                        ? liveEstCompletion.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                        : shift.estimatedCompletion
+                          ? new Date(shift.estimatedCompletion).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                          : '—'}
                     </p>
                   </div>
                 )}
