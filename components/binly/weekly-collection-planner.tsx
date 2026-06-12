@@ -97,13 +97,15 @@ export function WeeklyCollectionPlanner() {
     const avgFleetRate = analyticsData.summary.avg_fill_rate;
 
     // Score each route by urgency of its bins
+    // The /api/routes list doesn't include bin IDs, so match by geographic_area → bin.city
     const routeScores = routes.map(route => {
-      const routeBinIDs = new Set(route.bins || []);
-      const routeBins = bins.filter(b => routeBinIDs.has(b.id));
+      const area = (route.geographic_area || '').toLowerCase();
+      const routeBins = area
+        ? bins.filter(b => (b.city || '').toLowerCase() === area)
+        : [];
 
       if (routeBins.length === 0) {
-        // No bin data — use estimated fill from check count
-        return { route, score: 0, criticalBins: 0, avgFill: 0, daysToFull: 999 };
+        return { route, score: 0.1, criticalBins: 0, avgFill: 0, daysToFull: 999 };
       }
 
       const avgFill = routeBins.reduce((s, b) => s + b.estimated_current_fill, 0) / routeBins.length;

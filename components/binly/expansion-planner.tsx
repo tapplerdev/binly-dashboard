@@ -50,11 +50,11 @@ export function ExpansionPlanner() {
   });
 
   // Build expansion analysis per area
+  // Derive from bins directly — the areas API may return empty
   const expansionAreas = useMemo((): ExpansionArea[] => {
     if (!analyticsData) return [];
 
     const bins = analyticsData.bins;
-    const areas = analyticsData.areas;
 
     // Count pending potential locations per city
     const pendingByCity: Record<string, number> = {};
@@ -63,14 +63,19 @@ export function ExpansionPlanner() {
       pendingByCity[city] = (pendingByCity[city] || 0) + 1;
     });
 
-    return areas
-      .map(area => {
-        const areaBins = bins.filter(b => b.city === area.city);
-        const avgDailyRate = areaBins.length > 0
-          ? areaBins.reduce((s, b) => s + b.avg_daily_fill_rate, 0) / areaBins.length
-          : 0;
+    // Group bins by city
+    const cityMap: Record<string, typeof bins> = {};
+    bins.forEach(b => {
+      const city = b.city || 'Unknown';
+      if (!cityMap[city]) cityMap[city] = [];
+      cityMap[city].push(b);
+    });
+
+    return Object.entries(cityMap)
+      .map(([city, areaBins]) => {
+        const avgFill = areaBins.reduce((s, b) => s + b.estimated_current_fill, 0) / areaBins.length;
+        const avgDailyRate = areaBins.reduce((s, b) => s + b.avg_daily_fill_rate, 0) / areaBins.length;
         const criticalCount = areaBins.filter(b => b.estimated_current_fill >= 80).length;
-        const avgFill = area.avg_fill_rate || area.avg_fill_percentage || 0;
 
         let capacityPressure: 'high' | 'medium' | 'low' = 'low';
         let recommendation = 'Coverage adequate — monitor trends';
@@ -83,14 +88,14 @@ export function ExpansionPlanner() {
         }
 
         return {
-          city: area.city,
-          binCount: area.bin_count,
+          city,
+          binCount: areaBins.length,
           avgFill: Math.round(avgFill),
           criticalCount,
           avgDailyRate: Math.round(avgDailyRate * 10) / 10,
           capacityPressure,
           recommendation,
-          pendingLocations: pendingByCity[area.city] || 0,
+          pendingLocations: pendingByCity[city] || 0,
         };
       })
       .sort((a, b) => {
