@@ -1,4 +1,9 @@
-import { BinTemplateBuilder } from '@/components/binly/bin-template-builder';
+import dynamic from 'next/dynamic';
+
+const BinTemplateBuilder = dynamic(
+  () => import('@/components/binly/bin-template-builder').then(mod => ({ default: mod.BinTemplateBuilder })),
+  { ssr: false }
+);
 
 export const metadata = {
   title: 'Route Templates - Binly Dashboard',
