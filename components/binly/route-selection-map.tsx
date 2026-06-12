@@ -7,7 +7,7 @@ import { Bin } from '@/lib/types/bin';
 import { getBinMarkerColor } from '@/lib/types/bin';
 import { getRoutes } from '@/lib/api/routes';
 import { getBins } from '@/lib/api/bins';
-import { X, MapPin, Calendar, Loader2, Search, ChevronDown, Package } from 'lucide-react';
+import { X, MapPin, Calendar, Loader2, Search, ChevronDown, Package, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 
@@ -128,11 +128,16 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
 
   const selectedRoute = useMemo(() => routes.find(r => r.id === selectedRouteId) || null, [routes, selectedRouteId]);
 
-  const routeBins = useMemo(() => {
-    if (!selectedRoute) return [];
-    return selectedRoute.bin_ids
+  const { activeBins: routeBins, inactiveBins: routeInactiveBins } = useMemo(() => {
+    if (!selectedRoute) return { activeBins: [] as Bin[], inactiveBins: [] as Bin[] };
+    const allMatched = selectedRoute.bin_ids
       .map(id => allBins.find(b => b.id === id))
       .filter((b): b is Bin => b !== undefined && b.latitude != null && b.longitude != null);
+    const activeStatuses = new Set(['active', 'needs_check', 'pending_move']);
+    return {
+      activeBins: allMatched.filter(b => activeStatuses.has(b.status)),
+      inactiveBins: allMatched.filter(b => !activeStatuses.has(b.status)),
+    };
   }, [selectedRoute, allBins]);
 
   // Pre-compute urgency for every route so cards can show badges + sort
@@ -168,6 +173,7 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
 
   const handleConfirm = () => {
     if (!selectedRoute) return;
+    // Only pass active bins — inactive ones are excluded from the shift
     onConfirm(selectedRoute, routeBins);
   };
 
@@ -332,9 +338,12 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
                     {displayedRoutes.map(route => {
                       const urgency = routeUrgencyMap.get(route.id) ?? { critical: 0, high: 0 };
                       const isSelected = selectedRouteId === route.id;
-                      const routeBinsForCard = route.bin_ids
+                      const allRouteBins = route.bin_ids
                         .map(id => allBins.find(b => b.id === id))
                         .filter((b): b is Bin => !!b);
+                      const activeStatuses = new Set(['active', 'needs_check', 'pending_move']);
+                      const routeBinsForCard = allRouteBins.filter(b => activeStatuses.has(b.status));
+                      const inactiveForCard = allRouteBins.filter(b => !activeStatuses.has(b.status));
 
                       return (
                         <div key={route.id} className={`rounded-xl border-2 overflow-hidden transition-all ${
@@ -363,26 +372,18 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
                             {/* Meta row */}
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="flex items-center gap-1 text-xs text-gray-500">
-                                <MapPin className="w-3 h-3" />
-                                {route.bin_count} bins
+                                <Package className="w-3 h-3" />
+                                {inactiveForCard.length > 0
+                                  ? <>{routeBinsForCard.length}<span className="text-gray-400">/{route.bin_count}</span> bins</>
+                                  : <>{route.bin_count} bins</>
+                                }
                               </span>
                               <span className="text-xs text-gray-400">·</span>
                               <span className="text-xs text-gray-500">{route.geographic_area}</span>
 
-                              {/* Urgency badges */}
-                              {urgency.critical > 0 && (
-                                <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded border border-red-200">
-                                  🔴 {urgency.critical} critical
-                                </span>
-                              )}
-                              {urgency.high > 0 && (
-                                <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-xs font-semibold rounded border border-orange-200">
-                                  🟠 {urgency.high} high
-                                </span>
-                              )}
-                              {urgency.critical === 0 && urgency.high === 0 && (
-                                <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded border border-green-200">
-                                  Low fill
+                              {inactiveForCard.length > 0 && (
+                                <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs font-semibold rounded border border-amber-200">
+                                  {inactiveForCard.length} inactive
                                 </span>
                               )}
                             </div>
@@ -453,13 +454,20 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
                   'Select a template to import'
                 )}
               </p>
-              {selectedRoute && (
+              {selectedRoute && routeInactiveBins.length > 0 && (
+                <p className="text-xs text-amber-600 mt-0.5 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  {routeInactiveBins.length} inactive bin{routeInactiveBins.length !== 1 ? 's' : ''} will be excluded
+                  ({routeInactiveBins.map(b => `#${b.bin_number}`).join(', ')})
+                </p>
+              )}
+              {selectedRoute && routeInactiveBins.length === 0 && (
                 <p className="text-xs text-gray-500 mt-0.5">Route will be optimized when driver starts shift</p>
               )}
             </div>
             <div className="flex gap-3">
               <Button onClick={onClose} variant="outline">Cancel</Button>
-              <Button onClick={handleConfirm} disabled={!selectedRoute}>
+              <Button onClick={handleConfirm} disabled={!selectedRoute || routeBins.length === 0}>
                 Import Template ({routeBins.length} bins)
               </Button>
             </div>
