@@ -1,11 +1,10 @@
-'use client';
-
-import { ExpansionPlanner } from '@/components/binly/expansion-planner';
+import { ClientOnly } from '@/components/binly/client-only';
+import { ExpansionPlannerView } from '@/components/binly/expansion-planner-view';
 
 export default function PlannerPage() {
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <ExpansionPlanner />
-    </div>
+    <ClientOnly>
+      <ExpansionPlannerView />
+    </ClientOnly>
   );
 }

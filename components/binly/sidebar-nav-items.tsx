@@ -103,15 +103,8 @@ export const sidebarNavItems: NavItem[] = [
       },
       {
         path: '/intelligence/recommendations',
-        key: 'recommendations',
-        title: 'Recommendations',
-        icon: <Sparkles className="w-5 h-5" />,
-        children: [],
-      },
-      {
-        path: '/intelligence/predictive',
-        key: 'predictive',
-        title: 'Predictive Insights',
+        key: 'intelligence-hub',
+        title: 'Intelligence',
         icon: <Brain className="w-5 h-5" />,
         children: [],
       },

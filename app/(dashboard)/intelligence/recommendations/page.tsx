@@ -1,11 +1,10 @@
-'use client';
+import { ClientOnly } from '@/components/binly/client-only';
+import { IntelligenceView } from '@/components/binly/intelligence-view';
 
-import { AIRecommendationsInbox } from '@/components/binly/ai-recommendations-inbox';
-
-export default function RecommendationsPage() {
+export default function IntelligencePage() {
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <AIRecommendationsInbox />
-    </div>
+    <ClientOnly>
+      <IntelligenceView />
+    </ClientOnly>
   );
 }
