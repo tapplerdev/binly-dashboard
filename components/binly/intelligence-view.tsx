@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
+import { APIProvider, Map as GoogleMap, AdvancedMarker } from '@vis.gl/react-google-maps';
 import {
   Brain, AlertTriangle, Calendar, Check, X, Clock, Loader2,
   Sparkles, ChevronDown, ChevronUp, Route, Package, TrendingUp,
@@ -469,7 +469,7 @@ export function IntelligenceView() {
       {/* Right Panel - Map */}
       <div className="flex-1 relative">
         <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
-          <Map
+          <GoogleMap
             mapId="intelligence-map"
             defaultCenter={warehouse ? { lat: warehouse.latitude, lng: warehouse.longitude } : DEFAULT_CENTER}
             defaultZoom={11}
@@ -522,7 +522,7 @@ export function IntelligenceView() {
                 </AdvancedMarker>
               );
             })}
-          </Map>
+          </GoogleMap>
         </APIProvider>
 
         {/* Map legend */}

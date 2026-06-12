@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
+import { APIProvider, Map as GoogleMap, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { useBins } from '@/lib/hooks/use-bins';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
@@ -439,7 +439,7 @@ export function BinTemplateBuilder() {
                   </span>
                   {template.geographic_area && (
                     <span className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3" />
+                      <GoogleMapPin className="w-3 h-3" />
                       {template.geographic_area}
                     </span>
                   )}
@@ -491,7 +491,7 @@ export function BinTemplateBuilder() {
           </div>
         ) : (
           <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
-            <Map
+            <GoogleMap
               mapId="bin-template-builder-map"
               defaultCenter={DEFAULT_CENTER}
               defaultZoom={DEFAULT_ZOOM}
@@ -539,7 +539,7 @@ export function BinTemplateBuilder() {
                   </AdvancedMarker>
                 );
               })}
-            </Map>
+            </GoogleMap>
           </APIProvider>
         )}
 

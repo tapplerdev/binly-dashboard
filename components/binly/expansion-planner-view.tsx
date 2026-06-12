@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
+import { APIProvider, Map as GoogleMap, AdvancedMarker } from '@vis.gl/react-google-maps';
 import {
   Target, MapPin, Sparkles, Loader2, Plus, TrendingUp, Package,
   AlertTriangle, ArrowRight,
@@ -242,7 +242,7 @@ export function ExpansionPlannerView() {
       {/* Right Panel - Map */}
       <div className="flex-1 relative">
         <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
-          <Map
+          <GoogleMap
             mapId="expansion-planner-map"
             defaultCenter={warehouse ? { lat: warehouse.latitude, lng: warehouse.longitude } : DEFAULT_CENTER}
             defaultZoom={11}
@@ -323,7 +323,7 @@ export function ExpansionPlannerView() {
                 </div>
               </AdvancedMarker>
             ))}
-          </Map>
+          </GoogleMap>
         </APIProvider>
 
         {/* Map legend */}
