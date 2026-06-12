@@ -775,6 +775,7 @@ export function BinAnalyticsDashboard() {
                     Last Check <ArrowUpDown className="w-3 h-3" />
                   </button>
                 </th>
+                <th className="text-right px-4 py-2.5 font-semibold text-gray-600">Days to Full</th>
                 <th className="text-center px-4 py-2.5 font-semibold text-gray-600">Urgency</th>
               </tr>
             </thead>
@@ -801,9 +802,26 @@ export function BinAnalyticsDashboard() {
                         <span className={`font-medium w-8 text-right ${fillColor}`}>{bin.estimated_current_fill}%</span>
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 text-right text-gray-700">{bin.avg_daily_fill_rate}%/d</td>
+                    <td className="px-4 py-2.5 text-right text-gray-700">
+                      <span className="flex items-center justify-end gap-1">
+                        {bin.avg_daily_fill_rate}%/d
+                        {bin.avg_daily_fill_rate > (data.summary.avg_fill_rate * 3) && (
+                          <span title={`Filling ${(bin.avg_daily_fill_rate / data.summary.avg_fill_rate).toFixed(1)}x faster than average`} className="text-amber-500 cursor-help">⚠</span>
+                        )}
+                      </span>
+                    </td>
                     <td className="px-4 py-2.5 text-right text-gray-500">
                       {bin.days_since_check < 1 ? 'Today' : `${bin.days_since_check}d ago`}
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      {(() => {
+                        if (bin.estimated_current_fill >= 80) return <span className="text-xs font-medium text-red-600">Full</span>;
+                        if (bin.avg_daily_fill_rate <= 0) return <span className="text-xs text-gray-400">—</span>;
+                        const daysTo80 = Math.round(((80 - bin.estimated_current_fill) / bin.avg_daily_fill_rate) * 10) / 10;
+                        if (daysTo80 <= 0) return <span className="text-xs font-medium text-red-600">Full</span>;
+                        const color = daysTo80 <= 2 ? 'text-red-600 font-semibold' : daysTo80 <= 5 ? 'text-amber-600 font-medium' : 'text-green-600';
+                        return <span className={`text-xs ${color}`}>{daysTo80}d</span>;
+                      })()}
                     </td>
                     <td className="px-4 py-2.5 text-center">
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${urgencyColors[bin.urgency] || urgencyColors.low}`}>
