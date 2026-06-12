@@ -397,86 +397,81 @@ export function BinTemplateBuilder() {
               <p className="text-xs text-gray-400 mt-1">Try adjusting your filters</p>
             </div>
           ) : (
-            filteredTemplates.map(template => (
-              <div
-                key={template.id}
-                onClick={() => viewTemplateDetails(template)}
-                className={`p-3 rounded-lg border transition-fast cursor-pointer ${
-                  selectedTemplate?.id === template.id
-                    ? 'bg-primary/10 border-primary'
-                    : 'bg-white border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                <div className="flex items-start justify-between mb-1">
-                  <h3 className="font-medium text-gray-900 text-sm">{template.name}</h3>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEditModal(template);
-                      }}
-                      className="p-1 hover:bg-blue-100 rounded transition-fast"
-                      title="Edit Template"
-                    >
-                      <Edit2 className="w-3.5 h-3.5 text-blue-600" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openDeleteModal(template);
-                      }}
-                      className="p-1 hover:bg-red-100 rounded transition-fast"
-                      title="Delete Template"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-red-600" />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 text-xs text-gray-500">
-                  <span className="flex items-center gap-1">
-                    <Package className="w-3 h-3" />
-                    {template.bin_count} bins
-                  </span>
-                  {template.geographic_area && (
-                    <span className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3" />
-                      {template.geographic_area}
-                    </span>
-                  )}
-                </div>
-                {/* Health indicator */}
-                {(() => {
-                  const health = templateHealth.get(template.id);
-                  if (!health) return null;
-                  return (
-                    <div className="flex items-center gap-2 mt-2">
-                      <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${
-                            health.status === 'critical' ? 'bg-red-500' :
-                            health.status === 'attention' ? 'bg-amber-500' : 'bg-green-500'
-                          }`}
-                          style={{ width: `${Math.min(health.avgFill, 100)}%` }}
-                        />
-                      </div>
-                      <span className={`text-[10px] font-bold ${
-                        health.status === 'critical' ? 'text-red-600' :
-                        health.status === 'attention' ? 'text-amber-600' : 'text-green-600'
-                      }`}>
-                        {health.avgFill}%
+            filteredTemplates.map(template => {
+              const health = templateHealth.get(template.id);
+              const fillPct = health?.avgFill ?? 0;
+              const borderColor = !health ? 'border-l-gray-300'
+                : health.status === 'critical' ? 'border-l-red-500'
+                : health.status === 'attention' ? 'border-l-amber-500'
+                : 'border-l-green-500';
+              const ringColor = !health ? '#d1d5db'
+                : health.status === 'critical' ? '#ef4444'
+                : health.status === 'attention' ? '#f59e0b'
+                : '#22c55e';
+              // SVG donut: circumference = 2 * PI * 18 ≈ 113
+              const circ = 113.1;
+              const dashOffset = circ - (circ * Math.min(fillPct, 100) / 100);
+
+              return (
+                <div
+                  key={template.id}
+                  onClick={() => viewTemplateDetails(template)}
+                  className={`rounded-lg border-l-[4px] border border-gray-200 transition-fast cursor-pointer ${borderColor} ${
+                    selectedTemplate?.id === template.id
+                      ? 'bg-primary/5 ring-2 ring-primary/30'
+                      : 'bg-white hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 p-3">
+                    {/* Donut ring */}
+                    <div className="relative w-11 h-11 shrink-0">
+                      <svg viewBox="0 0 40 40" className="w-full h-full -rotate-90">
+                        <circle cx="20" cy="20" r="18" fill="none" stroke="#e5e7eb" strokeWidth="3" />
+                        <circle cx="20" cy="20" r="18" fill="none" stroke={ringColor} strokeWidth="3"
+                          strokeDasharray={circ} strokeDashoffset={dashOffset} strokeLinecap="round" />
+                      </svg>
+                      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-gray-800">
+                        {fillPct}%
                       </span>
-                      {health.criticalBins > 0 && (
-                        <span className="flex items-center gap-0.5 text-[10px] text-red-600 font-medium">
-                          <AlertTriangle className="w-3 h-3" />
-                          {health.criticalBins}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-1">
+                        <h3 className="font-semibold text-gray-900 text-sm leading-tight truncate">{template.name}</h3>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <button onClick={(e) => { e.stopPropagation(); openEditModal(template); }}
+                            className="p-1 hover:bg-blue-50 rounded transition-fast" title="Edit">
+                            <Edit2 className="w-3 h-3 text-blue-600" />
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); openDeleteModal(template); }}
+                            className="p-1 hover:bg-red-50 rounded transition-fast" title="Delete">
+                            <Trash2 className="w-3 h-3 text-red-500" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 text-[11px] text-gray-500">
+                        <span className="flex items-center gap-0.5">
+                          <Package className="w-3 h-3" /> {template.bin_count}
                         </span>
+                        {template.geographic_area && (
+                          <span className="truncate">{template.geographic_area}</span>
+                        )}
+                      </div>
+                      {health && health.criticalBins > 0 && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <AlertTriangle className="w-3 h-3 text-red-500" />
+                          <span className="text-[10px] font-semibold text-red-600">
+                            {health.criticalBins} bin{health.criticalBins !== 1 ? 's' : ''} over 80%
+                          </span>
+                        </div>
                       )}
                     </div>
-                  );
-                })()}
-              </div>
-            ))
-          )}
+                  </div>
+                </div>
+              );
+            }))
+          }
         </div>
       </div>
 
@@ -576,62 +571,97 @@ export function BinTemplateBuilder() {
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Template Info */}
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Name</label>
-              <p className="text-sm font-medium text-gray-900">{selectedTemplate.name}</p>
-            </div>
+          <div className="flex-1 overflow-y-auto">
+            {/* Route Health Hero */}
+            {(() => {
+              const h = templateHealth.get(selectedTemplate.id);
+              const fill = h?.avgFill ?? selectedTemplateMetrics.avgFill;
+              const critical = h?.criticalBins ?? selectedTemplateMetrics.criticalBins;
+              const heroColor = fill >= 70 ? 'from-red-500 to-red-600'
+                : fill >= 45 ? 'from-amber-500 to-amber-600'
+                : 'from-green-500 to-green-600';
+              const heroBg = fill >= 70 ? 'bg-red-50'
+                : fill >= 45 ? 'bg-amber-50'
+                : 'bg-green-50';
+              const circ = 150.8; // 2 * PI * 24
+              const dashOff = circ - (circ * Math.min(fill, 100) / 100);
 
-            {selectedTemplate.geographic_area && (
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Area</label>
-                <p className="text-sm text-gray-900">{selectedTemplate.geographic_area}</p>
-              </div>
-            )}
+              return (
+                <div className={`p-5 ${heroBg} border-b border-gray-200`}>
+                  <div className="flex items-center gap-4">
+                    {/* Large donut */}
+                    <div className="relative w-16 h-16 shrink-0">
+                      <svg viewBox="0 0 52 52" className="w-full h-full -rotate-90">
+                        <circle cx="26" cy="26" r="24" fill="none" stroke="white" strokeWidth="4" />
+                        <circle cx="26" cy="26" r="24" fill="none" strokeWidth="4"
+                          stroke="url(#grad)" strokeDasharray={circ} strokeDashoffset={dashOff} strokeLinecap="round" />
+                        <defs>
+                          <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stopColor={fill >= 70 ? '#ef4444' : fill >= 45 ? '#f59e0b' : '#22c55e'} />
+                            <stop offset="100%" stopColor={fill >= 70 ? '#dc2626' : fill >= 45 ? '#d97706' : '#16a34a'} />
+                          </linearGradient>
+                        </defs>
+                      </svg>
+                      <span className="absolute inset-0 flex items-center justify-center text-base font-bold text-gray-900">
+                        {fill}%
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-gray-900">{selectedTemplate.name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{selectedTemplate.geographic_area}</p>
+                      {selectedTemplate.description && (
+                        <p className="text-[11px] text-gray-400 mt-0.5">{selectedTemplate.description}</p>
+                      )}
+                    </div>
+                  </div>
 
-            {selectedTemplate.description && (
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
-                <p className="text-sm text-gray-900">{selectedTemplate.description}</p>
-              </div>
-            )}
-
-            {/* Metrics */}
-            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Metrics</h3>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Total Bins:</span>
-                <span className="font-semibold text-gray-900">{selectedTemplateMetrics.totalBins}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Critical (≥80%):</span>
-                <span className="font-semibold text-red-600">{selectedTemplateMetrics.criticalBins}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Average Fill:</span>
-                <span className="font-semibold text-gray-900">{selectedTemplateMetrics.avgFill}%</span>
-              </div>
-            </div>
+                  {/* Stat cards */}
+                  <div className="grid grid-cols-3 gap-2 mt-4">
+                    <div className="bg-white rounded-lg p-2.5 text-center shadow-sm">
+                      <p className="text-lg font-bold text-gray-900">{selectedTemplateMetrics.totalBins}</p>
+                      <p className="text-[10px] text-gray-500">Total Bins</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-2.5 text-center shadow-sm">
+                      <p className={`text-lg font-bold ${critical > 0 ? 'text-red-600' : 'text-gray-900'}`}>{critical}</p>
+                      <p className="text-[10px] text-gray-500">Over 80%</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-2.5 text-center shadow-sm">
+                      <p className="text-lg font-bold text-gray-900">{selectedTemplateMetrics.totalBins - critical}</p>
+                      <p className="text-[10px] text-gray-500">Healthy</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Bin List */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Bins in Template</h3>
-              <div className="space-y-2">
-                {selectedTemplateBins.map((bin) => (
-                  <div
-                    key={bin.id}
-                    className="p-3 bg-gray-50 rounded-lg border border-gray-200"
-                  >
-                    <div className="flex items-start justify-between mb-1">
-                      <p className="font-medium text-sm text-gray-900">Bin #{bin.bin_number}</p>
-                      <span className="text-xs text-gray-500">{bin.fill_percentage ?? 0}%</span>
+            <div className="p-4">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                Bins ({selectedTemplateBins.length})
+              </h3>
+              <div className="space-y-1.5">
+                {selectedTemplateBins.map((bin) => {
+                  const pct = bin.fill_percentage ?? 0;
+                  const fillColor = pct >= 80 ? 'bg-red-500' : pct >= 50 ? 'bg-amber-500' : 'bg-green-500';
+                  return (
+                    <div key={bin.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-fast">
+                      {/* Mini fill bar */}
+                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center relative overflow-hidden">
+                        <div className={`absolute bottom-0 left-0 right-0 ${fillColor} transition-all`}
+                          style={{ height: `${pct}%` }} />
+                        <span className="relative text-[10px] font-bold text-gray-800">{bin.bin_number}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {bin.location_name || `${bin.current_street}, ${bin.city}`}
+                        </p>
+                      </div>
+                      <span className={`text-xs font-semibold ${
+                        pct >= 80 ? 'text-red-600' : pct >= 50 ? 'text-amber-600' : 'text-green-600'
+                      }`}>{pct}%</span>
                     </div>
-                    <p className="text-xs text-gray-600 truncate">
-                      {bin.location_name || `${bin.current_street}, ${bin.city}`}
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
