@@ -50,6 +50,7 @@ export function BinTemplateBuilder() {
   const [templateToDelete, setTemplateToDelete] = useState<Route | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [perfFilter, setPerfFilter] = useState<'all' | 'top' | 'needs-runs' | 'has-issues'>('all');
+  const [showUncoveredBins, setShowUncoveredBins] = useState(false);
 
   // Route performance from shift history
   const { data: perfData = {} } = useQuery({
@@ -185,8 +186,8 @@ export function BinTemplateBuilder() {
     const coveredIds = new Set<string>();
     templates.forEach(t => (t.bin_ids || []).forEach(id => coveredIds.add(id)));
     const activeBins = bins.filter(b => b.status === 'active' || b.status === 'needs_check' || b.status === 'pending_move');
-    const uncovered = activeBins.filter(b => !coveredIds.has(b.id));
-    return { total: activeBins.length, covered: activeBins.length - uncovered.length, uncovered: uncovered.length };
+    const uncoveredBins = activeBins.filter(b => !coveredIds.has(b.id));
+    return { total: activeBins.length, covered: activeBins.length - uncoveredBins.length, uncovered: uncoveredBins.length, uncoveredBins };
   }, [bins, templates]);
 
   // Overlap detection
@@ -316,7 +317,7 @@ export function BinTemplateBuilder() {
   return (
     <div className="relative flex h-[calc(100vh-64px)] bg-gray-50">
       {/* Left Sidebar - Template List */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col z-10">
+      <div className="w-96 bg-white border-r border-gray-200 flex flex-col z-10">
         <div className="p-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900 mb-3">Bin Templates</h2>
           <div className="flex items-center gap-2">
@@ -339,13 +340,31 @@ export function BinTemplateBuilder() {
 
         {/* Coverage Stats */}
         {!loadingTemplates && coverageStats.total > 0 && (
-          <div className="px-4 py-2 border-b border-gray-200 flex items-center gap-3 text-[11px] text-gray-500 flex-wrap">
-            <span>{coverageStats.covered}/{coverageStats.total} bins covered</span>
-            {coverageStats.uncovered > 0 && (
-              <span className="text-amber-600 font-medium">{coverageStats.uncovered} not on any route</span>
-            )}
-            {overlaps.size > 0 && (
-              <span className="text-blue-600 font-medium">{overlaps.size} on multiple routes</span>
+          <div className="border-b border-gray-200">
+            <div className="px-4 py-2 flex items-center gap-3 text-[11px] text-gray-500 flex-wrap">
+              <span>{coverageStats.covered}/{coverageStats.total} bins covered</span>
+              {coverageStats.uncovered > 0 && (
+                <button
+                  onClick={() => setShowUncoveredBins(!showUncoveredBins)}
+                  className="text-amber-600 font-medium hover:text-amber-800 transition-colors"
+                >
+                  {coverageStats.uncovered} not on any route {showUncoveredBins ? '▾' : '▸'}
+                </button>
+              )}
+              {overlaps.size > 0 && (
+                <span className="text-blue-600 font-medium">{overlaps.size} on multiple routes</span>
+              )}
+            </div>
+            {showUncoveredBins && coverageStats.uncoveredBins.length > 0 && (
+              <div className="px-4 pb-2 max-h-32 overflow-y-auto">
+                <div className="grid grid-cols-2 gap-1">
+                  {coverageStats.uncoveredBins.map(bin => (
+                    <div key={bin.id} className="text-[10px] text-gray-500 truncate">
+                      <span className="font-medium text-gray-700">#{bin.bin_number}</span> {bin.current_street}, {bin.city}
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         )}

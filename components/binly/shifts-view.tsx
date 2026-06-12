@@ -1431,6 +1431,7 @@ export function CreateShiftDrawer({
   const [conflictShift, setConflictShift] = useState<{ id: string; status: string; created_at: number; active_tasks: number } | null>(null);
   const [allBins, setAllBins] = useState<Bin[]>([]);
   const [showRouteImport, setShowRouteImport] = useState(false);
+  const [importedRouteId, setImportedRouteId] = useState<string | null>(null);
   const [editingTaskIndex, setEditingTaskIndex] = useState<number | null>(null);
   const [editingTask, setEditingTask] = useState<ShiftTask | null>(null);
   const [showPlacementSelection, setShowPlacementSelection] = useState(false);
@@ -1837,6 +1838,7 @@ export function CreateShiftDrawer({
     console.log('✅ [ROUTE IMPORT] Created', newTasks.length, 'collection tasks');
 
     setTasks([...tasks, ...newTasks]);
+    setImportedRouteId(selectedRoute.id);
 
     // Merge route bins into allBins so lock detection works in the task list
     setAllBins(prev => {
@@ -2787,6 +2789,7 @@ export function CreateShiftDrawer({
         lock_route_order: lockRouteOrder,
         tasks: tasksPayload,
         warehouse_deployments: warehouseDeployments.length > 0 ? warehouseDeployments : undefined,
+        ...(importedRouteId && { route_id: importedRouteId }),
         // Scheduled date
         scheduled_date: (() => {
           const d = scheduledDate || new Date();
