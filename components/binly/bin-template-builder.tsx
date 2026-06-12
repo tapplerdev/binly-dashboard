@@ -439,7 +439,7 @@ export function BinTemplateBuilder() {
                   </span>
                   {template.geographic_area && (
                     <span className="flex items-center gap-1">
-                      <GoogleMapPin className="w-3 h-3" />
+                      <MapPin className="w-3 h-3" />
                       {template.geographic_area}
                     </span>
                   )}
