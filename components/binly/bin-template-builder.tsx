@@ -60,6 +60,34 @@ export function BinTemplateBuilder() {
     return Array.from(uniqueAreas).sort();
   }, [templates]);
 
+  // Compute health for all templates (must be before filteredTemplates)
+  const templateHealth = useMemo(() => {
+    const map = new Map<string, { avgFill: number; criticalBins: number; status: 'critical' | 'attention' | 'healthy' }>();
+    if (bins.length === 0) return map;
+
+    templates.forEach(template => {
+      const tBins = (template.bin_ids || [])
+        .map(id => bins.find(b => b.id === id))
+        .filter((b): b is Bin => b !== undefined);
+
+      if (tBins.length === 0) {
+        map.set(template.id, { avgFill: 0, criticalBins: 0, status: 'healthy' });
+        return;
+      }
+
+      const avgFill = Math.round(tBins.reduce((s, b) => s + (b.fill_percentage ?? 0), 0) / tBins.length);
+      const criticalBins = tBins.filter(b => (b.fill_percentage ?? 0) >= 80).length;
+
+      let status: 'critical' | 'attention' | 'healthy' = 'healthy';
+      if (criticalBins >= 2 || avgFill >= 70) status = 'critical';
+      else if (criticalBins >= 1 || avgFill >= 45) status = 'attention';
+
+      map.set(template.id, { avgFill, criticalBins, status });
+    });
+
+    return map;
+  }, [templates, bins]);
+
   // Filter templates based on search and filters
   const filteredTemplates = useMemo(() => {
     return templates.filter(template => {
@@ -92,35 +120,7 @@ export function BinTemplateBuilder() {
 
       return true;
     });
-  }, [templates, searchQuery, filterArea, filterBinCount]);
-
-  // Compute health for all templates
-  const templateHealth = useMemo(() => {
-    const map = new Map<string, { avgFill: number; criticalBins: number; status: 'critical' | 'attention' | 'healthy' }>();
-    if (bins.length === 0) return map;
-
-    templates.forEach(template => {
-      const tBins = (template.bin_ids || [])
-        .map(id => bins.find(b => b.id === id))
-        .filter((b): b is Bin => b !== undefined);
-
-      if (tBins.length === 0) {
-        map.set(template.id, { avgFill: 0, criticalBins: 0, status: 'healthy' });
-        return;
-      }
-
-      const avgFill = Math.round(tBins.reduce((s, b) => s + (b.fill_percentage ?? 0), 0) / tBins.length);
-      const criticalBins = tBins.filter(b => (b.fill_percentage ?? 0) >= 80).length;
-
-      let status: 'critical' | 'attention' | 'healthy' = 'healthy';
-      if (criticalBins >= 2 || avgFill >= 70) status = 'critical';
-      else if (criticalBins >= 1 || avgFill >= 45) status = 'attention';
-
-      map.set(template.id, { avgFill, criticalBins, status });
-    });
-
-    return map;
-  }, [templates, bins]);
+  }, [templates, searchQuery, filterArea, filterBinCount, healthFilter, templateHealth]);
 
   // Get bins for selected template
   const selectedTemplateBins = useMemo(() => {
