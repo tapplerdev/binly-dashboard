@@ -550,16 +550,20 @@ function BinsPageContent() {
                               <span
                                 className={cn(
                                   'text-sm font-medium',
-                                  bin.days_since_check !== undefined && bin.days_since_check !== null
-                                    ? bin.days_since_check >= 7
-                                      ? 'text-red-600'
-                                      : 'text-gray-700'
-                                    : 'text-gray-500'
+                                  bin.status === 'in_storage'
+                                    ? 'text-gray-400'
+                                    : bin.days_since_check !== undefined && bin.days_since_check !== null
+                                      ? bin.days_since_check >= 7
+                                        ? 'text-red-600'
+                                        : 'text-gray-700'
+                                      : 'text-gray-500'
                                 )}
                               >
-                                {bin.days_since_check !== undefined && bin.days_since_check !== null
-                                  ? `${bin.days_since_check} days ago`
-                                  : 'Never'}
+                                {bin.status === 'in_storage'
+                                  ? 'N/A'
+                                  : bin.days_since_check !== undefined && bin.days_since_check !== null
+                                    ? `${bin.days_since_check} days ago`
+                                    : 'Never'}
                               </span>
                             </div>
                           </td>
@@ -770,16 +774,20 @@ function BinsPageContent() {
                       <span
                         className={cn(
                           'font-medium',
-                          bin.days_since_check !== undefined && bin.days_since_check !== null
-                            ? bin.days_since_check >= 7
-                              ? 'text-red-600'
-                              : 'text-gray-700'
-                            : 'text-gray-500'
+                          bin.status === 'in_storage'
+                            ? 'text-gray-400'
+                            : bin.days_since_check !== undefined && bin.days_since_check !== null
+                              ? bin.days_since_check >= 7
+                                ? 'text-red-600'
+                                : 'text-gray-700'
+                              : 'text-gray-500'
                         )}
                       >
-                        {bin.days_since_check !== undefined && bin.days_since_check !== null
-                          ? `${bin.days_since_check} days ago`
-                          : 'Never'}
+                        {bin.status === 'in_storage'
+                          ? 'N/A'
+                          : bin.days_since_check !== undefined && bin.days_since_check !== null
+                            ? `${bin.days_since_check} days ago`
+                            : 'Never'}
                       </span>
                     </div>
                   </Card>
