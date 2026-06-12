@@ -109,13 +109,6 @@ export const sidebarNavItems: NavItem[] = [
         children: [],
       },
       {
-        path: '/intelligence/planner',
-        key: 'planner',
-        title: 'Expansion Planner',
-        icon: <MapPin className="w-5 h-5" />,
-        children: [],
-      },
-      {
         path: '/intelligence/leaderboard',
         key: 'leaderboard',
         title: 'Driver Leaderboard',

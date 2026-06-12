@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { APIProvider, Map as GoogleMap, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { useBins } from '@/lib/hooks/use-bins';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { Route } from '@/lib/types/route';
 import { getRoutes, createRoute, updateRoute, deleteRoute } from '@/lib/api/routes';
-import { Loader2, Plus, X, Trash2, Edit2, MapPin, Package, Search, Filter, Sparkles, AlertTriangle, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { getRoutePerformance, RoutePerformanceData } from '@/lib/api/route-performance';
+import { Loader2, Plus, X, Trash2, Edit2, MapPin, Package, Search, Filter, Sparkles, AlertTriangle, Trophy, Clock, TrendingUp } from 'lucide-react';
 import { SmartRoutesModal } from './smart-routes-modal';
 import { TemplateEditorModal } from './template-editor-modal';
 import { DeleteConfirmationModal } from './delete-confirmation-modal';
@@ -16,8 +18,18 @@ import { DeleteConfirmationModal } from './delete-confirmation-modal';
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 11;
 
+function timeAgo(ts: number): string {
+  const sec = Math.floor(Date.now() / 1000 - ts);
+  if (sec < 60) return 'just now';
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  const days = Math.floor(sec / 86400);
+  return days === 1 ? '1 day ago' : `${days}d ago`;
+}
+
 export function BinTemplateBuilder() {
   const { data: bins = [], isLoading: loadingBins } = useBins();
+  const { data: allBinsWithRetired = [] } = useBins(true); // includes retired for inactive detection
   const { data: warehouse } = useWarehouseLocation();
   const WAREHOUSE_LOCATION = { lat: warehouse?.latitude || 0, lng: warehouse?.longitude || 0 };
   const [templates, setTemplates] = useState<Route[]>([]);
@@ -35,7 +47,14 @@ export function BinTemplateBuilder() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<Route | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [healthFilter, setHealthFilter] = useState<'all' | 'critical' | 'attention' | 'healthy'>('all');
+  const [perfFilter, setPerfFilter] = useState<'all' | 'top' | 'needs-runs' | 'has-issues'>('all');
+
+  // Route performance from shift history
+  const { data: perfData = {} } = useQuery({
+    queryKey: ['route-performance'],
+    queryFn: getRoutePerformance,
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Load templates on mount
   useEffect(() => {
@@ -60,67 +79,81 @@ export function BinTemplateBuilder() {
     return Array.from(uniqueAreas).sort();
   }, [templates]);
 
-  // Compute health for all templates (must be before filteredTemplates)
-  const templateHealth = useMemo(() => {
-    const map = new Map<string, { avgFill: number; criticalBins: number; status: 'critical' | 'attention' | 'healthy' }>();
-    if (bins.length === 0) return map;
+  // Compute performance metrics for all templates
+  const templatePerf = useMemo(() => {
+    const map = new Map<string, {
+      avgFill: number; activeBins: number; inactiveBins: number;
+      totalBinIds: number; shiftsRun: number; avgCompletion: number;
+      avgDuration: number | null; lastRunAt: number | null;
+    }>();
 
     templates.forEach(template => {
-      const tBins = (template.bin_ids || [])
+      const binIds = template.bin_ids || [];
+      const activeBins = binIds
         .map(id => bins.find(b => b.id === id))
         .filter((b): b is Bin => b !== undefined);
+      // Find inactive by checking against all bins (including retired)
+      const inactiveCount = binIds.length - activeBins.length;
 
-      if (tBins.length === 0) {
-        map.set(template.id, { avgFill: 0, criticalBins: 0, status: 'healthy' });
-        return;
-      }
+      const avgFill = activeBins.length > 0
+        ? Math.round(activeBins.reduce((s, b) => s + (b.fill_percentage ?? 0), 0) / activeBins.length)
+        : 0;
 
-      const avgFill = Math.round(tBins.reduce((s, b) => s + (b.fill_percentage ?? 0), 0) / tBins.length);
-      const criticalBins = tBins.filter(b => (b.fill_percentage ?? 0) >= 80).length;
+      const perf = perfData[template.id];
 
-      let status: 'critical' | 'attention' | 'healthy' = 'healthy';
-      if (criticalBins >= 2 || avgFill >= 70) status = 'critical';
-      else if (criticalBins >= 1 || avgFill >= 45) status = 'attention';
-
-      map.set(template.id, { avgFill, criticalBins, status });
+      map.set(template.id, {
+        avgFill,
+        activeBins: activeBins.length,
+        inactiveBins: inactiveCount,
+        totalBinIds: binIds.length,
+        shiftsRun: perf?.shifts_completed || 0,
+        avgCompletion: perf?.avg_completion_rate || 0,
+        avgDuration: perf?.avg_duration_minutes ?? null,
+        lastRunAt: perf?.last_run_at ?? null,
+      });
     });
 
     return map;
-  }, [templates, bins]);
+  }, [templates, bins, perfData]);
 
-  // Filter templates based on search and filters
+  // Sort by avg fill descending (best performers first) + assign ranks
+  const rankedTemplates = useMemo(() => {
+    return [...templates]
+      .sort((a, b) => {
+        const pa = templatePerf.get(a.id);
+        const pb = templatePerf.get(b.id);
+        return (pb?.avgFill ?? 0) - (pa?.avgFill ?? 0);
+      })
+      .map((t, i) => ({ ...t, rank: i + 1 }));
+  }, [templates, templatePerf]);
+
+  // Filter templates
   const filteredTemplates = useMemo(() => {
-    return templates.filter(template => {
-      // Search filter
+    return rankedTemplates.filter(template => {
       if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        const matchesName = template.name.toLowerCase().includes(query);
-        const matchesArea = template.geographic_area?.toLowerCase().includes(query);
-        if (!matchesName && !matchesArea) return false;
+        const q = searchQuery.toLowerCase();
+        if (!template.name.toLowerCase().includes(q) && !template.geographic_area?.toLowerCase().includes(q)) return false;
       }
-
-      // Area filter
-      if (filterArea !== 'all' && template.geographic_area !== filterArea) {
-        return false;
-      }
-
-      // Bin count filter
+      if (filterArea !== 'all' && template.geographic_area !== filterArea) return false;
       if (filterBinCount !== 'all') {
         const count = template.bin_count;
         if (filterBinCount === 'small' && count > 5) return false;
         if (filterBinCount === 'medium' && (count <= 5 || count > 15)) return false;
         if (filterBinCount === 'large' && count <= 15) return false;
       }
-
-      // Health filter
-      if (healthFilter !== 'all') {
-        const health = templateHealth.get(template.id);
-        if (health && health.status !== healthFilter) return false;
+      if (perfFilter === 'top') {
+        const p = templatePerf.get(template.id);
+        if (!p || template.rank > 3) return false;
+      } else if (perfFilter === 'needs-runs') {
+        const p = templatePerf.get(template.id);
+        if (p && p.shiftsRun > 0) return false;
+      } else if (perfFilter === 'has-issues') {
+        const p = templatePerf.get(template.id);
+        if (!p || p.inactiveBins === 0) return false;
       }
-
       return true;
     });
-  }, [templates, searchQuery, filterArea, filterBinCount, healthFilter, templateHealth]);
+  }, [rankedTemplates, searchQuery, filterArea, filterBinCount, perfFilter, templatePerf]);
 
   // Get bins for selected template
   const selectedTemplateBins = useMemo(() => {
@@ -340,28 +373,28 @@ export function BinTemplateBuilder() {
           </div>
         </div>
 
-        {/* Health Filter Chips */}
-        {!loadingTemplates && templateHealth.size > 0 && (
+        {/* Performance Filter Chips */}
+        {!loadingTemplates && templates.length > 0 && (
           <div className="px-4 py-2 border-b border-gray-200 flex items-center gap-1.5 flex-wrap">
             {([
               { key: 'all' as const, label: 'All', count: templates.length },
-              { key: 'critical' as const, label: 'Critical', icon: <AlertTriangle className="w-3 h-3" />, count: templates.filter(t => templateHealth.get(t.id)?.status === 'critical').length },
-              { key: 'attention' as const, label: 'Attention', icon: <AlertCircle className="w-3 h-3" />, count: templates.filter(t => templateHealth.get(t.id)?.status === 'attention').length },
-              { key: 'healthy' as const, label: 'Healthy', icon: <CheckCircle2 className="w-3 h-3" />, count: templates.filter(t => templateHealth.get(t.id)?.status === 'healthy').length },
+              { key: 'top' as const, label: 'Top 3', icon: <Trophy className="w-3 h-3" />, count: Math.min(3, templates.length) },
+              { key: 'needs-runs' as const, label: 'No Runs', icon: <Clock className="w-3 h-3" />, count: templates.filter(t => !perfData[t.id]?.shifts_completed).length },
+              { key: 'has-issues' as const, label: 'Issues', icon: <AlertTriangle className="w-3 h-3" />, count: templates.filter(t => (templatePerf.get(t.id)?.inactiveBins ?? 0) > 0).length },
             ]).map(chip => (
               <button
                 key={chip.key}
-                onClick={() => setHealthFilter(chip.key)}
+                onClick={() => setPerfFilter(chip.key)}
                 className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition-all ${
-                  healthFilter === chip.key
-                    ? chip.key === 'critical' ? 'bg-red-100 text-red-700 border border-red-200'
-                      : chip.key === 'attention' ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                      : chip.key === 'healthy' ? 'bg-green-100 text-green-700 border border-green-200'
+                  perfFilter === chip.key
+                    ? chip.key === 'top' ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                      : chip.key === 'has-issues' ? 'bg-red-100 text-red-700 border border-red-200'
+                      : chip.key === 'needs-runs' ? 'bg-gray-200 text-gray-700 border border-gray-300'
                       : 'bg-blue-100 text-blue-700 border border-blue-200'
                     : 'bg-gray-100 text-gray-500 border border-transparent hover:bg-gray-200'
                 }`}
               >
-                {'icon' in chip && chip.icon}
+                {chip.icon}
                 {chip.label}
                 <span className="text-[10px] font-bold">{chip.count}</span>
               </button>
@@ -398,17 +431,11 @@ export function BinTemplateBuilder() {
             </div>
           ) : (
             filteredTemplates.map(template => {
-              const health = templateHealth.get(template.id);
-              const fillPct = health?.avgFill ?? 0;
-              const borderColor = !health ? 'border-l-gray-300'
-                : health.status === 'critical' ? 'border-l-red-500'
-                : health.status === 'attention' ? 'border-l-amber-500'
-                : 'border-l-green-500';
-              const ringColor = !health ? '#d1d5db'
-                : health.status === 'critical' ? '#ef4444'
-                : health.status === 'attention' ? '#f59e0b'
-                : '#22c55e';
-              // SVG donut: circumference = 2 * PI * 18 ≈ 113
+              const p = templatePerf.get(template.id);
+              const fillPct = p?.avgFill ?? 0;
+              const isTop3 = template.rank <= 3;
+              // Green tint for high performers (high fill = good)
+              const ringColor = fillPct >= 60 ? '#22c55e' : fillPct >= 35 ? '#f59e0b' : '#9ca3af';
               const circ = 113.1;
               const dashOffset = circ - (circ * Math.min(fillPct, 100) / 100);
 
@@ -416,15 +443,22 @@ export function BinTemplateBuilder() {
                 <div
                   key={template.id}
                   onClick={() => viewTemplateDetails(template)}
-                  className={`rounded-lg border-l-[4px] border border-gray-200 transition-fast cursor-pointer ${borderColor} ${
+                  className={`rounded-lg border border-gray-200 transition-fast cursor-pointer ${
                     selectedTemplate?.id === template.id
                       ? 'bg-primary/5 ring-2 ring-primary/30'
                       : 'bg-white hover:bg-gray-50'
                   }`}
                 >
                   <div className="flex items-center gap-3 p-3">
+                    {/* Rank badge */}
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
+                      isTop3 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {isTop3 && template.rank === 1 ? <Trophy className="w-3.5 h-3.5" /> : `#${template.rank}`}
+                    </div>
+
                     {/* Donut ring */}
-                    <div className="relative w-11 h-11 shrink-0">
+                    <div className="relative w-10 h-10 shrink-0">
                       <svg viewBox="0 0 40 40" className="w-full h-full -rotate-90">
                         <circle cx="20" cy="20" r="18" fill="none" stroke="#e5e7eb" strokeWidth="3" />
                         <circle cx="20" cy="20" r="18" fill="none" stroke={ringColor} strokeWidth="3"
@@ -451,19 +485,14 @@ export function BinTemplateBuilder() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 mt-1 text-[11px] text-gray-500">
-                        <span className="flex items-center gap-0.5">
-                          <Package className="w-3 h-3" /> {template.bin_count}
-                        </span>
-                        {template.geographic_area && (
-                          <span className="truncate">{template.geographic_area}</span>
-                        )}
+                        <span>{p?.inactiveBins ? `${p.activeBins}/${p.totalBinIds}` : template.bin_count} bins</span>
+                        {p && p.shiftsRun > 0 && <span>· {p.shiftsRun} runs</span>}
+                        {p && p.avgCompletion > 0 && <span>· {p.avgCompletion}%</span>}
                       </div>
-                      {health && health.criticalBins > 0 && (
+                      {p && p.inactiveBins > 0 && (
                         <div className="flex items-center gap-1 mt-1">
-                          <AlertTriangle className="w-3 h-3 text-red-500" />
-                          <span className="text-[10px] font-semibold text-red-600">
-                            {health.criticalBins} bin{health.criticalBins !== 1 ? 's' : ''} over 80%
-                          </span>
+                          <AlertTriangle className="w-3 h-3 text-amber-500" />
+                          <span className="text-[10px] font-medium text-amber-600">{p.inactiveBins} retired/missing</span>
                         </div>
                       )}
                     </div>
@@ -572,80 +601,135 @@ export function BinTemplateBuilder() {
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto">
-            {/* Route Health Hero */}
+            {/* Performance Hero */}
             {(() => {
-              const h = templateHealth.get(selectedTemplate.id);
-              const fill = h?.avgFill ?? selectedTemplateMetrics.avgFill;
-              const critical = h?.criticalBins ?? selectedTemplateMetrics.criticalBins;
-              const heroColor = fill >= 70 ? 'from-red-500 to-red-600'
-                : fill >= 45 ? 'from-amber-500 to-amber-600'
-                : 'from-green-500 to-green-600';
-              const heroBg = fill >= 70 ? 'bg-red-50'
-                : fill >= 45 ? 'bg-amber-50'
-                : 'bg-green-50';
-              const circ = 150.8; // 2 * PI * 24
+              const p = templatePerf.get(selectedTemplate.id);
+              const fill = p?.avgFill ?? selectedTemplateMetrics.avgFill;
+              const rank = rankedTemplates.find(t => t.id === selectedTemplate.id)?.rank ?? 0;
+              const isTop3 = rank <= 3;
+              const heroBg = fill >= 60 ? 'bg-green-50' : fill >= 35 ? 'bg-amber-50' : 'bg-gray-50';
+              const ringColor = fill >= 60 ? '#22c55e' : fill >= 35 ? '#f59e0b' : '#9ca3af';
+              const circ = 150.8;
               const dashOff = circ - (circ * Math.min(fill, 100) / 100);
+              const perf = perfData[selectedTemplate.id];
 
               return (
                 <div className={`p-5 ${heroBg} border-b border-gray-200`}>
                   <div className="flex items-center gap-4">
+                    {/* Rank */}
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                      isTop3 ? 'bg-amber-200 text-amber-800' : 'bg-gray-200 text-gray-600'
+                    }`}>
+                      {rank === 1 ? <Trophy className="w-5 h-5" /> : <span className="text-sm font-bold">#{rank}</span>}
+                    </div>
                     {/* Large donut */}
-                    <div className="relative w-16 h-16 shrink-0">
+                    <div className="relative w-14 h-14 shrink-0">
                       <svg viewBox="0 0 52 52" className="w-full h-full -rotate-90">
                         <circle cx="26" cy="26" r="24" fill="none" stroke="white" strokeWidth="4" />
-                        <circle cx="26" cy="26" r="24" fill="none" strokeWidth="4"
-                          stroke="url(#grad)" strokeDasharray={circ} strokeDashoffset={dashOff} strokeLinecap="round" />
-                        <defs>
-                          <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" stopColor={fill >= 70 ? '#ef4444' : fill >= 45 ? '#f59e0b' : '#22c55e'} />
-                            <stop offset="100%" stopColor={fill >= 70 ? '#dc2626' : fill >= 45 ? '#d97706' : '#16a34a'} />
-                          </linearGradient>
-                        </defs>
+                        <circle cx="26" cy="26" r="24" fill="none" stroke={ringColor} strokeWidth="4"
+                          strokeDasharray={circ} strokeDashoffset={dashOff} strokeLinecap="round" />
                       </svg>
-                      <span className="absolute inset-0 flex items-center justify-center text-base font-bold text-gray-900">
-                        {fill}%
-                      </span>
+                      <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-gray-900">{fill}%</span>
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-bold text-gray-900">{selectedTemplate.name}</p>
                       <p className="text-xs text-gray-500 mt-0.5">{selectedTemplate.geographic_area}</p>
-                      {selectedTemplate.description && (
-                        <p className="text-[11px] text-gray-400 mt-0.5">{selectedTemplate.description}</p>
-                      )}
                     </div>
                   </div>
 
                   {/* Stat cards */}
-                  <div className="grid grid-cols-3 gap-2 mt-4">
-                    <div className="bg-white rounded-lg p-2.5 text-center shadow-sm">
-                      <p className="text-lg font-bold text-gray-900">{selectedTemplateMetrics.totalBins}</p>
-                      <p className="text-[10px] text-gray-500">Total Bins</p>
+                  <div className="grid grid-cols-2 gap-2 mt-4">
+                    <div className="bg-white rounded-lg p-2.5 shadow-sm">
+                      <p className="text-[10px] text-gray-500">Active Bins</p>
+                      <p className="text-lg font-bold text-gray-900">
+                        {p?.inactiveBins ? <>{p.activeBins}<span className="text-xs text-gray-400 font-normal">/{p.totalBinIds}</span></> : selectedTemplateMetrics.totalBins}
+                      </p>
                     </div>
-                    <div className="bg-white rounded-lg p-2.5 text-center shadow-sm">
-                      <p className={`text-lg font-bold ${critical > 0 ? 'text-red-600' : 'text-gray-900'}`}>{critical}</p>
-                      <p className="text-[10px] text-gray-500">Over 80%</p>
+                    <div className="bg-white rounded-lg p-2.5 shadow-sm">
+                      <p className="text-[10px] text-gray-500">Avg Fill</p>
+                      <p className={`text-lg font-bold ${fill >= 60 ? 'text-green-600' : fill >= 35 ? 'text-amber-600' : 'text-gray-500'}`}>{fill}%</p>
                     </div>
-                    <div className="bg-white rounded-lg p-2.5 text-center shadow-sm">
-                      <p className="text-lg font-bold text-gray-900">{selectedTemplateMetrics.totalBins - critical}</p>
-                      <p className="text-[10px] text-gray-500">Healthy</p>
+                    <div className="bg-white rounded-lg p-2.5 shadow-sm">
+                      <p className="text-[10px] text-gray-500">Shifts Run</p>
+                      <p className="text-lg font-bold text-gray-900">{perf?.shifts_completed ?? 0}</p>
                     </div>
+                    <div className="bg-white rounded-lg p-2.5 shadow-sm">
+                      <p className="text-[10px] text-gray-500">Avg Completion</p>
+                      <p className="text-lg font-bold text-gray-900">{perf?.avg_completion_rate ? `${perf.avg_completion_rate}%` : '—'}</p>
+                    </div>
+                    {perf?.avg_duration_minutes && (
+                      <div className="bg-white rounded-lg p-2.5 shadow-sm">
+                        <p className="text-[10px] text-gray-500">Avg Duration</p>
+                        <p className="text-lg font-bold text-gray-900">{Math.round(perf.avg_duration_minutes)}m</p>
+                      </div>
+                    )}
+                    {perf?.last_run_at && (
+                      <div className="bg-white rounded-lg p-2.5 shadow-sm">
+                        <p className="text-[10px] text-gray-500">Last Run</p>
+                        <p className="text-sm font-bold text-gray-900">{timeAgo(perf.last_run_at)}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
             })()}
 
-            {/* Bin List */}
+            {/* Inactive bins warning */}
+            {(() => {
+              const p = templatePerf.get(selectedTemplate.id);
+              if (!p || p.inactiveBins === 0) return null;
+              // Find the inactive bin IDs
+              const activeBinIdSet = new Set(bins.map(b => b.id));
+              const inactiveBinIds = (selectedTemplate.bin_ids || []).filter(id => !activeBinIdSet.has(id));
+              const inactiveBinDetails = inactiveBinIds
+                .map(id => allBinsWithRetired.find(b => b.id === id))
+                .filter((b): b is Bin => b !== undefined);
+
+              return (
+                <div className="mx-4 mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 text-amber-600" />
+                      <span className="text-xs font-semibold text-amber-700">{p.inactiveBins} inactive bin{p.inactiveBins !== 1 ? 's' : ''}</span>
+                    </div>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const activeIds = (selectedTemplate.bin_ids || []).filter(id => activeBinIdSet.has(id));
+                        try {
+                          await updateRoute(selectedTemplate.id, { bin_ids: activeIds });
+                          await loadTemplates();
+                        } catch {}
+                      }}
+                      className="text-[10px] font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 px-2 py-1 rounded transition-colors"
+                    >
+                      Remove inactive
+                    </button>
+                  </div>
+                  {inactiveBinDetails.map(bin => (
+                    <div key={bin.id} className="flex items-center gap-2 py-1 text-xs text-gray-500">
+                      <span className="font-medium">#{bin.bin_number}</span>
+                      <span className="truncate">{bin.current_street}, {bin.city}</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                        bin.status === 'retired' ? 'bg-gray-200 text-gray-600' : 'bg-red-100 text-red-600'
+                      }`}>{bin.status}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* Active Bin List */}
             <div className="p-4">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                Bins ({selectedTemplateBins.length})
+                Active Bins ({selectedTemplateBins.length})
               </h3>
               <div className="space-y-1.5">
-                {selectedTemplateBins.map((bin) => {
+                {[...selectedTemplateBins].sort((a, b) => (b.fill_percentage ?? 0) - (a.fill_percentage ?? 0)).map((bin) => {
                   const pct = bin.fill_percentage ?? 0;
-                  const fillColor = pct >= 80 ? 'bg-red-500' : pct >= 50 ? 'bg-amber-500' : 'bg-green-500';
+                  const fillColor = pct >= 60 ? 'bg-green-500' : pct >= 35 ? 'bg-amber-500' : 'bg-gray-400';
                   return (
                     <div key={bin.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-fast">
-                      {/* Mini fill bar */}
                       <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center relative overflow-hidden">
                         <div className={`absolute bottom-0 left-0 right-0 ${fillColor} transition-all`}
                           style={{ height: `${pct}%` }} />
@@ -657,7 +741,7 @@ export function BinTemplateBuilder() {
                         </p>
                       </div>
                       <span className={`text-xs font-semibold ${
-                        pct >= 80 ? 'text-red-600' : pct >= 50 ? 'text-amber-600' : 'text-green-600'
+                        pct >= 60 ? 'text-green-600' : pct >= 35 ? 'text-amber-600' : 'text-gray-500'
                       }`}>{pct}%</span>
                     </div>
                   );
