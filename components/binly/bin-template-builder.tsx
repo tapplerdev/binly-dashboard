@@ -8,7 +8,8 @@ import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { Route } from '@/lib/types/route';
 import { getRoutes, createRoute, updateRoute, deleteRoute } from '@/lib/api/routes';
-import { getRoutePerformance, RoutePerformanceData } from '@/lib/api/route-performance';
+import { getRoutePerformance } from '@/lib/api/route-performance';
+import { fetchBinAnalytics } from '@/lib/api/bin-analytics';
 import { Loader2, Plus, X, Trash2, Edit2, MapPin, Package, Search, Filter, Sparkles, AlertTriangle, Trophy, Clock, TrendingUp } from 'lucide-react';
 import { SmartRoutesModal } from './smart-routes-modal';
 import { TemplateEditorModal } from './template-editor-modal';
@@ -56,6 +57,19 @@ export function BinTemplateBuilder() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Bin analytics for check counts (grace period)
+  const { data: analyticsData } = useQuery({
+    queryKey: ['bin-analytics'],
+    queryFn: fetchBinAnalytics,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const binCheckCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    (analyticsData?.bins || []).forEach(b => m.set(b.id, b.check_count));
+    return m;
+  }, [analyticsData]);
+
   // Load templates on mount
   useEffect(() => {
     loadTemplates();
@@ -91,8 +105,8 @@ export function BinTemplateBuilder() {
       const binIds = template.bin_ids || [];
       const activeBins = binIds
         .map(id => bins.find(b => b.id === id))
-        .filter((b): b is Bin => b !== undefined);
-      // Find inactive by checking against all bins (including retired)
+        .filter((b): b is Bin => b !== undefined && b.status !== 'in_storage');
+      // Find inactive: retired (filtered by useBins), missing, in_storage, or deleted from DB
       const inactiveCount = binIds.length - activeBins.length;
 
       const avgFill = activeBins.length > 0
@@ -155,10 +169,31 @@ export function BinTemplateBuilder() {
     });
   }, [rankedTemplates, searchQuery, filterArea, filterBinCount, perfFilter, templatePerf]);
 
+  // Coverage gap detection
+  const coverageStats = useMemo(() => {
+    const coveredIds = new Set<string>();
+    templates.forEach(t => (t.bin_ids || []).forEach(id => coveredIds.add(id)));
+    const activeBins = bins.filter(b => b.status === 'active' || b.status === 'needs_check' || b.status === 'pending_move');
+    const uncovered = activeBins.filter(b => !coveredIds.has(b.id));
+    return { total: activeBins.length, covered: activeBins.length - uncovered.length, uncovered: uncovered.length };
+  }, [bins, templates]);
+
+  // Overlap detection
+  const overlaps = useMemo(() => {
+    const binToRoutes = new Map<string, string[]>();
+    templates.forEach(t => {
+      (t.bin_ids || []).forEach(id => {
+        if (!binToRoutes.has(id)) binToRoutes.set(id, []);
+        binToRoutes.get(id)!.push(t.name);
+      });
+    });
+    return new Map(Array.from(binToRoutes.entries()).filter(([, routes]) => routes.length > 1));
+  }, [templates]);
+
   // Get bins for selected template
   const selectedTemplateBins = useMemo(() => {
     if (!selectedTemplate || !selectedTemplate.bin_ids) return [];
-    return bins.filter(bin => selectedTemplate.bin_ids!.includes(bin.id));
+    return bins.filter(bin => selectedTemplate.bin_ids!.includes(bin.id) && bin.status !== 'in_storage');
   }, [selectedTemplate, bins]);
 
   // Calculate metrics for selected template
@@ -290,6 +325,19 @@ export function BinTemplateBuilder() {
             </button>
           </div>
         </div>
+
+        {/* Coverage Stats */}
+        {!loadingTemplates && coverageStats.total > 0 && (
+          <div className="px-4 py-2 border-b border-gray-200 flex items-center gap-3 text-[11px] text-gray-500 flex-wrap">
+            <span>{coverageStats.covered}/{coverageStats.total} bins covered</span>
+            {coverageStats.uncovered > 0 && (
+              <span className="text-amber-600 font-medium">{coverageStats.uncovered} not on any route</span>
+            )}
+            {overlaps.size > 0 && (
+              <span className="text-blue-600 font-medium">{overlaps.size} on multiple routes</span>
+            )}
+          </div>
+        )}
 
         {/* Search Bar */}
         <div className="p-4 border-b border-gray-200">
@@ -711,7 +759,9 @@ export function BinTemplateBuilder() {
                       <span className="font-medium">#{bin.bin_number}</span>
                       <span className="truncate">{bin.current_street}, {bin.city}</span>
                       <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                        bin.status === 'retired' ? 'bg-gray-200 text-gray-600' : 'bg-red-100 text-red-600'
+                        bin.status === 'retired' ? 'bg-gray-200 text-gray-600'
+                          : bin.status === 'in_storage' ? 'bg-blue-100 text-blue-600'
+                          : 'bg-red-100 text-red-600'
                       }`}>{bin.status}</span>
                     </div>
                   ))}
@@ -739,10 +789,20 @@ export function BinTemplateBuilder() {
                         <p className="text-sm font-medium text-gray-900 truncate">
                           {bin.location_name || `${bin.current_street}, ${bin.city}`}
                         </p>
+                        {overlaps.has(bin.id) && (
+                          <p className="text-[9px] text-blue-500 truncate">
+                            Also on: {overlaps.get(bin.id)!.filter(n => n !== selectedTemplate?.name).join(', ')}
+                          </p>
+                        )}
                       </div>
-                      <span className={`text-xs font-semibold ${
-                        pct >= 60 ? 'text-green-600' : pct >= 35 ? 'text-amber-600' : 'text-gray-500'
-                      }`}>{pct}%</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {(binCheckCounts.get(bin.id) ?? 0) < 5 && (
+                          <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-medium">New</span>
+                        )}
+                        <span className={`text-xs font-semibold ${
+                          pct >= 60 ? 'text-green-600' : pct >= 35 ? 'text-amber-600' : 'text-gray-500'
+                        }`}>{pct}%</span>
+                      </div>
                     </div>
                   );
                 })}
