@@ -1,13 +1,11 @@
-export const metadata = {
-  title: 'Planner - Binly Dashboard',
-  description: 'Route and resource planning',
-};
+'use client';
+
+import { ExpansionPlanner } from '@/components/binly/expansion-planner';
 
 export default function PlannerPage() {
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-2">Planner</h1>
-      <p className="text-gray-600">Route and resource planning - Coming soon</p>
+    <div className="p-6 max-w-4xl mx-auto">
+      <ExpansionPlanner />
     </div>
   );
 }
