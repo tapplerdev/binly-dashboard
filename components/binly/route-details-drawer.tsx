@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, MapPin, Clock, Package, Calendar, Edit, Trash2, Copy } from 'lucide-react';
+import { X, MapPin, Clock, Package, Calendar, Edit, Trash2, Copy, AlertTriangle, TrendingUp, BarChart3 } from 'lucide-react';
 import { Route } from '@/lib/types/route';
 import { RouteMapView } from './route-map-view';
 import { getBins } from '@/lib/api/bins';
 import { Bin } from '@/lib/types/bin';
+import { RouteHealth } from '@/lib/hooks/use-route-health';
 
 // Format duration: show minutes if < 1 hour, otherwise show hours
 const formatDuration = (hours: number): string => {
@@ -17,13 +18,14 @@ const formatDuration = (hours: number): string => {
 
 interface RouteDetailsDrawerProps {
   route: Route;
+  routeHealth?: RouteHealth;
   onClose: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
   onDuplicate?: () => void;
 }
 
-export function RouteDetailsDrawer({ route, onClose, onEdit, onDelete, onDuplicate }: RouteDetailsDrawerProps) {
+export function RouteDetailsDrawer({ route, routeHealth, onClose, onEdit, onDelete, onDuplicate }: RouteDetailsDrawerProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [routeBins, setRouteBins] = useState<Bin[]>([]);
   const [loadingBins, setLoadingBins] = useState(true);
@@ -140,18 +142,6 @@ export function RouteDetailsDrawer({ route, onClose, onEdit, onDelete, onDuplica
               </button>
             </div>
 
-            {/* Last Used Attribution */}
-            <div className="mb-4 text-xs text-gray-500">
-              <span>Last completed by </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="font-medium text-gray-700">Omar Gabr</span>
-                <div className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-[8px] font-semibold">
-                  OG
-                </div>
-              </span>
-              <span> on Dec 26</span>
-            </div>
-
             {loadingBins ? (
               <div className="flex items-center justify-center py-8">
                 <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -203,23 +193,83 @@ export function RouteDetailsDrawer({ route, onClose, onEdit, onDelete, onDuplica
             )}
           </div>
 
-          {/* Usage Statistics */}
+          {/* Route Health */}
           <div className="p-4 md:p-6 border-t border-gray-100 bg-gray-50">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 md:mb-4">Usage Statistics</h3>
-            <div className="grid grid-cols-3 gap-3 md:gap-4">
-              <div className="bg-white rounded-lg p-3 border border-gray-200">
-                <p className="text-xs text-gray-500 mb-1">Times Used</p>
-                <p className="text-xl font-bold text-gray-900">0</p>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3 md:mb-4">Route Health</h3>
+            {routeHealth && routeHealth.matchedBins > 0 ? (
+              <>
+                {/* Health Status Banner */}
+                <div className={`rounded-lg p-3 mb-3 border ${
+                  routeHealth.status === 'critical' ? 'bg-red-50 border-red-200' :
+                  routeHealth.status === 'attention' ? 'bg-amber-50 border-amber-200' :
+                  'bg-green-50 border-green-200'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    {routeHealth.status === 'critical' ? (
+                      <AlertTriangle className="w-4 h-4 text-red-600" />
+                    ) : routeHealth.status === 'attention' ? (
+                      <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    ) : (
+                      <TrendingUp className="w-4 h-4 text-green-600" />
+                    )}
+                    <span className={`text-xs font-semibold ${
+                      routeHealth.status === 'critical' ? 'text-red-700' :
+                      routeHealth.status === 'attention' ? 'text-amber-700' : 'text-green-700'
+                    }`}>
+                      {routeHealth.status === 'critical'
+                        ? `${routeHealth.criticalBins} bins at critical fill — needs collection ASAP`
+                        : routeHealth.status === 'attention'
+                        ? `Approaching capacity — ~${routeHealth.daysToFull} days until full`
+                        : 'Healthy — bins well within capacity'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-white rounded-lg p-3 border border-gray-200">
+                    <p className="text-xs text-gray-500 mb-1">Avg Fill</p>
+                    <p className={`text-xl font-bold ${
+                      routeHealth.avgFill >= 70 ? 'text-red-600' :
+                      routeHealth.avgFill >= 45 ? 'text-amber-600' : 'text-green-600'
+                    }`}>{routeHealth.avgFill}%</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 border border-gray-200">
+                    <p className="text-xs text-gray-500 mb-1">Critical Bins</p>
+                    <p className={`text-xl font-bold ${routeHealth.criticalBins > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                      {routeHealth.criticalBins}
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 border border-gray-200">
+                    <p className="text-xs text-gray-500 mb-1">Fill Rate</p>
+                    <p className="text-xl font-bold text-gray-900">{routeHealth.avgDailyRate}%/d</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 border border-gray-200">
+                    <p className="text-xs text-gray-500 mb-1">Days to Full</p>
+                    <p className={`text-xl font-bold ${
+                      routeHealth.daysToFull <= 2 ? 'text-red-600' :
+                      routeHealth.daysToFull <= 5 ? 'text-amber-600' : 'text-green-600'
+                    }`}>
+                      {routeHealth.daysToFull > 30 ? '30+' : routeHealth.daysToFull}
+                    </p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="grid grid-cols-3 gap-3 md:gap-4">
+                <div className="bg-white rounded-lg p-3 border border-gray-200">
+                  <p className="text-xs text-gray-500 mb-1">Avg Fill</p>
+                  <p className="text-xl font-bold text-gray-400">—</p>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-gray-200">
+                  <p className="text-xs text-gray-500 mb-1">Critical Bins</p>
+                  <p className="text-xl font-bold text-gray-400">—</p>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-gray-200">
+                  <p className="text-xs text-gray-500 mb-1">Fill Rate</p>
+                  <p className="text-xl font-bold text-gray-400">—</p>
+                </div>
               </div>
-              <div className="bg-white rounded-lg p-3 border border-gray-200">
-                <p className="text-xs text-gray-500 mb-1">Avg. Completion</p>
-                <p className="text-xl font-bold text-gray-900">-</p>
-              </div>
-              <div className="bg-white rounded-lg p-3 border border-gray-200">
-                <p className="text-xs text-gray-500 mb-1">Success Rate</p>
-                <p className="text-xl font-bold text-gray-900">-</p>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 

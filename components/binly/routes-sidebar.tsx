@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Route } from '@/lib/types/route';
-import { Package, Clock, MapPin, Calendar, Search, X, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
+import { Package, Clock, MapPin, Calendar, Search, X, ChevronLeft, ChevronRight, ArrowUpDown, AlertTriangle, TrendingUp } from 'lucide-react';
+import { RouteHealth } from '@/lib/hooks/use-route-health';
 
 // Format duration: show minutes if < 1 hour, otherwise show hours
 const formatDuration = (hours: number): string => {
@@ -24,6 +25,7 @@ interface RoutesSidebarProps {
   routes: Route[];
   selectedRouteId?: string | null;
   visibleRouteIds?: Set<string>;
+  healthMap?: Map<string, RouteHealth>;
   onRouteSelect: (route: Route) => void;
   onViewDetails: (route: Route) => void;
   onRouteHover?: (routeId: string | null) => void;
@@ -43,7 +45,7 @@ const ROUTE_COLORS = [
   '#EC4899', // Pink
 ];
 
-export function RoutesSidebar({ routes, selectedRouteId, visibleRouteIds, onRouteSelect, onViewDetails, onRouteHover, onShowAll, onClearAll }: RoutesSidebarProps) {
+export function RoutesSidebar({ routes, selectedRouteId, visibleRouteIds, healthMap, onRouteSelect, onViewDetails, onRouteHover, onShowAll, onClearAll }: RoutesSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('name-asc');
@@ -307,6 +309,40 @@ export function RoutesSidebar({ routes, selectedRouteId, visibleRouteIds, onRout
                   </div>
                 )}
               </div>
+
+              {/* Health Indicator */}
+              {(() => {
+                const health = healthMap?.get(route.id);
+                if (!health || health.matchedBins === 0) return null;
+                return (
+                  <div className="flex items-center gap-2 pl-3 mb-1">
+                    <div className="flex items-center gap-1.5 flex-1">
+                      {/* Fill bar */}
+                      <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            health.status === 'critical' ? 'bg-red-500' :
+                            health.status === 'attention' ? 'bg-amber-500' : 'bg-green-500'
+                          }`}
+                          style={{ width: `${Math.min(health.avgFill, 100)}%` }}
+                        />
+                      </div>
+                      <span className={`text-[10px] font-bold ${
+                        health.status === 'critical' ? 'text-red-600' :
+                        health.status === 'attention' ? 'text-amber-600' : 'text-green-600'
+                      }`}>
+                        {health.avgFill}%
+                      </span>
+                    </div>
+                    {health.criticalBins > 0 && (
+                      <span className="flex items-center gap-0.5 text-[10px] text-red-600 font-medium">
+                        <AlertTriangle className="w-3 h-3" />
+                        {health.criticalBins}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* View Details Button */}
               <button

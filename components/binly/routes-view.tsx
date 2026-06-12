@@ -2,12 +2,13 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Route } from '@/lib/types/route';
-import { Plus, Filter, ChevronDown, Package, MapPin, Clock, Route as RouteIcon } from 'lucide-react';
+import { Plus, Filter, ChevronDown, Package, MapPin, Clock, Route as RouteIcon, AlertTriangle, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { RouteDetailsDrawer } from './route-details-drawer';
 import { CreateRouteModal } from './create-route-modal';
 import { RoutesMapView } from './routes-map-view';
 import { RoutesSidebar } from './routes-sidebar';
 import { useRoutes, useCreateRoute, useDeleteRoute, useDuplicateRoute } from '@/lib/hooks/use-routes';
+import { useRouteHealth, RouteHealthStatus } from '@/lib/hooks/use-route-health';
 import { FilterDrawer, type RouteFilters } from './filter-drawer';
 
 export function RoutesView() {
@@ -16,6 +17,10 @@ export function RoutesView() {
   const createRouteMutation = useCreateRoute();
   const deleteRouteMutation = useDeleteRoute();
   const duplicateRouteMutation = useDuplicateRoute();
+
+  // Route health analytics
+  const { healthMap } = useRouteHealth(routes);
+  const [healthFilter, setHealthFilter] = useState<RouteHealthStatus | 'all'>('all');
 
   // Local state
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
@@ -69,6 +74,12 @@ export function RoutesView() {
     if (confirmedFilters.containsBinNumber) {
       // This would need to check if the route contains a bin with this number
       // Placeholder: always pass for now
+    }
+
+    // Health status filter
+    if (healthFilter !== 'all') {
+      const health = healthMap.get(route.id);
+      if (health && health.status !== healthFilter) return false;
     }
 
     return true;
@@ -223,6 +234,35 @@ export function RoutesView() {
               </div>
             )}
 
+            {/* Health Filter Chips */}
+            {!loading && healthMap.size > 0 && (
+              <div className="flex items-center gap-1.5">
+                {([
+                  { key: 'all' as const, label: 'All', icon: null, count: routes.length },
+                  { key: 'critical' as const, label: 'Critical', icon: <AlertTriangle className="w-3 h-3" />, count: routes.filter(r => healthMap.get(r.id)?.status === 'critical').length },
+                  { key: 'attention' as const, label: 'Attention', icon: <AlertCircle className="w-3 h-3" />, count: routes.filter(r => healthMap.get(r.id)?.status === 'attention').length },
+                  { key: 'healthy' as const, label: 'Healthy', icon: <CheckCircle2 className="w-3 h-3" />, count: routes.filter(r => healthMap.get(r.id)?.status === 'healthy').length },
+                ] as const).map(chip => (
+                  <button
+                    key={chip.key}
+                    onClick={() => setHealthFilter(chip.key)}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-medium transition-all ${
+                      healthFilter === chip.key
+                        ? chip.key === 'critical' ? 'bg-red-100 text-red-700 border border-red-200'
+                          : chip.key === 'attention' ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                          : chip.key === 'healthy' ? 'bg-green-100 text-green-700 border border-green-200'
+                          : 'bg-blue-100 text-blue-700 border border-blue-200'
+                        : 'bg-gray-100 text-gray-600 border border-transparent hover:bg-gray-200'
+                    }`}
+                  >
+                    {chip.icon}
+                    {chip.label}
+                    <span className="text-[10px] font-bold">{chip.count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Filter and Create Buttons */}
             <div className="flex items-center gap-2 lg:gap-3">
               {/* Filter Button */}
@@ -280,6 +320,7 @@ export function RoutesView() {
               routes={displayedRoutes}
               selectedRouteId={selectedRoute?.id}
               visibleRouteIds={visibleRouteIds}
+              healthMap={healthMap}
               onRouteSelect={handleRouteSelect}
               onViewDetails={setDetailsRoute}
               onRouteHover={setHoveredRouteId}
@@ -361,6 +402,7 @@ export function RoutesView() {
       {detailsRoute && (
         <RouteDetailsDrawer
           route={detailsRoute}
+          routeHealth={healthMap.get(detailsRoute.id)}
           onClose={() => setDetailsRoute(null)}
           onEdit={() => {
             setIsCreating(true);
