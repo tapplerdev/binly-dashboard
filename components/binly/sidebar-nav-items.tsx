@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   Radio,
   Lightbulb,
+  Sparkles,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -98,6 +99,13 @@ export const sidebarNavItems: NavItem[] = [
         key: 'analytics',
         title: 'Analytics',
         icon: <BarChart3 className="w-5 h-5" />,
+        children: [],
+      },
+      {
+        path: '/intelligence/recommendations',
+        key: 'recommendations',
+        title: 'Recommendations',
+        icon: <Sparkles className="w-5 h-5" />,
         children: [],
       },
       {
