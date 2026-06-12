@@ -740,7 +740,7 @@ export function BinTemplateBuilder() {
                     {perf?.avg_duration_minutes && (
                       <div className="bg-white rounded-lg p-2.5 shadow-sm">
                         <p className="text-[10px] text-gray-500">Avg Duration</p>
-                        <p className="text-lg font-bold text-gray-900">{Math.round(perf.avg_duration_minutes)}m</p>
+                        <p className="text-lg font-bold text-gray-900">{Math.floor(perf.avg_duration_minutes / 60)}h {Math.round(perf.avg_duration_minutes % 60)}m</p>
                       </div>
                     )}
                     {perf?.last_run_at && (
