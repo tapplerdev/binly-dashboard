@@ -11,8 +11,9 @@ import { getRoutes, createRoute, updateRoute, deleteRoute } from '@/lib/api/rout
 import { getRoutePerformance, getBinCollectionStats } from '@/lib/api/route-performance';
 import { fetchBinAnalytics } from '@/lib/api/bin-analytics';
 import { createMoveRequest } from '@/lib/api/move-requests';
-import { Loader2, Plus, X, Trash2, Edit2, MapPin, Package, Search, Filter, Sparkles, AlertTriangle, Trophy, Clock, TrendingUp } from 'lucide-react';
+import { Loader2, Plus, X, Trash2, Edit2, MapPin, Package, Search, Filter, Sparkles, AlertTriangle, Trophy, Clock, TrendingUp, ChevronDown } from 'lucide-react';
 import { SmartRoutesModal } from './smart-routes-modal';
+import { AIRouteOptimizerModal } from './ai-route-optimizer-modal';
 import { TemplateEditorModal } from './template-editor-modal';
 import { DeleteConfirmationModal } from './delete-confirmation-modal';
 
@@ -51,6 +52,8 @@ export function BinTemplateBuilder() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [perfFilter, setPerfFilter] = useState<'all' | 'top' | 'needs-runs' | 'has-issues'>('all');
   const [showUncoveredBins, setShowUncoveredBins] = useState(false);
+  const [showOptimizer, setShowOptimizer] = useState(false);
+  const [showAIDropdown, setShowAIDropdown] = useState(false);
 
   // Route performance from shift history
   const { data: perfData = {} } = useQuery({
@@ -328,13 +331,37 @@ export function BinTemplateBuilder() {
               <Plus className="w-4 h-4" />
               New Template
             </button>
-            <button
-              onClick={() => setShowSmartRoutes(true)}
-              className="px-3 py-2.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg font-medium hover:bg-amber-100 transition-fast flex items-center justify-center gap-1.5"
-              title="Auto-generate routes from bin data"
-            >
-              <Sparkles className="w-4 h-4" />
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowAIDropdown(!showAIDropdown)}
+                className="px-3 py-2.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg font-medium hover:bg-purple-100 transition-fast flex items-center justify-center gap-1.5"
+                title="AI Route Tools"
+              >
+                <Sparkles className="w-4 h-4" />
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {showAIDropdown && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setShowAIDropdown(false)} />
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-40 w-48 overflow-hidden">
+                    <button
+                      onClick={() => { setShowAIDropdown(false); setShowOptimizer(true); }}
+                      className="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-purple-50 transition-colors flex items-center gap-2"
+                    >
+                      <TrendingUp className="w-4 h-4 text-purple-600" />
+                      Optimize Routes
+                    </button>
+                    <button
+                      onClick={() => { setShowAIDropdown(false); setShowSmartRoutes(true); }}
+                      className="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-amber-50 transition-colors flex items-center gap-2 border-t border-gray-100"
+                    >
+                      <Sparkles className="w-4 h-4 text-amber-600" />
+                      Regenerate All
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -931,6 +958,15 @@ export function BinTemplateBuilder() {
       />
       {showSmartRoutes && (
         <SmartRoutesModal onClose={() => { setShowSmartRoutes(false); loadTemplates(); }} />
+      )}
+      {showOptimizer && (
+        <AIRouteOptimizerModal
+          templates={templates}
+          bins={bins}
+          binCollectionStats={binCollectionStats}
+          onClose={() => setShowOptimizer(false)}
+          onApply={() => loadTemplates()}
+        />
       )}
     </div>
   );
