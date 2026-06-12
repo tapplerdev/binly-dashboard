@@ -7,7 +7,7 @@ import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { Route } from '@/lib/types/route';
 import { getRoutes, createRoute, updateRoute, deleteRoute } from '@/lib/api/routes';
-import { Loader2, Plus, X, Trash2, Edit2, MapPin, Package, Search, Filter, Sparkles } from 'lucide-react';
+import { Loader2, Plus, X, Trash2, Edit2, MapPin, Package, Search, Filter, Sparkles, AlertTriangle, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { SmartRoutesModal } from './smart-routes-modal';
 import { TemplateEditorModal } from './template-editor-modal';
 import { DeleteConfirmationModal } from './delete-confirmation-modal';
@@ -35,6 +35,7 @@ export function BinTemplateBuilder() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<Route | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [healthFilter, setHealthFilter] = useState<'all' | 'critical' | 'attention' | 'healthy'>('all');
 
   // Load templates on mount
   useEffect(() => {
@@ -83,9 +84,43 @@ export function BinTemplateBuilder() {
         if (filterBinCount === 'large' && count <= 15) return false;
       }
 
+      // Health filter
+      if (healthFilter !== 'all') {
+        const health = templateHealth.get(template.id);
+        if (health && health.status !== healthFilter) return false;
+      }
+
       return true;
     });
   }, [templates, searchQuery, filterArea, filterBinCount]);
+
+  // Compute health for all templates
+  const templateHealth = useMemo(() => {
+    const map = new Map<string, { avgFill: number; criticalBins: number; status: 'critical' | 'attention' | 'healthy' }>();
+    if (bins.length === 0) return map;
+
+    templates.forEach(template => {
+      const tBins = (template.bin_ids || [])
+        .map(id => bins.find(b => b.id === id))
+        .filter((b): b is Bin => b !== undefined);
+
+      if (tBins.length === 0) {
+        map.set(template.id, { avgFill: 0, criticalBins: 0, status: 'healthy' });
+        return;
+      }
+
+      const avgFill = Math.round(tBins.reduce((s, b) => s + (b.fill_percentage ?? 0), 0) / tBins.length);
+      const criticalBins = tBins.filter(b => (b.fill_percentage ?? 0) >= 80).length;
+
+      let status: 'critical' | 'attention' | 'healthy' = 'healthy';
+      if (criticalBins >= 2 || avgFill >= 70) status = 'critical';
+      else if (criticalBins >= 1 || avgFill >= 45) status = 'attention';
+
+      map.set(template.id, { avgFill, criticalBins, status });
+    });
+
+    return map;
+  }, [templates, bins]);
 
   // Get bins for selected template
   const selectedTemplateBins = useMemo(() => {
@@ -305,6 +340,35 @@ export function BinTemplateBuilder() {
           </div>
         </div>
 
+        {/* Health Filter Chips */}
+        {!loadingTemplates && templateHealth.size > 0 && (
+          <div className="px-4 py-2 border-b border-gray-200 flex items-center gap-1.5 flex-wrap">
+            {([
+              { key: 'all' as const, label: 'All', count: templates.length },
+              { key: 'critical' as const, label: 'Critical', icon: <AlertTriangle className="w-3 h-3" />, count: templates.filter(t => templateHealth.get(t.id)?.status === 'critical').length },
+              { key: 'attention' as const, label: 'Attention', icon: <AlertCircle className="w-3 h-3" />, count: templates.filter(t => templateHealth.get(t.id)?.status === 'attention').length },
+              { key: 'healthy' as const, label: 'Healthy', icon: <CheckCircle2 className="w-3 h-3" />, count: templates.filter(t => templateHealth.get(t.id)?.status === 'healthy').length },
+            ]).map(chip => (
+              <button
+                key={chip.key}
+                onClick={() => setHealthFilter(chip.key)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition-all ${
+                  healthFilter === chip.key
+                    ? chip.key === 'critical' ? 'bg-red-100 text-red-700 border border-red-200'
+                      : chip.key === 'attention' ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                      : chip.key === 'healthy' ? 'bg-green-100 text-green-700 border border-green-200'
+                      : 'bg-blue-100 text-blue-700 border border-blue-200'
+                    : 'bg-gray-100 text-gray-500 border border-transparent hover:bg-gray-200'
+                }`}
+              >
+                {'icon' in chip && chip.icon}
+                {chip.label}
+                <span className="text-[10px] font-bold">{chip.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Results Count */}
         {(searchQuery || filterArea !== 'all' || filterBinCount !== 'all') && (
           <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
@@ -380,6 +444,36 @@ export function BinTemplateBuilder() {
                     </span>
                   )}
                 </div>
+                {/* Health indicator */}
+                {(() => {
+                  const health = templateHealth.get(template.id);
+                  if (!health) return null;
+                  return (
+                    <div className="flex items-center gap-2 mt-2">
+                      <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${
+                            health.status === 'critical' ? 'bg-red-500' :
+                            health.status === 'attention' ? 'bg-amber-500' : 'bg-green-500'
+                          }`}
+                          style={{ width: `${Math.min(health.avgFill, 100)}%` }}
+                        />
+                      </div>
+                      <span className={`text-[10px] font-bold ${
+                        health.status === 'critical' ? 'text-red-600' :
+                        health.status === 'attention' ? 'text-amber-600' : 'text-green-600'
+                      }`}>
+                        {health.avgFill}%
+                      </span>
+                      {health.criticalBins > 0 && (
+                        <span className="flex items-center gap-0.5 text-[10px] text-red-600 font-medium">
+                          <AlertTriangle className="w-3 h-3" />
+                          {health.criticalBins}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             ))
           )}
