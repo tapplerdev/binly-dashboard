@@ -16,6 +16,7 @@ export interface RoutePerformanceData {
   total_bins_collected: number;
   total_incidents: number;
   last_run_at: number;
+  avg_fill_at_collection: number | null;
 }
 
 export async function getRoutePerformance(): Promise<Record<string, RoutePerformanceData>> {
@@ -26,6 +27,24 @@ export async function getRoutePerformance(): Promise<Record<string, RoutePerform
     if (!resp.ok) return {};
     const data = await resp.json();
     return data.routes || {};
+  } catch {
+    return {};
+  }
+}
+
+export interface BinCollectionStats {
+  avg_fill: number;
+  check_count: number;
+}
+
+export async function getBinCollectionStats(): Promise<Record<string, BinCollectionStats>> {
+  try {
+    const resp = await fetch(`${API_URL}/api/manager/bins/collection-stats`, {
+      headers: getAuthHeaders(),
+    });
+    if (!resp.ok) return {};
+    const data = await resp.json();
+    return data.bins || {};
   } catch {
     return {};
   }

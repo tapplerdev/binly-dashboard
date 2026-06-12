@@ -10,7 +10,8 @@ import {
 import { useBins } from '@/lib/hooks/use-bins';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
-import { fetchBinAnalytics, BinPerformance } from '@/lib/api/bin-analytics';
+import { fetchBinAnalytics } from '@/lib/api/bin-analytics';
+import { createMoveRequest } from '@/lib/api/move-requests';
 import {
   getRecommendations, acceptRecommendation, dismissRecommendation,
   snoozeRecommendation, AIRecommendation,
@@ -217,11 +218,26 @@ export function IntelligenceView() {
     setActingOnId(id);
     try {
       await acceptRecommendation(id);
+
+      // If it's a bin_relocate recommendation, auto-create a move request
+      const rec = recommendations.find(r => r.id === id);
+      if (rec?.type === 'bin_relocate' && rec.entity_id) {
+        try {
+          await createMoveRequest({
+            bin_id: rec.entity_id,
+            move_type: 'relocation',
+            scheduled_date: Math.floor(Date.now() / 1000) + 7 * 86400,
+            reason_category: 'relocation_request',
+            notes: `AI recommendation: ${rec.title}`,
+          });
+        } catch { /* move request creation is best-effort */ }
+      }
+
       queryClient.invalidateQueries({ queryKey: ['ai-recommendations'] });
       refetchRecs();
     } catch { /* ignore */ }
     setActingOnId(null);
-  }, [queryClient, refetchRecs]);
+  }, [queryClient, refetchRecs, recommendations]);
 
   const handleDismiss = useCallback(async (id: string) => {
     setActingOnId(id);

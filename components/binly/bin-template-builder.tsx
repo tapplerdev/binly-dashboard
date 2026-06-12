@@ -8,8 +8,9 @@ import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { Route } from '@/lib/types/route';
 import { getRoutes, createRoute, updateRoute, deleteRoute } from '@/lib/api/routes';
-import { getRoutePerformance } from '@/lib/api/route-performance';
+import { getRoutePerformance, getBinCollectionStats } from '@/lib/api/route-performance';
 import { fetchBinAnalytics } from '@/lib/api/bin-analytics';
+import { createMoveRequest } from '@/lib/api/move-requests';
 import { Loader2, Plus, X, Trash2, Edit2, MapPin, Package, Search, Filter, Sparkles, AlertTriangle, Trophy, Clock, TrendingUp } from 'lucide-react';
 import { SmartRoutesModal } from './smart-routes-modal';
 import { TemplateEditorModal } from './template-editor-modal';
@@ -69,6 +70,13 @@ export function BinTemplateBuilder() {
     (analyticsData?.bins || []).forEach(b => m.set(b.id, b.check_count));
     return m;
   }, [analyticsData]);
+
+  // Per-bin historical fill at collection
+  const { data: binCollectionStats = {} } = useQuery({
+    queryKey: ['bin-collection-stats'],
+    queryFn: getBinCollectionStats,
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Load templates on mount
   useEffect(() => {
@@ -130,16 +138,19 @@ export function BinTemplateBuilder() {
     return map;
   }, [templates, bins, perfData]);
 
-  // Sort by avg fill descending (best performers first) + assign ranks
+  // Sort by historical fill at collection (best performers first) + assign ranks
+  // Falls back to live fill if no collection data available
   const rankedTemplates = useMemo(() => {
     return [...templates]
       .sort((a, b) => {
-        const pa = templatePerf.get(a.id);
-        const pb = templatePerf.get(b.id);
-        return (pb?.avgFill ?? 0) - (pa?.avgFill ?? 0);
+        const perfA = perfData[a.id]?.avg_fill_at_collection;
+        const perfB = perfData[b.id]?.avg_fill_at_collection;
+        const fillA = perfA ?? templatePerf.get(a.id)?.avgFill ?? 0;
+        const fillB = perfB ?? templatePerf.get(b.id)?.avgFill ?? 0;
+        return fillB - fillA;
       })
       .map((t, i) => ({ ...t, rank: i + 1 }));
-  }, [templates, templatePerf]);
+  }, [templates, templatePerf, perfData]);
 
   // Filter templates
   const filteredTemplates = useMemo(() => {
@@ -480,7 +491,9 @@ export function BinTemplateBuilder() {
           ) : (
             filteredTemplates.map(template => {
               const p = templatePerf.get(template.id);
-              const fillPct = p?.avgFill ?? 0;
+              // Use historical fill at collection if available, fall back to live fill
+              const histFill = perfData[template.id]?.avg_fill_at_collection;
+              const fillPct = histFill != null ? Math.round(histFill) : (p?.avgFill ?? 0);
               const isTop3 = template.rank <= 3;
               // Green tint for high performers (high fill = good)
               const ringColor = fillPct >= 60 ? '#22c55e' : fillPct >= 35 ? '#f59e0b' : '#9ca3af';
@@ -775,14 +788,27 @@ export function BinTemplateBuilder() {
                 Active Bins ({selectedTemplateBins.length})
               </h3>
               <div className="space-y-1.5">
-                {[...selectedTemplateBins].sort((a, b) => (b.fill_percentage ?? 0) - (a.fill_percentage ?? 0)).map((bin) => {
-                  const pct = bin.fill_percentage ?? 0;
-                  const fillColor = pct >= 60 ? 'bg-green-500' : pct >= 35 ? 'bg-amber-500' : 'bg-gray-400';
+                {[...selectedTemplateBins]
+                  .sort((a, b) => {
+                    // Sort by historical fill at collection, fall back to live fill
+                    const ha = binCollectionStats[a.id]?.avg_fill ?? (a.fill_percentage ?? 0);
+                    const hb = binCollectionStats[b.id]?.avg_fill ?? (b.fill_percentage ?? 0);
+                    return hb - ha;
+                  })
+                  .map((bin) => {
+                  const histStat = binCollectionStats[bin.id];
+                  const histFill = histStat ? Math.round(histStat.avg_fill) : null;
+                  const displayFill = histFill ?? (bin.fill_percentage ?? 0);
+                  const checks = histStat?.check_count ?? 0;
+                  const isNew = (binCheckCounts.get(bin.id) ?? 0) < 5;
+                  const isLowPerformer = !isNew && checks >= 5 && histFill !== null && histFill < 15;
+                  const fillColor = displayFill >= 60 ? 'bg-green-500' : displayFill >= 35 ? 'bg-amber-500' : displayFill >= 15 ? 'bg-gray-400' : 'bg-red-400';
+
                   return (
-                    <div key={bin.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-fast">
+                    <div key={bin.id} className={`flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-fast ${isLowPerformer ? 'bg-red-50/50' : ''}`}>
                       <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center relative overflow-hidden">
                         <div className={`absolute bottom-0 left-0 right-0 ${fillColor} transition-all`}
-                          style={{ height: `${pct}%` }} />
+                          style={{ height: `${displayFill}%` }} />
                         <span className="relative text-[10px] font-bold text-gray-800">{bin.bin_number}</span>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -794,14 +820,39 @@ export function BinTemplateBuilder() {
                             Also on: {overlaps.get(bin.id)!.filter(n => n !== selectedTemplate?.name).join(', ')}
                           </p>
                         )}
+                        {isLowPerformer && (
+                          <p className="text-[9px] text-red-500 font-medium">Avg {histFill}% over {checks} checks</p>
+                        )}
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {(binCheckCounts.get(bin.id) ?? 0) < 5 && (
+                        {isNew && (
                           <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-medium">New</span>
                         )}
+                        {isLowPerformer && (
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                await createMoveRequest({
+                                  bin_id: bin.id,
+                                  move_type: 'relocation',
+                                  scheduled_date: Math.floor(Date.now() / 1000) + 7 * 86400,
+                                  reason_category: 'relocation_request',
+                                  notes: `Low performer: avg ${histFill}% fill over ${checks} checks`,
+                                });
+                                alert(`Move request created for Bin #${bin.bin_number}`);
+                              } catch { alert('Failed to create move request'); }
+                            }}
+                            className="text-[9px] bg-red-100 text-red-600 hover:bg-red-200 px-1.5 py-0.5 rounded font-medium transition-colors"
+                          >
+                            Relocate
+                          </button>
+                        )}
                         <span className={`text-xs font-semibold ${
-                          pct >= 60 ? 'text-green-600' : pct >= 35 ? 'text-amber-600' : 'text-gray-500'
-                        }`}>{pct}%</span>
+                          displayFill >= 60 ? 'text-green-600' : displayFill >= 35 ? 'text-amber-600' : displayFill >= 15 ? 'text-gray-500' : 'text-red-500'
+                        }`}>
+                          {histFill !== null ? `${histFill}%` : `${bin.fill_percentage ?? 0}%`}
+                        </span>
                       </div>
                     </div>
                   );
