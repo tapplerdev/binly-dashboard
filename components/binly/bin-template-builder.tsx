@@ -537,8 +537,9 @@ export function BinTemplateBuilder() {
           ) : (
             filteredTemplates.map(template => {
               const p = templatePerf.get(template.id);
-              // Use historical fill at collection if available, fall back to live fill
-              const histFill = perfData[template.id]?.avg_fill_at_collection;
+              // Use historical fill only if this template has actual shift history
+              const perf = perfData[template.id];
+              const histFill = perf?.shifts_completed > 0 ? perf.avg_fill_at_collection : null;
               const fillPct = histFill != null ? Math.round(histFill) : (p?.avgFill ?? 0);
               const isTop3 = template.rank <= 3;
               // Green tint for high performers (high fill = good)
