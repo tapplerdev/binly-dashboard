@@ -1,301 +1,117 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { APIProvider, Map as GoogleMap, AdvancedMarker } from '@vis.gl/react-google-maps';
 import {
-  X, Check, Minus, Plus, AlertTriangle, Calendar, Sparkles,
-  Loader2, Package, TrendingUp,
+  X, Check, AlertTriangle, Calendar, Sparkles,
+  Loader2, Package, TrendingUp, Clock,
 } from 'lucide-react';
 import { Route } from '@/lib/types/route';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { updateRoute } from '@/lib/api/routes';
-import { BinCollectionStats, estimateRouteDuration, DurationEstimate } from '@/lib/api/route-performance';
-import { haversine } from '@/lib/utils/geo';
+import { smartReoptimize, ReoptRoute, ReoptBin } from '@/lib/api/route-performance';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
-
 const ROUTE_COLORS = ['#4880FF', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#14B8A6', '#F97316', '#EC4899'];
-
-interface Change {
-  id: string;
-  type: 'remove' | 'add';
-  binId: string;
-  binNumber: number;
-  binStreet: string;
-  binCity: string;
-  binLat: number;
-  binLng: number;
-  fillPct: number;
-  routeId: string;
-  routeName: string;
-  reason: string;
-  checked: boolean;
-  distance?: number;
-}
-
-interface Suggestion {
-  routeId: string;
-  routeName: string;
-  message: string;
-}
 
 interface AIRouteOptimizerModalProps {
   templates: Route[];
   bins: Bin[];
   allBinsWithRetired: Bin[];
-  binCollectionStats: Record<string, BinCollectionStats>;
+  binCollectionStats: Record<string, { avg_fill: number; check_count: number }>;
   onClose: () => void;
   onApply: () => void;
 }
 
-export function AIRouteOptimizerModal({ templates, bins, allBinsWithRetired, binCollectionStats, onClose, onApply }: AIRouteOptimizerModalProps) {
+export function AIRouteOptimizerModal({ templates, bins, onClose, onApply }: AIRouteOptimizerModalProps) {
   const { data: warehouse } = useWarehouseLocation();
   const [phase, setPhase] = useState<'config' | 'results'>('config');
-  const [tab, setTab] = useState<'changes' | 'preview' | 'schedule'>('changes');
-  const [changes, setChanges] = useState<Change[]>([]);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [applying, setApplying] = useState(false);
+  const [tab, setTab] = useState<'preview' | 'schedule'>('preview');
   const [analyzing, setAnalyzing] = useState(false);
-  const [selectedBinId, setSelectedBinId] = useState<string | null>(null);
-  const [previewView, setPreviewView] = useState<'after' | 'before'>('after');
-  const [selectedPreviewRoute, setSelectedPreviewRoute] = useState<string | null>(null);
-  const [routeDurations, setRouteDurations] = useState<Record<string, DurationEstimate>>({});
+  const [applying, setApplying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedRouteIdx, setSelectedRouteIdx] = useState<number | null>(null);
 
   // Config
   const [maxBinsPerRoute, setMaxBinsPerRoute] = useState(30);
-  const [targetDurationHours, setTargetDurationHours] = useState(8);
+  const [targetDurationHours, setTargetDurationHours] = useState(10);
   const [lowPerformerThreshold, setLowPerformerThreshold] = useState(15);
 
-  const activeBins = useMemo(() =>
-    bins.filter(b => (b.status === 'active' || b.status === 'needs_check' || b.status === 'pending_move') && b.latitude && b.longitude),
-  [bins]);
+  // Results from backend
+  const [resultRoutes, setResultRoutes] = useState<ReoptRoute[]>([]);
+  const [removedBins, setRemovedBins] = useState<ReoptBin[]>([]);
+  const [solverInfo, setSolverInfo] = useState<{ runtime_ms: number; feasible: boolean; unassigned: number } | null>(null);
 
-  const binById = useMemo(() => {
-    const m = new Map<string, Bin>();
-    // Include retired bins so we can show names for stale references
-    allBinsWithRetired.forEach(b => m.set(b.id, b));
-    // Active bins overwrite retired ones with same ID
-    bins.forEach(b => m.set(b.id, b));
-    return m;
-  }, [bins, allBinsWithRetired]);
-
-  // Route centroids
-  const routeCentroids = useMemo(() => {
-    const m = new Map<string, { lat: number; lng: number }>();
-    templates.forEach(t => {
-      const tBins = (t.bin_ids || []).map(id => binById.get(id)).filter((b): b is Bin => !!b && !!b.latitude && !!b.longitude);
-      if (tBins.length === 0) return;
-      m.set(t.id, {
-        lat: tBins.reduce((s, b) => s + b.latitude!, 0) / tBins.length,
-        lng: tBins.reduce((s, b) => s + b.longitude!, 0) / tBins.length,
-      });
-    });
-    return m;
-  }, [templates, binById]);
-
-  // Run analysis (called from config step)
-  const runAnalysis = useCallback(async () => {
+  const runAnalysis = async () => {
     setAnalyzing(true);
+    setError(null);
+    try {
+      const routeIds = templates.map(t => t.id);
+      const result = await smartReoptimize(routeIds, maxBinsPerRoute, lowPerformerThreshold);
+      if (!result) throw new Error('No response from optimizer');
+      setResultRoutes(result.routes);
+      setRemovedBins(result.removed_bins || []);
+      setSolverInfo(result.solver);
+      setPhase('results');
+    } catch (err: any) {
+      setError(err.message || 'Optimization failed');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
-    const proposed: Change[] = [];
-    const sugs: Suggestion[] = [];
-    let idx = 0;
-
-    // REMOVE: inactive + low performers
-    templates.forEach(t => {
-      (t.bin_ids || []).forEach(binId => {
-        const bin = binById.get(binId);
-        const isActive = bin && (bin.status === 'active' || bin.status === 'needs_check' || bin.status === 'pending_move');
-
-        if (!isActive) {
-          proposed.push({
-            id: `c-${idx++}`, type: 'remove', binId,
-            binNumber: bin?.bin_number ?? 0, binStreet: bin?.current_street ?? 'Unknown',
-            binCity: bin?.city ?? '', binLat: bin?.latitude ?? 0, binLng: bin?.longitude ?? 0,
-            fillPct: 0, routeId: t.id, routeName: t.name,
-            reason: !bin ? 'Bin no longer exists' : bin.status === 'in_storage' ? 'In warehouse' : `Status: ${bin.status}`,
-            checked: true,
-          });
-          return;
-        }
-
-        const stats = binCollectionStats[binId];
-        if (stats && stats.check_count >= 5 && stats.avg_fill < lowPerformerThreshold) {
-          proposed.push({
-            id: `c-${idx++}`, type: 'remove', binId,
-            binNumber: bin.bin_number, binStreet: bin.current_street, binCity: bin.city,
-            binLat: bin.latitude ?? 0, binLng: bin.longitude ?? 0,
-            fillPct: Math.round(stats.avg_fill), routeId: t.id, routeName: t.name,
-            reason: `Avg ${Math.round(stats.avg_fill)}% fill over ${stats.check_count} checks`,
-            checked: true,
-          });
-        }
-      });
-    });
-
-    // ADD: uncovered bins
-    const coveredIds = new Set<string>();
-    templates.forEach(t => (t.bin_ids || []).forEach(id => coveredIds.add(id)));
-
-    activeBins.forEach(bin => {
-      if (coveredIds.has(bin.id)) return;
-      let nearestRoute: Route | null = null;
-      let nearestDist = Infinity;
-      templates.forEach(t => {
-        const c = routeCentroids.get(t.id);
-        if (!c) return;
-        const d = haversine(bin.latitude!, bin.longitude!, c.lat, c.lng);
-        if (d < nearestDist) { nearestDist = d; nearestRoute = t; }
-      });
-      if (nearestRoute) {
-        proposed.push({
-          id: `c-${idx++}`, type: 'add', binId: bin.id,
-          binNumber: bin.bin_number, binStreet: bin.current_street, binCity: bin.city,
-          binLat: bin.latitude!, binLng: bin.longitude!,
-          fillPct: bin.fill_percentage ?? 0, routeId: nearestRoute.id, routeName: nearestRoute.name,
-          reason: `${nearestDist.toFixed(1)} mi from route center`,
-          checked: true, distance: nearestDist,
+  const handleApply = async () => {
+    setApplying(true);
+    try {
+      for (const route of resultRoutes) {
+        if (!route.route_id) continue;
+        await updateRoute(route.route_id, {
+          bin_ids: route.bin_ids,
+          name: route.suggested_name,
+          geographic_area: route.geographic_area,
+          estimated_duration_hours: route.estimated_duration_hours,
+          schedule_pattern: route.schedule_pattern,
         });
       }
-    });
-
-    // Suggestions: compute after counts
-    const afterCounts = new Map<string, number>();
-    templates.forEach(t => {
-      let count = (t.bin_ids || []).length;
-      proposed.forEach(c => {
-        if (c.routeId === t.id && c.checked) count += c.type === 'add' ? 1 : -1;
-      });
-      afterCounts.set(t.id, count);
-    });
-    templates.forEach(t => {
-      const count = afterCounts.get(t.id) || 0;
-      if (count > maxBinsPerRoute) sugs.push({ routeId: t.id, routeName: t.name, message: `${count} bins exceeds ${maxBinsPerRoute} max — consider splitting` });
-      if (count > 0 && count < 5) sugs.push({ routeId: t.id, routeName: t.name, message: `Only ${count} bins — consider merging` });
-    });
-
-    setChanges(proposed);
-    setSuggestions(sugs);
-
-    // Estimate durations for modified routes via OSRM
-    const durations: Record<string, DurationEstimate> = {};
-    for (const t of templates) {
-      const currentBinIds = new Set(t.bin_ids || []);
-      proposed.filter(c => c.checked && c.routeId === t.id).forEach(c => {
-        if (c.type === 'remove') currentBinIds.delete(c.binId);
-        if (c.type === 'add') currentBinIds.add(c.binId);
-      });
-      const activeIds = Array.from(currentBinIds).filter(id => {
-        const b = binById.get(id);
-        return b && (b.status === 'active' || b.status === 'needs_check' || b.status === 'pending_move');
-      });
-      if (activeIds.length >= 2) {
-        const est = await estimateRouteDuration(activeIds);
-        if (est) {
-          durations[t.id] = est;
-          // Flag if exceeds target
-          if (est.estimated_duration_hours > targetDurationHours) {
-            sugs.push({
-              routeId: t.id, routeName: t.name,
-              message: `Estimated ${est.estimated_duration_hours}h exceeds ${targetDurationHours}h target`,
-            });
-          }
-        }
-      }
+      onApply();
+      onClose();
+    } catch {
+      alert('Failed to apply some changes.');
+    } finally {
+      setApplying(false);
     }
-    setRouteDurations(durations);
-    setSuggestions([...sugs]);
+  };
 
-    setPhase('results');
-    setAnalyzing(false);
-  }, [templates, binById, binCollectionStats, activeBins, routeCentroids, lowPerformerThreshold, maxBinsPerRoute, targetDurationHours]);
-
-  const toggleChange = useCallback((id: string) => {
-    setChanges(prev => prev.map(c => c.id === id ? { ...c, checked: !c.checked } : c));
-  }, []);
-
-  // Group changes by route
-  const changesByRoute = useMemo(() => {
-    const m = new Map<string, { route: Route; removes: Change[]; adds: Change[] }>();
-    templates.forEach(t => m.set(t.id, { route: t, removes: [], adds: [] }));
-    changes.forEach(c => {
-      const entry = m.get(c.routeId);
-      if (!entry) return;
-      if (c.type === 'remove') entry.removes.push(c);
-      else entry.adds.push(c);
-    });
-    return Array.from(m.values()).filter(e => e.removes.length > 0 || e.adds.length > 0);
-  }, [changes, templates]);
-
-  // Preview routes
-  const previewRoutes = useMemo(() => {
-    return templates.map((t, i) => {
-      const currentBinIds = new Set(t.bin_ids || []);
-      changes.filter(c => c.checked && c.routeId === t.id).forEach(c => {
-        if (c.type === 'remove') currentBinIds.delete(c.binId);
-        if (c.type === 'add') currentBinIds.add(c.binId);
-      });
-      const newIds = Array.from(currentBinIds);
-      const newBins = newIds.map(id => binById.get(id)).filter((b): b is Bin => !!b && !!b.latitude);
-      const avgFill = newBins.length > 0 ? Math.round(newBins.reduce((s, b) => s + (b.fill_percentage ?? 0), 0) / newBins.length) : 0;
-      return {
-        ...t, newBinIds: newIds, newBins, newBinCount: newIds.length,
-        oldBinCount: (t.bin_ids || []).length, delta: newIds.length - (t.bin_ids || []).length,
-        avgFill, color: ROUTE_COLORS[i % ROUTE_COLORS.length],
-      };
-    });
-  }, [templates, changes, binById]);
-
-  // Schedule
+  // Schedule from results
   const schedule = useMemo(() => {
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const routes = previewRoutes.filter(r => r.newBinCount > 0).map(r => ({
-      ...r, freq: r.avgFill >= 60 ? 3 : r.avgFill >= 35 ? 2 : 1,
+    const routes = resultRoutes.map((r, i) => ({
+      ...r, color: ROUTE_COLORS[i % ROUTE_COLORS.length],
+      freq: r.avg_fill >= 60 ? 3 : r.avg_fill >= 35 ? 2 : 1,
     })).sort((a, b) => b.freq - a.freq);
 
     const daySlots: typeof routes[number][][] = days.map(() => []);
     routes.forEach(route => {
       const step = Math.max(1, Math.floor(days.length / route.freq));
       for (let i = 0; i < route.freq && i < days.length; i++) {
-        const idx = (i * step) % days.length;
-        daySlots[idx].push(route);
+        daySlots[(i * step) % days.length].push(route);
       }
     });
     return days.map((d, i) => ({ day: d, routes: daySlots[i] }));
-  }, [previewRoutes]);
+  }, [resultRoutes]);
 
-  const totalChecked = changes.filter(c => c.checked).length;
-  const checkedRemoves = changes.filter(c => c.checked && c.type === 'remove').length;
-  const checkedAdds = changes.filter(c => c.checked && c.type === 'add').length;
+  // Compute deltas vs original templates
+  const routeDeltas = useMemo(() => {
+    const m = new Map<string, number>();
+    resultRoutes.forEach(r => {
+      const orig = templates.find(t => t.id === r.route_id);
+      m.set(r.route_id, r.bin_count - (orig?.bin_count ?? 0));
+    });
+    return m;
+  }, [resultRoutes, templates]);
 
-  const handleApply = async () => {
-    setApplying(true);
-    try {
-      for (const r of previewRoutes) {
-        if (r.delta !== 0) await updateRoute(r.id, { bin_ids: r.newBinIds });
-      }
-      onApply();
-      onClose();
-    } catch { alert('Failed to apply some changes.'); }
-    finally { setApplying(false); }
-  };
-
-  // Map bins for current tab
-  const mapBins = useMemo(() => {
-    if (tab === 'preview') {
-      const route = selectedPreviewRoute ? previewRoutes.find(r => r.id === selectedPreviewRoute) : null;
-      if (previewView === 'after' && route) return route.newBins.filter(isMappableBin);
-      if (previewView === 'before' && route) {
-        return (route.bin_ids || []).map(id => binById.get(id)).filter((b): b is Bin => !!b && isMappableBin(b));
-      }
-      return activeBins.filter(isMappableBin);
-    }
-    return activeBins.filter(isMappableBin);
-  }, [tab, previewView, selectedPreviewRoute, previewRoutes, activeBins, binById]);
-
-  const removeBinIds = new Set(changes.filter(c => c.checked && c.type === 'remove').map(c => c.binId));
-  const addBinIds = new Set(changes.filter(c => c.checked && c.type === 'add').map(c => c.binId));
+  const selectedRoute = selectedRouteIdx !== null ? resultRoutes[selectedRouteIdx] : null;
 
   return (
     <>
@@ -311,7 +127,8 @@ export function AIRouteOptimizerModal({ templates, bins, allBinsWithRetired, bin
                 AI Route Optimizer
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">
-                {checkedRemoves} removal{checkedRemoves !== 1 ? 's' : ''}, {checkedAdds} addition{checkedAdds !== 1 ? 's' : ''} proposed
+                {phase === 'config' ? 'Configure and analyze your routes'
+                  : `${resultRoutes.length} optimized routes · ${removedBins.length} low performers excluded`}
               </p>
             </div>
             <button onClick={onClose} className="w-9 h-9 rounded-lg hover:bg-gray-100 flex items-center justify-center">
@@ -320,342 +137,245 @@ export function AIRouteOptimizerModal({ templates, bins, allBinsWithRetired, bin
           </div>
 
           {phase === 'config' ? (
-            /* CONFIG PHASE */
+            /* CONFIG */
             <div className="flex-1 flex items-center justify-center p-8">
               <div className="max-w-md w-full space-y-6">
                 <div className="text-center mb-6">
                   <Sparkles className="w-10 h-10 text-purple-400 mx-auto mb-3" />
-                  <p className="text-sm text-gray-600">Configure optimization parameters, then analyze your routes.</p>
+                  <p className="text-sm text-gray-600">
+                    OR-Tools will redistribute all active bins across your {templates.length} route templates
+                    for optimal driving distance, then suggest names and schedules.
+                  </p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Max bins per route</label>
                   <input type="number" value={maxBinsPerRoute} onChange={e => setMaxBinsPerRoute(parseInt(e.target.value) || 30)}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-200 focus:border-purple-400" />
-                  <p className="text-xs text-gray-400 mt-1">Routes exceeding this will be flagged for splitting</p>
+                  <p className="text-xs text-gray-400 mt-1">Soft limit — allows +1/+2 overflow to avoid tiny leftover routes</p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Target duration per route (hours)</label>
-                  <input type="number" value={targetDurationHours} onChange={e => setTargetDurationHours(parseInt(e.target.value) || 8)}
+                  <input type="number" value={targetDurationHours} onChange={e => setTargetDurationHours(parseInt(e.target.value) || 10)}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-200 focus:border-purple-400" />
-                  <p className="text-xs text-gray-400 mt-1">Routes exceeding this duration (via OSRM estimate) will be flagged</p>
+                  <p className="text-xs text-gray-400 mt-1">Routes exceeding this will be highlighted in red</p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Low performer threshold (%)</label>
                   <input type="number" value={lowPerformerThreshold} onChange={e => setLowPerformerThreshold(parseInt(e.target.value) || 15)}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-200 focus:border-purple-400" />
-                  <p className="text-xs text-gray-400 mt-1">Bins with historical avg fill below this (over 5+ checks) will be flagged for removal</p>
+                  <p className="text-xs text-gray-400 mt-1">Bins below this avg fill (5+ checks) will be excluded from all routes</p>
                 </div>
+
+                {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</p>}
 
                 <button onClick={runAnalysis} disabled={analyzing}
                   className="w-full py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                  {analyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing routes...</> : <><Sparkles className="w-4 h-4" /> Analyze Routes</>}
+                  {analyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> Running OR-Tools optimization...</> : <><Sparkles className="w-4 h-4" /> Analyze & Optimize</>}
                 </button>
+
+                <div className="text-center">
+                  <p className="text-[10px] text-gray-400">
+                    This calls OSRM for distance matrix + OR-Tools CVRP solver. Takes 5-15 seconds.
+                  </p>
+                </div>
               </div>
             </div>
           ) : (
-            /* RESULTS PHASE */
+            /* RESULTS */
             <>
+              {/* Tabs */}
+              <div className="flex border-b border-gray-200 shrink-0">
+                <button onClick={() => setTab('preview')}
+                  className={`flex-1 px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${
+                    tab === 'preview' ? 'border-purple-600 text-purple-700' : 'border-transparent text-gray-500'
+                  }`}>Routes ({resultRoutes.length})</button>
+                <button onClick={() => setTab('schedule')}
+                  className={`flex-1 px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${
+                    tab === 'schedule' ? 'border-purple-600 text-purple-700' : 'border-transparent text-gray-500'
+                  }`}>Schedule</button>
+              </div>
 
-          {/* Tabs */}
-          <div className="flex border-b border-gray-200 shrink-0">
-            {(['changes', 'preview', 'schedule'] as const).map(t => (
-              <button key={t} onClick={() => setTab(t)}
-                className={`flex-1 px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${
-                  tab === t ? 'border-purple-600 text-purple-700' : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}>
-                {t === 'changes' ? `Changes (${totalChecked})` : t === 'preview' ? 'Preview' : 'Schedule'}
-              </button>
-            ))}
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 flex overflow-hidden">
-
-            {/* === CHANGES TAB === */}
-            {tab === 'changes' && (
-              <>
-                <div className="w-[420px] border-r border-gray-200 overflow-y-auto shrink-0 p-3 space-y-4">
-                  {changesByRoute.length === 0 ? (
-                    <div className="text-center py-16">
-                      <Check className="w-12 h-12 text-green-400 mx-auto mb-3" />
-                      <p className="text-sm text-gray-600 font-medium">Routes are optimized</p>
-                    </div>
-                  ) : (
-                    changesByRoute.map(({ route, removes, adds }) => (
-                      <div key={route.id} className="rounded-lg border border-gray-200 overflow-hidden">
-                        <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
-                          <h4 className="text-sm font-semibold text-gray-900">{route.name}</h4>
-                          <p className="text-[10px] text-gray-500">{route.geographic_area}</p>
-                        </div>
-
-                        {removes.length > 0 && (
-                          <div className="p-2 space-y-1">
-                            <p className="text-[10px] font-bold text-red-600 uppercase px-1">Remove ({removes.length})</p>
-                            {removes.map(c => (
-                              <label key={c.id}
-                                onMouseEnter={() => setSelectedBinId(c.binId)}
-                                onMouseLeave={() => setSelectedBinId(null)}
-                                className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-all ${
-                                  c.checked ? 'bg-red-50' : 'opacity-50'
-                                } ${selectedBinId === c.binId ? 'ring-2 ring-purple-300' : ''}`}>
-                                <input type="checkbox" checked={c.checked} onChange={() => toggleChange(c.id)}
-                                  className="rounded border-gray-300 text-red-600 focus:ring-red-500" />
-                                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
-                                  style={{ backgroundColor: '#ef4444' }}>
-                                  {c.binNumber}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-medium text-gray-900 truncate">{c.binStreet}, {c.binCity}</p>
-                                  <p className="text-[10px] text-red-600">{c.reason}</p>
-                                </div>
-                                <span className="text-[10px] font-bold text-gray-500">{c.fillPct}%</span>
-                              </label>
-                            ))}
-                          </div>
-                        )}
-
-                        {adds.length > 0 && (
-                          <div className="p-2 space-y-1 border-t border-gray-100">
-                            <p className="text-[10px] font-bold text-green-600 uppercase px-1">Add ({adds.length})</p>
-                            {adds.map(c => (
-                              <label key={c.id}
-                                onMouseEnter={() => setSelectedBinId(c.binId)}
-                                onMouseLeave={() => setSelectedBinId(null)}
-                                className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-all ${
-                                  c.checked ? 'bg-green-50' : 'opacity-50'
-                                } ${selectedBinId === c.binId ? 'ring-2 ring-purple-300' : ''}`}>
-                                <input type="checkbox" checked={c.checked} onChange={() => toggleChange(c.id)}
-                                  className="rounded border-gray-300 text-green-600 focus:ring-green-500" />
-                                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
-                                  style={{ backgroundColor: '#22c55e' }}>
-                                  {c.binNumber}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-medium text-gray-900 truncate">{c.binStreet}, {c.binCity}</p>
-                                  <p className="text-[10px] text-green-600">{c.distance?.toFixed(1)} mi from route center</p>
-                                </div>
-                                <span className="text-[10px] font-bold text-gray-500">{c.fillPct}%</span>
-                              </label>
-                            ))}
-                          </div>
-                        )}
+              <div className="flex-1 flex overflow-hidden">
+                {tab === 'preview' && (
+                  <>
+                    {/* Route list */}
+                    <div className="w-[420px] border-r border-gray-200 overflow-y-auto shrink-0">
+                      {/* Solver info */}
+                      <div className="p-3 bg-purple-50 border-b border-purple-100">
+                        <p className="text-xs text-purple-700">
+                          Optimized in {solverInfo?.runtime_ms}ms · {removedBins.length > 0 && `${removedBins.length} low performers excluded · `}
+                          All {resultRoutes.reduce((s, r) => s + r.bin_count, 0)} active bins distributed
+                        </p>
                       </div>
-                    ))
-                  )}
 
-                  {suggestions.length > 0 && (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
-                      <p className="text-[10px] font-bold text-amber-700 uppercase flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3" /> Suggestions
-                      </p>
-                      {suggestions.map((s, i) => (
-                        <div key={i} className="text-xs text-amber-800">
-                          <span className="font-medium">{s.routeName}:</span> {s.message}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Map */}
-                <div className="flex-1 relative">
-                  <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
-                    <GoogleMap mapId="optimizer-changes-map"
-                      defaultCenter={warehouse ? { lat: warehouse.latitude, lng: warehouse.longitude } : DEFAULT_CENTER}
-                      defaultZoom={11} mapTypeId="hybrid" disableDefaultUI={false}
-                      streetViewControl={false} gestureHandling="greedy"
-                      style={{ width: '100%', height: '100%' }}>
-                      {mapBins.map(bin => {
-                        const isRemove = removeBinIds.has(bin.id);
-                        const isAdd = addBinIds.has(bin.id);
-                        const isSelected = selectedBinId === bin.id;
-                        const fill = bin.fill_percentage ?? 0;
-                        return (
-                          <AdvancedMarker key={bin.id} position={{ lat: bin.latitude, lng: bin.longitude }}
-                            zIndex={isSelected ? 20 : isRemove || isAdd ? 15 : 10}>
-                            <div className={`rounded-full border-2 shadow-lg flex items-center justify-center transition-all duration-200 ${
-                              isSelected ? 'w-10 h-10 ring-4 ring-purple-400/60 animate-pulse border-white'
-                                : isRemove ? 'w-9 h-9 border-red-300 ring-2 ring-red-400/40'
-                                : isAdd ? 'w-9 h-9 border-green-300 ring-2 ring-green-400/40'
-                                : 'w-7 h-7 border-white'
-                            }`}
-                              style={{ backgroundColor: isRemove ? '#ef4444' : isAdd ? '#22c55e' : getBinMarkerColor(fill, bin.status) }}>
-                              <span className={`font-bold text-white ${isSelected || isRemove || isAdd ? 'text-[11px]' : 'text-[9px]'}`}>
-                                {bin.bin_number}
-                              </span>
-                            </div>
-                          </AdvancedMarker>
-                        );
-                      })}
-                    </GoogleMap>
-                  </APIProvider>
-                  <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg shadow px-3 py-2 flex items-center gap-3 text-[10px]">
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-500 border border-white shadow" /> Removing</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-500 border border-white shadow" /> Adding</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-500 border border-white shadow" /> Existing</span>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* === PREVIEW TAB === */}
-            {tab === 'preview' && (
-              <>
-                <div className="w-[420px] border-r border-gray-200 overflow-y-auto shrink-0">
-                  {/* Summary */}
-                  <div className="p-4 bg-purple-50 border-b border-purple-100">
-                    <h3 className="text-sm font-semibold text-purple-800 flex items-center gap-1.5 mb-1.5">
-                      <Sparkles className="w-4 h-4" /> Optimization Summary
-                    </h3>
-                    <p className="text-xs text-purple-700 leading-relaxed">
-                      {checkedRemoves > 0 ? `Removing ${checkedRemoves} underperforming/inactive bins. ` : ''}
-                      {checkedAdds > 0 ? `Adding ${checkedAdds} uncovered bins to nearest routes. ` : ''}
-                      {totalChecked > 0 ? 'This improves coverage and eliminates wasted stops.' : 'No changes selected.'}
-                    </p>
-                  </div>
-
-                  {/* Before/After toggle */}
-                  <div className="px-4 py-2 border-b border-gray-200 flex items-center gap-2">
-                    <button onClick={() => setPreviewView('after')}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                        previewView === 'after' ? 'bg-purple-100 text-purple-700' : 'text-gray-500 hover:bg-gray-100'
-                      }`}>After</button>
-                    <button onClick={() => setPreviewView('before')}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                        previewView === 'before' ? 'bg-gray-200 text-gray-700' : 'text-gray-500 hover:bg-gray-100'
-                      }`}>Before</button>
-                  </div>
-
-                  {/* Route cards */}
-                  <div className="p-3 space-y-2">
-                    {previewRoutes.map((r, i) => (
-                      <button key={r.id} onClick={() => setSelectedPreviewRoute(selectedPreviewRoute === r.id ? null : r.id)}
-                        className={`w-full text-left rounded-lg border p-3 transition-all ${
-                          selectedPreviewRoute === r.id ? 'border-purple-300 bg-purple-50 ring-1 ring-purple-200' : 'border-gray-200 bg-white hover:bg-gray-50'
-                        }`}>
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-3 h-8 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <h4 className="text-sm font-semibold text-gray-900 truncate">{r.name}</h4>
-                              {r.delta !== 0 && (
-                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
-                                  r.delta > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                }`}>{r.delta > 0 ? '+' : ''}{r.delta}</span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3 text-[11px] text-gray-500 mt-0.5">
-                              <span>{previewView === 'after' ? r.newBinCount : r.oldBinCount} bins</span>
-                              <span>{r.avgFill}% avg fill</span>
-                              {routeDurations[r.id] && (
-                                <span className={routeDurations[r.id].estimated_duration_hours > targetDurationHours ? 'text-red-600 font-medium' : ''}>
-                                  {routeDurations[r.id].estimated_duration_hours}h · {routeDurations[r.id].estimated_distance_miles} mi
-                                </span>
-                              )}
-                              <span className="text-gray-400">{r.geographic_area}</span>
-                            </div>
+                      {/* Removed bins */}
+                      {removedBins.length > 0 && (
+                        <div className="p-3 border-b border-gray-200">
+                          <p className="text-[10px] font-bold text-red-600 uppercase mb-1.5 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" /> Excluded ({removedBins.length})
+                          </p>
+                          <div className="space-y-1">
+                            {removedBins.map(b => (
+                              <div key={b.id} className="flex items-center gap-2 text-xs text-gray-500">
+                                <span className="w-5 h-5 rounded-full bg-red-100 text-red-600 text-[9px] font-bold flex items-center justify-center">{b.bin_number}</span>
+                                <span className="truncate">{b.current_street}, {b.city}</span>
+                                <span className="text-red-500 shrink-0">{b.fill_percentage}%</span>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                      )}
 
-                {/* Map */}
-                <div className="flex-1 relative">
-                  <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
-                    <GoogleMap mapId="optimizer-preview-map"
-                      defaultCenter={warehouse ? { lat: warehouse.latitude, lng: warehouse.longitude } : DEFAULT_CENTER}
-                      defaultZoom={11} mapTypeId="hybrid" disableDefaultUI={false}
-                      streetViewControl={false} gestureHandling="greedy"
-                      style={{ width: '100%', height: '100%' }}>
-                      {(() => {
-                        const route = selectedPreviewRoute ? previewRoutes.find(r => r.id === selectedPreviewRoute) : null;
-                        const binsToShow = route
-                          ? (previewView === 'after' ? route.newBins : (route.bin_ids || []).map(id => binById.get(id)).filter((b): b is Bin => !!b))
-                              .filter(isMappableBin)
-                          : activeBins.filter(isMappableBin);
-
-                        return binsToShow.map(bin => (
-                          <AdvancedMarker key={bin.id} position={{ lat: bin.latitude, lng: bin.longitude }} zIndex={10}>
-                            <div className="w-8 h-8 rounded-full border-2 border-white shadow-lg flex items-center justify-center"
-                              style={{ backgroundColor: route ? route.color : getBinMarkerColor(bin.fill_percentage, bin.status) }}>
-                              <span className="text-[10px] font-bold text-white">{bin.bin_number}</span>
-                            </div>
-                          </AdvancedMarker>
-                        ));
-                      })()}
-                    </GoogleMap>
-                  </APIProvider>
-                </div>
-              </>
-            )}
-
-            {/* === SCHEDULE TAB === */}
-            {tab === 'schedule' && (
-              <div className="flex-1 overflow-y-auto p-6">
-                <div className="max-w-4xl mx-auto">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                    <h3 className="text-sm font-semibold text-blue-800 flex items-center gap-1.5 mb-1.5">
-                      <Calendar className="w-4 h-4" /> Recommended Weekly Schedule
-                    </h3>
-                    <p className="text-xs text-blue-700 leading-relaxed">
-                      Routes with higher average fill rates are scheduled more frequently to prevent overflow.
-                      Lower-fill routes run less often to optimize driver time. Adjust as needed for your operations.
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    {schedule.map(day => (
-                      <div key={day.day} className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-                        <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
-                          <h4 className="text-xs font-bold text-gray-700">{day.day}</h4>
-                        </div>
-                        <div className="p-2">
-                          {day.routes.length === 0 ? (
-                            <p className="text-[11px] text-gray-400 px-1 py-2">No routes</p>
-                          ) : (
-                            <div className="space-y-1.5">
-                              {day.routes.map((r, i) => (
-                                <div key={i} className="rounded px-2.5 py-2 border-l-[3px]" style={{ borderColor: r.color, backgroundColor: `${r.color}08` }}>
-                                  <p className="text-xs font-medium text-gray-900 truncate">{r.name}</p>
-                                  <div className="flex items-center gap-2 text-[10px] text-gray-500 mt-0.5">
-                                    <span>{r.newBinCount} bins</span>
-                                    <span>{r.avgFill}% fill</span>
+                      {/* Route cards */}
+                      <div className="p-3 space-y-2">
+                        {resultRoutes.map((r, i) => {
+                          const color = ROUTE_COLORS[i % ROUTE_COLORS.length];
+                          const delta = routeDeltas.get(r.route_id) ?? 0;
+                          const overDuration = r.estimated_duration_hours > targetDurationHours;
+                          return (
+                            <button key={i} onClick={() => setSelectedRouteIdx(selectedRouteIdx === i ? null : i)}
+                              className={`w-full text-left rounded-lg border p-3 transition-all ${
+                                selectedRouteIdx === i ? 'border-purple-300 bg-purple-50 ring-1 ring-purple-200' : 'border-gray-200 bg-white hover:bg-gray-50'
+                              }`}>
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-3 h-full rounded-full shrink-0" style={{ backgroundColor: color, minHeight: '2rem' }} />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="text-xs text-gray-400 truncate">{r.name || 'New route'}</p>
+                                      <p className="text-sm font-semibold text-gray-900 truncate">{r.suggested_name}</p>
+                                    </div>
+                                    {delta !== 0 && (
+                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
+                                        delta > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                      }`}>{delta > 0 ? '+' : ''}{delta}</span>
+                                    )}
                                   </div>
+                                  <div className="flex items-center gap-2.5 text-[11px] text-gray-500 mt-1">
+                                    <span className="flex items-center gap-0.5"><Package className="w-3 h-3" />{r.bin_count}</span>
+                                    <span className="flex items-center gap-0.5"><TrendingUp className="w-3 h-3" />{r.avg_fill}%</span>
+                                    <span className={`flex items-center gap-0.5 ${overDuration ? 'text-red-600 font-medium' : ''}`}>
+                                      <Clock className="w-3 h-3" />{r.estimated_duration_hours}h
+                                    </span>
+                                    <span>{r.estimated_distance_miles} mi</span>
+                                  </div>
+                                  <p className="text-[10px] text-purple-600 mt-0.5">{r.schedule_pattern}</p>
                                 </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
-                    ))}
+                    </div>
+
+                    {/* Map */}
+                    <div className="flex-1 relative">
+                      <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
+                        <GoogleMap mapId="optimizer-preview-map"
+                          defaultCenter={warehouse ? { lat: warehouse.latitude, lng: warehouse.longitude } : DEFAULT_CENTER}
+                          defaultZoom={11} mapTypeId="hybrid" disableDefaultUI={false}
+                          streetViewControl={false} gestureHandling="greedy"
+                          style={{ width: '100%', height: '100%' }}>
+                          {/* Show selected route's bins, or all */}
+                          {selectedRoute ? (
+                            selectedRoute.bins.map(bin => (
+                              <AdvancedMarker key={bin.id} position={{ lat: bin.latitude, lng: bin.longitude }} zIndex={15}>
+                                <div className="w-9 h-9 rounded-full border-2 border-white shadow-lg flex items-center justify-center ring-2"
+                                  style={{ backgroundColor: ROUTE_COLORS[selectedRouteIdx! % ROUTE_COLORS.length], ringColor: `${ROUTE_COLORS[selectedRouteIdx! % ROUTE_COLORS.length]}40` }}>
+                                  <span className="text-[10px] font-bold text-white">{bin.bin_number}</span>
+                                </div>
+                              </AdvancedMarker>
+                            ))
+                          ) : (
+                            resultRoutes.flatMap((r, ri) =>
+                              r.bins.map(bin => (
+                                <AdvancedMarker key={bin.id} position={{ lat: bin.latitude, lng: bin.longitude }} zIndex={10}>
+                                  <div className="w-7 h-7 rounded-full border-2 border-white shadow flex items-center justify-center"
+                                    style={{ backgroundColor: ROUTE_COLORS[ri % ROUTE_COLORS.length] }}>
+                                    <span className="text-[9px] font-bold text-white">{bin.bin_number}</span>
+                                  </div>
+                                </AdvancedMarker>
+                              ))
+                            )
+                          )}
+                          {/* Warehouse */}
+                          {warehouse && (
+                            <AdvancedMarker position={{ lat: warehouse.latitude, lng: warehouse.longitude }} zIndex={20}>
+                              <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg border-2 border-purple-500">
+                                <svg className="w-5 h-5 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                                </svg>
+                              </div>
+                            </AdvancedMarker>
+                          )}
+                        </GoogleMap>
+                      </APIProvider>
+                    </div>
+                  </>
+                )}
+
+                {tab === 'schedule' && (
+                  <div className="flex-1 overflow-y-auto p-6">
+                    <div className="max-w-4xl mx-auto">
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                        <h3 className="text-sm font-semibold text-blue-800 flex items-center gap-1.5 mb-1.5">
+                          <Calendar className="w-4 h-4" /> Recommended Weekly Schedule
+                        </h3>
+                        <p className="text-xs text-blue-700">
+                          Higher avg fill routes run more frequently. Adjust as needed.
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        {schedule.map(day => (
+                          <div key={day.day} className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+                            <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
+                              <h4 className="text-xs font-bold text-gray-700">{day.day}</h4>
+                            </div>
+                            <div className="p-2">
+                              {day.routes.length === 0 ? (
+                                <p className="text-[11px] text-gray-400 px-1 py-2">No routes</p>
+                              ) : (
+                                <div className="space-y-1.5">
+                                  {day.routes.map((r, i) => (
+                                    <div key={i} className="rounded px-2.5 py-2 border-l-[3px]"
+                                      style={{ borderColor: r.color, backgroundColor: `${r.color}08` }}>
+                                      <p className="text-xs font-medium text-gray-900 truncate">{r.suggested_name}</p>
+                                      <div className="flex items-center gap-2 text-[10px] text-gray-500 mt-0.5">
+                                        <span>{r.bin_count} bins</span>
+                                        <span>{r.avg_fill}% fill</span>
+                                        <span>{r.estimated_duration_hours}h</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 shrink-0 flex items-center justify-between">
+                <button onClick={() => setPhase('config')} className="text-sm text-purple-600 hover:text-purple-800 font-medium">
+                  ← Reconfigure
+                </button>
+                <div className="flex gap-3">
+                  <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100">Cancel</button>
+                  <button onClick={handleApply} disabled={applying || resultRoutes.length === 0}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2">
+                    {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    Apply & Rename All Routes
+                  </button>
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 shrink-0 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button onClick={() => setPhase('config')} className="text-sm text-purple-600 hover:text-purple-800 font-medium">
-                ← Reconfigure
-              </button>
-              <p className="text-sm text-gray-500">{totalChecked} change{totalChecked !== 1 ? 's' : ''} selected</p>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100">Cancel</button>
-              <button onClick={handleApply} disabled={totalChecked === 0 || applying}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2">
-                {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                Apply {totalChecked} Change{totalChecked !== 1 ? 's' : ''}
-              </button>
-            </div>
-          </div>
-          </>
+            </>
           )}
         </div>
       </div>

@@ -70,3 +70,52 @@ export async function estimateRouteDuration(binIds: string[]): Promise<DurationE
     return null;
   }
 }
+
+export interface ReoptBin {
+  id: string;
+  bin_number: number;
+  current_street: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+  fill_percentage: number;
+}
+
+export interface ReoptRoute {
+  route_id: string;
+  name: string;
+  suggested_name: string;
+  bin_ids: string[];
+  bins: ReoptBin[];
+  bin_count: number;
+  estimated_duration_hours: number;
+  estimated_distance_miles: number;
+  avg_fill: number;
+  geographic_area: string;
+  schedule_pattern: string;
+}
+
+export interface SmartReoptimizeResponse {
+  routes: ReoptRoute[];
+  removed_bins: ReoptBin[];
+  total_bins: number;
+  solver: { runtime_ms: number; feasible: boolean; unassigned: number };
+}
+
+export async function smartReoptimize(routeIds: string[], maxBinsPerRoute: number, lowPerformerThreshold: number): Promise<SmartReoptimizeResponse | null> {
+  try {
+    const resp = await fetch(`${API_URL}/api/manager/routes/smart-reoptimize`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ route_ids: routeIds, max_bins_per_route: maxBinsPerRoute, low_performer_threshold: lowPerformerThreshold }),
+    });
+    if (!resp.ok) {
+      const err = await resp.text();
+      throw new Error(err);
+    }
+    return resp.json();
+  } catch (err) {
+    console.error('Smart reoptimize failed:', err);
+    return null;
+  }
+}
