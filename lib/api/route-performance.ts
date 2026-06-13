@@ -49,3 +49,24 @@ export async function getBinCollectionStats(): Promise<Record<string, BinCollect
     return {};
   }
 }
+
+export interface DurationEstimate {
+  estimated_duration_hours: number;
+  estimated_distance_miles: number;
+  bin_count: number;
+  driving_duration_hours: number;
+}
+
+export async function estimateRouteDuration(binIds: string[]): Promise<DurationEstimate | null> {
+  try {
+    const resp = await fetch(`${API_URL}/api/manager/routes/estimate-duration`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ bin_ids: binIds }),
+    });
+    if (!resp.ok) return null;
+    return resp.json();
+  } catch {
+    return null;
+  }
+}

@@ -963,6 +963,7 @@ export function BinTemplateBuilder() {
         <AIRouteOptimizerModal
           templates={templates}
           bins={bins}
+          allBinsWithRetired={allBinsWithRetired}
           binCollectionStats={binCollectionStats}
           onClose={() => setShowOptimizer(false)}
           onApply={() => loadTemplates()}

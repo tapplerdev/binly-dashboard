@@ -9,7 +9,7 @@ import {
 import { Route } from '@/lib/types/route';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { updateRoute } from '@/lib/api/routes';
-import { BinCollectionStats } from '@/lib/api/route-performance';
+import { BinCollectionStats, estimateRouteDuration, DurationEstimate } from '@/lib/api/route-performance';
 import { haversine } from '@/lib/utils/geo';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 
@@ -43,21 +43,29 @@ interface Suggestion {
 interface AIRouteOptimizerModalProps {
   templates: Route[];
   bins: Bin[];
+  allBinsWithRetired: Bin[];
   binCollectionStats: Record<string, BinCollectionStats>;
   onClose: () => void;
   onApply: () => void;
 }
 
-export function AIRouteOptimizerModal({ templates, bins, binCollectionStats, onClose, onApply }: AIRouteOptimizerModalProps) {
+export function AIRouteOptimizerModal({ templates, bins, allBinsWithRetired, binCollectionStats, onClose, onApply }: AIRouteOptimizerModalProps) {
   const { data: warehouse } = useWarehouseLocation();
+  const [phase, setPhase] = useState<'config' | 'results'>('config');
   const [tab, setTab] = useState<'changes' | 'preview' | 'schedule'>('changes');
   const [changes, setChanges] = useState<Change[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [applying, setApplying] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [selectedBinId, setSelectedBinId] = useState<string | null>(null);
-  const [initialized, setInitialized] = useState(false);
   const [previewView, setPreviewView] = useState<'after' | 'before'>('after');
   const [selectedPreviewRoute, setSelectedPreviewRoute] = useState<string | null>(null);
+  const [routeDurations, setRouteDurations] = useState<Record<string, DurationEstimate>>({});
+
+  // Config
+  const [maxBinsPerRoute, setMaxBinsPerRoute] = useState(30);
+  const [targetDurationHours, setTargetDurationHours] = useState(8);
+  const [lowPerformerThreshold, setLowPerformerThreshold] = useState(15);
 
   const activeBins = useMemo(() =>
     bins.filter(b => (b.status === 'active' || b.status === 'needs_check' || b.status === 'pending_move') && b.latitude && b.longitude),
@@ -65,9 +73,12 @@ export function AIRouteOptimizerModal({ templates, bins, binCollectionStats, onC
 
   const binById = useMemo(() => {
     const m = new Map<string, Bin>();
+    // Include retired bins so we can show names for stale references
+    allBinsWithRetired.forEach(b => m.set(b.id, b));
+    // Active bins overwrite retired ones with same ID
     bins.forEach(b => m.set(b.id, b));
     return m;
-  }, [bins]);
+  }, [bins, allBinsWithRetired]);
 
   // Route centroids
   const routeCentroids = useMemo(() => {
@@ -83,10 +94,9 @@ export function AIRouteOptimizerModal({ templates, bins, binCollectionStats, onC
     return m;
   }, [templates, binById]);
 
-  // Analysis
-  useMemo(() => {
-    if (initialized) return;
-    setInitialized(true);
+  // Run analysis (called from config step)
+  const runAnalysis = useCallback(async () => {
+    setAnalyzing(true);
 
     const proposed: Change[] = [];
     const sugs: Suggestion[] = [];
@@ -96,19 +106,22 @@ export function AIRouteOptimizerModal({ templates, bins, binCollectionStats, onC
     templates.forEach(t => {
       (t.bin_ids || []).forEach(binId => {
         const bin = binById.get(binId);
-        if (!bin || bin.status === 'retired' || bin.status === 'missing' || bin.status === 'in_storage') {
+        const isActive = bin && (bin.status === 'active' || bin.status === 'needs_check' || bin.status === 'pending_move');
+
+        if (!isActive) {
           proposed.push({
             id: `c-${idx++}`, type: 'remove', binId,
             binNumber: bin?.bin_number ?? 0, binStreet: bin?.current_street ?? 'Unknown',
             binCity: bin?.city ?? '', binLat: bin?.latitude ?? 0, binLng: bin?.longitude ?? 0,
             fillPct: 0, routeId: t.id, routeName: t.name,
-            reason: bin ? `In ${bin.status === 'in_storage' ? 'warehouse' : bin.status}` : 'Bin no longer exists',
+            reason: !bin ? 'Bin no longer exists' : bin.status === 'in_storage' ? 'In warehouse' : `Status: ${bin.status}`,
             checked: true,
           });
           return;
         }
+
         const stats = binCollectionStats[binId];
-        if (stats && stats.check_count >= 5 && stats.avg_fill < 15) {
+        if (stats && stats.check_count >= 5 && stats.avg_fill < lowPerformerThreshold) {
           proposed.push({
             id: `c-${idx++}`, type: 'remove', binId,
             binNumber: bin.bin_number, binStreet: bin.current_street, binCity: bin.city,
@@ -147,7 +160,7 @@ export function AIRouteOptimizerModal({ templates, bins, binCollectionStats, onC
       }
     });
 
-    // Suggestions
+    // Suggestions: compute after counts
     const afterCounts = new Map<string, number>();
     templates.forEach(t => {
       let count = (t.bin_ids || []).length;
@@ -158,13 +171,45 @@ export function AIRouteOptimizerModal({ templates, bins, binCollectionStats, onC
     });
     templates.forEach(t => {
       const count = afterCounts.get(t.id) || 0;
-      if (count > 30) sugs.push({ routeId: t.id, routeName: t.name, message: `${count} bins — consider splitting into 2 routes` });
-      if (count > 0 && count < 5) sugs.push({ routeId: t.id, routeName: t.name, message: `Only ${count} bins — consider merging with nearest route` });
+      if (count > maxBinsPerRoute) sugs.push({ routeId: t.id, routeName: t.name, message: `${count} bins exceeds ${maxBinsPerRoute} max — consider splitting` });
+      if (count > 0 && count < 5) sugs.push({ routeId: t.id, routeName: t.name, message: `Only ${count} bins — consider merging` });
     });
 
     setChanges(proposed);
     setSuggestions(sugs);
-  }, [initialized, templates, binById, binCollectionStats, activeBins, routeCentroids]);
+
+    // Estimate durations for modified routes via OSRM
+    const durations: Record<string, DurationEstimate> = {};
+    for (const t of templates) {
+      const currentBinIds = new Set(t.bin_ids || []);
+      proposed.filter(c => c.checked && c.routeId === t.id).forEach(c => {
+        if (c.type === 'remove') currentBinIds.delete(c.binId);
+        if (c.type === 'add') currentBinIds.add(c.binId);
+      });
+      const activeIds = Array.from(currentBinIds).filter(id => {
+        const b = binById.get(id);
+        return b && (b.status === 'active' || b.status === 'needs_check' || b.status === 'pending_move');
+      });
+      if (activeIds.length >= 2) {
+        const est = await estimateRouteDuration(activeIds);
+        if (est) {
+          durations[t.id] = est;
+          // Flag if exceeds target
+          if (est.estimated_duration_hours > targetDurationHours) {
+            sugs.push({
+              routeId: t.id, routeName: t.name,
+              message: `Estimated ${est.estimated_duration_hours}h exceeds ${targetDurationHours}h target`,
+            });
+          }
+        }
+      }
+    }
+    setRouteDurations(durations);
+    setSuggestions([...sugs]);
+
+    setPhase('results');
+    setAnalyzing(false);
+  }, [templates, binById, binCollectionStats, activeBins, routeCentroids, lowPerformerThreshold, maxBinsPerRoute, targetDurationHours]);
 
   const toggleChange = useCallback((id: string) => {
     setChanges(prev => prev.map(c => c.id === id ? { ...c, checked: !c.checked } : c));
@@ -273,6 +318,46 @@ export function AIRouteOptimizerModal({ templates, bins, binCollectionStats, onC
               <X className="w-5 h-5 text-gray-600" />
             </button>
           </div>
+
+          {phase === 'config' ? (
+            /* CONFIG PHASE */
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="max-w-md w-full space-y-6">
+                <div className="text-center mb-6">
+                  <Sparkles className="w-10 h-10 text-purple-400 mx-auto mb-3" />
+                  <p className="text-sm text-gray-600">Configure optimization parameters, then analyze your routes.</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Max bins per route</label>
+                  <input type="number" value={maxBinsPerRoute} onChange={e => setMaxBinsPerRoute(parseInt(e.target.value) || 30)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-200 focus:border-purple-400" />
+                  <p className="text-xs text-gray-400 mt-1">Routes exceeding this will be flagged for splitting</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Target duration per route (hours)</label>
+                  <input type="number" value={targetDurationHours} onChange={e => setTargetDurationHours(parseInt(e.target.value) || 8)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-200 focus:border-purple-400" />
+                  <p className="text-xs text-gray-400 mt-1">Routes exceeding this duration (via OSRM estimate) will be flagged</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Low performer threshold (%)</label>
+                  <input type="number" value={lowPerformerThreshold} onChange={e => setLowPerformerThreshold(parseInt(e.target.value) || 15)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-200 focus:border-purple-400" />
+                  <p className="text-xs text-gray-400 mt-1">Bins with historical avg fill below this (over 5+ checks) will be flagged for removal</p>
+                </div>
+
+                <button onClick={runAnalysis} disabled={analyzing}
+                  className="w-full py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                  {analyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing routes...</> : <><Sparkles className="w-4 h-4" /> Analyze Routes</>}
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* RESULTS PHASE */
+            <>
 
           {/* Tabs */}
           <div className="flex border-b border-gray-200 shrink-0">
@@ -465,6 +550,11 @@ export function AIRouteOptimizerModal({ templates, bins, binCollectionStats, onC
                             <div className="flex items-center gap-3 text-[11px] text-gray-500 mt-0.5">
                               <span>{previewView === 'after' ? r.newBinCount : r.oldBinCount} bins</span>
                               <span>{r.avgFill}% avg fill</span>
+                              {routeDurations[r.id] && (
+                                <span className={routeDurations[r.id].estimated_duration_hours > targetDurationHours ? 'text-red-600 font-medium' : ''}>
+                                  {routeDurations[r.id].estimated_duration_hours}h · {routeDurations[r.id].estimated_distance_miles} mi
+                                </span>
+                              )}
                               <span className="text-gray-400">{r.geographic_area}</span>
                             </div>
                           </div>
@@ -550,7 +640,12 @@ export function AIRouteOptimizerModal({ templates, bins, binCollectionStats, onC
 
           {/* Footer */}
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 shrink-0 flex items-center justify-between">
-            <p className="text-sm text-gray-500">{totalChecked} change{totalChecked !== 1 ? 's' : ''} selected</p>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setPhase('config')} className="text-sm text-purple-600 hover:text-purple-800 font-medium">
+                ← Reconfigure
+              </button>
+              <p className="text-sm text-gray-500">{totalChecked} change{totalChecked !== 1 ? 's' : ''} selected</p>
+            </div>
             <div className="flex gap-3">
               <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100">Cancel</button>
               <button onClick={handleApply} disabled={totalChecked === 0 || applying}
@@ -560,6 +655,8 @@ export function AIRouteOptimizerModal({ templates, bins, binCollectionStats, onC
               </button>
             </div>
           </div>
+          </>
+          )}
         </div>
       </div>
     </>
