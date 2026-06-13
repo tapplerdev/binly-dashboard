@@ -9,7 +9,7 @@ import {
 import { Route } from '@/lib/types/route';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { updateRoute, createRoute, deleteRoute } from '@/lib/api/routes';
-import { smartReoptimize, ReoptRoute, ReoptBin } from '@/lib/api/route-performance';
+import { smartReoptimize, ReoptRoute, ReoptBin, LowPerformerBin } from '@/lib/api/route-performance';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -40,7 +40,7 @@ export function AIRouteOptimizerModal({ templates, bins, onClose, onApply }: AIR
 
   // Results from backend
   const [resultRoutes, setResultRoutes] = useState<ReoptRoute[]>([]);
-  const [removedBins, setRemovedBins] = useState<ReoptBin[]>([]);
+  const [lowPerformers, setLowPerformers] = useState<LowPerformerBin[]>([]);
   const [deleteRouteIds, setDeleteRouteIds] = useState<string[]>([]);
   const [solverInfo, setSolverInfo] = useState<{ runtime_ms: number; feasible: boolean; unassigned: number; num_vehicles: number } | null>(null);
 
@@ -52,7 +52,7 @@ export function AIRouteOptimizerModal({ templates, bins, onClose, onApply }: AIR
       const result = await smartReoptimize(routeIds, maxBinsPerRoute, lowPerformerThreshold);
       if (!result) throw new Error('No response from optimizer');
       setResultRoutes(result.routes);
-      setRemovedBins(result.removed_bins || []);
+      setLowPerformers(result.low_performers || []);
       setDeleteRouteIds(result.delete_route_ids || []);
       setSolverInfo(result.solver);
       setPhase('results');
@@ -145,7 +145,7 @@ export function AIRouteOptimizerModal({ templates, bins, onClose, onApply }: AIR
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">
                 {phase === 'config' ? 'Configure and analyze your routes'
-                  : `${resultRoutes.length} optimized routes${deleteRouteIds.length > 0 ? ` · ${deleteRouteIds.length} templates removed` : ''} · ${removedBins.length} low performers excluded`}
+                  : `${resultRoutes.length} optimized routes${deleteRouteIds.length > 0 ? ` · ${deleteRouteIds.length} templates removed` : ''}${lowPerformers.length > 0 ? ` · ${lowPerformers.length} low performers flagged` : ''}`}
               </p>
             </div>
             <button onClick={onClose} className="w-9 h-9 rounded-lg hover:bg-gray-100 flex items-center justify-center">
@@ -228,18 +228,18 @@ export function AIRouteOptimizerModal({ templates, bins, onClose, onApply }: AIR
                         </p>
                       </div>
 
-                      {/* Removed bins */}
-                      {removedBins.length > 0 && (
+                      {/* Low performers */}
+                      {lowPerformers.length > 0 && (
                         <div className="p-3 border-b border-gray-200">
-                          <p className="text-[10px] font-bold text-red-600 uppercase mb-1.5 flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3" /> Excluded ({removedBins.length})
+                          <p className="text-[10px] font-bold text-amber-600 uppercase mb-1.5 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" /> Low Performers — Consider Relocating ({lowPerformers.length})
                           </p>
                           <div className="space-y-1">
-                            {removedBins.map(b => (
+                            {lowPerformers.map(b => (
                               <div key={b.id} className="flex items-center gap-2 text-xs text-gray-500">
-                                <span className="w-5 h-5 rounded-full bg-red-100 text-red-600 text-[9px] font-bold flex items-center justify-center">{b.bin_number}</span>
+                                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-600 text-[9px] font-bold flex items-center justify-center">{b.bin_number}</span>
                                 <span className="truncate">{b.current_street}, {b.city}</span>
-                                <span className="text-red-500 shrink-0">{b.fill_percentage}%</span>
+                                <span className="text-amber-600 shrink-0">{b.avg_fill}% avg · {b.check_count} checks</span>
                               </div>
                             ))}
                           </div>

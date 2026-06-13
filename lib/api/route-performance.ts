@@ -95,12 +95,17 @@ export interface ReoptRoute {
   schedule_pattern: string;
 }
 
+export interface LowPerformerBin extends ReoptBin {
+  avg_fill: number;
+  check_count: number;
+}
+
 export interface SmartReoptimizeResponse {
   routes: ReoptRoute[];
-  removed_bins: ReoptBin[];
+  low_performers: LowPerformerBin[];
   delete_route_ids: string[];
   total_bins: number;
-  solver: { runtime_ms: number; feasible: boolean; unassigned: number; num_vehicles: number };
+  solver: { runtime_ms: number; feasible: boolean; unassigned: number; num_vehicles: number; balanced_capacity: number };
 }
 
 export async function smartReoptimize(routeIds: string[], maxBinsPerRoute: number, lowPerformerThreshold: number): Promise<SmartReoptimizeResponse | null> {
