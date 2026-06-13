@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { Route } from '@/lib/types/route';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
-import { updateRoute } from '@/lib/api/routes';
+import { updateRoute, createRoute, deleteRoute } from '@/lib/api/routes';
 import { smartReoptimize, ReoptRoute, ReoptBin } from '@/lib/api/route-performance';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 
@@ -41,7 +41,8 @@ export function AIRouteOptimizerModal({ templates, bins, onClose, onApply }: AIR
   // Results from backend
   const [resultRoutes, setResultRoutes] = useState<ReoptRoute[]>([]);
   const [removedBins, setRemovedBins] = useState<ReoptBin[]>([]);
-  const [solverInfo, setSolverInfo] = useState<{ runtime_ms: number; feasible: boolean; unassigned: number } | null>(null);
+  const [deleteRouteIds, setDeleteRouteIds] = useState<string[]>([]);
+  const [solverInfo, setSolverInfo] = useState<{ runtime_ms: number; feasible: boolean; unassigned: number; num_vehicles: number } | null>(null);
 
   const runAnalysis = async () => {
     setAnalyzing(true);
@@ -52,6 +53,7 @@ export function AIRouteOptimizerModal({ templates, bins, onClose, onApply }: AIR
       if (!result) throw new Error('No response from optimizer');
       setResultRoutes(result.routes);
       setRemovedBins(result.removed_bins || []);
+      setDeleteRouteIds(result.delete_route_ids || []);
       setSolverInfo(result.solver);
       setPhase('results');
     } catch (err: any) {
@@ -64,15 +66,30 @@ export function AIRouteOptimizerModal({ templates, bins, onClose, onApply }: AIR
   const handleApply = async () => {
     setApplying(true);
     try {
+      // Update existing templates
       for (const route of resultRoutes) {
-        if (!route.route_id) continue;
-        await updateRoute(route.route_id, {
-          bin_ids: route.bin_ids,
-          name: route.suggested_name,
-          geographic_area: route.geographic_area,
-          estimated_duration_hours: route.estimated_duration_hours,
-          schedule_pattern: route.schedule_pattern,
-        });
+        if (route.route_id) {
+          await updateRoute(route.route_id, {
+            bin_ids: route.bin_ids,
+            name: route.suggested_name,
+            geographic_area: route.geographic_area,
+            estimated_duration_hours: route.estimated_duration_hours,
+            schedule_pattern: route.schedule_pattern,
+          });
+        } else {
+          // Create new template for routes that don't map to existing ones
+          await createRoute({
+            name: route.suggested_name,
+            geographic_area: route.geographic_area,
+            bin_ids: route.bin_ids,
+            estimated_duration_hours: route.estimated_duration_hours,
+            schedule_pattern: route.schedule_pattern,
+          });
+        }
+      }
+      // Delete templates that got 0 bins
+      for (const id of deleteRouteIds) {
+        try { await deleteRoute(id); } catch { /* ignore */ }
       }
       onApply();
       onClose();
@@ -128,7 +145,7 @@ export function AIRouteOptimizerModal({ templates, bins, onClose, onApply }: AIR
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">
                 {phase === 'config' ? 'Configure and analyze your routes'
-                  : `${resultRoutes.length} optimized routes · ${removedBins.length} low performers excluded`}
+                  : `${resultRoutes.length} optimized routes${deleteRouteIds.length > 0 ? ` · ${deleteRouteIds.length} templates removed` : ''} · ${removedBins.length} low performers excluded`}
               </p>
             </div>
             <button onClick={onClose} className="w-9 h-9 rounded-lg hover:bg-gray-100 flex items-center justify-center">
