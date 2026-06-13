@@ -223,7 +223,7 @@ export function AIRouteOptimizerModal({ templates, bins, onClose, onApply }: AIR
                       {/* Solver info */}
                       <div className="p-3 bg-purple-50 border-b border-purple-100">
                         <p className="text-xs text-purple-700">
-                          Optimized in {solverInfo?.runtime_ms}ms · {removedBins.length > 0 && `${removedBins.length} low performers excluded · `}
+                          Optimized in {solverInfo?.runtime_ms}ms · {lowPerformers.length > 0 && `${lowPerformers.length} low performers flagged · `}
                           All {resultRoutes.reduce((s, r) => s + r.bin_count, 0)} active bins distributed
                         </p>
                       </div>
