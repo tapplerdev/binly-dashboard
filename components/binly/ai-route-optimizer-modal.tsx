@@ -10,6 +10,7 @@ import { Route } from '@/lib/types/route';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { updateRoute, createRoute, deleteRoute } from '@/lib/api/routes';
 import { smartReoptimize, ReoptRoute, ReoptBin, LowPerformerBin } from '@/lib/api/route-performance';
+import { createMoveRequest } from '@/lib/api/move-requests';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -231,9 +232,30 @@ export function AIRouteOptimizerModal({ templates, bins, onClose, onApply }: AIR
                       {/* Low performers */}
                       {lowPerformers.length > 0 && (
                         <div className="p-3 border-b border-gray-200">
-                          <p className="text-[10px] font-bold text-amber-600 uppercase mb-1.5 flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3" /> Low Performers — Consider Relocating ({lowPerformers.length})
-                          </p>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-[10px] font-bold text-amber-600 uppercase flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3" /> Low Performers ({lowPerformers.length})
+                            </p>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  for (const b of lowPerformers) {
+                                    await createMoveRequest({
+                                      bin_id: b.id,
+                                      move_type: 'relocation',
+                                      scheduled_date: Math.floor(Date.now() / 1000) + 7 * 86400,
+                                      reason_category: 'relocation_request',
+                                      notes: `Low performer: avg ${b.avg_fill}% fill over ${b.check_count} checks`,
+                                    });
+                                  }
+                                  alert(`${lowPerformers.length} move requests created. Assign destinations in Operations → Shifts.`);
+                                } catch { alert('Failed to create move requests'); }
+                              }}
+                              className="text-[10px] font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 px-2 py-1 rounded transition-colors"
+                            >
+                              Relocate All
+                            </button>
+                          </div>
                           <div className="space-y-1">
                             {lowPerformers.map(b => (
                               <div key={b.id} className="flex items-center gap-2 text-xs text-gray-500">
