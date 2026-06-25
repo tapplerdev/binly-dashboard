@@ -128,6 +128,7 @@ export function CreatePotentialLocationDialog({
   const [showAiSuggest, setShowAiSuggest] = useState(false);
   const [aiCount, setAiCount] = useState('10');
   const [aiCity, setAiCity] = useState('');
+  const [aiMode, setAiMode] = useState<'auto' | 'infill' | 'expand'>('auto');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
 
@@ -541,9 +542,13 @@ export function CreatePotentialLocationDialog({
     setAiError('');
 
     try {
+      let modeStr = '';
+      if (aiMode === 'infill') modeStr = ' mode infill';
+      else if (aiMode === 'expand') modeStr = ' mode expand';
+
       const prompt = aiCity
-        ? `Recommend ${count} locations for new bins in ${aiCity}`
-        : `Recommend ${count} locations for new bins`;
+        ? `Recommend ${count} locations for new bins in ${aiCity}${modeStr}`
+        : `Recommend ${count} locations for new bins${modeStr}`;
 
       const result = await sendChatMessage(prompt);
 
@@ -1148,6 +1153,34 @@ export function CreatePotentialLocationDialog({
                         <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
+                    {/* Mode selector */}
+                    <div className="flex gap-1">
+                      {([
+                        { key: 'auto' as const, label: 'Auto' },
+                        { key: 'infill' as const, label: 'Infill' },
+                        { key: 'expand' as const, label: 'Expand' },
+                      ]).map(m => (
+                        <button
+                          key={m.key}
+                          type="button"
+                          onClick={() => setAiMode(m.key)}
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+                            aiMode === m.key
+                              ? 'bg-purple-600 text-white'
+                              : 'bg-white text-purple-600 border border-purple-200 hover:bg-purple-100'
+                          }`}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-purple-500">
+                      {aiMode === 'infill' ? 'Near existing top performers (within 3 mi)'
+                        : aiMode === 'expand' ? 'New cities with no existing bins'
+                        : 'AI decides based on demand'}
+                    </p>
+
+                    {/* Count + City + Go */}
                     <div className="flex gap-2">
                       <input
                         type="number"
@@ -1176,7 +1209,11 @@ export function CreatePotentialLocationDialog({
                       </Button>
                     </div>
                     {aiError && <p className="text-xs text-red-500">{aiError}</p>}
-                    {aiLoading && <p className="text-xs text-purple-500">Analyzing areas, filtering no-go zones, scoring locations...</p>}
+                    {aiLoading && <p className="text-xs text-purple-500">
+                      {aiMode === 'infill' ? 'Finding spots near your best bins...'
+                        : aiMode === 'expand' ? 'Searching new cities with good demographics...'
+                        : 'Analyzing areas, scoring locations...'}
+                    </p>}
                   </div>
                 )}
 
