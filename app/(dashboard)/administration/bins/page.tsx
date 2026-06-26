@@ -35,7 +35,7 @@ import {
   Search,
   Eye,
   MoreVertical,
-  X,
+  X as XIcon,
   Edit,
   CheckCircle2,
   Warehouse,
@@ -411,7 +411,7 @@ function BinsPageContent() {
                 }}
                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-500 hover:text-primary hover:bg-blue-50 rounded-lg border border-gray-200 transition-colors whitespace-nowrap"
               >
-                <X className="w-3.5 h-3.5" />
+                <XIcon className="w-3.5 h-3.5" />
                 Reset
               </button>
             )}
@@ -850,7 +850,7 @@ function BinsPageContent() {
                   className="lg:hidden ml-auto p-2 hover:bg-gray-100 rounded-lg transition-colors"
                   title="Clear selection"
                 >
-                  <X className="w-4 h-4 text-gray-500" />
+                  <XIcon className="w-4 h-4 text-gray-500" />
                 </button>
               </div>
 
@@ -897,7 +897,7 @@ function BinsPageContent() {
                 className="hidden lg:block p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 title="Clear selection"
               >
-                <X className="w-4 h-4 text-gray-500" />
+                <XIcon className="w-4 h-4 text-gray-500" />
               </button>
             </div>
           </Card>
