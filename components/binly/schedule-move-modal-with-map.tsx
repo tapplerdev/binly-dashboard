@@ -278,9 +278,15 @@ export function ScheduleMoveModalWithMap({
     const editBin = allBins.find(b => b.id === editMoveRequest.bin_id);
     if (!editBin) return;
 
-    // Select the bin and skip to configuration
+    // Select the bin — stay on selection step so map is visible, focused on bin
     dispatch({ type: 'SELECT_BIN', bin: editBin });
-    dispatch({ type: 'SET_STEP', step: 'configuration' });
+
+    // Center map on the edit bin
+    const binLat = editBin.current_latitude ?? editBin.latitude;
+    const binLng = editBin.current_longitude ?? editBin.longitude;
+    if (binLat && binLng) {
+      setMapCenter({ lat: binLat, lng: binLng });
+    }
 
     // Pre-fill configuration after a tick (needs INITIALIZE_CONFIGS to run first)
     setTimeout(() => {
@@ -1364,19 +1370,41 @@ export function ScheduleMoveModalWithMap({
 
         {/* Footer with next button - Flush with bottom, no gap */}
         <div className="sticky bottom-0 p-3 pb-3 md:p-4 md:pb-4 border-t border-gray-200 flex-shrink-0 bg-white md:bg-gray-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none -mb-3 md:mb-0">
-          {/* Next Button */}
-          <button
-            onClick={handleNext}
-            disabled={selectedBins.length === 0}
-            className={cn(
-              'w-full py-3 md:py-2.5 rounded-lg font-semibold text-sm transition-all',
-              selectedBins.length > 0
-                ? 'bg-primary text-white hover:bg-primary/90 active:bg-primary shadow-sm'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+          <div className="flex gap-2">
+            {/* Cancel Move button — edit mode only */}
+            {isEditMode && editMoveRequest && editMoveRequest.status !== 'cancelled' && editMoveRequest.status !== 'completed' && (
+              <button
+                onClick={async () => {
+                  if (!confirm('Are you sure you want to cancel this move request?')) return;
+                  try {
+                    const { cancelMoveRequest } = await import('@/lib/api/move-requests');
+                    await cancelMoveRequest(editMoveRequest.id);
+                    queryClient.invalidateQueries({ queryKey: ['move-requests'] });
+                    onSuccess?.();
+                    handleClose();
+                  } catch (err) {
+                    alert('Failed to cancel move request');
+                  }
+                }}
+                className="px-4 py-3 md:py-2.5 rounded-lg font-semibold text-sm bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-all"
+              >
+                Cancel Move
+              </button>
             )}
-          >
-            Next: Configure Moves ({selectedBins.length})
-          </button>
+            {/* Next Button */}
+            <button
+              onClick={handleNext}
+              disabled={selectedBins.length === 0}
+              className={cn(
+                'flex-1 py-3 md:py-2.5 rounded-lg font-semibold text-sm transition-all',
+                selectedBins.length > 0
+                  ? 'bg-primary text-white hover:bg-primary/90 active:bg-primary shadow-sm'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              )}
+            >
+              {isEditMode ? 'Next: Edit Configuration' : `Next: Configure Moves (${selectedBins.length})`}
+            </button>
+          </div>
         </div>
       </div>
     </>
