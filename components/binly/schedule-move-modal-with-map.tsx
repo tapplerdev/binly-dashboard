@@ -569,6 +569,7 @@ export function ScheduleMoveModalWithMap({
         const config = binConfigs[editBin?.id];
         if (!config) throw new Error('Missing configuration');
 
+        // Step 1: Update move request fields
         await updateMoveRequest(editMoveRequest.id, {
           scheduled_date: Math.floor(config.scheduledDate / 1000),
           reason: config.reason || config.reasonCategory || '',
@@ -580,7 +581,34 @@ export function ScheduleMoveModalWithMap({
           new_longitude: config.newLongitude,
         });
 
+        // Step 2: Handle assignment changes
+        const currentAssignmentType = editMoveRequest.assignment_type || '';
+        const newAssignmentType = config.assignmentType || 'unassigned';
+
+        if (newAssignmentType === 'user' && config.assignedUserId) {
+          // Assign to driver
+          console.log('🔄 [EDIT] Assigning to user:', config.assignedUserId);
+          await assignMoveToUser({
+            move_request_id: editMoveRequest.id,
+            user_id: config.assignedUserId,
+          });
+        } else if ((newAssignmentType === 'active_shift' || newAssignmentType === 'future_shift') && config.assignedShiftId) {
+          // Assign to shift
+          console.log('🔄 [EDIT] Assigning to shift:', config.assignedShiftId);
+          await assignMoveToShift({
+            move_request_id: editMoveRequest.id,
+            shift_id: config.assignedShiftId,
+            insert_position: config.insertPosition || 'end',
+          });
+        } else if (newAssignmentType === 'unassigned' && (currentAssignmentType === 'shift' || currentAssignmentType === 'manual')) {
+          // Clear assignment
+          console.log('🔄 [EDIT] Clearing assignment');
+          const { clearMoveAssignment: clearAssignment } = await import('@/lib/api/move-requests');
+          await clearAssignment(editMoveRequest.id);
+        }
+
         await queryClient.invalidateQueries({ queryKey: ['move-requests'] });
+        await queryClient.invalidateQueries({ queryKey: ['shifts'] });
         onSuccess?.();
         handleClose();
         dispatch({ type: 'SET_SUBMITTING', isSubmitting: false });
