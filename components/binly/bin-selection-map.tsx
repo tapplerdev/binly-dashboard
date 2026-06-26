@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { APIProvider, Map as GoogleMap, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { getBins } from '@/lib/api/bins';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
+import { ZoneMarkersLayer, WarehouseMarkerLayer } from '@/components/binly/map-layers';
 import { X, Search, Lasso, MapIcon, List, Filter, ChevronDown } from 'lucide-react';
 import { LassoSelect } from './lasso-select';
 
@@ -250,6 +251,10 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
                       </AdvancedMarker>
                     );
                   })}
+
+                  {/* Shared context layers */}
+                  <ZoneMarkersLayer />
+                  <WarehouseMarkerLayer />
                 </GoogleMap>
               </APIProvider>
             )}

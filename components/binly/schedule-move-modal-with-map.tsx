@@ -48,6 +48,7 @@ import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 
 // Google Maps imports
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
+import { ZoneMarkersLayer, WarehouseMarkerLayer } from '@/components/binly/map-layers';
 
 // Default map center (San Jose, CA - warehouse location)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -939,6 +940,10 @@ export function ScheduleMoveModalWithMap({
                 renderPotentialLocationMarker(location, bin.id)
               );
             })}
+
+            {/* Shared context layers */}
+            <ZoneMarkersLayer />
+            <WarehouseMarkerLayer />
           </Map>
         </APIProvider>
 
