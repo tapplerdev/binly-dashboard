@@ -1200,7 +1200,7 @@ export function CreatePotentialLocationDialog({
                       <input
                         type="number"
                         min="1"
-                        max="30"
+                        max="100"
                         value={aiCount}
                         onChange={(e) => setAiCount(e.target.value)}
                         placeholder="Count"
