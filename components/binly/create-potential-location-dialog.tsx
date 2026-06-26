@@ -1154,31 +1154,41 @@ export function CreatePotentialLocationDialog({
                       </button>
                     </div>
                     {/* Mode selector */}
-                    <div className="flex gap-1">
+                    <div className="space-y-1.5">
                       {([
-                        { key: 'auto' as const, label: 'Auto' },
-                        { key: 'infill' as const, label: 'Infill' },
-                        { key: 'expand' as const, label: 'Expand' },
+                        {
+                          key: 'auto' as const,
+                          label: 'Smart Mix',
+                          desc: 'AI picks the best strategy — fills gaps near top performers and explores promising new areas',
+                        },
+                        {
+                          key: 'infill' as const,
+                          label: 'Near Existing Bins',
+                          desc: 'Place bins close to your best performers — same corridors, proven demand',
+                        },
+                        {
+                          key: 'expand' as const,
+                          label: 'New Territory',
+                          desc: 'Find locations in cities where you have no bins yet',
+                        },
                       ]).map(m => (
                         <button
                           key={m.key}
                           type="button"
                           onClick={() => setAiMode(m.key)}
-                          className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+                          className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-all ${
                             aiMode === m.key
                               ? 'bg-purple-600 text-white'
-                              : 'bg-white text-purple-600 border border-purple-200 hover:bg-purple-100'
+                              : 'bg-white text-gray-700 border border-purple-200 hover:bg-purple-50'
                           }`}
                         >
-                          {m.label}
+                          <div className="font-medium">{m.label}</div>
+                          <div className={`text-[10px] mt-0.5 leading-snug ${aiMode === m.key ? 'text-purple-200' : 'text-gray-400'}`}>
+                            {m.desc}
+                          </div>
                         </button>
                       ))}
                     </div>
-                    <p className="text-[10px] text-purple-500">
-                      {aiMode === 'infill' ? 'Near existing top performers (within 3 mi)'
-                        : aiMode === 'expand' ? 'New cities with no existing bins'
-                        : 'AI decides based on demand'}
-                    </p>
 
                     {/* Count + City + Go */}
                     <div className="flex gap-2">
