@@ -700,7 +700,7 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                         </div>
 
                         {/* Rich Data Display */}
-                        <div className="flex-shrink-0 flex items-center gap-3">
+                        <div className="flex-shrink-0 flex items-center gap-3 justify-end ml-auto w-[140px]">
                           {isSkipped && (() => {
                             const skipReason = getSkipReason(task.task_data);
                             return skipReason ? (
