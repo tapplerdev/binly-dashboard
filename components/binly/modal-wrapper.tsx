@@ -12,11 +12,11 @@ interface ModalWrapperProps {
  * Shared modal wrapper with consistent open/close animations.
  *
  * Usage:
- * ```tsx
+ * ```
  * <ModalWrapper onClose={onClose}>
  *   <div className="modal-container">
  *     <div className="modal-content modal-full">
- *       {/* modal content */}
+ *       ... modal content ...
  *     </div>
  *   </div>
  * </ModalWrapper>
