@@ -107,6 +107,12 @@ Binly is a waste management command center dashboard following "Progressive Disc
 - **Transitions:** All interactive elements use `transition-card` (200ms ease-in-out)
 - **Spacing:** Consistent padding using p-4 (16px) for cards
 
+#### NEVER Use Native Browser Dialogs
+**NEVER** use `window.confirm()`, `window.alert()`, or `window.prompt()`. Always use custom modal components:
+- **Confirmations:** Use `DeleteConfirmationModal` from `components/binly/delete-confirmation-modal.tsx` — supports custom title, message, confirm/cancel text, loading state
+- **Errors:** Show inline error banners within the component, not `alert()`
+- **Info:** Use toast notifications or inline messages
+
 #### Modal Pattern (REQUIRED for all modals)
 All modals MUST use the `useModalClose` hook from `components/binly/modal-wrapper.tsx` and the global CSS classes from `globals.css`:
 

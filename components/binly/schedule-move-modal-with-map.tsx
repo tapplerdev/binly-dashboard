@@ -49,6 +49,8 @@ import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 // Google Maps imports
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { ZoneMarkersLayer, WarehouseMarkerLayer } from '@/components/binly/map-layers';
+import { DeleteConfirmationModal } from '@/components/binly/delete-confirmation-modal';
+import { cancelMoveRequest } from '@/lib/api/move-requests';
 
 // Default map center (San Jose, CA - warehouse location)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -271,6 +273,8 @@ export function ScheduleMoveModalWithMap({
 
   // Edit mode: pre-fill data from existing move request
   const [editInitialized, setEditInitialized] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   useEffect(() => {
     if (!isEditMode || !editMoveRequest || !allBins || editInitialized) return;
 
@@ -1374,18 +1378,7 @@ export function ScheduleMoveModalWithMap({
             {/* Cancel Move button — edit mode only */}
             {isEditMode && editMoveRequest && editMoveRequest.status !== 'cancelled' && editMoveRequest.status !== 'completed' && (
               <button
-                onClick={async () => {
-                  if (!confirm('Are you sure you want to cancel this move request?')) return;
-                  try {
-                    const { cancelMoveRequest } = await import('@/lib/api/move-requests');
-                    await cancelMoveRequest(editMoveRequest.id);
-                    queryClient.invalidateQueries({ queryKey: ['move-requests'] });
-                    onSuccess?.();
-                    handleClose();
-                  } catch (err) {
-                    alert('Failed to cancel move request');
-                  }
-                }}
+                onClick={() => setShowCancelConfirm(true)}
                 className="px-4 py-3 md:py-2.5 rounded-lg font-semibold text-sm bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-all"
               >
                 Cancel Move
@@ -3246,6 +3239,32 @@ export function ScheduleMoveModalWithMap({
               </div>
             </Card>
           </div>
+
+          {/* Cancel Move Confirmation */}
+          <DeleteConfirmationModal
+            isOpen={showCancelConfirm}
+            onClose={() => setShowCancelConfirm(false)}
+            onConfirm={async () => {
+              if (!editMoveRequest) return;
+              setIsCancelling(true);
+              try {
+                await cancelMoveRequest(editMoveRequest.id);
+                queryClient.invalidateQueries({ queryKey: ['move-requests'] });
+                setShowCancelConfirm(false);
+                onSuccess?.();
+                handleClose();
+              } catch {
+                // stay open
+              } finally {
+                setIsCancelling(false);
+              }
+            }}
+            title="Cancel Move Request"
+            message={`Are you sure you want to cancel the move request for Bin #${editMoveRequest?.bin_number}? This action cannot be undone.`}
+            confirmText="Cancel Move"
+            cancelText="Keep Move"
+            isDeleting={isCancelling}
+          />
 
           {/* Potential Location Picker Modal */}
           {locationPickerBinId && (() => {
