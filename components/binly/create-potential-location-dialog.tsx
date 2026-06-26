@@ -18,6 +18,7 @@ import { formatIncidentType } from '@/lib/types/zone';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { NoGoZonePin } from '@/components/ui/no-go-zone-pin';
 import { BinMarkersLayer, ZoneMarkersLayer, WarehouseMarkerLayer } from '@/components/binly/map-layers';
+import { useModalClose } from '@/components/binly/modal-wrapper';
 import { MapMarkerPin } from '@/components/ui/map-marker-pin';
 
 interface QueuedLocation {
@@ -93,6 +94,7 @@ export function CreatePotentialLocationDialog({
   open,
   onOpenChange,
 }: CreatePotentialLocationDialogProps) {
+  const { isClosing, handleClose } = useModalClose(() => onOpenChange(false));
   const { data: bins = [] } = useBins();
   const { data: warehouse } = useWarehouseLocation();
   const { data: activeZones = [] } = useNoGoZones('active');
@@ -737,12 +739,12 @@ export function CreatePotentialLocationDialog({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 z-50 animate-fade-in flex items-center justify-center"
-        onClick={() => onOpenChange(false)}
+        className={`fixed inset-0 bg-black/50 z-50 ${isClosing ? 'animate-fade-out' : 'animate-fade-in'} flex items-center justify-center`}
+        onClick={handleClose}
       >
         {/* Modal - Larger for map view */}
         <div
-          className="w-[99vw] max-w-[1800px] h-[96vh] bg-white rounded-2xl shadow-2xl z-50 animate-scale-in overflow-hidden flex flex-col"
+          className={`w-[99vw] max-w-[1800px] h-[96vh] bg-white rounded-2xl shadow-2xl z-50 ${isClosing ? 'animate-scale-out animate-fade-out' : 'animate-scale-in animate-fade-in'} overflow-hidden flex flex-col`}
           onClick={(e) => e.stopPropagation()}
         >
         {/* Header */}
@@ -762,7 +764,7 @@ export function CreatePotentialLocationDialog({
               </div>
             </div>
             <button
-              onClick={() => onOpenChange(false)}
+              onClick={handleClose}
               className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors"
             >
               <X className="w-5 h-5 text-gray-600" />
@@ -1252,7 +1254,7 @@ export function CreatePotentialLocationDialog({
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => onOpenChange(false)}
+                    onClick={handleClose}
                     className="flex-1"
                     disabled={loading}
                   >

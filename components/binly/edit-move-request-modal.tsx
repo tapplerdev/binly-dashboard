@@ -12,6 +12,7 @@ import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete
 import { HerePlaceDetails } from '@/lib/services/geocoding.service';
 import { X, MapPin, Calendar, Loader2, Building2, FileText, AlertCircle, User, UserPlus, UserMinus, Truck } from 'lucide-react';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { useModalClose } from './modal-wrapper';
 import { ActiveShiftWarningDialog } from './active-shift-warning-dialog';
 import { MapMarkerPin } from '@/components/ui/map-marker-pin';
 import { BinMarkersLayer, ZoneMarkersLayer, WarehouseMarkerLayer } from '@/components/binly/map-layers';
@@ -58,6 +59,7 @@ const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 
 export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMoveRequestModalProps) {
   const queryClient = useQueryClient();
+  const { isClosing, handleClose } = useModalClose(onClose);
 
   // ── Form state ─────────────────────────────────────────────────────────────
   const scheduledDateStr = moveRequest.scheduled_date
@@ -346,10 +348,10 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
+      <div className={`fixed inset-0 bg-black/50 z-50 ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`} onClick={handleClose} />
 
       {/* Modal */}
-      <div className="fixed inset-4 z-50 flex items-stretch pointer-events-none">
+      <div className={`fixed inset-4 z-50 flex items-stretch pointer-events-none ${isClosing ? 'animate-scale-out animate-fade-out' : 'animate-scale-in animate-fade-in'}`}>
         <div className="bg-white rounded-2xl shadow-2xl w-full flex flex-col overflow-hidden pointer-events-auto">
 
           {/* Header */}
@@ -361,7 +363,7 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
               </p>
             </div>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="w-9 h-9 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors"
             >
               <X className="w-5 h-5 text-gray-600" />
