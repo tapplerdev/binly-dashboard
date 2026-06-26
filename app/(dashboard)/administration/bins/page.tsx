@@ -224,7 +224,8 @@ function BinsPageContent() {
           comparison = (b.fill_percentage || 0) - (a.fill_percentage || 0);
           break;
         case 'days_since_check':
-          comparison = (b.days_since_check || 0) - (a.days_since_check || 0);
+          // N/A (null) sorts to the end — use 99999 as "never checked"
+          comparison = (b.days_since_check ?? 99999) - (a.days_since_check ?? 99999);
           break;
         case 'status': {
           const statusOrder: Record<string, number> = { active: 0, pending_move: 1, missing: 2, in_storage: 3, retired: 4 };
