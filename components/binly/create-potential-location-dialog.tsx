@@ -736,7 +736,7 @@ export function CreatePotentialLocationDialog({
       >
         {/* Modal - Larger for map view */}
         <div
-          className="w-[95vw] max-w-[1400px] h-[90vh] bg-white rounded-2xl shadow-2xl z-50 animate-scale-in overflow-hidden flex flex-col"
+          className="w-[99vw] max-w-[1800px] h-[96vh] bg-white rounded-2xl shadow-2xl z-50 animate-scale-in overflow-hidden flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
         {/* Header */}
