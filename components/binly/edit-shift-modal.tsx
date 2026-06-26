@@ -93,38 +93,47 @@ function TaskRow({ task, isSelected, isSelectable, isInProgress, isDone, isSkipp
   return (
     <div
       onClick={() => isSelectable && !dimmed && onToggle()}
-      className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border transition-all ${
-        isPendingRemove ? 'opacity-40 bg-red-50 border-red-200 line-through' :
-        isPendingMove ? 'opacity-40 bg-amber-50 border-amber-200' :
-        isSelected ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-200 cursor-pointer' :
-        isDone ? 'bg-green-50 border-green-200 opacity-60' :
-        isSkipped ? 'bg-yellow-50 border-yellow-200 opacity-50' :
-        isInProgress ? 'bg-blue-50 border-blue-300 border-l-[3px] border-l-blue-500' :
-        'bg-white border-gray-200 hover:bg-gray-50 cursor-pointer'
+      className={`flex items-center gap-2 p-2.5 rounded-lg border transition-all ${
+        isPendingRemove ? 'opacity-40 bg-red-50 border-l-4 border-red-400' :
+        isPendingMove ? 'opacity-40 bg-amber-50 border-l-4 border-amber-400' :
+        isSelected ? 'bg-blue-50 border-l-4 border-blue-500 ring-1 ring-blue-200 cursor-pointer' :
+        isSkipped ? 'bg-yellow-50 border-l-4 border-yellow-500 opacity-75' :
+        isDone ? 'bg-green-50 border-l-4 border-green-500 opacity-75' :
+        isInProgress ? 'bg-blue-50 border-l-4 border-blue-600 ring-1 ring-blue-100' :
+        'bg-white border-l-4 border-gray-300 hover:bg-gray-50 cursor-pointer'
       }`}
     >
       {isSelectable && !dimmed && (
         <input type="checkbox" checked={isSelected} onChange={onToggle} onClick={e => e.stopPropagation()}
           className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer shrink-0" />
       )}
-      <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${iconConfig.bg}`}>
-        <Icon className={`w-3 h-3 ${iconConfig.color}`} />
+      <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${iconConfig.bg}`}>
+        <Icon className={`w-3.5 h-3.5 ${iconConfig.color}`} />
+      </div>
+      {/* Status icon */}
+      <div className="shrink-0">
+        {isPendingRemove ? (
+          <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"><Trash2 className="w-3 h-3 text-white" /></div>
+        ) : isPendingMove ? (
+          <div className="w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center"><ArrowRight className="w-3 h-3 text-white" /></div>
+        ) : isSkipped ? (
+          <div className="w-5 h-5 bg-yellow-500 rounded-full flex items-center justify-center"><SkipForward className="w-3 h-3 text-white" /></div>
+        ) : isDone ? (
+          <div className="w-5 h-5 bg-green-600 rounded-full flex items-center justify-center"><Check className="w-3 h-3 text-white" /></div>
+        ) : isInProgress ? (
+          <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center animate-pulse"><Navigation className="w-3 h-3 text-white" /></div>
+        ) : (
+          <div className="w-5 h-5 bg-gray-200 rounded-full flex items-center justify-center"><Circle className="w-2.5 h-2.5 text-gray-400" /></div>
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className={`text-sm font-medium truncate ${dimmed || isDone || isSkipped ? 'text-gray-400' : 'text-gray-800'} ${isDone || isSkipped || isPendingRemove ? 'line-through' : ''}`}>
+          <span className={`text-xs font-medium truncate ${dimmed || isDone || isSkipped ? 'text-gray-500' : 'text-gray-800'}`}>
             {getTaskLabel(task)}
           </span>
           {moveTag && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-600 font-medium shrink-0">{moveTag}</span>}
         </div>
-        {subtext && <div className={`text-xs truncate ${isDone || isSkipped ? 'text-gray-300' : 'text-gray-500'}`}>{subtext}</div>}
-      </div>
-      <div className="shrink-0">
-        {isPendingRemove && <Trash2 className="w-3.5 h-3.5 text-red-400" />}
-        {isPendingMove && <ArrowRight className="w-3.5 h-3.5 text-amber-500" />}
-        {!dimmed && isDone && <Check className="w-4 h-4 text-green-500" />}
-        {!dimmed && isSkipped && <SkipForward className="w-4 h-4 text-orange-400" />}
-        {!dimmed && isInProgress && <Navigation className="w-3.5 h-3.5 text-blue-600 animate-pulse" />}
+        {subtext && <div className={`text-[11px] truncate ${isDone || isSkipped ? 'text-gray-400' : 'text-gray-500'}`}>{subtext}</div>}
       </div>
     </div>
   );
@@ -472,8 +481,8 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
 
   return (
     <>
-      <div className={`fixed inset-0 bg-black/50 z-50 flex items-center justify-center ${isClosing ? "animate-fade-out" : "animate-fade-in"}`}>
-        <div className="bg-white rounded-2xl w-full max-w-4xl h-[85vh] mx-4 flex flex-col animate-scale-in">
+      <div className={`fixed inset-0 bg-black/50 z-50 flex items-center justify-center ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`}>
+        <div className={`bg-white rounded-2xl w-full max-w-4xl h-[85vh] mx-4 flex flex-col shadow-2xl ${isClosing ? 'animate-scale-out animate-fade-out' : 'animate-scale-in animate-fade-in'}`}>
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
             <div>
@@ -486,7 +495,7 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
                 {shift.status === 'active' ? 'Active' : 'Ready'}
               </span>
             </div>
-            <button onClick={() => { if (stagedMove) { setStagedMove(null); setTargetDriverTasks([]); } else onClose(); }}
+            <button onClick={() => { if (stagedMove) { setStagedMove(null); setTargetDriverTasks([]); } else handleClose(); }}
               className="p-1 text-gray-400 hover:text-gray-600 rounded">
               <X className="w-5 h-5" />
             </button>

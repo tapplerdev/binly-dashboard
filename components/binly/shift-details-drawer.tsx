@@ -1185,19 +1185,19 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
       {/* Fullscreen Photo Modal */}
       {fullscreenPhoto && (
         <div
-          className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/95 z-[9999] flex items-center justify-center p-4 animate-fade-in"
           onClick={() => setFullscreenPhoto(null)}
         >
           <button
-            onClick={() => setFullscreenPhoto(null)}
-            className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+            onClick={(e) => { e.stopPropagation(); setFullscreenPhoto(null); }}
+            className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
           >
-            <X className="w-6 h-6 text-white" />
+            <span className="text-white text-xl font-light">&#x2715;</span>
           </button>
           <img
             src={fullscreenPhoto}
             alt="Collection photo fullscreen"
-            className="max-w-full max-h-full object-contain rounded-lg"
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           />
         </div>
