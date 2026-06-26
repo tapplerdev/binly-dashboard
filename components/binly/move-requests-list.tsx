@@ -641,22 +641,21 @@ export function MoveRequestsList() {
           />
 
           {/* Reset all — clears filters, search, sort, assignment filter */}
-          {(filters.length > 0 || searchQuery || sortColumn !== 'created_at' || sortDirection !== 'desc' || assignedFilter !== 'all') && (
-            <button
-              type="button"
-              onClick={() => {
-                setFilters([]);
-                setSearchQuery('');
-                setSortColumn('created_at');
-                setSortDirection('desc');
-                setAssignedFilter('all');
-              }}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-500 hover:text-primary hover:bg-blue-50 rounded-lg border border-gray-200 transition-colors whitespace-nowrap"
-            >
-              <X className="w-3.5 h-3.5" />
-              Reset
-            </button>
-          )}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setFilters([]);
+              setSearchQuery('');
+              setSortColumn('created_at');
+              setSortDirection('desc');
+              setAssignedFilter('all');
+            }}
+            className="gap-1.5 text-xs border-primary text-primary hover:bg-primary/5 whitespace-nowrap"
+          >
+            <X className="w-3.5 h-3.5" />
+            Reset
+          </Button>
 
           {/* Search Bar */}
           <div className="relative flex-1 lg:max-w-md">

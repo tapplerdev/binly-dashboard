@@ -174,7 +174,7 @@ function BinsPageContent() {
 
       // Multi-select filters
       if (filters.length > 0) {
-        const passesFilters = filters.every((filter) => {
+        const passesFilters = filters.some((filter) => {
           switch (filter) {
             case 'next_move_request':
               return bin.has_pending_move;
@@ -400,21 +400,20 @@ function BinsPageContent() {
             />
 
             {/* Reset all — clears filters, search, sort */}
-            {(filters.length > 0 || searchQuery || sortBy !== 'bin_number' || sortDirection !== 'asc') && (
-              <button
-                type="button"
-                onClick={() => {
-                  setFilters([]);
-                  setSearchQuery('');
-                  setSortBy('bin_number');
-                  setSortDirection('asc');
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-500 hover:text-primary hover:bg-blue-50 rounded-lg border border-gray-200 transition-colors whitespace-nowrap"
-              >
-                <XIcon className="w-3.5 h-3.5" />
-                Reset
-              </button>
-            )}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setFilters([]);
+                setSearchQuery('');
+                setSortBy('bin_number');
+                setSortDirection('asc');
+              }}
+              className="gap-1.5 text-xs border-primary text-primary hover:bg-primary/5 whitespace-nowrap"
+            >
+              <XIcon className="w-3.5 h-3.5" />
+              Reset
+            </Button>
 
             {/* Search Bar */}
             <div className="relative flex-1 lg:max-w-md">
