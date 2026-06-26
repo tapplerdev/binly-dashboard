@@ -1279,8 +1279,8 @@ export function MoveRequestsList() {
 
       {/* New Edit Move Request Modal — satellite map + drag-to-relocate */}
       {showEditMoveModal && moveToEdit && (
-        <EditMoveRequestModal
-          moveRequest={moveToEdit}
+        <ScheduleMoveModalWithMap
+          editMoveRequest={moveToEdit}
           onClose={() => {
             setShowEditMoveModal(false);
             setMoveToEdit(null);

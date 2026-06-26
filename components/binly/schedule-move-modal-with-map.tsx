@@ -31,7 +31,7 @@ import {
   CheckCircle2,
   Info,
 } from 'lucide-react';
-import { createMoveRequest, assignMoveToShift, assignMoveToUser } from '@/lib/api/move-requests';
+import { createMoveRequest, updateMoveRequest, assignMoveToShift, assignMoveToUser } from '@/lib/api/move-requests';
 import { BinChangeReasonCategory } from '@/lib/api/bins';
 import { getShifts, getShiftDetailsByDriverId } from '@/lib/api/shifts';
 import { Shift } from '@/lib/types/shift';
@@ -90,6 +90,7 @@ interface BinMoveConfig {
 interface ScheduleMoveModalWithMapProps {
   bin?: BinWithPriority;
   bins?: BinWithPriority[];
+  editMoveRequest?: MoveRequest; // If provided, modal opens in edit mode with pre-filled data
   onClose: () => void;
   onSuccess?: () => void;
 }
@@ -134,9 +135,11 @@ function PolylineConnector({ from, to }: { from: { lat: number; lng: number }; t
 export function ScheduleMoveModalWithMap({
   bin,
   bins,
+  editMoveRequest,
   onClose,
   onSuccess,
 }: ScheduleMoveModalWithMapProps) {
+  const isEditMode = !!editMoveRequest;
   const queryClient = useQueryClient();
 
   // Unified state management with reducer
@@ -265,6 +268,48 @@ export function ScheduleMoveModalWithMap({
       mode: state.mode,
     });
   }, [state.selectedBins, state.mode]);
+
+  // Edit mode: pre-fill data from existing move request
+  const [editInitialized, setEditInitialized] = useState(false);
+  useEffect(() => {
+    if (!isEditMode || !editMoveRequest || !allBins || editInitialized) return;
+
+    // Find the bin in allBins
+    const editBin = allBins.find(b => b.id === editMoveRequest.bin_id);
+    if (!editBin) return;
+
+    // Select the bin and skip to configuration
+    dispatch({ type: 'SELECT_BIN', bin: editBin });
+    dispatch({ type: 'SET_STEP', step: 'configuration' });
+
+    // Pre-fill configuration after a tick (needs INITIALIZE_CONFIGS to run first)
+    setTimeout(() => {
+      const reasonCategory = editMoveRequest.reason as any;
+      dispatch({
+        type: 'UPDATE_CONFIG',
+        binId: editBin.id,
+        updates: {
+          moveType: editMoveRequest.move_type as any,
+          schedule: {
+            date: editMoveRequest.scheduled_date * 1000,
+            dateOption: 'custom' as const,
+          },
+          destination: {
+            type: 'custom' as const,
+            street: editMoveRequest.new_street || undefined,
+            city: editMoveRequest.new_city || undefined,
+            zip: editMoveRequest.new_zip || undefined,
+            latitude: editMoveRequest.new_latitude || undefined,
+            longitude: editMoveRequest.new_longitude || undefined,
+          },
+          reason: reasonCategory || undefined,
+          notes: editMoveRequest.notes || undefined,
+        },
+      });
+    }, 100);
+
+    setEditInitialized(true);
+  }, [isEditMode, editMoveRequest, allBins, editInitialized]);
 
   // Auto-fetch nearby potential locations for relocation and redeployment moves
   useEffect(() => {
@@ -507,6 +552,31 @@ export function ScheduleMoveModalWithMap({
     dispatch({ type: 'SET_SUBMITTING', isSubmitting: true });
 
     try {
+      if (isEditMode && editMoveRequest) {
+        // Edit mode: update existing move request
+        console.log('🔄 [EDIT] Updating move request:', editMoveRequest.id);
+        const editBin = selectedBins[0];
+        const config = binConfigs[editBin?.id];
+        if (!config) throw new Error('Missing configuration');
+
+        await updateMoveRequest(editMoveRequest.id, {
+          scheduled_date: Math.floor(config.scheduledDate / 1000),
+          reason: config.reason || config.reasonCategory || '',
+          notes: config.notes || '',
+          new_street: config.newStreet,
+          new_city: config.newCity,
+          new_zip: config.newZip,
+          new_latitude: config.newLatitude,
+          new_longitude: config.newLongitude,
+        });
+
+        await queryClient.invalidateQueries({ queryKey: ['move-requests'] });
+        onSuccess?.();
+        handleClose();
+        dispatch({ type: 'SET_SUBMITTING', isSubmitting: false });
+        return;
+      }
+
       console.log('🚀 [BULK CREATE] Starting bulk move request creation...');
       console.log(`📦 [BULK CREATE] Creating ${selectedBins.length} move requests`);
 
@@ -519,22 +589,20 @@ export function ScheduleMoveModalWithMap({
 
         const payload: any = {
           bin_id: bin.id,
-          scheduled_date: Math.floor(config.scheduledDate / 1000), // Convert to Unix seconds
-          move_type: config.moveType, // 'store', 'relocation', or 'redeployment'
+          scheduled_date: Math.floor(config.scheduledDate / 1000),
+          move_type: config.moveType,
           reason: config.reason || '',
           notes: config.notes || '',
           reason_category: config.reasonCategory || undefined,
           create_no_go_zone: config.reasonCategory === 'relocation_request' ? (config.createNoGoZone ?? false) : undefined,
         };
 
-        // Add destination fields for relocation and redeployment
         if (config.moveType === 'relocation' || config.moveType === 'redeployment') {
           payload.new_street = config.newStreet;
           payload.new_city = config.newCity;
           payload.new_zip = config.newZip;
           payload.new_latitude = config.newLatitude;
           payload.new_longitude = config.newLongitude;
-          // Include source_potential_location_id if a potential location was selected
           if (config.sourcePotentialLocationId) {
             payload.source_potential_location_id = config.sourcePotentialLocationId;
           }
@@ -3065,13 +3133,19 @@ export function ScheduleMoveModalWithMap({
                 <div className="flex items-start justify-between">
                   <div className="flex-1 mr-2">
                     <h2 className="text-lg md:text-2xl font-bold text-gray-900">
-                      Schedule Bin Moves
+                      {isEditMode ? 'Edit Move Request' : 'Schedule Bin Moves'}
                     </h2>
-                    <p className="text-xs md:text-sm text-gray-600 mt-1">
-                      {wizardStep === 'selection' && 'Step 1 of 3: Select bins from map or search'}
-                      {wizardStep === 'configuration' && `Step 2 of 3: Configure ${selectedBins.length} move request${selectedBins.length !== 1 ? 's' : ''}`}
-                      {wizardStep === 'review' && `Step 3 of 3: Review & confirm ${selectedBins.length} move request${selectedBins.length !== 1 ? 's' : ''}`}
-                    </p>
+                    {isEditMode ? (
+                      <p className="text-xs md:text-sm text-gray-600 mt-1">
+                        Bin #{editMoveRequest?.bin_number} · {editMoveRequest?.current_street}, {editMoveRequest?.city}
+                      </p>
+                    ) : (
+                      <p className="text-xs md:text-sm text-gray-600 mt-1">
+                        {wizardStep === 'selection' && 'Step 1 of 3: Select bins from map or search'}
+                        {wizardStep === 'configuration' && `Step 2 of 3: Configure ${selectedBins.length} move request${selectedBins.length !== 1 ? 's' : ''}`}
+                        {wizardStep === 'review' && `Step 3 of 3: Review & confirm ${selectedBins.length} move request${selectedBins.length !== 1 ? 's' : ''}`}
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={handleClose}
