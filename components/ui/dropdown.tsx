@@ -183,7 +183,7 @@ export function MultiSelectDropdown({
       {(isOpen || isClosing) && (
         <div
           className={cn(
-            'absolute top-full left-0 mt-2 w-full min-w-[200px] bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden',
+            'absolute top-full left-0 mt-2 w-full min-w-[200px] bg-white border border-gray-200 rounded-lg shadow-lg z-50',
             isClosing ? 'animate-slide-out-up' : 'animate-slide-in-down'
           )}
         >
