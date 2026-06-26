@@ -118,8 +118,8 @@ export function ShiftTaskCard({ task, isCurrentTask = false }: TaskCardProps) {
 
         {/* Right side: fill % + photo */}
         <div className="flex-shrink-0 flex items-center gap-1.5">
-          {/* Fill % badge */}
-          {task.task_type === 'collection' && displayFill > 0 && (
+          {/* Fill % badge — hide on skipped tasks */}
+          {task.task_type === 'collection' && displayFill > 0 && !isSkipped && (
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
               displayFill >= 80 ? 'bg-red-100 text-red-700' :
               displayFill >= 50 ? 'bg-amber-100 text-amber-700' :
@@ -151,13 +151,20 @@ export function ShiftTaskCard({ task, isCurrentTask = false }: TaskCardProps) {
       {/* Fullscreen photo overlay */}
       {fullscreenPhoto && (
         <div
-          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center cursor-pointer animate-fade-in"
+          className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center animate-fade-in"
           onClick={() => setFullscreenPhoto(null)}
         >
+          <button
+            onClick={(e) => { e.stopPropagation(); setFullscreenPhoto(null); }}
+            className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+          >
+            <span className="text-white text-xl font-light">&#x2715;</span>
+          </button>
           <img
             src={fullscreenPhoto}
             alt="Collection photo"
             className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
           />
         </div>
       )}
