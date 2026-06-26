@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, ReactNode } from 'react';
+import { useState, useCallback, useEffect, ReactNode } from 'react';
 
 interface ModalWrapperProps {
   children: ReactNode;
@@ -55,8 +55,13 @@ export function ModalWrapper({ children, onClose, backdrop = 'bg-black/50' }: Mo
  * const { isClosing, handleClose } = useModalClose(onClose);
  * ```
  */
-export function useModalClose(onClose: () => void) {
+export function useModalClose(onClose: () => void, open?: boolean) {
   const [isClosing, setIsClosing] = useState(false);
+
+  // Reset isClosing when modal reopens (component may not unmount between close/open cycles)
+  useEffect(() => {
+    if (open) setIsClosing(false);
+  }, [open]);
 
   const handleClose = useCallback(() => {
     setIsClosing(true);

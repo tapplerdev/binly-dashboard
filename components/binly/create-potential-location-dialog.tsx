@@ -94,7 +94,7 @@ export function CreatePotentialLocationDialog({
   open,
   onOpenChange,
 }: CreatePotentialLocationDialogProps) {
-  const { isClosing, handleClose } = useModalClose(() => onOpenChange(false));
+  const { isClosing, handleClose } = useModalClose(() => onOpenChange(false), open);
   const { data: bins = [] } = useBins();
   const { data: warehouse } = useWarehouseLocation();
   const { data: activeZones = [] } = useNoGoZones('active');
