@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { PotentialLocationsList } from '@/components/binly/potential-locations-list';
 import { CreatePotentialLocationDialog } from '@/components/binly/create-potential-location-dialog';
-import { PlacementPlanner } from '@/components/binly/placement-planner';
+// import { PlacementPlanner } from '@/components/binly/placement-planner';
 import { MoveRequestsList } from '@/components/binly/move-requests-list';
 
 // Import the full bins page component
@@ -12,7 +12,7 @@ import BinsPage from '../bins/page';
 export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState<'bins' | 'potential' | 'moves'>('bins');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showPlanner, setShowPlanner] = useState(false);
+  // const [showPlanner, setShowPlanner] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
@@ -71,7 +71,7 @@ export default function InventoryPage() {
           <div className="max-w-[1600px] mx-auto">
             <PotentialLocationsList
               onCreateNew={() => setShowCreateDialog(true)}
-              onOpenPlanner={() => setShowPlanner(true)}
+              // onOpenPlanner={() => setShowPlanner(true)}
             />
           </div>
         </div>
@@ -91,8 +91,8 @@ export default function InventoryPage() {
         onOpenChange={setShowCreateDialog}
       />
 
-      {/* Placement Planner */}
-      {showPlanner && <PlacementPlanner onClose={() => setShowPlanner(false)} />}
+      {/* Placement Planner — commented out, revisit at 200+ bins scale */}
+      {/* {showPlanner && <PlacementPlanner onClose={() => setShowPlanner(false)} />} */}
     </div>
   );
 }
