@@ -494,6 +494,16 @@ export function ScheduleMoveModalWithMap({
       return;
     }
 
+    // Validate: reason is required for all bins
+    const missingReason = selectedBins.find(bin => {
+      const config = binConfigs[bin.id];
+      return !config?.reasonCategory;
+    });
+    if (missingReason) {
+      alert(`Please select a reason for Bin #${missingReason.bin_number}`);
+      return;
+    }
+
     dispatch({ type: 'SET_SUBMITTING', isSubmitting: true });
 
     try {
@@ -2333,7 +2343,7 @@ export function ScheduleMoveModalWithMap({
                   <>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Reason for Move <span className="text-gray-400 font-normal">(optional)</span>
+                        Reason for Move <span className="text-red-400 font-normal">*</span>
                       </label>
                       <Dropdown
                         label=""

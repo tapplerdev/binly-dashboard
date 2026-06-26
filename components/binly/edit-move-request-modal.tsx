@@ -16,6 +16,7 @@ import { useModalClose } from './modal-wrapper';
 import { ActiveShiftWarningDialog } from './active-shift-warning-dialog';
 import { MapMarkerPin } from '@/components/ui/map-marker-pin';
 import { BinMarkersLayer, ZoneMarkersLayer, WarehouseMarkerLayer } from '@/components/binly/map-layers';
+import { MoveReasonSelect } from '@/components/binly/move-reason-select';
 import { useNearbyIncidents } from '@/lib/hooks/use-zones';
 import { formatIncidentType } from '@/lib/types/zone';
 
@@ -691,18 +692,16 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
                   </div>
                 )}
 
-                {/* ── Reason ── */}
+                {/* ── Reason (required) ── */}
                 <div>
                   <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-2">
                     <FileText className="w-4 h-4 text-gray-400" />
-                    Reason <span className="font-normal text-gray-400">(optional)</span>
+                    Reason <span className="font-normal text-red-400">*</span>
                   </label>
-                  <input
-                    type="text"
+                  <MoveReasonSelect
                     value={formData.reason}
-                    onChange={e => setFormData(prev => ({ ...prev, reason: e.target.value }))}
-                    placeholder="e.g. Client requested earlier pickup"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    onChange={(reason) => setFormData(prev => ({ ...prev, reason }))}
+                    error={!!error && !formData.reason}
                   />
                 </div>
 
