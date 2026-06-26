@@ -3,13 +3,10 @@
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Map as MapIcon, Loader2 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { Map, AdvancedMarker } from '@vis.gl/react-google-maps';
-import { useBins } from '@/lib/hooks/use-bins';
-import { useNoGoZones } from '@/lib/hooks/use-zones';
-import { isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
-import { NoGoZonePin } from '@/components/ui/no-go-zone-pin';
+import { Map } from '@vis.gl/react-google-maps';
+import { BinMarkersLayer, ZoneMarkersLayer, WarehouseMarkerLayer } from '@/components/binly/map-layers';
 
 // Default map center (San Jose, CA area)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -23,14 +20,9 @@ export function TacticalMap({ className }: TacticalMapProps) {
   const [fillLevelsEnabled, setFillLevelsEnabled] = useState(true);
   const [noGoZonesEnabled, setNoGoZonesEnabled] = useState(false);
 
-  // Use React Query for data fetching and caching
-  const { data: bins = [], isLoading: loadingBins } = useBins();
-  const { data: zones = [], isLoading: loadingZones } = useNoGoZones('active');
-
-  const loading = loadingBins || loadingZones;
+  const loading = false; // layers handle their own loading
 
   // Memoize filtered bins to prevent unnecessary recalculations
-  const mappableBins = useMemo(() => bins.filter(isMappableBin), [bins]);
 
   return (
     <Card className={cn('overflow-hidden h-full', className)}>
@@ -63,47 +55,10 @@ export function TacticalMap({ className }: TacticalMapProps) {
             }}
             style={{ width: '100%', height: '100%' }}
           >
-            {/* Render no-go zone markers */}
-            {noGoZonesEnabled &&
-              zones.map((zone) => (
-                <AdvancedMarker
-                  key={zone.id}
-                  position={{
-                    lat: zone.center_latitude,
-                    lng: zone.center_longitude,
-                  }}
-                  zIndex={1}
-                >
-                  <div
-                    className="cursor-pointer transition-all duration-300 hover:scale-110 animate-scale-in"
-                    title={zone.name}
-                  >
-                    <NoGoZonePin size={36} />
-                  </div>
-                </AdvancedMarker>
-              ))}
-
-            {/* Render bin markers */}
-            {fillLevelsEnabled &&
-              mappableBins.map((bin) => (
-                <AdvancedMarker
-                  key={bin.id}
-                  position={{ lat: bin.latitude, lng: bin.longitude }}
-                  zIndex={10}
-                >
-                  <div
-                    className="w-8 h-8 rounded-full border-2 border-white shadow-lg cursor-pointer transition-all duration-300 animate-scale-in"
-                    style={{
-                      backgroundColor: getBinMarkerColor(bin.fill_percentage),
-                    }}
-                    title={`Bin #${bin.bin_number} - ${bin.fill_percentage ?? 0}%`}
-                  >
-                    <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
-                      {bin.bin_number}
-                    </div>
-                  </div>
-                </AdvancedMarker>
-              ))}
+            {/* Shared layers — same rendering as live map */}
+            {noGoZonesEnabled && <ZoneMarkersLayer />}
+            {fillLevelsEnabled && <BinMarkersLayer />}
+            <WarehouseMarkerLayer />
           </Map>
         )}
 

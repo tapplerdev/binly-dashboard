@@ -14,6 +14,7 @@ import { X, MapPin, Calendar, Loader2, Building2, FileText, AlertCircle, User, U
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { ActiveShiftWarningDialog } from './active-shift-warning-dialog';
 import { MapMarkerPin } from '@/components/ui/map-marker-pin';
+import { BinMarkersLayer, ZoneMarkersLayer, WarehouseMarkerLayer } from '@/components/binly/map-layers';
 import { useNearbyIncidents } from '@/lib/hooks/use-zones';
 import { formatIncidentType } from '@/lib/types/zone';
 
@@ -509,6 +510,11 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
                       </div>
                     </AdvancedMarker>
                   )}
+
+                  {/* Shared context layers — same rendering as live map */}
+                  <BinMarkersLayer size="sm" showLabels={false} zIndex={1} />
+                  <ZoneMarkersLayer />
+                  <WarehouseMarkerLayer />
                 </GoogleMap>
               </APIProvider>
 

@@ -5,6 +5,7 @@ import { X, MapPin } from 'lucide-react';
 import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { BinWithPriority, getBinMarkerColor } from '@/lib/types/bin';
 import { NearbyPotentialLocation } from '@/lib/api/potential-locations';
+import { BinMarkersLayer, ZoneMarkersLayer, WarehouseMarkerLayer } from '@/components/binly/map-layers';
 import { cn } from '@/lib/utils';
 
 interface PotentialLocationPickerModalProps {
@@ -180,6 +181,11 @@ export function PotentialLocationPickerModal({
                   </AdvancedMarker>
                 );
               })}
+
+              {/* Shared context layers */}
+              <BinMarkersLayer size="sm" showLabels={false} zIndex={1} />
+              <ZoneMarkersLayer />
+              <WarehouseMarkerLayer />
             </Map>
           </APIProvider>
 
