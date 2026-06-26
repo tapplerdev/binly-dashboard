@@ -193,7 +193,6 @@ export function MultiSelectDropdown({
               className={cn(
                 'flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors',
                 index === 0 && 'rounded-t-lg',
-                index === options.length - 1 && 'rounded-b-lg'
               )}
             >
               <input
@@ -205,6 +204,20 @@ export function MultiSelectDropdown({
               <span className="text-sm text-gray-700">{option.label}</span>
             </label>
           ))}
+
+          {/* Reset button — only show when filters are active */}
+          {selectedValues.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                onChange([]);
+                handleCloseDropdown();
+              }}
+              className="w-full px-4 py-2.5 text-sm text-primary font-medium border-t border-gray-100 hover:bg-blue-50 transition-colors rounded-b-lg"
+            >
+              Reset Filters
+            </button>
+          )}
         </div>
       )}
     </div>
