@@ -562,7 +562,12 @@ export function CreatePotentialLocationDialog({
           notes: `AI recommended (Score: ${rec.score}) — ${rec.reasoning}`,
         }));
 
-        setLocationQueue((prev) => [...prev, ...newLocations]);
+        setLocationQueue((prev) => {
+          // Dedup: skip new locations that match an existing queued location by coordinates
+          const existing = new Set(prev.map(l => `${l.latitude.toFixed(4)},${l.longitude.toFixed(4)}`));
+          const unique = newLocations.filter(l => !existing.has(`${l.latitude.toFixed(4)},${l.longitude.toFixed(4)}`));
+          return [...prev, ...unique];
+        });
         setShowAiSuggest(false);
         setAiCity('');
       } else {
