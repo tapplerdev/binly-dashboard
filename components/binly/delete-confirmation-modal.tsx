@@ -1,6 +1,7 @@
 'use client';
 
 import { AlertCircle, X } from 'lucide-react';
+import { useModalClose } from '@/components/binly/modal-wrapper';
 
 interface DeleteConfirmationModalProps {
   isOpen: boolean;
@@ -23,20 +24,21 @@ export function DeleteConfirmationModal({
   cancelText = 'Cancel',
   isDeleting = false,
 }: DeleteConfirmationModalProps) {
+  const { isClosing, handleClose } = useModalClose(onClose, isOpen);
   if (!isOpen) return null;
 
   return (
     <>
       {/* Overlay */}
       <div
-        className="fixed inset-0 bg-black/50 z-50 animate-in fade-in duration-200"
-        onClick={onClose}
+        className={`fixed inset-0 bg-black/50 z-50 animate-in fade-in duration-200 ${isClosing ? "animate-fade-out" : "animate-fade-in"}`}
+        onClick={handleClose}
       />
 
       {/* Modal */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none ${isClosing ? 'animate-scale-out animate-fade-out' : 'animate-scale-in animate-fade-in'}`}>
         <div
-          className="bg-white rounded-2xl shadow-2xl max-w-md w-full pointer-events-auto animate-in zoom-in-95 fade-in duration-200"
+          className="bg-white rounded-2xl shadow-2xl max-w-md w-full pointer-events-auto"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -51,7 +53,7 @@ export function DeleteConfirmationModal({
               </div>
             </div>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               disabled={isDeleting}
               className="p-1 hover:bg-gray-100 rounded-lg transition-fast disabled:opacity-50"
             >
@@ -62,7 +64,7 @@ export function DeleteConfirmationModal({
           {/* Actions */}
           <div className="flex items-center gap-3 p-6">
             <button
-              onClick={onClose}
+              onClick={handleClose}
               disabled={isDeleting}
               className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-fast disabled:opacity-50 disabled:cursor-not-allowed"
             >

@@ -7,6 +7,7 @@ import { BinWithPriority, getBinMarkerColor } from '@/lib/types/bin';
 import { NearbyPotentialLocation } from '@/lib/api/potential-locations';
 import { BinMarkersLayer, ZoneMarkersLayer, WarehouseMarkerLayer } from '@/components/binly/map-layers';
 import { cn } from '@/lib/utils';
+import { useModalClose } from '@/components/binly/modal-wrapper';
 
 interface PotentialLocationPickerModalProps {
   bin: BinWithPriority;
@@ -25,6 +26,7 @@ export function PotentialLocationPickerModal({
   onSelect,
   onClose,
 }: PotentialLocationPickerModalProps) {
+  const { isClosing, handleClose } = useModalClose(onClose);
   const [hoveredLocationId, setHoveredLocationId] = useState<string | null>(null);
 
   const binLat = bin.current_latitude ?? bin.latitude;
@@ -35,8 +37,8 @@ export function PotentialLocationPickerModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full h-[80vh] flex flex-col">
+    <div className={`fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4 ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`}>
+      <div className={`bg-white rounded-2xl shadow-2xl max-w-6xl w-full h-[80vh] flex flex-col ${isClosing ? 'animate-scale-out animate-fade-out' : 'animate-scale-in animate-fade-in'}`}>
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -58,7 +60,7 @@ export function PotentialLocationPickerModal({
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <X className="w-6 h-6 text-gray-400" />

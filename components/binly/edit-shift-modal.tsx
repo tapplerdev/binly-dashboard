@@ -10,6 +10,7 @@ import { PlacementLocationSelectionMap } from './placement-location-selection-ma
 import { useBins } from '@/lib/hooks/use-bins';
 import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
 import { MoveRequest, getMoveRequests } from '@/lib/api/move-requests';
+import { useModalClose } from '@/components/binly/modal-wrapper';
 
 interface EditShiftModalProps {
   shift: {
@@ -130,6 +131,7 @@ function TaskRow({ task, isSelected, isSelectable, isInProgress, isDone, isSkipp
 }
 
 export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditShiftModalProps) {
+  const { isClosing, handleClose } = useModalClose(onClose);
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -470,7 +472,7 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+      <div className={`fixed inset-0 bg-black/50 z-50 flex items-center justify-center ${isClosing ? "animate-fade-out" : "animate-fade-in"}`}>
         <div className="bg-white rounded-2xl w-full max-w-4xl h-[85vh] mx-4 flex flex-col animate-scale-in">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
@@ -887,7 +889,7 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
                         Review & Submit
                       </button>
                     )}
-                    <button onClick={onClose} className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                    <button onClick={handleClose} className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
                       {hasChanges ? 'Discard' : 'Close'}
                     </button>
                   </div>

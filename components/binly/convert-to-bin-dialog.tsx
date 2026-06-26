@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { inputStyles } from '@/lib/utils';
 import { checkPotentialLocationDependencies, ActiveShiftDependency } from '@/lib/api/potential-locations';
 import { ActiveShiftWarningDialog } from './active-shift-warning-dialog';
+import { useModalClose } from '@/components/binly/modal-wrapper';
 
 interface PotentialLocation {
   id: string;
@@ -28,6 +29,7 @@ export function ConvertToBinDialog({
   location,
   onSuccess,
 }: ConvertToBinDialogProps) {
+  const { isClosing, handleClose } = useModalClose(() => onOpenChange(false), open);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [binNumber, setBinNumber] = useState('');
@@ -139,7 +141,7 @@ export function ConvertToBinDialog({
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/30 z-[60] animate-fade-in flex items-center justify-center p-4"
-        onClick={() => onOpenChange(false)}
+        onClick={handleClose}
       >
         {/* Dialog */}
         <div
@@ -159,7 +161,7 @@ export function ConvertToBinDialog({
               </div>
             </div>
             <button
-              onClick={() => onOpenChange(false)}
+              onClick={handleClose}
               className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors"
             >
               <X className="w-5 h-5 text-gray-600" />
@@ -288,7 +290,7 @@ export function ConvertToBinDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={handleClose}
               className="flex-1"
               disabled={loading}
             >

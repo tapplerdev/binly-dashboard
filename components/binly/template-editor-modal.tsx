@@ -6,6 +6,7 @@ import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { X, Search, Lasso, AlertCircle, Save } from 'lucide-react';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { LassoSelect } from './lasso-select';
+import { useModalClose } from '@/components/binly/modal-wrapper';
 
 // Default map center (San Jose, CA)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -40,6 +41,7 @@ export function TemplateEditorModal({
   allBins,
   isEditing = false
 }: TemplateEditorModalProps) {
+  const { isClosing, handleClose } = useModalClose(onClose);
   const { data: warehouse } = useWarehouseLocation();
   const WAREHOUSE_LOCATION = { lat: warehouse?.latitude || 0, lng: warehouse?.longitude || 0 };
 
@@ -153,10 +155,10 @@ export function TemplateEditorModal({
   return (
     <>
       {/* Overlay */}
-      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
+      <div className={`fixed inset-0 bg-black/50 z-50 ${isClosing ? "animate-fade-out" : "animate-fade-in"}`} onClick={handleClose} />
 
       {/* Full-screen Modal */}
-      <div className="fixed inset-4 bg-white rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden">
+      <div className={`fixed inset-4 bg-white rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden ${isClosing ? 'animate-scale-out animate-fade-out' : 'animate-scale-in animate-fade-in'}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
           <div>
@@ -168,7 +170,7 @@ export function TemplateEditorModal({
             </p>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 hover:bg-gray-200 rounded-lg transition-fast"
           >
             <X className="w-5 h-5 text-gray-600" />
@@ -433,7 +435,7 @@ export function TemplateEditorModal({
         {/* Footer Actions */}
         <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             disabled={saving}
             className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-fast disabled:opacity-50"
           >

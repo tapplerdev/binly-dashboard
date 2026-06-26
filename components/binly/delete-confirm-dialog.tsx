@@ -5,6 +5,7 @@ import { Trash2, X, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { checkPotentialLocationDependencies, ActiveShiftDependency } from '@/lib/api/potential-locations';
 import { ActiveShiftWarningDialog } from './active-shift-warning-dialog';
+import { useModalClose } from '@/components/binly/modal-wrapper';
 
 interface PotentialLocation {
   id: string;
@@ -27,6 +28,7 @@ export function DeleteConfirmDialog({
   location,
   onSuccess,
 }: DeleteConfirmDialogProps) {
+  const { isClosing, handleClose } = useModalClose(() => onOpenChange(false), open);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [checkingDependencies, setCheckingDependencies] = useState(false);
@@ -114,7 +116,7 @@ export function DeleteConfirmDialog({
       {/* Backdrop + centering flex container */}
       <div
         className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center animate-fade-in"
-        onClick={() => onOpenChange(false)}
+        onClick={handleClose}
       >
       {/* Dialog — click inside must not close */}
       <div
@@ -134,7 +136,7 @@ export function DeleteConfirmDialog({
               </div>
             </div>
             <button
-              onClick={() => onOpenChange(false)}
+              onClick={handleClose}
               className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors"
             >
               <X className="w-5 h-5 text-gray-600" />
@@ -217,7 +219,7 @@ export function DeleteConfirmDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={handleClose}
               className="flex-1"
               disabled={loading}
             >

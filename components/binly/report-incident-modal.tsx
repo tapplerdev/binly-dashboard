@@ -13,6 +13,7 @@ import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
 import { HerePlaceDetails, hereReverseGeocode } from '@/lib/services/geocoding.service';
 import { MapMarkerPin } from '@/components/ui/map-marker-pin';
+import { useModalClose } from '@/components/binly/modal-wrapper';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,7 @@ interface ReportIncidentModalProps {
 }
 
 export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
+  const { isClosing, handleClose } = useModalClose(onClose);
   const mutation = useCreateManagerIncidentReport();
   const { data: bins = [], isLoading: binsLoading } = useBins();
   const mappableBins = bins.filter(isMappableBin);
@@ -200,11 +202,11 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 flex bg-black/50 backdrop-blur-[1px]">
-      <div className="absolute inset-0" onClick={onClose} />
+    <div className={`fixed inset-0 z-50 flex bg-black/50 backdrop-blur-[1px] ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`}>
+      <div className="absolute inset-0" onClick={handleClose} />
 
       {/* Modal — match edit-bin-dialog sizing */}
-      <div className="relative z-10 m-auto w-full max-w-[1400px] h-[90vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+      <div className={`relative z-10 m-auto w-full max-w-[1400px] h-[90vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden ${isClosing ? 'animate-scale-out animate-fade-out' : 'animate-scale-in animate-fade-in'}`}>
 
         {/* ── Header ──────────────────────────────────────────────────── */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200 shrink-0">
@@ -218,7 +220,7 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
             </p>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors"
           >
             <X className="w-4 h-4 text-gray-500" />
@@ -546,7 +548,7 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
               {/* ── Footer ──────────────────────────────────────────────── */}
               <div className="px-5 py-4 border-t border-gray-100 bg-gray-50 shrink-0 flex gap-3">
                 <button
-                  onClick={onClose}
+                  onClick={handleClose}
                   className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Cancel

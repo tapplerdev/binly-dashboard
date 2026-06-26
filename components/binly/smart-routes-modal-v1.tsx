@@ -5,6 +5,7 @@ import { X, Sparkles, Loader2, MapPin, Clock, Route, ChevronRight, Check, Trash2
 import { generateSmartRoutes, RecommendedRoute, SmartRoutesResponse } from '@/lib/api/smart-routes';
 import { createRoute } from '@/lib/api/routes';
 import { useQueryClient } from '@tanstack/react-query';
+import { useModalClose } from '@/components/binly/modal-wrapper';
 
 interface SmartRoutesModalProps {
   onClose: () => void;
@@ -17,6 +18,7 @@ const tierConfig = {
 };
 
 export function SmartRoutesModal({ onClose }: SmartRoutesModalProps) {
+  const { isClosing, handleClose } = useModalClose(onClose);
   const [step, setStep] = useState<'configure' | 'review' | 'saving'>('configure');
   const [maxBins, setMaxBins] = useState(30);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -92,7 +94,7 @@ export function SmartRoutesModal({ onClose }: SmartRoutesModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+    <div className={`fixed inset-0 bg-black/50 z-50 flex items-center justify-center ${isClosing ? "animate-fade-out" : "animate-fade-in"}`}>
       <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] mx-4 overflow-hidden flex flex-col animate-scale-in">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
@@ -102,7 +104,7 @@ export function SmartRoutesModal({ onClose }: SmartRoutesModalProps) {
               {step === 'configure' ? 'Auto-Generate Routes' : step === 'saving' ? 'Saving Routes...' : 'Review Recommendations'}
             </h2>
           </div>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded"><X className="w-5 h-5" /></button>
+          <button onClick={handleClose} className="p-1 text-gray-400 hover:text-gray-600 rounded"><X className="w-5 h-5" /></button>
         </div>
 
         {/* Content */}
@@ -247,7 +249,7 @@ export function SmartRoutesModal({ onClose }: SmartRoutesModalProps) {
           <div className="flex items-center justify-between">
             {step === 'configure' ? (
               <>
-                <button onClick={onClose} className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                <button onClick={handleClose} className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
                   Cancel
                 </button>
                 <button onClick={handleAnalyze} disabled={isAnalyzing}

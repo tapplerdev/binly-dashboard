@@ -12,6 +12,7 @@ import { updateRoute, createRoute, deleteRoute } from '@/lib/api/routes';
 import { smartReoptimize, ReoptRoute, ReoptBin, LowPerformerBin } from '@/lib/api/route-performance';
 import { createMoveRequest } from '@/lib/api/move-requests';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
+import { useModalClose } from '@/components/binly/modal-wrapper';
 
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const ROUTE_COLORS = ['#4880FF', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#14B8A6', '#F97316', '#EC4899'];
@@ -26,6 +27,7 @@ interface AIRouteOptimizerModalProps {
 }
 
 export function AIRouteOptimizerModal({ templates, bins, onClose, onApply }: AIRouteOptimizerModalProps) {
+  const { isClosing, handleClose } = useModalClose(onClose);
   const { data: warehouse } = useWarehouseLocation();
   const [phase, setPhase] = useState<'config' | 'results'>('config');
   const [tab, setTab] = useState<'preview' | 'schedule'>('preview');
@@ -133,8 +135,8 @@ export function AIRouteOptimizerModal({ templates, bins, onClose, onApply }: AIR
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      <div className={`fixed inset-0 bg-black/50 z-50 ${isClosing ? "animate-fade-out" : "animate-fade-in"}`} onClick={handleClose} />
+      <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none ${isClosing ? 'animate-scale-out animate-fade-out' : 'animate-scale-in animate-fade-in'}`}>
         <div className="bg-white rounded-2xl shadow-2xl w-full h-[90vh] max-w-7xl flex flex-col overflow-hidden pointer-events-auto">
 
           {/* Header */}
@@ -149,7 +151,7 @@ export function AIRouteOptimizerModal({ templates, bins, onClose, onApply }: AIR
                   : `${resultRoutes.length} optimized routes${deleteRouteIds.length > 0 ? ` · ${deleteRouteIds.length} templates removed` : ''}${lowPerformers.length > 0 ? ` · ${lowPerformers.length} low performers flagged` : ''}`}
               </p>
             </div>
-            <button onClick={onClose} className="w-9 h-9 rounded-lg hover:bg-gray-100 flex items-center justify-center">
+            <button onClick={handleClose} className="w-9 h-9 rounded-lg hover:bg-gray-100 flex items-center justify-center">
               <X className="w-5 h-5 text-gray-600" />
             </button>
           </div>
@@ -406,7 +408,7 @@ export function AIRouteOptimizerModal({ templates, bins, onClose, onApply }: AIR
                   ← Reconfigure
                 </button>
                 <div className="flex gap-3">
-                  <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100">Cancel</button>
+                  <button onClick={handleClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100">Cancel</button>
                   <button onClick={handleApply} disabled={applying || resultRoutes.length === 0}
                     className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2">
                     {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
