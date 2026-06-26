@@ -417,3 +417,28 @@ export async function checkMoveRequestDependencies(
     throw error;
   }
 }
+
+/**
+ * Get pending move requests for a specific driver (for shift creation awareness)
+ */
+export interface DriverPendingMove {
+  id: string;
+  bin_id: string;
+  bin_number: number;
+  status: string;
+  move_type: string;
+  scheduled_date: number;
+  reason: string | null;
+  current_street: string;
+  city: string;
+  urgency: 'critical' | 'overdue' | 'due_today' | 'scheduled';
+}
+
+export async function getDriverPendingMoves(driverId: string): Promise<DriverPendingMove[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/manager/drivers/${driverId}/pending-moves`,
+    { headers: getAuthHeaders() }
+  );
+  if (!response.ok) return [];
+  return response.json();
+}

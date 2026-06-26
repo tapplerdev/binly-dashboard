@@ -15,7 +15,7 @@ import { getBins } from '@/lib/api/bins';
 import { getShifts, getShiftTasks, checkShiftDriverProximity, ShiftDriverProximity } from '@/lib/api/shifts';
 import { PotentialLocation } from '@/lib/api/potential-locations';
 import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
-import { MoveRequest, getMoveRequests } from '@/lib/api/move-requests';
+import { MoveRequest, getMoveRequests, getDriverPendingMoves, DriverPendingMove } from '@/lib/api/move-requests';
 import { useShifts, useAssignRoute, shiftKeys } from '@/lib/hooks/use-shifts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRoutes } from '@/lib/hooks/use-routes';
@@ -1436,6 +1436,18 @@ export function CreateShiftDrawer({
   const [editingTask, setEditingTask] = useState<ShiftTask | null>(null);
   const [showPlacementSelection, setShowPlacementSelection] = useState(false);
   const { data: potentialLocations = [] } = usePotentialLocations('active');
+
+  // Fetch pending moves for selected driver (shift creation awareness)
+  const { data: driverPendingMoves = [] } = useQuery<DriverPendingMove[]>({
+    queryKey: ['driver-pending-moves', driverId],
+    queryFn: () => getDriverPendingMoves(driverId),
+    enabled: !!driverId,
+  });
+  const [dismissedMoveIds, setDismissedMoveIds] = useState<Set<string>>(new Set());
+  const visiblePendingMoves = driverPendingMoves.filter(m => !dismissedMoveIds.has(m.id));
+  const criticalMoves = visiblePendingMoves.filter(m => m.urgency === 'critical');
+  const overdueMoves = visiblePendingMoves.filter(m => m.urgency === 'overdue');
+  const dueTodayMoves = visiblePendingMoves.filter(m => m.urgency === 'due_today');
   const [showMoveRequestSelection, setShowMoveRequestSelection] = useState(false);
   const [warehouseDeployments, setWarehouseDeployments] = useState<WarehouseDeploymentItem[]>([]);
   const [showWarehouseDeployment, setShowWarehouseDeployment] = useState(false);
@@ -3124,6 +3136,110 @@ export function CreateShiftDrawer({
                 )}
               </div>
             </div>
+
+            {/* Move Request Awareness Banner */}
+            {driverId && visiblePendingMoves.length > 0 && (
+              <div className="space-y-2">
+                {/* Critical — overdue >7 days */}
+                {criticalMoves.length > 0 && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm font-semibold text-red-800 mb-1.5">
+                      {criticalMoves.length} critically overdue move{criticalMoves.length > 1 ? 's' : ''}
+                    </p>
+                    {criticalMoves.map(m => (
+                      <div key={m.id} className="flex items-center justify-between text-xs text-red-700 py-1">
+                        <span>Bin #{m.bin_number} — {m.current_street}, {m.city}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTasks(prev => [...prev,
+                              { type: 'pickup', binId: m.bin_id, binNumber: m.bin_number, address: `${m.current_street}, ${m.city}`, moveRequestId: m.id },
+                              { type: 'dropoff', binId: m.bin_id, binNumber: m.bin_number, address: '', moveRequestId: m.id },
+                            ]);
+                            setDismissedMoveIds(prev => new Set([...prev, m.id]));
+                          }}
+                          className="px-2 py-0.5 bg-red-600 text-white rounded text-[10px] font-medium hover:bg-red-700"
+                        >
+                          Add to shift
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Overdue */}
+                {overdueMoves.length > 0 && (
+                  <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                    <p className="text-sm font-semibold text-orange-800 mb-1.5">
+                      {overdueMoves.length} overdue move{overdueMoves.length > 1 ? 's' : ''}
+                    </p>
+                    {overdueMoves.map(m => (
+                      <div key={m.id} className="flex items-center justify-between text-xs text-orange-700 py-1">
+                        <span>Bin #{m.bin_number} — {m.current_street}, {m.city}</span>
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTasks(prev => [...prev,
+                                { type: 'pickup', binId: m.bin_id, binNumber: m.bin_number, address: `${m.current_street}, ${m.city}`, moveRequestId: m.id },
+                                { type: 'dropoff', binId: m.bin_id, binNumber: m.bin_number, address: '', moveRequestId: m.id },
+                              ]);
+                              setDismissedMoveIds(prev => new Set([...prev, m.id]));
+                            }}
+                            className="px-2 py-0.5 bg-orange-600 text-white rounded text-[10px] font-medium hover:bg-orange-700"
+                          >
+                            Add
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDismissedMoveIds(prev => new Set([...prev, m.id]))}
+                            className="px-2 py-0.5 bg-white text-orange-600 border border-orange-300 rounded text-[10px] font-medium hover:bg-orange-50"
+                          >
+                            Later
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Due today */}
+                {dueTodayMoves.length > 0 && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm font-semibold text-blue-800 mb-1.5">
+                      {dueTodayMoves.length} move{dueTodayMoves.length > 1 ? 's' : ''} due today
+                    </p>
+                    {dueTodayMoves.map(m => (
+                      <div key={m.id} className="flex items-center justify-between text-xs text-blue-700 py-1">
+                        <span>Bin #{m.bin_number} — {m.current_street}, {m.city}</span>
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTasks(prev => [...prev,
+                                { type: 'pickup', binId: m.bin_id, binNumber: m.bin_number, address: `${m.current_street}, ${m.city}`, moveRequestId: m.id },
+                                { type: 'dropoff', binId: m.bin_id, binNumber: m.bin_number, address: '', moveRequestId: m.id },
+                              ]);
+                              setDismissedMoveIds(prev => new Set([...prev, m.id]));
+                            }}
+                            className="px-2 py-0.5 bg-blue-600 text-white rounded text-[10px] font-medium hover:bg-blue-700"
+                          >
+                            Add
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDismissedMoveIds(prev => new Set([...prev, m.id]))}
+                            className="px-2 py-0.5 bg-white text-blue-600 border border-blue-300 rounded text-[10px] font-medium hover:bg-blue-50"
+                          >
+                            Skip
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Truck Capacity — only required when operational tasks exist */}
             {(tasks.length === 0 || tasks.some(t => ['collection', 'placement', 'pickup', 'dropoff', 'warehouse_stop'].includes(t.type))) && (
