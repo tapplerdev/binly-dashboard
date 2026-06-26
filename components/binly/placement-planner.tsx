@@ -10,8 +10,6 @@ import { sendChatMessage, LocationRecommendation } from '@/lib/api/chat';
 import { useBins } from '@/lib/hooks/use-bins';
 import { cn } from '@/lib/utils';
 
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-const MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID || '';
 const DEFAULT_CENTER = { lat: 37.5, lng: -122.05 };
 const DEFAULT_ZOOM = 10;
 
@@ -360,14 +358,18 @@ export function PlacementPlanner({ onClose }: { onClose: () => void }) {
 
       {/* Map */}
       <div className="flex-1">
-        <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
+        <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
           <GoogleMap
+            mapId="placement-planner-map"
             defaultCenter={DEFAULT_CENTER}
             defaultZoom={DEFAULT_ZOOM}
-            mapId={MAP_ID}
             gestureHandling="greedy"
             disableDefaultUI={false}
-            className="w-full h-full"
+            zoomControl={true}
+            mapTypeControl={false}
+            streetViewControl={false}
+            fullscreenControl={false}
+            style={{ width: '100%', height: '100%' }}
           >
             {/* City polygon overlays */}
             <CityPolygonLayer
