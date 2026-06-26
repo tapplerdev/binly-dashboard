@@ -3045,7 +3045,7 @@ export function ScheduleMoveModalWithMap({
           <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none p-0 md:p-4">
             <Card
               className={cn(
-                'w-full h-full md:w-[95vw] md:max-w-[1400px] md:h-[90vh] md:rounded-2xl rounded-none pointer-events-auto overflow-hidden flex flex-col',
+                'w-full h-full md:w-[99vw] md:max-w-[1800px] md:h-[96vh] md:rounded-2xl rounded-none pointer-events-auto overflow-hidden flex flex-col',
                 isClosing ? 'animate-scale-out' : 'animate-scale-in'
               )}
               onClick={(e) => e.stopPropagation()}
