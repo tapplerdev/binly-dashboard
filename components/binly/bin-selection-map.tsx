@@ -46,7 +46,7 @@ export function BinSelectionMap({ onClose, onConfirm, initialSelectedBins = [], 
       try {
         setLoading(true);
         const data = await getBins();
-        setBins(data);
+        setBins(data.filter(b => b.status === 'active' || b.status === 'pending_move'));
       } catch (error) {
         console.error('Failed to load bins:', error);
       } finally {

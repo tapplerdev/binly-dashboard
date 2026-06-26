@@ -5,19 +5,19 @@ import { useState, useCallback, useEffect, ReactNode } from 'react';
 interface ModalWrapperProps {
   children: ReactNode;
   onClose: () => void;
-  /** Backdrop opacity. Default: "bg-black/50" */
   backdrop?: string;
 }
 
 /**
  * Shared modal wrapper with consistent open/close animations.
- * Handles: fade-in/scale-in on mount, fade-out/scale-out on close with 300ms delay.
  *
  * Usage:
  * ```tsx
  * <ModalWrapper onClose={onClose}>
- *   <div className="fixed inset-0 z-50 p-6 ...">
- *     {/* modal content *\/}
+ *   <div className="modal-container">
+ *     <div className="modal-content modal-full">
+ *       {/* modal content */}
+ *     </div>
  *   </div>
  * </ModalWrapper>
  * ```
@@ -32,12 +32,10 @@ export function ModalWrapper({ children, onClose, backdrop = 'bg-black/50' }: Mo
 
   return (
     <>
-      {/* Backdrop */}
       <div
         className={`fixed inset-0 ${backdrop} z-50 ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
         onClick={handleClose}
       />
-      {/* Modal content — clone children with isClosing and handleClose */}
       <div className={`${isClosing ? 'animate-scale-out animate-fade-out' : 'animate-scale-in animate-fade-in'}`}>
         {typeof children === 'function'
           ? (children as any)({ isClosing, handleClose })
@@ -48,11 +46,19 @@ export function ModalWrapper({ children, onClose, backdrop = 'bg-black/50' }: Mo
 }
 
 /**
- * Hook for modal close animation. Use this in modals that manage their own backdrop.
+ * Hook for modal close animation. Returns isClosing state, handleClose function,
+ * and pre-built className strings for backdrop and container.
  *
  * Usage:
  * ```tsx
- * const { isClosing, handleClose } = useModalClose(onClose);
+ * const { isClosing, handleClose, backdropClass, containerClass } = useModalClose(onClose);
+ *
+ * <div className={backdropClass} onClick={handleClose} />
+ * <div className={containerClass}>
+ *   <div className="modal-content modal-full">
+ *     ...
+ *   </div>
+ * </div>
  * ```
  */
 export function useModalClose(onClose: () => void, open?: boolean) {
@@ -68,5 +74,8 @@ export function useModalClose(onClose: () => void, open?: boolean) {
     setTimeout(() => onClose(), 300);
   }, [onClose]);
 
-  return { isClosing, handleClose };
+  const backdropClass = `modal-backdrop ${isClosing ? 'closing' : 'opening'}`;
+  const containerClass = `modal-container ${isClosing ? 'closing' : 'opening'}`;
+
+  return { isClosing, handleClose, backdropClass, containerClass };
 }

@@ -94,7 +94,7 @@ export function CreatePotentialLocationDialog({
   open,
   onOpenChange,
 }: CreatePotentialLocationDialogProps) {
-  const { isClosing, handleClose } = useModalClose(() => onOpenChange(false), open);
+  const { handleClose, backdropClass, containerClass } = useModalClose(() => onOpenChange(false), open);
   const { data: bins = [] } = useBins();
   const { data: warehouse } = useWarehouseLocation();
   const { data: activeZones = [] } = useNoGoZones('active');
@@ -738,13 +738,10 @@ export function CreatePotentialLocationDialog({
   return (
     <>
       {/* Backdrop */}
-      <div
-        className={`fixed inset-0 bg-black/50 z-50 ${isClosing ? 'animate-fade-out' : 'animate-fade-in'} flex items-center justify-center`}
-        onClick={handleClose}
-      >
-        {/* Modal - Larger for map view */}
+      <div className={backdropClass} onClick={handleClose} />
+      <div className={containerClass}>
         <div
-          className={`w-[99vw] max-w-[1800px] h-[96vh] bg-white rounded-2xl shadow-2xl z-50 ${isClosing ? 'animate-scale-out animate-fade-out' : 'animate-scale-in animate-fade-in'} overflow-hidden flex flex-col`}
+          className="modal-content modal-full"
           onClick={(e) => e.stopPropagation()}
         >
         {/* Header */}

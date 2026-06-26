@@ -239,6 +239,50 @@
     animation: dropdown-in 0.15s ease-out forwards;
   }
 
+  /* ========================================
+     GLOBAL MODAL STYLES
+     Ensures consistent shadow, sizing, and animation for ALL modals.
+     ======================================== */
+
+  /* Modal backdrop — dark overlay behind the modal */
+  .modal-backdrop {
+    @apply fixed inset-0 bg-black/50 z-50;
+  }
+  .modal-backdrop.opening { animation: fadeIn 0.3s ease-in-out forwards; }
+  .modal-backdrop.closing { animation: fadeOut 0.3s ease-in-out forwards; }
+
+  /* Modal container — centers the modal and provides padding for shadow */
+  .modal-container {
+    @apply fixed inset-0 z-50 flex items-center justify-center p-6 pointer-events-none;
+  }
+  .modal-container.opening { animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, fadeIn 0.3s ease-in-out forwards; }
+  .modal-container.closing { animation: scaleOut 0.2s ease-in-out forwards, fadeOut 0.2s ease-in-out forwards; }
+
+  /* Modal content — the white card itself */
+  .modal-content {
+    @apply bg-white rounded-2xl shadow-2xl pointer-events-auto flex flex-col overflow-hidden;
+  }
+
+  /* Modal sizes */
+  .modal-content.modal-full {
+    @apply w-full h-full;
+    max-width: 1800px;
+    max-height: 96vh;
+  }
+  .modal-content.modal-lg {
+    @apply w-full;
+    max-width: 1400px;
+    max-height: 90vh;
+  }
+  .modal-content.modal-md {
+    @apply w-full;
+    max-width: 640px;
+  }
+  .modal-content.modal-sm {
+    @apply w-full;
+    max-width: 480px;
+  }
+
   /* Animation utility classes */
   .animate-fade-in {
     animation: fadeIn 0.3s ease-in-out forwards;

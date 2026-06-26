@@ -59,7 +59,7 @@ const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 
 export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMoveRequestModalProps) {
   const queryClient = useQueryClient();
-  const { isClosing, handleClose } = useModalClose(onClose);
+  const { handleClose, backdropClass, containerClass } = useModalClose(onClose);
 
   // ── Form state ─────────────────────────────────────────────────────────────
   const scheduledDateStr = moveRequest.scheduled_date
@@ -348,11 +348,11 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
   return (
     <>
       {/* Backdrop */}
-      <div className={`fixed inset-0 bg-black/50 z-50 ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`} onClick={handleClose} />
+      <div className={backdropClass} onClick={handleClose} />
 
       {/* Modal */}
-      <div className={`fixed inset-0 z-50 flex items-center justify-center p-6 pointer-events-none ${isClosing ? 'animate-scale-out animate-fade-out' : 'animate-scale-in animate-fade-in'}`}>
-        <div className="bg-white rounded-2xl shadow-2xl w-full h-full flex flex-col overflow-hidden pointer-events-auto">
+      <div className={containerClass}>
+        <div className="modal-content modal-full">
 
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200 shrink-0 flex items-center justify-between bg-white">
