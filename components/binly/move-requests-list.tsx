@@ -243,15 +243,19 @@ export function MoveRequestsList() {
               comparison = urgencyOrder[aUrgency] - urgencyOrder[bUrgency];
               break;
             }
-            case 'status':
-              comparison = a.status.localeCompare(b.status);
+            case 'status': {
+              const statusOrder: Record<string, number> = { overdue: 0, in_progress: 1, pending: 2, assigned: 3, completed: 4, cancelled: 5 };
+              comparison = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
               break;
+            }
             case 'assigned_driver_name':
-              comparison = (a.assigned_driver_name || '').localeCompare(b.assigned_driver_name || '');
+              comparison = (a.assigned_driver_name || 'zzz').localeCompare(b.assigned_driver_name || 'zzz');
               break;
-            case 'move_type':
-              comparison = (a.move_type || '').localeCompare(b.move_type || '');
+            case 'move_type': {
+              const typeOrder: Record<string, number> = { store: 0, relocation: 1, redeployment: 2, pickup_only: 3 };
+              comparison = (typeOrder[a.move_type] ?? 9) - (typeOrder[b.move_type] ?? 9);
               break;
+            }
           }
 
           return sortDirection === 'asc' ? comparison : -comparison;

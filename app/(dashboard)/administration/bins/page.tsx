@@ -226,9 +226,11 @@ function BinsPageContent() {
         case 'days_since_check':
           comparison = (b.days_since_check || 0) - (a.days_since_check || 0);
           break;
-        case 'status':
-          comparison = a.status.localeCompare(b.status);
+        case 'status': {
+          const statusOrder: Record<string, number> = { active: 0, pending_move: 1, missing: 2, in_storage: 3, retired: 4 };
+          comparison = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
           break;
+        }
         case 'location':
           comparison = (`${a.current_street} ${a.city}`).localeCompare(`${b.current_street} ${b.city}`);
           break;
