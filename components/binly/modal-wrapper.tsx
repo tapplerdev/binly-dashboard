@@ -16,7 +16,7 @@ interface ModalWrapperProps {
  * Usage:
  * ```tsx
  * <ModalWrapper onClose={onClose}>
- *   <div className="fixed inset-4 z-50 ...">
+ *   <div className="fixed inset-0 z-50 p-6 ...">
  *     {/* modal content *\/}
  *   </div>
  * </ModalWrapper>

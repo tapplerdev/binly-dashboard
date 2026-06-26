@@ -158,7 +158,8 @@ export function TemplateEditorModal({
       <div className={`fixed inset-0 bg-black/50 z-50 ${isClosing ? "animate-fade-out" : "animate-fade-in"}`} onClick={handleClose} />
 
       {/* Full-screen Modal */}
-      <div className={`fixed inset-4 bg-white rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden ${isClosing ? 'animate-scale-out animate-fade-out' : 'animate-scale-in animate-fade-in'}`}>
+      <div className={`fixed inset-0 z-50 p-6 pointer-events-none ${isClosing ? 'animate-scale-out animate-fade-out' : 'animate-scale-in animate-fade-in'}`}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full h-full flex flex-col overflow-hidden pointer-events-auto">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
           <div>
@@ -459,6 +460,7 @@ export function TemplateEditorModal({
             )}
           </button>
         </div>
+      </div>
       </div>
     </>
   );

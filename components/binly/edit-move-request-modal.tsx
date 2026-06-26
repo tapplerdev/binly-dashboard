@@ -351,8 +351,8 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
       <div className={`fixed inset-0 bg-black/50 z-50 ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`} onClick={handleClose} />
 
       {/* Modal */}
-      <div className={`fixed inset-4 z-50 flex items-stretch pointer-events-none ${isClosing ? 'animate-scale-out animate-fade-out' : 'animate-scale-in animate-fade-in'}`}>
-        <div className="bg-white rounded-2xl shadow-2xl w-full flex flex-col overflow-hidden pointer-events-auto">
+      <div className={`fixed inset-0 z-50 flex items-center justify-center p-6 pointer-events-none ${isClosing ? 'animate-scale-out animate-fade-out' : 'animate-scale-in animate-fade-in'}`}>
+        <div className="bg-white rounded-2xl shadow-2xl w-full h-full flex flex-col overflow-hidden pointer-events-auto">
 
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200 shrink-0 flex items-center justify-between bg-white">
