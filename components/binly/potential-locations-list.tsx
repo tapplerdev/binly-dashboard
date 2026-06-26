@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { MapPin, User, Calendar, Check, Trash2, Loader2, MoreVertical, Eye, ChevronsUpDown, Truck, UserCog, Search, X, AlertTriangle, RefreshCw, Navigation } from 'lucide-react';
+import { MapPin, User, Calendar, Check, Trash2, Loader2, MoreVertical, Eye, ChevronsUpDown, Truck, UserCog, Search, X, AlertTriangle, RefreshCw, Navigation, Map as MapIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PotentialLocationDetailsDrawer } from './potential-location-details-drawer';
@@ -14,11 +14,12 @@ import { useCentrifugo } from '@/lib/hooks/use-centrifugo';
 
 interface PotentialLocationsListProps {
   onCreateNew: () => void;
+  onOpenPlanner?: () => void;
 }
 
 type SortColumn = 'street' | 'requested_by_name' | 'created_at_iso' | 'converted_at_iso';
 
-export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListProps) {
+export function PotentialLocationsList({ onCreateNew, onOpenPlanner }: PotentialLocationsListProps) {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<PotentialLocationStatus>('active');
   const [selectedLocation, setSelectedLocation] = useState<PotentialLocation | null>(null);
@@ -282,6 +283,19 @@ export function PotentialLocationsList({ onCreateNew }: PotentialLocationsListPr
                   Converted
                 </button>
               </div>
+
+              {/* Planner Button */}
+              {onOpenPlanner && (
+                <Button
+                  onClick={onOpenPlanner}
+                  variant="outline"
+                  className="gap-1.5 md:gap-2 text-xs md:text-sm px-3 md:px-4 py-1.5 md:py-2 h-auto border-[#4880FF] text-[#4880FF] hover:bg-[#EDF0FF]"
+                >
+                  <MapIcon className="w-3.5 md:w-4 h-3.5 md:h-4" />
+                  <span className="hidden sm:inline">Placement Planner</span>
+                  <span className="sm:hidden">Planner</span>
+                </Button>
+              )}
 
               {/* Create Button */}
               <Button
