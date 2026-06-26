@@ -229,6 +229,9 @@ function BinsPageContent() {
         case 'status':
           comparison = a.status.localeCompare(b.status);
           break;
+        case 'location':
+          comparison = (`${a.current_street} ${a.city}`).localeCompare(`${b.current_street} ${b.city}`);
+          break;
         default:
           return 0;
       }
@@ -476,8 +479,14 @@ function BinsPageContent() {
                           <ChevronsUpDown className="w-4 h-4 text-gray-400" />
                         </div>
                       </th>
-                      <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle">
-                        Location
+                      <th
+                        className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle cursor-pointer"
+                        onClick={() => handleSort('location')}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Location</span>
+                          <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                        </div>
                       </th>
                       <th
                         className="text-left py-4 px-4 text-sm font-semibold text-gray-700 cursor-pointer whitespace-nowrap align-middle"

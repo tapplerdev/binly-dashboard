@@ -43,7 +43,7 @@ import {
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
-type SortColumn = 'bin_number' | 'scheduled_date' | 'created_at' | 'urgency' | 'status' | 'assigned_driver_name';
+type SortColumn = 'bin_number' | 'scheduled_date' | 'created_at' | 'urgency' | 'status' | 'assigned_driver_name' | 'move_type';
 type MoveFilterOption = 'overdue' | 'urgent' | 'pending' | 'assigned' | 'in_progress' | 'completed' | 'cancelled' | 'store' | 'relocation' | 'redeployment';
 
 // Get auth token helper function
@@ -248,6 +248,9 @@ export function MoveRequestsList() {
               break;
             case 'assigned_driver_name':
               comparison = (a.assigned_driver_name || '').localeCompare(b.assigned_driver_name || '');
+              break;
+            case 'move_type':
+              comparison = (a.move_type || '').localeCompare(b.move_type || '');
               break;
           }
 
@@ -826,8 +829,14 @@ export function MoveRequestsList() {
                     <ChevronsUpDown className="w-4 h-4 text-gray-400" />
                   </div>
                 </th>
-                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle">
-                  Type
+                <th
+                  className="text-left py-4 px-4 text-sm font-semibold text-gray-700 align-middle cursor-pointer"
+                  onClick={() => handleSort('move_type')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Type</span>
+                    <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+                  </div>
                 </th>
                 <th className="text-center py-4 px-4 text-sm font-semibold text-gray-700 align-middle rounded-tr-2xl">
                   Actions
