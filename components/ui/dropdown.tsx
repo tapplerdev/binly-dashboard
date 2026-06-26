@@ -205,19 +205,6 @@ export function MultiSelectDropdown({
             </label>
           ))}
 
-          {/* Reset button — only show when filters are active */}
-          {selectedValues.length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                onChange([]);
-                handleCloseDropdown();
-              }}
-              className="w-full px-4 py-2.5 text-sm text-primary font-medium border-t border-gray-100 hover:bg-blue-50 transition-colors rounded-b-lg"
-            >
-              Reset Filters
-            </button>
-          )}
         </div>
       )}
     </div>

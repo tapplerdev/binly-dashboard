@@ -637,6 +637,24 @@ export function MoveRequestsList() {
             onChange={(values) => setFilters(values as MoveFilterOption[])}
           />
 
+          {/* Reset all — clears filters, search, sort, assignment filter */}
+          {(filters.length > 0 || searchQuery || sortColumn !== 'created_at' || sortDirection !== 'desc' || assignedFilter !== 'all') && (
+            <button
+              type="button"
+              onClick={() => {
+                setFilters([]);
+                setSearchQuery('');
+                setSortColumn('created_at');
+                setSortDirection('desc');
+                setAssignedFilter('all');
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-500 hover:text-primary hover:bg-blue-50 rounded-lg border border-gray-200 transition-colors whitespace-nowrap"
+            >
+              <X className="w-3.5 h-3.5" />
+              Reset
+            </button>
+          )}
+
           {/* Search Bar */}
           <div className="relative flex-1 lg:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
