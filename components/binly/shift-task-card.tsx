@@ -18,6 +18,7 @@ interface TaskCardProps {
     destination_address?: string | null;
     completed_at?: number | null;
     photo_url?: string | null;
+    after_photo_url?: string | null;
   };
   isCurrentTask?: boolean;
 }
@@ -129,19 +130,26 @@ export function ShiftTaskCard({ task, isCurrentTask = false }: TaskCardProps) {
             </span>
           )}
 
-          {/* Photo thumbnail with hover overlay */}
+          {/* Before/After photo thumbnails */}
           {isDone && task.photo_url && (
             <button
               onClick={(e) => { e.stopPropagation(); setFullscreenPhoto(task.photo_url!); }}
-              className="relative w-9 h-9 rounded-md overflow-hidden border border-gray-200 hover:border-blue-500 transition-colors group flex-shrink-0"
+              className="relative w-8 h-8 rounded-md overflow-hidden border border-gray-200 hover:border-blue-500 transition-colors group flex-shrink-0"
             >
-              <img
-                src={task.photo_url}
-                alt="Collection"
-                className="w-full h-full object-cover"
-              />
+              <img src={task.photo_url} alt="Before" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <ImageIcon className="w-4 h-4 text-white" />
+                <ImageIcon className="w-3 h-3 text-white" />
+              </div>
+            </button>
+          )}
+          {isDone && task.after_photo_url && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setFullscreenPhoto(task.after_photo_url!); }}
+              className="relative w-8 h-8 rounded-md overflow-hidden border border-green-200 hover:border-green-500 transition-colors group flex-shrink-0"
+            >
+              <img src={task.after_photo_url} alt="After" className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <ImageIcon className="w-3 h-3 text-white" />
               </div>
             </button>
           )}

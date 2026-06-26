@@ -725,21 +725,33 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
 
                           {task.task_type === 'collection' && isCompleted && !isSkipped && (
                             <>
-                              {task.photo_url && (
-                                <button
-                                  onClick={() => setFullscreenPhoto(task.photo_url!)}
-                                  className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-gray-200 hover:border-blue-500 transition-colors group"
-                                >
-                                  <img
-                                    src={task.photo_url}
-                                    alt="Collection photo"
-                                    className="w-full h-full object-cover"
-                                  />
-                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <ImageIcon className="w-6 h-6 text-white" />
-                                  </div>
-                                </button>
-                              )}
+                              {/* Before/After photos side by side */}
+                              <div className="flex items-center gap-1.5">
+                                {task.photo_url && (
+                                  <button
+                                    onClick={() => setFullscreenPhoto(task.photo_url!)}
+                                    className="relative w-14 h-14 rounded-lg overflow-hidden border-2 border-gray-200 hover:border-blue-500 transition-colors group"
+                                  >
+                                    <img src={task.photo_url} alt="Before" className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                      <ImageIcon className="w-4 h-4 text-white" />
+                                    </div>
+                                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] text-center py-0.5 font-medium">Before</div>
+                                  </button>
+                                )}
+                                {task.after_photo_url && (
+                                  <button
+                                    onClick={() => setFullscreenPhoto(task.after_photo_url!)}
+                                    className="relative w-14 h-14 rounded-lg overflow-hidden border-2 border-green-200 hover:border-green-500 transition-colors group"
+                                  >
+                                    <img src={task.after_photo_url} alt="After" className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                      <ImageIcon className="w-4 h-4 text-white" />
+                                    </div>
+                                    <div className="absolute bottom-0 left-0 right-0 bg-green-600/80 text-white text-[8px] text-center py-0.5 font-medium">After</div>
+                                  </button>
+                                )}
+                              </div>
                               <div className="text-right">
                                 <p className="text-sm font-semibold text-gray-900">
                                   {task.updated_fill_percentage ?? task.fill_percentage}% Fill
