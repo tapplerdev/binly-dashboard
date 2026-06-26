@@ -184,7 +184,7 @@ export function ScheduleMoveModalWithMap({
 
   // Computed properties: Separate bins by status for display
   const fieldBins = useMemo(() => {
-    return selectedBins.filter(bin => bin.status !== 'in_storage');
+    return selectedBins.filter(bin => bin.status === 'active' || bin.status === 'pending_move');
   }, [selectedBins]);
 
   const warehouseBins = useMemo(() => {
@@ -729,9 +729,9 @@ export function ScheduleMoveModalWithMap({
       const testBins = allBins.filter(b => [92, 96, 101].includes(b.bin_number));
       console.log('🔍 [FILTER] Bins 92, 96, 101 statuses:', testBins.map(b => ({ num: b.bin_number, status: b.status })));
     } else {
-      // Show field bins (NOT in warehouse)
-      filtered = filtered.filter((b) => b.status !== 'in_storage');
-      console.log('🔍 [FILTER] Field bins (not in_storage):', filtered.length);
+      // Show field bins (active + pending_move only — exclude retired, missing, in_storage)
+      filtered = filtered.filter((b) => b.status === 'active' || b.status === 'pending_move');
+      console.log('🔍 [FILTER] Field bins (active/pending_move):', filtered.length);
     }
 
     // Apply search filter
@@ -883,8 +883,8 @@ export function ScheduleMoveModalWithMap({
             mapTypeId="hybrid"
             style={{ width: '100%', height: '100%' }}
           >
-            {/* Render ALL bin markers (not filtered - show everything on map) */}
-            {allBins?.map((b) => renderBinMarker(b))}
+            {/* Render bin markers (exclude retired) */}
+            {allBins?.filter(b => b.status !== 'retired').map((b) => renderBinMarker(b))}
 
             {/* Render ghost pins for relocated bins */}
             {allBins?.map((bin) => {
