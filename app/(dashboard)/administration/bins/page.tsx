@@ -180,6 +180,10 @@ function BinsPageContent() {
               return bin.has_pending_move;
             case 'missing':
               return bin.status === 'missing';
+            case 'pending_move':
+              return bin.status === 'pending_move';
+            case 'in_storage':
+              return bin.status === 'in_storage';
             case 'high_fill':
               return (bin.fill_percentage || 0) >= 50 && (bin.fill_percentage || 0) < 80;
             case 'medium_fill':
@@ -383,6 +387,8 @@ function BinsPageContent() {
               options={[
                 { value: 'next_move_request', label: 'Move Requests' },
                 { value: 'missing', label: 'Missing' },
+                { value: 'pending_move', label: 'Pending Move' },
+                { value: 'in_storage', label: 'In Storage' },
                 { value: 'high_fill', label: 'High Fill' },
                 { value: 'medium_fill', label: 'Medium Fill' },
                 { value: 'low_fill', label: 'Low Fill' },

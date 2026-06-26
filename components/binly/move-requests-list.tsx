@@ -44,7 +44,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
 type SortColumn = 'bin_number' | 'scheduled_date' | 'created_at' | 'urgency' | 'status' | 'assigned_driver_name';
-type MoveFilterOption = 'overdue' | 'urgent' | 'pending' | 'assigned' | 'in_progress' | 'completed' | 'store' | 'relocation';
+type MoveFilterOption = 'overdue' | 'urgent' | 'pending' | 'assigned' | 'in_progress' | 'completed' | 'cancelled' | 'store' | 'relocation' | 'redeployment';
 
 // Get auth token helper function
 function getAuthToken(): string | null {
@@ -179,6 +179,8 @@ export function MoveRequestsList() {
                 return move.status === 'in_progress';
               case 'completed':
                 return move.status === 'completed';
+              case 'cancelled':
+                return move.status === 'cancelled';
               case 'store':
                 return move.move_type === 'store' || move.move_type === 'pickup_only'; // backward compatibility
               case 'relocation':
@@ -627,6 +629,7 @@ export function MoveRequestsList() {
               { value: 'assigned', label: 'Assigned' },
               { value: 'in_progress', label: 'In Progress' },
               { value: 'completed', label: 'Completed' },
+              { value: 'cancelled', label: 'Cancelled' },
               { value: 'store', label: 'Store' },
               { value: 'relocation', label: 'Relocation' },
               { value: 'redeployment', label: 'Redeployment' },
