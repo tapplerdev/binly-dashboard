@@ -107,6 +107,55 @@ Binly is a waste management command center dashboard following "Progressive Disc
 - **Transitions:** All interactive elements use `transition-card` (200ms ease-in-out)
 - **Spacing:** Consistent padding using p-4 (16px) for cards
 
+#### Modal Pattern (REQUIRED for all modals)
+All modals MUST use the `useModalClose` hook from `components/binly/modal-wrapper.tsx` and the global CSS classes from `globals.css`:
+
+```tsx
+import { useModalClose } from '@/components/binly/modal-wrapper';
+
+function MyModal({ onClose }: { onClose: () => void }) {
+  const { handleClose, backdropClass, containerClass } = useModalClose(onClose);
+  // For modals with an `open` prop that don't unmount: useModalClose(onClose, open)
+
+  return (
+    <>
+      <div className={backdropClass} onClick={handleClose} />
+      <div className={containerClass}>
+        <div className="modal-content modal-full"> {/* or modal-lg, modal-md, modal-sm */}
+          {/* header, body, footer */}
+        </div>
+      </div>
+    </>
+  );
+}
+```
+
+- `modal-full`: 1800px max-width, 96vh height (placement, schedule moves)
+- `modal-lg`: 1400px max-width, 90vh height
+- `modal-md`: 640px max-width
+- `modal-sm`: 480px max-width
+- All modals get consistent 0.3s fade+scale open/close animations
+- `p-6` padding ensures shadow renders on all sides (no clipping)
+- Close buttons must use `handleClose` (not `onClose` directly) for exit animation
+
+#### Map Layer Pattern (REQUIRED for all maps)
+All maps MUST use shared layer components from `components/binly/map-layers/`:
+
+```tsx
+import { BinMarkersLayer, ZoneMarkersLayer, WarehouseMarkerLayer } from '@/components/binly/map-layers';
+
+<GoogleMap ...>
+  <BinMarkersLayer />           {/* fill-level colored circles, active bins only */}
+  <ZoneMarkersLayer />          {/* red NoGoZonePin markers */}
+  <WarehouseMarkerLayer />      {/* blue house icon */}
+  <PotentialLocationsLayer />   {/* orange pins */}
+</GoogleMap>
+```
+
+- `BinMarkersLayer` props: `size="sm"|"md"|"lg"`, `showLabels`, `filter`, `excludeStatuses`
+- Layers fetch their own data via hooks — no need to pass data manually
+- Rendering matches `live-map-view.tsx` (the gold standard)
+
 ### Component Architecture
 
 #### Base UI Components (`components/ui/`)
