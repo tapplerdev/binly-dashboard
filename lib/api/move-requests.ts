@@ -333,10 +333,17 @@ export async function assignMoveToUser(params: AssignMoveToUserParams): Promise<
  * TODO: Backend needs to implement proper endpoint - for now this is a workaround
  */
 export async function clearMoveAssignment(moveRequestId: string): Promise<void> {
-  // NOTE: This needs a backend endpoint like:
-  // PUT /api/manager/bins/move-requests/:id/clear-assignment
-  // For now, we'll show an alert
-  throw new Error('Clear assignment endpoint not yet implemented on backend');
+  const response = await fetch(
+    `${API_BASE_URL}/api/manager/bins/move-requests/${moveRequestId}/clear-assignment`,
+    {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+    }
+  );
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(errorData.error || 'Failed to clear assignment');
+  }
 }
 
 /**

@@ -3,12 +3,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { APIProvider, Map as GoogleMap, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { MoveRequest } from '@/lib/types/bin';
-import { updateMoveRequest, checkMoveRequestDependencies, ActiveShiftDependency } from '@/lib/api/move-requests';
+import { updateMoveRequest, checkMoveRequestDependencies, ActiveShiftDependency, assignMoveToUser, clearMoveAssignment } from '@/lib/api/move-requests';
+import { getAllUsers, User as UserType } from '@/lib/api/users';
+import { getShifts } from '@/lib/api/shifts';
+import { Shift } from '@/lib/types/shift';
 import { hereReverseGeocode, geocodeAddress } from '@/lib/services/geocoding.service';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
 import { HerePlaceDetails } from '@/lib/services/geocoding.service';
-import { X, MapPin, Calendar, Loader2, Building2, FileText, AlertCircle } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { X, MapPin, Calendar, Loader2, Building2, FileText, AlertCircle, User, UserPlus, UserMinus, Truck } from 'lucide-react';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { ActiveShiftWarningDialog } from './active-shift-warning-dialog';
 import { MapMarkerPin } from '@/components/ui/map-marker-pin';
 import { useNearbyIncidents } from '@/lib/hooks/use-zones';
@@ -93,6 +96,63 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
   const [showActiveShiftWarning, setShowActiveShiftWarning] = useState(false);
   const [activeShiftDependencies, setActiveShiftDependencies] = useState<ActiveShiftDependency[]>([]);
   const [checkingDependencies, setCheckingDependencies] = useState(false);
+
+  // ── Assignment state ──────────────────────────────────────────────────────
+  const [showAssignDropdown, setShowAssignDropdown] = useState(false);
+  const [assigningTo, setAssigningTo] = useState<string | null>(null);
+  const [unassigning, setUnassigning] = useState(false);
+
+  // Fetch drivers for assignment dropdown
+  const { data: users } = useQuery<UserType[]>({
+    queryKey: ['users'],
+    queryFn: getAllUsers,
+    enabled: showAssignDropdown,
+  });
+  const drivers = users?.filter(u => u.role === 'driver') || [];
+
+  // Fetch shifts to check if assigned driver is on an active one
+  const { data: allShifts } = useQuery<Shift[]>({
+    queryKey: ['shifts'],
+    queryFn: getShifts,
+  });
+  const assignedDriverShift = allShifts?.find(
+    s => s.driverId === moveRequest.assigned_user_id && s.status === 'active'
+  );
+
+  const handleAssignToUser = async (userId: string, userName: string) => {
+    setAssigningTo(userId);
+    try {
+      await assignMoveToUser({ move_request_id: moveRequest.id, user_id: userId });
+      queryClient.invalidateQueries({ queryKey: ['move-requests'] });
+      // Update local moveRequest state
+      moveRequest.assigned_user_id = userId;
+      moveRequest.assigned_user_name = userName;
+      moveRequest.assignment_type = 'manual';
+      moveRequest.status = 'assigned';
+      setShowAssignDropdown(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to assign');
+    } finally {
+      setAssigningTo(null);
+    }
+  };
+
+  const handleUnassign = async () => {
+    setUnassigning(true);
+    try {
+      await clearMoveAssignment(moveRequest.id);
+      queryClient.invalidateQueries({ queryKey: ['move-requests'] });
+      moveRequest.assigned_user_id = undefined as any;
+      moveRequest.assigned_user_name = undefined as any;
+      moveRequest.assignment_type = '' as any;
+      moveRequest.status = 'pending';
+      setShowAssignDropdown(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to unassign');
+    } finally {
+      setUnassigning(false);
+    }
+  };
 
   // ── Geocode current bin address on mount ───────────────────────────────────
   useEffect(() => {
@@ -306,6 +366,95 @@ export function EditMoveRequestModal({ moveRequest, onClose, onSuccess }: EditMo
               <X className="w-5 h-5 text-gray-600" />
             </button>
           </div>
+
+          {/* Assignment Section */}
+          {moveRequest.status !== 'completed' && moveRequest.status !== 'cancelled' && (
+            <div className="px-6 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    moveRequest.assigned_user_name ? 'bg-blue-100' : 'bg-gray-200'
+                  }`}>
+                    <User className={`w-4 h-4 ${moveRequest.assigned_user_name ? 'text-blue-600' : 'text-gray-400'}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {moveRequest.assigned_user_name
+                        ? `Assigned to ${moveRequest.assigned_user_name}`
+                        : 'Unassigned'}
+                    </p>
+                    {moveRequest.assigned_user_name && moveRequest.assignment_type === 'shift' && (
+                      <p className="text-xs text-blue-600">In active shift</p>
+                    )}
+                    {moveRequest.assigned_user_name && moveRequest.assignment_type === 'manual' && (
+                      <p className="text-xs text-gray-500">Manual assignment</p>
+                    )}
+                    {!moveRequest.assigned_user_name && (
+                      <p className="text-xs text-gray-400">No one is handling this move yet</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {/* Assign / Reassign button */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowAssignDropdown(!showAssignDropdown)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-blue-200 text-blue-700 bg-white hover:bg-blue-50 transition-colors"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      {moveRequest.assigned_user_name ? 'Reassign' : 'Assign Driver'}
+                    </button>
+
+                    {/* Driver dropdown */}
+                    {showAssignDropdown && (
+                      <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-20 py-1 max-h-48 overflow-y-auto">
+                        {drivers.length === 0 && (
+                          <p className="px-3 py-2 text-xs text-gray-400">Loading drivers...</p>
+                        )}
+                        {drivers.map(driver => (
+                          <button
+                            key={driver.id}
+                            onClick={() => handleAssignToUser(driver.id, driver.name)}
+                            disabled={assigningTo === driver.id}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between transition-colors ${
+                              moveRequest.assigned_user_id === driver.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                            }`}
+                          >
+                            <span>{driver.name}</span>
+                            {assigningTo === driver.id && <Loader2 className="w-3 h-3 animate-spin" />}
+                            {moveRequest.assigned_user_id === driver.id && (
+                              <span className="text-[10px] text-blue-500">current</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Unassign button */}
+                  {moveRequest.assigned_user_name && moveRequest.assignment_type !== 'shift' && (
+                    <button
+                      onClick={handleUnassign}
+                      disabled={unassigning}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 transition-colors"
+                    >
+                      {unassigning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserMinus className="w-3.5 h-3.5" />}
+                      Unassign
+                    </button>
+                  )}
+
+                  {/* Active shift indicator */}
+                  {assignedDriverShift && (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-green-50 text-green-700 border border-green-200">
+                      <Truck className="w-3.5 h-3.5" />
+                      On active shift
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Body — map left, form right */}
           <div className="flex-1 flex overflow-hidden">
