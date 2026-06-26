@@ -653,7 +653,7 @@ export function MoveRequestsList() {
             }}
             className="gap-1.5 text-xs border-primary text-primary hover:bg-primary/5 whitespace-nowrap"
           >
-            <X className="w-3.5 h-3.5" />
+            <XIcon className="w-3.5 h-3.5" />
             Reset
           </Button>
 
