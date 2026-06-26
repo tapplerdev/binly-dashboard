@@ -67,7 +67,7 @@ export function DriverColumn({ driver, shift, tasks, isToday, onCreateShift, onS
   };
 
   return (
-    <div className="flex flex-col w-full md:w-[300px] shrink-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className="flex flex-col w-full md:w-[380px] shrink-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       {/* Column header — click opens drawer */}
       <div
         className="px-4 py-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50/50 transition-colors"
@@ -91,15 +91,24 @@ export function DriverColumn({ driver, shift, tasks, isToday, onCreateShift, onS
           {hasShift && <Info className="w-4 h-4 text-gray-400" />}
         </div>
 
-        {hasShift && shift!.status === 'active' && (
-          <div className="mt-2">
-            <div className="flex justify-between text-xs text-gray-500 mb-1">
-              <span>{completedCount} of {taskCount} tasks</span>
-              <span>{completionPct}%</span>
-            </div>
-            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${completionPct}%` }} />
-            </div>
+        {hasShift && (
+          <div className="mt-1.5">
+            <p className="text-xs text-gray-400">
+              {taskCount} task{taskCount !== 1 ? 's' : ''}
+              {shift!.optimization_metadata?.total_duration_formatted && ` · ${shift!.optimization_metadata.total_duration_formatted}`}
+              {shift!.optimization_metadata?.total_distance_miles && ` · ${shift!.optimization_metadata.total_distance_miles.toFixed(1)} mi`}
+            </p>
+            {shift!.status === 'active' && (
+              <div className="mt-1.5">
+                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <span>{completedCount} of {taskCount} tasks</span>
+                  <span>{completionPct}%</span>
+                </div>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${completionPct}%` }} />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -133,13 +142,8 @@ export function DriverColumn({ driver, shift, tasks, isToday, onCreateShift, onS
       </div>
 
       {/* Column footer */}
-      {hasShift && (
-        <div className="px-3 py-2 border-t border-gray-100 bg-gray-50/50 space-y-1.5">
-          <div className="text-xs text-gray-400">
-            {taskCount} task{taskCount !== 1 ? 's' : ''}
-            {shift!.optimization_metadata?.total_duration_formatted && ` · ${shift!.optimization_metadata.total_duration_formatted}`}
-            {shift!.optimization_metadata?.total_distance_miles && ` · ${shift!.optimization_metadata.total_distance_miles.toFixed(1)} mi`}
-          </div>
+      {hasShift && canEdit && (
+        <div className="px-3 py-2 border-t border-gray-100 bg-gray-50/50">
           {canEdit && (
             <div className="flex items-center gap-1.5">
               <button

@@ -12,10 +12,12 @@ interface TaskCardProps {
     is_completed: number;
     skipped?: boolean;
     fill_percentage?: number | null;
+    updated_fill_percentage?: number | null;
     sequence_order: number;
     task_label?: string | null;
     destination_address?: string | null;
     completed_at?: number | null;
+    photo_url?: string | null;
   };
   isCurrentTask?: boolean;
 }
@@ -50,7 +52,8 @@ export function ShiftTaskCard({ task, isCurrentTask = false }: TaskCardProps) {
         : task.task_type.charAt(0).toUpperCase() + task.task_type.slice(1);
 
   const addr = task.address || '';
-  const truncAddr = addr.length > 28 ? addr.slice(0, 26) + '…' : addr;
+  const truncAddr = addr.length > 40 ? addr.slice(0, 38) + '…' : addr;
+  const displayFill = task.updated_fill_percentage ?? task.fill_percentage ?? 0;
 
   return (
     <div
@@ -80,7 +83,27 @@ export function ShiftTaskCard({ task, isCurrentTask = false }: TaskCardProps) {
           )}
         </div>
 
-        <div className="shrink-0 flex items-center gap-1">
+        <div className="shrink-0 flex items-center gap-1.5">
+          {/* Fill % badge for collections */}
+          {task.task_type === 'collection' && displayFill > 0 && (
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+              displayFill >= 80 ? 'bg-red-100 text-red-700' :
+              displayFill >= 50 ? 'bg-amber-100 text-amber-700' :
+              'bg-green-100 text-green-700'
+            }`}>
+              {displayFill}%
+            </span>
+          )}
+
+          {/* Photo thumbnail for completed collections */}
+          {isDone && task.photo_url && (
+            <img
+              src={task.photo_url}
+              alt=""
+              className="w-8 h-8 rounded object-cover border border-gray-200"
+            />
+          )}
+
           {isDone && <Check className="w-4 h-4 text-green-500" />}
           {isSkipped && <SkipForward className="w-4 h-4 text-orange-400" />}
           {isCurrentTask && <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />}
