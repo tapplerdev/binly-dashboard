@@ -281,11 +281,13 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
   const canRemoveTasks = shift.status === 'active' || shift.status === 'scheduled';
 
   // Support both task-based and bin-based systems
+  // Exclude warehouse_stop and service tasks from bin counts — they aren't "collected" bins
   const usingTasks = tasks.length > 0;
-  const totalItems = usingTasks ? tasks.length : bins.length;
-  const completedItems = usingTasks
-    ? tasks.filter(t => t.is_completed === 1).length
-    : bins.filter(b => b.is_completed === 1).length;
+  const binTasks = usingTasks
+    ? tasks.filter(t => t.stop_type !== 'warehouse_stop' && t.stop_type !== 'service')
+    : bins;
+  const totalItems = binTasks.length;
+  const completedItems = binTasks.filter(t => t.is_completed === 1).length;
 
   const collectedCount = completedItems;
   const remainingItems = totalItems - completedItems;
