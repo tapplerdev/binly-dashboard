@@ -449,7 +449,7 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
               {/* Progress Bar */}
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">Collection Progress</span>
+                  <span className="text-sm font-medium text-gray-700">Task Progress</span>
                   <span className="text-sm font-semibold text-primary">{progressPercentage}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
@@ -465,10 +465,10 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                 <div className="bg-white rounded-lg p-3 border border-gray-200">
                   <div className="flex items-center gap-2 mb-1">
                     <Package className="w-4 h-4 text-gray-400" />
-                    <span className="text-xs text-gray-500">Collected</span>
+                    <span className="text-xs text-gray-500">Completed</span>
                   </div>
                   <p className="text-lg font-semibold text-gray-900">
-                    {shift.binsCollected || collectedCount}/{shift.binCount}
+                    {collectedCount}/{totalItems}
                   </p>
                 </div>
 
