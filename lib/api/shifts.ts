@@ -315,7 +315,7 @@ export async function cancelShift(shiftId: string): Promise<void> {
   console.log('🚫 Cancelling shift:', shiftId);
   try {
     const response = await fetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}/cancel`, {
-      method: 'PUT',
+      method: 'POST',
       headers: getAuthHeaders(),
     });
 
