@@ -11,7 +11,7 @@ import { inputStyles, cn } from '@/lib/utils';
 import { useBins } from '@/lib/hooks/use-bins';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { Bin, isMappableBin, getBinMarkerColor, BinStatus, PotentialLocation } from '@/lib/types/bin';
-import { updateBin, BinChangeReasonCategory, checkBinDependencies, ActiveShiftDependency } from '@/lib/api/bins';
+import { updateBin, BinChangeReasonCategory, checkBinDependencies, ActiveShiftDependency, getBinActiveMoveRequests, BinActiveMoveRequest } from '@/lib/api/bins';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
 import { ActiveShiftWarningDialog } from './active-shift-warning-dialog';
@@ -298,6 +298,11 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
 
+  // Pending move requests for this bin + the ids the manager chose to cancel because this
+  // manual edit supersedes them (sent as cancel_move_request_ids; backend cancels atomically).
+  const [activeMoves, setActiveMoves] = useState<BinActiveMoveRequest[]>([]);
+  const [movesToCancel, setMovesToCancel] = useState<Set<string>>(new Set());
+
   // Initialize form with bin data when dialog opens
   useEffect(() => {
     if (open && bin) {
@@ -314,8 +319,29 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
         setMarkerPosition({ lat: bin.latitude, lng: bin.longitude });
         setMapCenter({ lat: bin.latitude, lng: bin.longitude });
       }
+
+      // Load the bin's pending moves so we can warn about (and offer to cancel) ones this
+      // edit would supersede. Clear first so a previously-opened bin's moves don't flash.
+      setActiveMoves([]);
+      setMovesToCancel(new Set());
+      getBinActiveMoveRequests(bin.id).then(setActiveMoves).catch(() => setActiveMoves([]));
     }
   }, [open, bin]);
+
+  // Default-select the moves this edit FULFILLS: setting the bin to In Warehouse / Retired
+  // completes a pending store/pickup_only move, so pre-check those for cancellation.
+  useEffect(() => {
+    const fulfills = status === 'in_storage' || status === 'retired';
+    setMovesToCancel(
+      new Set(
+        fulfills
+          ? activeMoves
+              .filter((m) => m.move_type === 'store' || m.move_type === 'pickup_only')
+              .map((m) => m.id)
+          : []
+      )
+    );
+  }, [status, activeMoves]);
 
   // Reset form when dialog closes
   useEffect(() => {
@@ -471,6 +497,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
         reason_notes: reasonNotes.trim() || null,
         create_no_go_zone: reasonCategory === 'relocation_request' ? createNoGoZone : null,
         source_potential_location_id: selectedPotentialLocation?.id || null,
+        cancel_move_request_ids: Array.from(movesToCancel),
       });
     },
     onSuccess: () => {
@@ -954,6 +981,59 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                     </div>
                   </div>
                 )}
+
+                {/* Pending move-request conflict: a manual bin edit can supersede a pending move.
+                    An in_progress move means a driver is actively en route — escalate to red. */}
+                {activeMoves.length > 0 && (() => {
+                  const enRoute = activeMoves.some((m) => m.status === 'in_progress');
+                  return (
+                    <div className={cn('border-2 rounded-xl p-4 mb-6', enRoute ? 'bg-red-50 border-red-300' : 'bg-amber-50 border-amber-200')}>
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className={cn('w-5 h-5 flex-shrink-0 mt-0.5', enRoute ? 'text-red-600' : 'text-amber-600')} />
+                        <div className="flex-1">
+                          <h3 className={cn('text-sm font-semibold', enRoute ? 'text-red-800' : 'text-amber-800')}>
+                            {enRoute
+                              ? 'A driver is actively working a move for this bin'
+                              : `This bin has ${activeMoves.length === 1 ? 'a pending move request' : `${activeMoves.length} pending move requests`}`}
+                          </h3>
+                          <p className={cn('text-xs mt-0.5', enRoute ? 'text-red-700' : 'text-amber-700')}>
+                            {enRoute
+                              ? 'Cancelling an in-progress move stops the driver mid-route. Only check it if you are sure — the driver is notified immediately.'
+                              : `Editing the bin manually may make ${activeMoves.length === 1 ? 'it' : 'them'} redundant. Check any you want to cancel as part of this edit — the driver is notified.`}
+                          </p>
+                          <div className="mt-3 space-y-2">
+                            {activeMoves.map((m) => {
+                              const inProgress = m.status === 'in_progress';
+                              return (
+                                <label key={m.id} className={cn('flex items-center gap-2 text-xs cursor-pointer', inProgress ? 'text-red-900' : 'text-amber-900')}>
+                                  <input
+                                    type="checkbox"
+                                    checked={movesToCancel.has(m.id)}
+                                    onChange={(e) => {
+                                      setMovesToCancel((prev) => {
+                                        const next = new Set(prev);
+                                        if (e.target.checked) next.add(m.id);
+                                        else next.delete(m.id);
+                                        return next;
+                                      });
+                                    }}
+                                    className={cn('rounded', inProgress ? 'border-red-400' : 'border-amber-300')}
+                                  />
+                                  <span>
+                                    Cancel <span className="font-semibold">{m.move_type}</span> move
+                                    {m.new_address ? ` → ${m.new_address}` : ''}
+                                    {m.assigned_driver_name ? ` (assigned to ${m.assigned_driver_name})` : ` (${m.status})`}
+                                    {inProgress && <span className="ml-1 font-semibold text-red-700">🚨 driver en route — cancelling stops them</span>}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Location Details */}
                 <div className={cn('bg-gray-50 border-2 rounded-xl p-4 mb-6', warehouseMode === 'send' ? 'border-amber-200 bg-amber-50/40' : 'border-gray-200')}>

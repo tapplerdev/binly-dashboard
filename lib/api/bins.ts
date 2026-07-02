@@ -198,6 +198,10 @@ export async function updateBin(
     reason_notes?: string | null;
     create_no_go_zone?: boolean | null;
     source_potential_location_id?: string | null;
+    // Pending move requests the manager chose to cancel because this manual edit supersedes
+    // them (e.g. setting a bin to In Warehouse fulfills a pending 'store' move). Cancelled
+    // atomically with the edit by the backend.
+    cancel_move_request_ids?: string[];
   }
 ): Promise<Bin> {
   try {
@@ -217,6 +221,38 @@ export async function updateBin(
   } catch (error) {
     console.error(`Error updating bin ${id}:`, error);
     throw error;
+  }
+}
+
+/** A bin's non-terminal move request, for the "manual edit supersedes move" banner. */
+export interface BinActiveMoveRequest {
+  id: string;
+  move_type: string; // store | pickup_only | relocation | redeployment
+  status: string;
+  new_address: string;
+  disposal_action?: string | null;
+  assigned_shift_id?: string | null;
+  assigned_driver_name: string;
+}
+
+/**
+ * Fetch a bin's non-terminal (pending/assigned/in_progress) move requests so the
+ * Edit-Bin dialog can warn the manager that a manual edit may supersede them.
+ */
+export async function getBinActiveMoveRequests(
+  binId: string
+): Promise<BinActiveMoveRequest[]> {
+  try {
+    const response = await fetch(
+      `${API_URL}/api/manager/bins/${binId}/active-move-requests`,
+      { method: 'GET', headers: getAuthHeaders() }
+    );
+    if (!response.ok) return [];
+    const result = await response.json();
+    return result.data ?? [];
+  } catch (error) {
+    console.error(`Error fetching active move requests for bin ${binId}:`, error);
+    return [];
   }
 }
 
