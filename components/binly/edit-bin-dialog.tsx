@@ -495,7 +495,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
         longitude,
         reason_category: finalReason as BinChangeReasonCategory | null,
         reason_notes: reasonNotes.trim() || null,
-        create_no_go_zone: reasonCategory === 'relocation_request' ? createNoGoZone : null,
+        create_no_go_zone: (finalReason === 'relocation_request' || finalReason === 'pulled_from_service') ? createNoGoZone : null,
         source_potential_location_id: selectedPotentialLocation?.id || null,
         cancel_move_request_ids: Array.from(movesToCancel),
       });
@@ -653,6 +653,10 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
 
   const mapApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
   const isAutoReason = reasonContext?.autoReason != null;
+  // Storing/retiring takes a bin out of the field: the backend forces fill → 0%
+  // and clears last-checked (surfaced as N/A). Reflect that on the review step so
+  // the confirmation isn't misleading, regardless of the raw form values.
+  const isStoringStatus = status === 'in_storage' || status === 'retired';
 
   return (
     <div className={cn(
@@ -1276,7 +1280,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                   <p className="text-xs font-medium text-blue-800 mb-1">Saving changes to Bin #{bin.bin_number}:</p>
                   <p className="text-xs text-blue-700">{street}, {city} {zip}</p>
-                  <p className="text-xs text-blue-700">Status: {status === 'in_storage' ? 'In Warehouse' : status === 'active' ? 'Active' : status === 'missing' ? 'Missing' : status === 'retired' ? 'Retired' : status} · Fill: {fillPercentage ?? '—'}%</p>
+                  <p className="text-xs text-blue-700">Status: {status === 'in_storage' ? 'In Warehouse' : status === 'active' ? 'Active' : status === 'missing' ? 'Missing' : status === 'retired' ? 'Retired' : status} · Fill: {isStoringStatus ? '0' : (fillPercentage ?? '—')}%{isStoringStatus ? ' · Last checked: N/A' : ''}</p>
                 </div>
 
                 {/* ── PULLED FROM SERVICE: auto-reason, no dropdown ── */}
@@ -1287,7 +1291,7 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                       <div>
                         <p className="text-xs font-medium text-gray-800">Pulled from service</p>
                         <p className="text-xs text-gray-600 mt-0.5">
-                          Bin will be marked as <strong>In Storage</strong> at the warehouse location. No incident zone will be created — this is an operational pull, not an incident.
+                          Bin will be marked as <strong>In Storage</strong> at the warehouse location, its fill reset to <strong>0%</strong> and last-checked cleared. This is an operational pull — no incident zone is created unless you opt in below.
                         </p>
                       </div>
                     </div>
@@ -1298,6 +1302,20 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                         <p className="text-xs text-green-700">{warehouse.address}</p>
                       </div>
                     )}
+
+                    {/* Optional no-go zone opt-in for pulled_from_service (default OFF) */}
+                    <div className="flex items-start gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                      <input
+                        id="create-no-go-zone-store"
+                        type="checkbox"
+                        checked={createNoGoZone}
+                        onChange={(e) => setCreateNoGoZone(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <label htmlFor="create-no-go-zone-store" className="text-xs text-gray-700 cursor-pointer">
+                        <span className="font-medium">Create no-go zone</span> at the bin&apos;s current location to avoid re-placing a bin here
+                      </label>
+                    </div>
                   </div>
                 ) : (
                   <>
