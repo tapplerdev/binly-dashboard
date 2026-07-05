@@ -109,8 +109,29 @@ function TaskCard({ task, index }: { task: ShiftHistoryTask; index: number }) {
             {task.updated_fill_percentage != null && (
               <Row label="Fill recorded" value={`${task.updated_fill_percentage}%`} />
             )}
-            {/* Collection photo */}
-            {task.photo_url && (
+            {/* Collection photos — before/after side by side when the driver
+                captured both; a lone photo (older data, incident flow) stays
+                full-width and unlabeled. */}
+            {task.photo_url && task.after_photo_url ? (
+              <div className="pt-2 grid grid-cols-2 gap-2">
+                <div className="relative w-full h-40 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(task.photo_url!, '_blank')}>
+                  <img
+                    src={task.photo_url}
+                    alt="Before collection"
+                    className="w-full h-full object-cover"
+                  />
+                  <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] font-semibold">Before</span>
+                </div>
+                <div className="relative w-full h-40 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(task.after_photo_url!, '_blank')}>
+                  <img
+                    src={task.after_photo_url}
+                    alt="After collection"
+                    className="w-full h-full object-cover"
+                  />
+                  <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-green-600/80 text-white text-[10px] font-semibold">After</span>
+                </div>
+              </div>
+            ) : task.photo_url ? (
               <div className="pt-2">
                 <div className="relative w-full h-40 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(task.photo_url!, '_blank')}>
                   <img
@@ -120,7 +141,7 @@ function TaskCard({ task, index }: { task: ShiftHistoryTask; index: number }) {
                   />
                 </div>
               </div>
-            )}
+            ) : null}
             {/* Incident context: an incident completion carries no task photo/fill —
                 the driver's evidence is on the incident record, so show it here. */}
             {task.incident_type && (
