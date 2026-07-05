@@ -100,6 +100,31 @@ export interface CreateMoveRequestParams {
   assign_to_shift_id?: string; // Optional: auto-assign to shift
 }
 
+/** The existing open move returned in a 409 from schedule-move. */
+export interface ExistingOpenMove {
+  id: string;
+  move_type: string;
+  status: string;
+  new_address: string;
+  assigned_driver_name: string;
+}
+
+/**
+ * Thrown when the backend rejects a create because the bin already has an open
+ * (pending/assigned/in_progress) move request — the one-open-move-per-bin
+ * invariant. `existingMove` carries the conflicting move so UIs can offer
+ * cancel-or-edit instead of a generic failure.
+ */
+export class MoveRequestConflictError extends Error {
+  readonly existingMove: ExistingOpenMove | null;
+
+  constructor(message: string, existingMove: ExistingOpenMove | null) {
+    super(message);
+    this.name = 'MoveRequestConflictError';
+    this.existingMove = existingMove;
+  }
+}
+
 export async function createMoveRequest(params: CreateMoveRequestParams): Promise<MoveRequest> {
   const response = await fetch(`${API_BASE_URL}/api/manager/bins/schedule-move`, {
     method: 'POST',
@@ -108,7 +133,12 @@ export async function createMoveRequest(params: CreateMoveRequestParams): Promis
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create move request: ${response.statusText}`);
+    const body = await response.json().catch(() => ({}));
+    const message = body.message || body.error || `Failed to create move request: ${response.statusText}`;
+    if (response.status === 409) {
+      throw new MoveRequestConflictError(message, body.existing_move_request ?? null);
+    }
+    throw new Error(message);
   }
 
   return response.json();

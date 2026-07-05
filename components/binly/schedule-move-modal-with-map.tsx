@@ -31,7 +31,7 @@ import {
   CheckCircle2,
   Info,
 } from 'lucide-react';
-import { createMoveRequest, updateMoveRequest, assignMoveToShift, assignMoveToUser } from '@/lib/api/move-requests';
+import { createMoveRequest, updateMoveRequest, assignMoveToShift, assignMoveToUser, MoveRequestConflictError } from '@/lib/api/move-requests';
 import { BinChangeReasonCategory } from '@/lib/api/bins';
 import { getShifts, getShiftDetailsByDriverId } from '@/lib/api/shifts';
 import { Shift } from '@/lib/types/shift';
@@ -148,6 +148,20 @@ export function ScheduleMoveModalWithMap({
   const [state, dispatch] = useReducer(
     moveRequestReducer,
     createInitialState(bin, bins)
+  );
+
+  // Inline notices (CLAUDE.md: no alert()). blockedNotice = tried to select a
+  // bin that already has an open move; submitError = create failed (incl. 409).
+  const [blockedNotice, setBlockedNotice] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // One open move per bin (backend enforces with 409): a bin that already has
+  // an open move request can't be selected for a new one. Exempt the bin whose
+  // move is being edited — its open move IS the one in this modal.
+  const isBinLockedByOpenMove = useCallback(
+    (b: BinWithPriority) =>
+      b.has_pending_move && !(isEditMode && editMoveRequest?.bin_id === b.id),
+    [isEditMode, editMoveRequest?.bin_id]
   );
 
   // Helper: Convert reducer state to old BinMoveConfig format for compatibility
@@ -381,7 +395,14 @@ export function ScheduleMoveModalWithMap({
 
     if (isCurrentlySelected) {
       dispatch({ type: 'DESELECT_BIN', binId: clickedBin.id });
+    } else if (isBinLockedByOpenMove(clickedBin)) {
+      // One open move per bin — explain instead of silently ignoring the click.
+      setBlockedNotice(
+        `Bin #${clickedBin.bin_number} already has an open move request. Cancel or edit the existing move before scheduling a new one.`
+      );
+      return;
     } else {
+      setBlockedNotice(null);
       dispatch({ type: 'SELECT_BIN', bin: clickedBin });
 
       // If selecting a warehouse bin, ensure it's set to redeployment
@@ -407,12 +428,21 @@ export function ScheduleMoveModalWithMap({
       setMapCenter({ lat, lng });
       setMapZoom(15);
     }
-  }, [state.selectedBins]);
+  }, [state.selectedBins, isBinLockedByOpenMove]);
 
   // Handle bin selection from search
   const handleBinSearchSelect = (clickedBin: BinWithPriority) => {
     const isSelected = state.selectedBins.some((b) => b.id === clickedBin.id);
     if (!isSelected) {
+      if (isBinLockedByOpenMove(clickedBin)) {
+        setBlockedNotice(
+          `Bin #${clickedBin.bin_number} already has an open move request. Cancel or edit the existing move before scheduling a new one.`
+        );
+        setBinSearchQuery('');
+        setShowBinDropdown(false);
+        return;
+      }
+      setBlockedNotice(null);
       dispatch({ type: 'SELECT_BIN', bin: clickedBin });
     }
 
@@ -559,6 +589,7 @@ export function ScheduleMoveModalWithMap({
       return;
     }
 
+    setSubmitError(null);
     dispatch({ type: 'SET_SUBMITTING', isSubmitting: true });
 
     try {
@@ -688,7 +719,19 @@ export function ScheduleMoveModalWithMap({
       handleClose();
     } catch (error) {
       console.error('❌ [BULK CREATE] Failed:', error);
-      alert(`Failed to create move requests. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      if (error instanceof MoveRequestConflictError) {
+        // One open move per bin — the backend names the conflicting move.
+        const existing = error.existingMove;
+        setSubmitError(
+          existing
+            ? `${error.message} (existing: ${existing.move_type} — ${existing.status}${existing.assigned_driver_name ? `, assigned to ${existing.assigned_driver_name}` : ''})`
+            : error.message
+        );
+      } else {
+        setSubmitError(
+          `Failed to create move requests: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+      }
     } finally {
       dispatch({ type: 'SET_SUBMITTING', isSubmitting: false });
     }
@@ -795,7 +838,8 @@ export function ScheduleMoveModalWithMap({
             className={cn(
               'w-8 h-8 rounded-full border-2 border-white shadow-lg cursor-pointer transition-all pointer-events-auto',
               isSelected && 'border-blue-500 border-4 scale-110',
-              isHovered && 'scale-125'
+              isHovered && 'scale-125',
+              isBinLockedByOpenMove(bin) && 'border-amber-400 border-dashed opacity-60 cursor-not-allowed'
             )}
             style={{
               backgroundColor: isSelected ? '#3B82F6' : getBinMarkerColor(bin.fill_percentage, bin.status),
@@ -808,7 +852,11 @@ export function ScheduleMoveModalWithMap({
                 handleBinMarkerClick(bin);
               }
             }}
-            title={`Bin #${bin.bin_number} - ${bin.fill_percentage ?? 0}%`}
+            title={
+              isBinLockedByOpenMove(bin)
+                ? `Bin #${bin.bin_number} — already has an open move request`
+                : `Bin #${bin.bin_number} - ${bin.fill_percentage ?? 0}%`
+            }
           >
             <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
               {bin.bin_number}
@@ -1342,6 +1390,7 @@ export function ScheduleMoveModalWithMap({
               {filteredBinsForList.map((b) => {
                 const isSelected = selectedBins.some((sb) => sb.id === b.id);
                 const isMissing = b.status === 'missing';
+                const isLocked = isBinLockedByOpenMove(b);
                 const fillColor =
                   b.fill_percentage >= 80
                     ? 'bg-red-500'
@@ -1355,14 +1404,16 @@ export function ScheduleMoveModalWithMap({
                     className={cn(
                       'flex items-center gap-2 md:gap-3 p-2 md:p-3 hover:bg-gray-50 cursor-pointer transition-colors active:bg-gray-100',
                       isSelected && 'bg-blue-50 hover:bg-blue-100',
-                      isMissing && 'bg-gray-50/50'
+                      isMissing && 'bg-gray-50/50',
+                      isLocked && 'bg-amber-50/50 cursor-not-allowed'
                     )}
                   >
                     <input
                       type="checkbox"
                       checked={isSelected}
+                      disabled={isLocked}
                       onChange={() => handleBinMarkerClick(b)}
-                      className="w-4 h-4 md:w-4 md:h-4 text-primary border-gray-300 rounded focus:ring-primary min-w-[16px]"
+                      className="w-4 h-4 md:w-4 md:h-4 text-primary border-gray-300 rounded focus:ring-primary min-w-[16px] disabled:opacity-40 disabled:cursor-not-allowed"
                     />
 
                     <div className="flex-1 min-w-0">
@@ -1370,6 +1421,12 @@ export function ScheduleMoveModalWithMap({
                         <span className="font-semibold text-sm text-gray-900">
                           Bin #{b.bin_number}
                         </span>
+                        {isLocked && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                            <AlertTriangle className="w-3 h-3" />
+                            Move already scheduled
+                          </span>
+                        )}
                         {isMissing ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">
                             <AlertTriangle className="w-3 h-3" />
@@ -1402,6 +1459,18 @@ export function ScheduleMoveModalWithMap({
 
         {/* Footer with next button - Flush with bottom, no gap */}
         <div className="sticky bottom-0 p-3 pb-3 md:p-4 md:pb-4 border-t border-gray-200 flex-shrink-0 bg-white md:bg-gray-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none -mb-3 md:mb-0">
+          {blockedNotice && (
+            <div className="mb-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-800 flex-1">{blockedNotice}</p>
+              <button
+                onClick={() => setBlockedNotice(null)}
+                className="text-amber-500 hover:text-amber-700 text-xs font-semibold"
+              >
+                ✕
+              </button>
+            </div>
+          )}
           <div className="flex gap-2">
             {/* Cancel Move button — edit mode only */}
             {isEditMode && editMoveRequest && editMoveRequest.status !== 'cancelled' && editMoveRequest.status !== 'completed' && (
@@ -3114,6 +3183,20 @@ export function ScheduleMoveModalWithMap({
                 </Card>
               );
             })}
+          </div>
+        )}
+
+        {/* Submit error banner (inline — no alert()) */}
+        {submitError && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 mb-3">
+            <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700 flex-1">{submitError}</p>
+            <button
+              onClick={() => setSubmitError(null)}
+              className="text-red-400 hover:text-red-600 text-xs font-semibold"
+            >
+              ✕
+            </button>
           </div>
         )}
 

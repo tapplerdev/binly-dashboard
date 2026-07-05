@@ -230,7 +230,11 @@ export function IntelligenceView() {
             reason_category: 'relocation_request',
             notes: `AI recommendation: ${rec.title}`,
           });
-        } catch { /* move request creation is best-effort */ }
+        } catch (e) {
+          // Best-effort: a 409 here means the bin already has an open move —
+          // the recommendation is effectively already being acted on.
+          console.warn('Move request not created (best-effort):', e instanceof Error ? e.message : e);
+        }
       }
 
       queryClient.invalidateQueries({ queryKey: ['ai-recommendations'] });
