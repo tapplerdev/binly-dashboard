@@ -13,6 +13,11 @@ import {
 
 type FilterType = 'all' | 'collections' | 'placements' | 'moves' | 'services' | 'timeline' | 'removed';
 
+/** "landlord_complaint" → "Landlord Complaint" */
+function formatIncidentType(t: string): string {
+  return t.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function formatTime(ts: number | null): string {
@@ -73,8 +78,15 @@ function TaskCard({ task, index }: { task: ShiftHistoryTask; index: number }) {
           </div>
         ) : completed ? (
           <div className="text-right">
-            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-700 border border-green-200">
-              <CheckCircle2 className="w-3 h-3" /> Completed by driver
+            <div className="flex items-center justify-end gap-1.5">
+              {task.incident_type && (
+                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+                  <AlertTriangle className="w-3 h-3" /> {formatIncidentType(task.incident_type)}
+                </div>
+              )}
+              <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-700 border border-green-200">
+                <CheckCircle2 className="w-3 h-3" /> Completed by driver
+              </div>
             </div>
             {task.completed_at && (
               <div className="text-xs text-gray-400 mt-1">{formatTime(task.completed_at)}</div>
@@ -107,6 +119,36 @@ function TaskCard({ task, index }: { task: ShiftHistoryTask; index: number }) {
                     className="w-full h-full object-cover"
                   />
                 </div>
+              </div>
+            )}
+            {/* Incident context: an incident completion carries no task photo/fill —
+                the driver's evidence is on the incident record, so show it here. */}
+            {task.incident_type && (
+              <div className="pt-2 space-y-2">
+                <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <span className="font-semibold text-red-800">Incident reported: {formatIncidentType(task.incident_type)}</span>
+                      {task.incident_description && (
+                        <p className="text-red-700 mt-0.5">{task.incident_description}</p>
+                      )}
+                      {!task.photo_url && task.incident_photo_url && (
+                        <p className="text-red-600/80 mt-0.5">No collection photo — the driver&apos;s photo is attached to the incident below.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {task.incident_photo_url && (
+                  <div className="relative w-full h-40 rounded-lg overflow-hidden bg-gray-100 border border-red-200 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(task.incident_photo_url!, '_blank')}>
+                    <img
+                      src={task.incident_photo_url}
+                      alt="Incident photo"
+                      className="w-full h-full object-cover"
+                    />
+                    <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-red-600/90 text-white text-[10px] font-semibold">Incident photo</span>
+                  </div>
+                )}
               </div>
             )}
           </>

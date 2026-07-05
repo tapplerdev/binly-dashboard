@@ -499,6 +499,12 @@ export interface ShiftHistoryTask {
   task_description: string | null;
   completion_notes: string | null;
   photo_required: boolean;
+  // Driver-reported incident at this stop (if any) — an incident completion is
+  // allowed without a task photo/fill, so the evidence lives on the incident.
+  incident_type: string | null;
+  incident_photo_url: string | null;
+  incident_description: string | null;
+  incident_zone_id: string | null;
 }
 
 export async function getShiftHistoryTasks(shiftId: string): Promise<ShiftHistoryTask[]> {
