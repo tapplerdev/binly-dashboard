@@ -127,7 +127,7 @@ export interface PotentialLocation {
  * Move Request - A request to move a bin to a new location or store in warehouse
  */
 export type MoveRequestStatus = 'pending' | 'assigned' | 'in_progress' | 'completed' | 'cancelled' | 'overdue';
-export type MoveRequestType = 'store' | 'relocation';
+export type MoveRequestType = 'store' | 'relocation' | 'redeployment' | 'pickup_only';
 
 export interface MoveRequest {
   id: string;

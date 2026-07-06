@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { BinAnalyticsDashboard } from '@/components/binly/bin-analytics-dashboard';
 import { NetworkHealthView } from '@/components/binly/network-health-view';
 import { BinPerformanceView } from '@/components/binly/bin-performance-view';
-import { Activity, LayoutDashboard, Target } from 'lucide-react';
+import { GrowthView } from '@/components/binly/growth-view';
+import { Activity, LayoutDashboard, Target, TrendingUp } from 'lucide-react';
 
 /**
  * Analytics is organized by DECISION, not data type:
@@ -16,6 +17,7 @@ import { Activity, LayoutDashboard, Target } from 'lucide-react';
 const TABS = [
   { key: 'health', label: 'Network Health', icon: Activity },
   { key: 'bins', label: 'Bin Performance', icon: Target },
+  { key: 'growth', label: 'Growth', icon: TrendingUp },
   { key: 'operations', label: 'Operations', icon: LayoutDashboard },
 ] as const;
 
@@ -45,6 +47,7 @@ export function AnalyticsTabs() {
 
       {tab === 'health' && <NetworkHealthView />}
       {tab === 'bins' && <BinPerformanceView />}
+      {tab === 'growth' && <GrowthView />}
       {tab === 'operations' && <BinAnalyticsDashboard />}
     </div>
   );
