@@ -98,7 +98,7 @@ Binly is a waste management command center dashboard following "Progressive Disc
 - **Hover State:** `#EDF0FF` - Light blue background on hover
 
 #### Typography
-- **Font:** Nunito Sans (loaded via next/font/google)
+- **Font:** Montserrat in globals.css today (doc previously said Nunito Sans; body background is also pure white vs the documented #F4F5F9 — both flagged as a "TEMP monitor calibration" experiment in globals.css. Reconcile deliberately: either restore the documented tokens or bless the current ones.)
 - **Scale:** Responsive sizing with font-semibold for headings
 
 #### Component Patterns

@@ -12,6 +12,7 @@ import { useModalClose } from '@/components/binly/modal-wrapper';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { WarehouseMarkerLayer } from '@/components/binly/map-layers';
 import { getBins } from '@/lib/api/bins';
+import { WeeklyGrowthPlan } from '@/components/binly/weekly-growth-plan';
 import type { Bin } from '@/lib/types/bin';
 
 const API_BASE_URL =
@@ -391,7 +392,9 @@ export function GrowthView() {
     : null;
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 items-stretch xl:h-[clamp(480px,62vh,680px)]">
+    <div className="space-y-4">
+      <WeeklyGrowthPlan />
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 items-stretch xl:h-[clamp(480px,62vh,680px)]">
       {/* ── Map card (60%) ─────────────────────────────────────────── */}
       <Card className="p-4 xl:col-span-3 flex flex-col">
         <div className="shrink-0 mb-3">
@@ -664,6 +667,7 @@ export function GrowthView() {
       )}
 
       {toastMsg && <Toast message={toastMsg} type="success" onClose={() => setToastMsg(null)} />}
+      </div>
     </div>
   );
 }

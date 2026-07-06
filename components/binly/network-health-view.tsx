@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { WeekDetailDrawer } from '@/components/binly/week-detail-drawer';
 import { Card } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Minus, Package, CheckCircle2, AlertTriangle, Truck } from 'lucide-react';
+import { KpiStatCard } from '@/components/binly/kpi-stat-card';
+import { Package, CheckCircle2, AlertTriangle, Truck } from 'lucide-react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -53,56 +54,6 @@ async function fetchTimeseries(): Promise<{ weeks: WeekBucket[]; fleet: FleetSta
 /** Sum a numeric field over a slice of weeks. */
 function sum(weeks: WeekBucket[], f: (w: WeekBucket) => number): number {
   return weeks.reduce((s, w) => s + f(w), 0);
-}
-
-/**
- * KPI card with a delta vs the prior 4 weeks. Deltas compare the two most
- * recent 4-week windows so a single quiet week doesn't read as a trend.
- */
-function KpiCard({
-  label,
-  value,
-  delta,
-  deltaGoodWhen,
-  icon,
-  hint,
-  onClick,
-}: {
-  label: string;
-  value: string;
-  delta: number | null; // percent change vs prior window
-  deltaGoodWhen: 'up' | 'down';
-  icon: React.ReactNode;
-  hint: string;
-  onClick?: () => void;
-}) {
-  const direction = delta == null || Math.abs(delta) < 1 ? 'flat' : delta > 0 ? 'up' : 'down';
-  const isGood = direction === 'flat' ? null : (direction === deltaGoodWhen);
-  const deltaColor =
-    isGood == null ? 'text-gray-400' : isGood ? 'text-green-600' : 'text-red-500';
-  const DeltaIcon = direction === 'up' ? TrendingUp : direction === 'down' ? TrendingDown : Minus;
-
-  return (
-    <Card
-      className={`p-4 ${onClick ? 'cursor-pointer hover:bg-gray-50 transition-fast' : ''}`}
-      onClick={onClick}
-    >
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-medium text-gray-500">{label}</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
-        </div>
-        <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-          {icon}
-        </div>
-      </div>
-      <div className={`flex items-center gap-1 mt-2 text-xs font-medium ${deltaColor}`}>
-        <DeltaIcon className="w-3.5 h-3.5" />
-        <span>{delta == null ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(0)}%`}</span>
-        <span className="text-gray-400 font-normal">{hint}</span>
-      </div>
-    </Card>
-  );
 }
 
 /** Percent change between two windows; null when the baseline is empty. */
@@ -172,7 +123,7 @@ export function NetworkHealthView({
     <div className="space-y-4">
       {/* KPI strip — 4-week window vs the prior 4 weeks */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard
+        <KpiStatCard
           label="Collections (4 wks)"
           value={String(collectionsNow)}
           delta={pctChange(collectionsNow, collectionsPrior)}
@@ -181,7 +132,7 @@ export function NetworkHealthView({
           hint="vs prior 4 wks"
           onClick={onNavigate ? () => onNavigate('bins') : undefined}
         />
-        <KpiCard
+        <KpiStatCard
           label="Median Fill at Collection"
           value={fillNow != null ? `${fillNow.toFixed(0)}%` : '—'}
           delta={fillNow != null && fillPrior != null ? pctChange(fillNow, fillPrior) : null}
@@ -190,7 +141,7 @@ export function NetworkHealthView({
           hint="target 60–85%"
           onClick={onNavigate ? () => onNavigate('bins', { quadrant: 'over_visited' }) : undefined}
         />
-        <KpiCard
+        <KpiStatCard
           label="Incidents (4 wks)"
           value={String(incidentsNow)}
           delta={pctChange(incidentsNow, incidentsPrior)}
@@ -198,7 +149,7 @@ export function NetworkHealthView({
           icon={<AlertTriangle className="w-4 h-4" />}
           hint="vs prior 4 wks"
         />
-        <KpiCard
+        <KpiStatCard
           label="Shifts Run (4 wks)"
           value={String(shiftsNow)}
           delta={pctChange(shiftsNow, shiftsPrior)}

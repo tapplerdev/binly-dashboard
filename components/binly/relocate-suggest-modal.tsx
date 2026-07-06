@@ -32,11 +32,14 @@ interface ScoredCandidate {
 export function RelocateSuggestModal({
   bin,
   reason,
+  moveType = 'relocation',
   onClose,
   onDone,
 }: {
   bin: { id: string; bin_number: number };
   reason: string; // evidence line written into the move notes
+  /** 'relocation' for street bins, 'redeployment' for warehouse bins. */
+  moveType?: 'relocation' | 'redeployment';
   onClose: () => void;
   onDone: (msg: string) => void;
 }) {
@@ -64,7 +67,7 @@ export function RelocateSuggestModal({
     try {
       await createMoveRequest({
         bin_id: bin.id,
-        move_type: 'relocation',
+        move_type: moveType,
         scheduled_date: Math.floor(Date.now() / 1000) + 7 * 86400,
         reason_category: 'relocation_request',
         new_street: choice.street,
@@ -75,7 +78,7 @@ export function RelocateSuggestModal({
         notes: `${reason} → suggested destination (score ${choice.score}/100): ${choice.address}`,
       });
       queryClient.invalidateQueries({ queryKey: ['growth-candidates'] });
-      onDone(`Relocation move created for Bin #${bin.bin_number} → ${choice.street}`);
+      onDone(`${moveType === 'redeployment' ? 'Redeployment' : 'Relocation'} move created for Bin #${bin.bin_number} → ${choice.street}`);
       handleClose();
     } catch (e) {
       setErr(
@@ -95,7 +98,7 @@ export function RelocateSuggestModal({
           <div className="p-5">
             <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
               <MapPin className="w-4 h-4 text-purple-500" />
-              Relocate Bin #{bin.bin_number} to a better spot
+              {moveType === 'redeployment' ? 'Deploy' : 'Relocate'} Bin #{bin.bin_number} to a scored spot
             </p>
             <p className="text-xs text-gray-500 mt-1">{reason}</p>
 
@@ -146,7 +149,7 @@ export function RelocateSuggestModal({
                 disabled={!choice || submitting}
                 className="px-4 py-1.5 text-sm font-medium text-white bg-primary hover:bg-primary/90 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-fast focus:outline-none"
               >
-                {submitting ? 'Creating…' : 'Create relocation move'}
+                {submitting ? 'Creating…' : `Create ${moveType} move`}
               </button>
             </div>
           </div>

@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Check, X, Clock, Sparkles, ChevronDown, ChevronUp, Loader2, Inbox, Filter } from 'lucide-react';
 import { getRecommendations, acceptRecommendation, dismissRecommendation, snoozeRecommendation, AIRecommendation } from '@/lib/api/ai-recommendations';
+import { RelocateSuggestModal } from '@/components/binly/relocate-suggest-modal';
+import { getBins } from '@/lib/api/bins';
+import type { Bin } from '@/lib/types/bin';
 
 const severityConfig: Record<string, { color: string; bg: string; border: string }> = {
   critical: { color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
@@ -16,9 +19,19 @@ const typeLabels: Record<string, string> = {
   bin_overflow: 'Collection Needed',
   bin_retire: 'Retire Bin',
   bin_relocate: 'Relocate Bin',
+  bin_redeploy: 'Redeploy Bin',
+  bin_reduce_cadence: 'Reduce Cadence',
+  bin_increase_cadence: 'Increase Cadence',
+  move_stranded: 'Stranded Move',
   route_split: 'Split Route',
   route_merge: 'Merge Routes',
   driver_assign: 'Driver Assignment',
+};
+
+/** Rec types whose verb is one click away (the modal already exists). */
+const EXECUTABLE: Record<string, 'relocation' | 'redeployment'> = {
+  bin_relocate: 'relocation',
+  bin_redeploy: 'redeployment',
 };
 
 function timeAgo(timestamp: number): string {
@@ -37,10 +50,22 @@ function expiresIn(timestamp: number): string {
   return `expires in ${Math.floor(seconds / 86400)}d`;
 }
 
-function RecommendationCard({ rec, onAction }: { rec: AIRecommendation; onAction: () => void }) {
+function RecommendationCard({
+  rec,
+  onAction,
+  resolveBin,
+}: {
+  rec: AIRecommendation;
+  onAction: () => void;
+  resolveBin: (id: string) => Bin | undefined;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [acting, setActing] = useState(false);
+  const [executing, setExecuting] = useState(false);
   const queryClient = useQueryClient();
+  const executable = rec.status === 'pending' && rec.entity_id && EXECUTABLE[rec.type]
+    ? resolveBin(rec.entity_id)
+    : undefined;
 
   const config = severityConfig[rec.severity] || severityConfig.medium;
 
@@ -95,6 +120,28 @@ function RecommendationCard({ rec, onAction }: { rec: AIRecommendation; onAction
 
           {rec.recommended_action && (
             <p className="text-xs text-blue-700 mt-2 font-medium">Suggested: {rec.recommended_action}</p>
+          )}
+          {executable && (
+            <button
+              onClick={() => setExecuting(true)}
+              className="mt-2 px-3 py-1.5 text-xs font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-fast focus:outline-none"
+            >
+              {EXECUTABLE[rec.type] === 'redeployment' ? 'Deploy to a scored spot' : 'Relocate to a scored spot'}
+            </button>
+          )}
+          {executing && executable && (
+            <RelocateSuggestModal
+              bin={{ id: executable.id, bin_number: executable.bin_number }}
+              reason={rec.title}
+              moveType={EXECUTABLE[rec.type]}
+              onClose={() => setExecuting(false)}
+              onDone={async () => {
+                // The verb ran — mark the recommendation actioned and refresh.
+                try { await acceptRecommendation(rec.id); } catch { /* best-effort */ }
+                queryClient.invalidateQueries({ queryKey: ['ai-recommendations'] });
+                onAction();
+              }}
+            />
           )}
 
           {rec.reasoning && (
@@ -162,6 +209,14 @@ function RecommendationCard({ rec, onAction }: { rec: AIRecommendation; onAction
 }
 
 export function AIRecommendationsInbox() {
+  // Bin lookup backs the executable buttons (recs carry only entity_id).
+  const { data: allBinsForRecs = [] } = useQuery({
+    queryKey: ['bins-for-recs'],
+    queryFn: () => getBins(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const resolveBin = (id: string) => (allBinsForRecs as Bin[]).find(b => b.id === id);
+
   const [statusFilter, setStatusFilter] = useState<string>('pending');
   const [typeFilter, setTypeFilter] = useState<string>('');
 
@@ -250,7 +305,7 @@ export function AIRecommendationsInbox() {
       ) : (
         <div className="space-y-3">
           {recommendations.map(rec => (
-            <RecommendationCard key={rec.id} rec={rec} onAction={() => refetch()} />
+            <RecommendationCard key={rec.id} rec={rec} onAction={() => refetch()} resolveBin={resolveBin} />
           ))}
         </div>
       )}
