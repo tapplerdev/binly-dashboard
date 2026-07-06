@@ -25,6 +25,12 @@ type TabKey = (typeof TABS)[number]['key'];
 
 export function AnalyticsTabs() {
   const [tab, setTab] = useState<TabKey>('health');
+  const [binsQuadrant, setBinsQuadrant] = useState<string | undefined>(undefined);
+
+  const navigate = (target: 'bins' | 'growth', params?: { quadrant?: string }) => {
+    if (target === 'bins') setBinsQuadrant(params?.quadrant);
+    setTab(target);
+  };
 
   return (
     <div>
@@ -45,8 +51,8 @@ export function AnalyticsTabs() {
         ))}
       </div>
 
-      {tab === 'health' && <NetworkHealthView />}
-      {tab === 'bins' && <BinPerformanceView />}
+      {tab === 'health' && <NetworkHealthView onNavigate={navigate} />}
+      {tab === 'bins' && <BinPerformanceView key={binsQuadrant ?? 'all'} initialQuadrant={binsQuadrant as never} />}
       {tab === 'growth' && <GrowthView />}
       {tab === 'operations' && <BinAnalyticsDashboard />}
     </div>

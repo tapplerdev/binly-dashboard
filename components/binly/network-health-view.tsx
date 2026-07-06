@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { WeekDetailDrawer } from '@/components/binly/week-detail-drawer';
 import { Card } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, Minus, Package, CheckCircle2, AlertTriangle, Truck } from 'lucide-react';
 import {
@@ -64,6 +66,7 @@ function KpiCard({
   deltaGoodWhen,
   icon,
   hint,
+  onClick,
 }: {
   label: string;
   value: string;
@@ -71,6 +74,7 @@ function KpiCard({
   deltaGoodWhen: 'up' | 'down';
   icon: React.ReactNode;
   hint: string;
+  onClick?: () => void;
 }) {
   const direction = delta == null || Math.abs(delta) < 1 ? 'flat' : delta > 0 ? 'up' : 'down';
   const isGood = direction === 'flat' ? null : (direction === deltaGoodWhen);
@@ -79,7 +83,10 @@ function KpiCard({
   const DeltaIcon = direction === 'up' ? TrendingUp : direction === 'down' ? TrendingDown : Minus;
 
   return (
-    <Card className="p-4">
+    <Card
+      className={`p-4 ${onClick ? 'cursor-pointer hover:bg-gray-50 transition-fast' : ''}`}
+      onClick={onClick}
+    >
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-medium text-gray-500">{label}</p>
@@ -104,7 +111,13 @@ function pctChange(current: number, prior: number): number | null {
   return ((current - prior) / prior) * 100;
 }
 
-export function NetworkHealthView() {
+export function NetworkHealthView({
+  onNavigate,
+}: {
+  /** Jump to a sibling analytics tab (KPI cards pivot, they don't pop up). */
+  onNavigate?: (tab: 'bins' | 'growth', params?: { quadrant?: string }) => void;
+}) {
+  const [selectedWeek, setSelectedWeek] = useState<WeekBucket | null>(null);
   const { data, isLoading, error } = useQuery({
     queryKey: ['analytics-timeseries'],
     queryFn: fetchTimeseries,
@@ -166,6 +179,7 @@ export function NetworkHealthView() {
           deltaGoodWhen="up"
           icon={<Package className="w-4 h-4" />}
           hint="vs prior 4 wks"
+          onClick={onNavigate ? () => onNavigate('bins') : undefined}
         />
         <KpiCard
           label="Median Fill at Collection"
@@ -174,6 +188,7 @@ export function NetworkHealthView() {
           deltaGoodWhen="up"
           icon={<CheckCircle2 className="w-4 h-4" />}
           hint="target 60–85%"
+          onClick={onNavigate ? () => onNavigate('bins', { quadrant: 'over_visited' }) : undefined}
         />
         <KpiCard
           label="Incidents (4 wks)"
@@ -231,8 +246,10 @@ export function NetworkHealthView() {
               <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
               <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={30} />
               <Tooltip />
-              <Bar dataKey="collections" name="Collections" fill="#4880FF" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="shifts_completed" name="Shifts" fill="#93c5fd" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="collections" name="Collections" fill="#4880FF" radius={[3, 3, 0, 0]}
+                className="cursor-pointer" onClick={(d: { payload?: WeekBucket }) => d?.payload && setSelectedWeek(d.payload)} />
+              <Bar dataKey="shifts_completed" name="Shifts" fill="#93c5fd" radius={[3, 3, 0, 0]}
+                className="cursor-pointer" onClick={(d: { payload?: WeekBucket }) => d?.payload && setSelectedWeek(d.payload)} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
@@ -270,7 +287,8 @@ export function NetworkHealthView() {
               <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
               <YAxis allowDecimals={false} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={30} />
               <Tooltip />
-              <Bar dataKey="incidents" name="Incidents" fill="#f87171" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="incidents" name="Incidents" fill="#f87171" radius={[3, 3, 0, 0]}
+                className="cursor-pointer" onClick={(d: { payload?: WeekBucket }) => d?.payload && setSelectedWeek(d.payload)} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
@@ -283,11 +301,22 @@ export function NetworkHealthView() {
               <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
               <YAxis allowDecimals={false} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={30} />
               <Tooltip />
-              <Bar dataKey="moves" name="Moves" fill="#a78bfa" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="moves" name="Moves" fill="#a78bfa" radius={[3, 3, 0, 0]}
+                className="cursor-pointer" onClick={(d: { payload?: WeekBucket }) => d?.payload && setSelectedWeek(d.payload)} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
       </div>
+
+      {selectedWeek && (
+        <WeekDetailDrawer
+          weekStart={selectedWeek.week_start}
+          collections={selectedWeek.collections}
+          medianFill={selectedWeek.median_fill_at_collection}
+          incidents={selectedWeek.incidents}
+          onClose={() => setSelectedWeek(null)}
+        />
+      )}
     </div>
   );
 }

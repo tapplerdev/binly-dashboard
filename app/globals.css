@@ -402,3 +402,12 @@
     box-shadow: 0 2px 8px rgba(72, 128, 255, 0.4);
   }
 }
+
+/* Recharts 3 accessibility layer draws a focus rectangle around clicked
+   chart elements — suppressed globally (accessibilityLayer is also disabled
+   per-chart on the analytics views; this is the backstop). */
+.recharts-wrapper:focus,
+.recharts-wrapper *:focus,
+.recharts-surface:focus {
+  outline: none !important;
+}

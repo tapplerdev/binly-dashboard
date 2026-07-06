@@ -3,6 +3,11 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
+import { Toast } from '@/components/ui/toast';
+import { BinDetailDrawer } from '@/components/binly/bin-detail-drawer';
+import { RelocateSuggestModal } from '@/components/binly/relocate-suggest-modal';
+import { getBins } from '@/lib/api/bins';
+import type { Bin, BinWithPriority } from '@/lib/types/bin';
 import {
   ResponsiveContainer,
   ScatterChart,
@@ -53,16 +58,37 @@ const QUADRANT_META: Record<ScorecardRow['quadrant'], { label: string; color: st
 
 type SortKey = 'bin_number' | 'fill_rate_per_day' | 'median_fill_last6' | 'est_days_to_90' | 'days_since_collection';
 
-export function BinPerformanceView() {
+export function BinPerformanceView({
+  initialQuadrant,
+}: {
+  initialQuadrant?: ScorecardRow['quadrant'];
+}) {
   const { data = [], isLoading, error } = useQuery({
     queryKey: ['bin-scorecard'],
     queryFn: fetchScorecard,
     staleTime: 5 * 60 * 1000,
   });
+  // Full bin objects back the drill-down drawer (scorecard rows are slim).
+  const { data: allBins = [] } = useQuery({
+    queryKey: ['bins-for-drawer'],
+    queryFn: () => getBins(),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const [sortKey, setSortKey] = useState<SortKey>('median_fill_last6');
   const [sortAsc, setSortAsc] = useState(true);
-  const [quadrantFilter, setQuadrantFilter] = useState<ScorecardRow['quadrant'] | 'all'>('all');
+  const [quadrantFilter, setQuadrantFilter] = useState<ScorecardRow['quadrant'] | 'all'>(initialQuadrant ?? 'all');
+  const [drawerBin, setDrawerBin] = useState<BinWithPriority | null>(null);
+  const [relocateFor, setRelocateFor] = useState<{ row: ScorecardRow } | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // Any bin anywhere opens the app's richest detail surface — the existing
+  // bin drawer (check/move/incident history tabs) — not a new bespoke view.
+  const openBin = (id: string) => {
+    const bin = (allBins as Bin[]).find(b => b.id === id);
+    if (!bin) return;
+    setDrawerBin({ ...bin, priority_score: 0, has_pending_move: false, has_check_recommendation: false });
+  };
 
   const now = Math.floor(Date.now() / 1000);
   const daysSince = (t: number | null) => (t == null ? null : Math.floor((now - t) / 86400));
@@ -151,7 +177,7 @@ export function BinPerformanceView() {
                 );
               }}
             />
-            <Scatter data={scatterData}>
+            <Scatter data={scatterData} onClick={(d: { payload?: ScorecardRow }) => d?.payload && openBin(d.payload.id)} className="cursor-pointer">
               {scatterData.map(r => (
                 <Cell key={r.id} fill={QUADRANT_META[r.quadrant].color} fillOpacity={0.8} />
               ))}
@@ -196,7 +222,7 @@ export function BinPerformanceView() {
               const meta = QUADRANT_META[r.quadrant];
               const since = daysSince(r.last_collection_on);
               return (
-                <tr key={r.id} className="hover:bg-gray-50">
+                <tr key={r.id} onClick={() => openBin(r.id)} className="hover:bg-gray-50 cursor-pointer">
                   <td className="px-3 py-2 font-semibold text-gray-900">#{r.bin_number}</td>
                   <td className="px-3 py-2 text-gray-600 truncate max-w-[220px]">{r.current_street}, {r.city}</td>
                   <td className="px-3 py-2 text-gray-800">{r.fill_rate_per_day != null ? r.fill_rate_per_day.toFixed(1) : '—'}</td>
@@ -204,7 +230,17 @@ export function BinPerformanceView() {
                   <td className="px-3 py-2 text-gray-800">{since != null ? `${since}d` : 'never'}</td>
                   <td className="px-3 py-2 text-gray-800">{r.est_days_to_90 != null ? `${Math.max(0, r.est_days_to_90).toFixed(0)}d` : '—'}</td>
                   <td className="px-3 py-2">
-                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${meta.chip}`}>{meta.label}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${meta.chip}`}>{meta.label}</span>
+                      {r.quadrant === 'weak_site' && (
+                        <button
+                          onClick={e => { e.stopPropagation(); setRelocateFor({ row: r }); }}
+                          className="px-2 py-0.5 text-[10px] font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-fast focus:outline-none"
+                        >
+                          Relocate
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
@@ -215,6 +251,19 @@ export function BinPerformanceView() {
           <p className="text-center py-8 text-gray-400 text-sm">No bins in this quadrant.</p>
         )}
       </Card>
+
+      {drawerBin && <BinDetailDrawer bin={drawerBin} onClose={() => setDrawerBin(null)} />}
+
+      {relocateFor && (
+        <RelocateSuggestModal
+          bin={{ id: relocateFor.row.id, bin_number: relocateFor.row.bin_number }}
+          reason={`Weak site: collected at ${relocateFor.row.median_fill_last6?.toFixed(0) ?? '?'}% median (last ${relocateFor.row.collections_last6}), fills ${relocateFor.row.fill_rate_per_day?.toFixed(1) ?? '?'}%/day`}
+          onClose={() => setRelocateFor(null)}
+          onDone={msg => setToastMsg(msg)}
+        />
+      )}
+
+      {toastMsg && <Toast message={toastMsg} type="success" onClose={() => setToastMsg(null)} />}
     </div>
   );
 }
