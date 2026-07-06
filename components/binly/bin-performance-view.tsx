@@ -166,7 +166,7 @@ export function BinPerformanceView() {
           <button
             key={q}
             onClick={() => setQuadrantFilter(q)}
-            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none ${
               quadrantFilter === q
                 ? q === 'all' ? 'bg-gray-800 text-white' : QUADRANT_META[q].chip + ' ring-1 ring-current'
                 : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'

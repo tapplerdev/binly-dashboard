@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { APIProvider, Map as GoogleMap, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { latLngToCell, cellToBoundary } from 'h3-js';
 import { Card } from '@/components/ui/card';
 import { Warehouse, MapPin, AlertTriangle } from 'lucide-react';
 import { createMoveRequest, MoveRequestConflictError } from '@/lib/api/move-requests';
+import { useModalClose } from '@/components/binly/modal-wrapper';
+import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { getBins } from '@/lib/api/bins';
 import type { Bin } from '@/lib/types/bin';
 
@@ -105,6 +107,131 @@ function HexLayer({ hexes, breaks, onSelect }: { hexes: HexBucket[]; breaks: num
   return null;
 }
 
+/**
+ * Dashed warehouse → candidate polyline while a candidate is focused; the
+ * map pans to fit both ends so the deployment journey reads at a glance.
+ */
+function ConnectionLine({ from, to }: { from: google.maps.LatLngLiteral; to: google.maps.LatLngLiteral }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map) return;
+    const line = new google.maps.Polyline({
+      path: [from, to],
+      strokeOpacity: 0,
+      icons: [{
+        icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeWeight: 2.5, strokeColor: '#f97316' },
+        offset: '0',
+        repeat: '14px',
+      }],
+      map,
+    });
+    const bounds = new google.maps.LatLngBounds();
+    bounds.extend(from);
+    bounds.extend(to);
+    map.fitBounds(bounds, 80);
+    return () => line.setMap(null);
+  }, [map, from, to]);
+  return null;
+}
+
+/**
+ * Deploy modal — house pattern (useModalClose + global modal classes) so it
+ * gets the same fade+scale and full-page backdrop as every other modal.
+ */
+function DeployModal({
+  candidate,
+  warehouseBins,
+  onClose,
+  onDeployed,
+}: {
+  candidate: Candidate;
+  warehouseBins: Bin[];
+  onClose: () => void;
+  onDeployed: (msg: string) => void;
+}) {
+  const { handleClose, backdropClass, containerClass } = useModalClose(onClose);
+  const [binId, setBinId] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const submit = async () => {
+    if (!binId) return;
+    setSubmitting(true);
+    setErr(null);
+    try {
+      await createMoveRequest({
+        bin_id: binId,
+        move_type: 'redeployment',
+        scheduled_date: Math.floor(Date.now() / 1000) + 3 * 86400,
+        reason_category: 'relocation_request',
+        new_street: candidate.street,
+        new_city: candidate.city,
+        new_zip: candidate.zip || '',
+        new_latitude: candidate.latitude ?? undefined,
+        new_longitude: candidate.longitude ?? undefined,
+        notes: `Growth candidate (score ${candidate.score}/100): ${candidate.address}`,
+      });
+      onDeployed(`✓ Redeployment move created to ${candidate.street}`);
+      handleClose();
+    } catch (e) {
+      setErr(
+        e instanceof MoveRequestConflictError
+          ? 'That bin already has an open move — pick another.'
+          : 'Failed to create the move request.',
+      );
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <div className={backdropClass} onClick={handleClose} />
+      <div className={containerClass}>
+        <div className="modal-content modal-sm">
+          <div className="p-5">
+            <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-orange-500" />
+              Deploy a warehouse bin to {candidate.street}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Score {candidate.score}/100 · {candidate.city} · creates a redeployment move you can assign to a shift.
+            </p>
+            <select
+              value={binId}
+              onChange={e => setBinId(e.target.value)}
+              className="mt-3 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              <option value="">Choose a warehouse bin…</option>
+              {warehouseBins.map(b => (
+                <option key={b.id} value={b.id}>Bin #{b.bin_number}</option>
+              ))}
+            </select>
+            {warehouseBins.length === 0 && (
+              <p className="text-xs text-amber-600 mt-2">No bins in the warehouse right now.</p>
+            )}
+            {err && <p className="text-xs text-red-600 mt-2">{err}</p>}
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={handleClose}
+                className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submit}
+                disabled={!binId || submitting}
+                className="px-4 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors focus:outline-none"
+              >
+                {submitting ? 'Creating…' : 'Create redeployment move'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function GrowthView() {
   const { data: binYields = [], isLoading: loadingYields } = useQuery({
     queryKey: ['growth-bin-yield'],
@@ -122,9 +249,11 @@ export function GrowthView() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const queryClient = useQueryClient();
+  const { data: warehouse } = useWarehouseLocation();
   const [selectedHex, setSelectedHex] = useState<HexBucket | null>(null);
   const [deployFor, setDeployFor] = useState<Candidate | null>(null);
-  const [deployBinId, setDeployBinId] = useState('');
+  const [focusCandidate, setFocusCandidate] = useState<Candidate | null>(null);
   const [deployMsg, setDeployMsg] = useState<string | null>(null);
 
   const warehouseBins = useMemo(
@@ -172,33 +301,6 @@ export function GrowthView() {
   const candidates = candData?.candidates ?? [];
   const topCandidates = candidates.slice(0, 15);
 
-  const handleDeploy = async () => {
-    if (!deployFor || !deployBinId) return;
-    setDeployMsg(null);
-    try {
-      await createMoveRequest({
-        bin_id: deployBinId,
-        move_type: 'redeployment',
-        scheduled_date: Math.floor(Date.now() / 1000) + 3 * 86400,
-        reason_category: 'relocation_request',
-        new_street: deployFor.street,
-        new_city: deployFor.city,
-        new_zip: deployFor.zip || '',
-        new_latitude: deployFor.latitude ?? undefined,
-        new_longitude: deployFor.longitude ?? undefined,
-        notes: `Growth candidate (score ${deployFor.score}/100): ${deployFor.address}`,
-      });
-      setDeployMsg(`✓ Redeployment move created to ${deployFor.street}`);
-      setDeployFor(null);
-      setDeployBinId('');
-    } catch (e) {
-      setDeployMsg(
-        e instanceof MoveRequestConflictError
-          ? 'That bin already has an open move — pick another.'
-          : 'Failed to create the move request.',
-      );
-    }
-  };
 
   if (loadingYields || loadingCands) {
     return <div className="text-center py-16 text-gray-500">Loading growth data…</div>;
@@ -237,17 +339,28 @@ export function GrowthView() {
                 className="w-full h-full"
               >
                 <HexLayer hexes={hexes} breaks={breaks} onSelect={setSelectedHex} />
+                {warehouse && (
+                  <AdvancedMarker position={{ lat: warehouse.latitude, lng: warehouse.longitude }}>
+                    <div className="w-7 h-7 rounded-full bg-blue-600 border-2 border-white shadow flex items-center justify-center text-white text-xs">🏭</div>
+                  </AdvancedMarker>
+                )}
+                {warehouse && focusCandidate && focusCandidate.latitude != null && focusCandidate.longitude != null && (
+                  <ConnectionLine
+                    from={{ lat: warehouse.latitude, lng: warehouse.longitude }}
+                    to={{ lat: focusCandidate.latitude, lng: focusCandidate.longitude }}
+                  />
+                )}
                 {topCandidates.map(c =>
                   c.latitude != null && c.longitude != null ? (
                     <AdvancedMarker
                       key={c.id}
                       position={{ lat: c.latitude, lng: c.longitude }}
-                      onClick={() => setDeployFor(c)}
+                      onClick={() => setFocusCandidate(prev => (prev?.id === c.id ? null : c))}
                     >
                       <div
-                        className={`w-6 h-6 rounded-full border-2 border-white shadow flex items-center justify-center text-[9px] font-bold text-white ${
+                        className={`w-6 h-6 rounded-full border-2 border-white shadow flex items-center justify-center text-[9px] font-bold text-white transition-transform ${
                           c.in_no_go_zone ? 'bg-gray-400' : 'bg-orange-500'
-                        }`}
+                        } ${focusCandidate?.id === c.id ? 'scale-125 ring-2 ring-orange-300' : ''}`}
                       >
                         {c.score}
                       </div>
@@ -304,7 +417,13 @@ export function GrowthView() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {topCandidates.map(c => (
-              <tr key={c.id} className={`hover:bg-gray-50 ${c.in_no_go_zone ? 'opacity-50' : ''}`}>
+              <tr
+                key={c.id}
+                onClick={() => setFocusCandidate(prev => (prev?.id === c.id ? null : c))}
+                className={`cursor-pointer transition-colors ${
+                  focusCandidate?.id === c.id ? 'bg-orange-50' : 'hover:bg-gray-50'
+                } ${c.in_no_go_zone ? 'opacity-50' : ''}`}
+              >
                 <td className="px-3 py-2">
                   <span className={`inline-flex items-center justify-center w-9 h-6 rounded font-bold text-white ${
                     c.score >= 60 ? 'bg-green-600' : c.score >= 35 ? 'bg-amber-500' : 'bg-gray-400'
@@ -326,8 +445,8 @@ export function GrowthView() {
                 <td className="px-3 py-2 text-right">
                   {!c.in_no_go_zone && (
                     <button
-                      onClick={() => { setDeployFor(c); setDeployMsg(null); }}
-                      className="px-2.5 py-1 text-[11px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors"
+                      onClick={e => { e.stopPropagation(); setDeployFor(c); setDeployMsg(null); }}
+                      className="px-2.5 py-1 text-[11px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors focus:outline-none"
                     >
                       Deploy here
                     </button>
@@ -344,47 +463,20 @@ export function GrowthView() {
         )}
       </Card>
 
-      {/* Deploy picker */}
+      {/* Deploy modal (house pattern: fade+scale, full-page backdrop) */}
       {deployFor && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setDeployFor(null)}>
-          <div className="bg-white rounded-xl shadow-xl p-5 w-[420px] max-w-[90vw]" onClick={e => e.stopPropagation()}>
-            <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-orange-500" />
-              Deploy a warehouse bin to {deployFor.street}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              Score {deployFor.score}/100 · {deployFor.city} · creates a redeployment move you can assign to a shift.
-            </p>
-            <select
-              value={deployBinId}
-              onChange={e => setDeployBinId(e.target.value)}
-              className="mt-3 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="">Choose a warehouse bin…</option>
-              {warehouseBins.map(b => (
-                <option key={b.id} value={b.id}>Bin #{b.bin_number}</option>
-              ))}
-            </select>
-            {warehouseBins.length === 0 && (
-              <p className="text-xs text-amber-600 mt-2">No bins in the warehouse right now.</p>
-            )}
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                onClick={() => setDeployFor(null)}
-                className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeploy}
-                disabled={!deployBinId}
-                className="px-4 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 rounded-lg"
-              >
-                Create redeployment move
-              </button>
-            </div>
-          </div>
-        </div>
+        <DeployModal
+          candidate={deployFor}
+          warehouseBins={warehouseBins}
+          onClose={() => setDeployFor(null)}
+          onDeployed={msg => {
+            setDeployMsg(msg);
+            // Reactivity: refresh the candidate list + warehouse count so the
+            // deployed spot re-scores and the banner updates immediately.
+            queryClient.invalidateQueries({ queryKey: ['growth-candidates'] });
+            queryClient.invalidateQueries({ queryKey: ['bins-for-deploy'] });
+          }}
+        />
       )}
     </div>
   );
