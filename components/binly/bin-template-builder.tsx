@@ -75,6 +75,14 @@ export function BinTemplateBuilder() {
     return m;
   }, [analyticsData]);
 
+  // Per-bin demand signal (%/day) — used to tell "weak site" apart from
+  // "over-visited" when fill at collection is low.
+  const binFillRates = useMemo(() => {
+    const m = new Map<string, number>();
+    (analyticsData?.bins || []).forEach(b => m.set(b.id, b.avg_daily_fill_rate));
+    return m;
+  }, [analyticsData]);
+
   // Per-bin historical fill at collection
   const { data: binCollectionStats = {} } = useQuery({
     queryKey: ['bin-collection-stats'],
@@ -142,18 +150,44 @@ export function BinTemplateBuilder() {
     return map;
   }, [templates, bins, perfData]);
 
-  // Sort by historical fill at collection (best performers first) + assign ranks
-  // Falls back to live fill if no collection data available
+  // Fair ranking: a template only earns a rank once it has enough run history
+  // (small samples are pure luck — one rainy day sinks a 3-run template, one
+  // jackpot bin crowns a 2-run one). Qualified templates are ordered by an
+  // empirical-Bayes-shrunk fill-at-collection (pulled toward the network mean,
+  // so 8 runs can't out-shout 40). Everything below the threshold is
+  // "unproven" (rank 0) and listed after, most-run first — never celebrated,
+  // never shamed.
+  const MIN_RUNS_FOR_RANKING = 8;
+  const SHRINKAGE_K = 5;
   const rankedTemplates = useMemo(() => {
-    return [...templates]
+    const withRuns = templates
+      .map(t => perfData[t.id])
+      .filter(p => p && p.shifts_completed > 0 && p.avg_fill_at_collection != null);
+    const networkMean = withRuns.length > 0
+      ? withRuns.reduce((s, p) => s + (p!.avg_fill_at_collection as number), 0) / withRuns.length
+      : 0;
+    const shrunkFill = (id: string) => {
+      const p = perfData[id];
+      const n = p?.shifts_completed ?? 0;
+      const mean = p?.avg_fill_at_collection;
+      if (n === 0 || mean == null) return 0;
+      return (n * mean + SHRINKAGE_K * networkMean) / (n + SHRINKAGE_K);
+    };
+    const qualified = templates
+      .filter(t => (perfData[t.id]?.shifts_completed ?? 0) >= MIN_RUNS_FOR_RANKING)
+      .sort((a, b) => shrunkFill(b.id) - shrunkFill(a.id));
+    const unproven = templates
+      .filter(t => (perfData[t.id]?.shifts_completed ?? 0) < MIN_RUNS_FOR_RANKING)
       .sort((a, b) => {
-        const perfA = perfData[a.id]?.avg_fill_at_collection;
-        const perfB = perfData[b.id]?.avg_fill_at_collection;
-        const fillA = perfA ?? templatePerf.get(a.id)?.avgFill ?? 0;
-        const fillB = perfB ?? templatePerf.get(b.id)?.avgFill ?? 0;
-        return fillB - fillA;
-      })
-      .map((t, i) => ({ ...t, rank: i + 1 }));
+        const runsDiff = (perfData[b.id]?.shifts_completed ?? 0) - (perfData[a.id]?.shifts_completed ?? 0);
+        if (runsDiff !== 0) return runsDiff;
+        return (templatePerf.get(b.id)?.avgFill ?? 0) - (templatePerf.get(a.id)?.avgFill ?? 0);
+      });
+    return [
+      ...qualified.map((t, i) => ({ ...t, rank: i + 1 })),
+      // rank 0 = unproven (not enough runs to rank)
+      ...unproven.map(t => ({ ...t, rank: 0 })),
+    ];
   }, [templates, templatePerf, perfData]);
 
   // Filter templates
@@ -172,7 +206,7 @@ export function BinTemplateBuilder() {
       }
       if (perfFilter === 'top') {
         const p = templatePerf.get(template.id);
-        if (!p || template.rank > 3) return false;
+        if (!p || template.rank === 0 || template.rank > 3) return false;
       } else if (perfFilter === 'needs-runs') {
         const p = templatePerf.get(template.id);
         if (p && p.shiftsRun > 0) return false;
@@ -483,7 +517,7 @@ export function BinTemplateBuilder() {
           <div className="px-4 py-2 border-b border-gray-200 flex items-center gap-1.5 flex-wrap">
             {([
               { key: 'all' as const, label: 'All', count: templates.length },
-              { key: 'top' as const, label: 'Top 3', icon: <Trophy className="w-3 h-3" />, count: Math.min(3, templates.length) },
+              { key: 'top' as const, label: 'Top 3', icon: <Trophy className="w-3 h-3" />, count: Math.min(3, rankedTemplates.filter(t => t.rank >= 1).length) },
               { key: 'needs-runs' as const, label: 'No Runs', icon: <Clock className="w-3 h-3" />, count: templates.filter(t => !perfData[t.id]?.shifts_completed).length },
               { key: 'has-issues' as const, label: 'Issues', icon: <AlertTriangle className="w-3 h-3" />, count: templates.filter(t => (templatePerf.get(t.id)?.inactiveBins ?? 0) > 0).length },
             ]).map(chip => (
@@ -541,9 +575,13 @@ export function BinTemplateBuilder() {
               const perf = perfData[template.id];
               const histFill = perf?.shifts_completed > 0 ? perf.avg_fill_at_collection : null;
               const fillPct = histFill != null ? Math.round(histFill) : (p?.avgFill ?? 0);
-              const isTop3 = template.rank <= 3;
-              // Green tint for high performers (high fill = good)
-              const ringColor = fillPct >= 60 ? '#22c55e' : fillPct >= 35 ? '#f59e0b' : '#9ca3af';
+              const isRanked = template.rank >= 1;
+              const isTop3 = isRanked && template.rank <= 3;
+              // Performance colors only apply to REAL run history — a template
+              // with no (or few) runs shows its live fill in neutral gray so a
+              // fresh AI template can't look like a proven winner (or loser).
+              const ringColor = histFill == null ? '#9ca3af'
+                : fillPct >= 60 ? '#22c55e' : fillPct >= 35 ? '#f59e0b' : '#9ca3af';
               const circ = 113.1;
               const dashOffset = circ - (circ * Math.min(fillPct, 100) / 100);
 
@@ -558,11 +596,15 @@ export function BinTemplateBuilder() {
                   }`}
                 >
                   <div className="flex items-center gap-3 p-3">
-                    {/* Rank badge */}
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
-                      isTop3 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      {isTop3 && template.rank === 1 ? <Trophy className="w-3.5 h-3.5" /> : `#${template.rank}`}
+                    {/* Rank badge — unproven templates (< 8 runs) get a neutral
+                        dot instead of a rank they haven't earned */}
+                    <div
+                      title={isRanked ? `Ranked #${template.rank} by fill at collection (shrunk, ${MIN_RUNS_FOR_RANKING}+ runs)` : `Unproven — needs ${MIN_RUNS_FOR_RANKING}+ runs to rank`}
+                      className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
+                        isTop3 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'
+                      }`}
+                    >
+                      {!isRanked ? '·' : isTop3 && template.rank === 1 ? <Trophy className="w-3.5 h-3.5" /> : `#${template.rank}`}
                     </div>
 
                     {/* Donut ring */}
@@ -714,21 +756,31 @@ export function BinTemplateBuilder() {
               const p = templatePerf.get(selectedTemplate.id);
               const fill = p?.avgFill ?? selectedTemplateMetrics.avgFill;
               const rank = rankedTemplates.find(t => t.id === selectedTemplate.id)?.rank ?? 0;
-              const isTop3 = rank <= 3;
-              const heroBg = fill >= 60 ? 'bg-green-50' : fill >= 35 ? 'bg-amber-50' : 'bg-gray-50';
-              const ringColor = fill >= 60 ? '#22c55e' : fill >= 35 ? '#f59e0b' : '#9ca3af';
+              const isRanked = rank >= 1;
+              const isTop3 = isRanked && rank <= 3;
+              const perf = perfData[selectedTemplate.id];
+              const hasRunHistory = (perf?.shifts_completed ?? 0) > 0;
+              // Performance coloring is earned by run history; unproven
+              // templates stay neutral regardless of live fill.
+              const heroBg = !hasRunHistory ? 'bg-gray-50'
+                : fill >= 60 ? 'bg-green-50' : fill >= 35 ? 'bg-amber-50' : 'bg-gray-50';
+              const ringColor = !hasRunHistory ? '#9ca3af'
+                : fill >= 60 ? '#22c55e' : fill >= 35 ? '#f59e0b' : '#9ca3af';
               const circ = 150.8;
               const dashOff = circ - (circ * Math.min(fill, 100) / 100);
-              const perf = perfData[selectedTemplate.id];
 
               return (
                 <div className={`p-5 ${heroBg} border-b border-gray-200`}>
                   <div className="flex items-center gap-4">
                     {/* Rank */}
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                      isTop3 ? 'bg-amber-200 text-amber-800' : 'bg-gray-200 text-gray-600'
-                    }`}>
-                      {rank === 1 ? <Trophy className="w-5 h-5" /> : <span className="text-sm font-bold">#{rank}</span>}
+                    <div
+                      title={isRanked ? `Ranked #${rank}` : `Unproven — needs ${MIN_RUNS_FOR_RANKING}+ runs to rank`}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                        isTop3 ? 'bg-amber-200 text-amber-800' : 'bg-gray-200 text-gray-600'
+                      }`}
+                    >
+                      {!isRanked ? <span className="text-[9px] font-bold leading-tight text-center">LOW<br/>DATA</span>
+                        : rank === 1 ? <Trophy className="w-5 h-5" /> : <span className="text-sm font-bold">#{rank}</span>}
                     </div>
                     {/* Large donut */}
                     <div className="relative w-14 h-14 shrink-0">
@@ -848,11 +900,18 @@ export function BinTemplateBuilder() {
                   const displayFill = histFill ?? (bin.fill_percentage ?? 0);
                   const checks = histStat?.check_count ?? 0;
                   const isNew = (binCheckCounts.get(bin.id) ?? 0) < 5;
-                  const isLowPerformer = !isNew && checks >= 5 && histFill !== null && histFill < 15;
+                  // Quadrant test: low fill AT COLLECTION alone doesn't mean a
+                  // bad bin — it splits on the site's own demand (fill %/day).
+                  //   weak site    = low at collection AND fills slowly → relocation candidate
+                  //   over-visited = low at collection but fills fine  → we come too early (cadence fix, NOT a move)
+                  const fillRate = binFillRates.get(bin.id);
+                  const lowAtCollection = !isNew && checks >= 5 && histFill !== null && histFill < 30;
+                  const isWeakSite = lowAtCollection && (fillRate ?? 0) < 1.5;
+                  const isOverVisited = lowAtCollection && (fillRate ?? 0) >= 1.5;
                   const fillColor = displayFill >= 60 ? 'bg-green-500' : displayFill >= 35 ? 'bg-amber-500' : displayFill >= 15 ? 'bg-gray-400' : 'bg-red-400';
 
                   return (
-                    <div key={bin.id} className={`flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-fast ${isLowPerformer ? 'bg-red-50/50' : ''}`}>
+                    <div key={bin.id} className={`flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-fast ${isWeakSite ? 'bg-red-50/50' : isOverVisited ? 'bg-amber-50/50' : ''}`}>
                       <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center relative overflow-hidden">
                         <div className={`absolute bottom-0 left-0 right-0 ${fillColor} transition-all`}
                           style={{ height: `${displayFill}%` }} />
@@ -867,15 +926,22 @@ export function BinTemplateBuilder() {
                             Also on: {overlaps.get(bin.id)!.filter(n => n !== selectedTemplate?.name).join(', ')}
                           </p>
                         )}
-                        {isLowPerformer && (
-                          <p className="text-[9px] text-red-500 font-medium">Avg {histFill}% over {checks} checks</p>
+                        {isWeakSite && (
+                          <p className="text-[9px] text-red-500 font-medium">
+                            Weak site — avg {histFill}% over {checks} checks{fillRate != null ? `, fills ${fillRate.toFixed(1)}%/day` : ''}
+                          </p>
+                        )}
+                        {isOverVisited && (
+                          <p className="text-[9px] text-amber-600 font-medium">
+                            Over-visited — fills {fillRate!.toFixed(1)}%/day but collected at {histFill}%. Visit less often.
+                          </p>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {isNew && (
                           <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-medium">New</span>
                         )}
-                        {isLowPerformer && (
+                        {isWeakSite && (
                           <button
                             onClick={async (e) => {
                               e.stopPropagation();
@@ -885,7 +951,7 @@ export function BinTemplateBuilder() {
                                   move_type: 'relocation',
                                   scheduled_date: Math.floor(Date.now() / 1000) + 7 * 86400,
                                   reason_category: 'relocation_request',
-                                  notes: `Low performer: avg ${histFill}% fill over ${checks} checks`,
+                                  notes: `Weak site: avg ${histFill}% at collection over ${checks} checks, fills ${fillRate != null ? fillRate.toFixed(1) : '?'}%/day`,
                                 });
                                 alert(`Move request created for Bin #${bin.bin_number}`);
                               } catch { alert('Failed to create move request'); }
