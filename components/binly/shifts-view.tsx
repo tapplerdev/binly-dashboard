@@ -194,6 +194,55 @@ export function CreateShiftDrawer({
   const [moveRequestFocusBinId, setMoveRequestFocusBinId] = useState<string | null>(null);
   const driverDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Load bins on mount so inactive-bin detection works even before the bin
+  // picker is opened (allBins is otherwise only populated lazily).
+  useEffect(() => {
+    getBins().then(setAllBins).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Tasks whose bin can't be routed (retired, missing, or in the warehouse).
+  // The backend would silently skip these at create time — surface them here
+  // and gate submit until each is resolved (removed or converted to a
+  // warehouse deployment).
+  const inactiveTaskEntries = useMemo(() => {
+    if (allBins.length === 0) return [];
+    const inactiveStatuses = ['retired', 'missing', 'in_storage'];
+    return tasks
+      .map((task, index) => ({
+        task,
+        index,
+        bin: task.bin_id ? allBins.find(b => b.id === task.bin_id) : undefined,
+      }))
+      .filter(e => !e.task.isExisting && e.bin && inactiveStatuses.includes(e.bin.status));
+  }, [tasks, allBins]);
+
+  const removeTaskAt = (index: number) => {
+    setTasks(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Convert an in_storage bin's task into a warehouse deployment: the stop's
+  // own coordinates become the deployment destination (editable afterwards in
+  // the deployments section), and the task leaves the list.
+  const convertTaskToDeployment = (index: number) => {
+    const task = tasks[index];
+    const bin = task?.bin_id ? allBins.find(b => b.id === task.bin_id) : undefined;
+    if (!task || !bin) return;
+    if (!warehouseDeployments.some(d => d.bin_id === bin.id)) {
+      setWarehouseDeployments(prev => [
+        ...prev,
+        {
+          bin_id: bin.id,
+          bin_number: bin.bin_number,
+          destination_address: task.address,
+          destination_latitude: task.latitude,
+          destination_longitude: task.longitude,
+        },
+      ]);
+    }
+    removeTaskAt(index);
+  };
+
   // Close dropdown with animation
   const closeDriverDropdown = () => {
     setIsDriverClosing(true);
@@ -1693,6 +1742,18 @@ export function CreateShiftDrawer({
         throw new Error(errorMessage);
       }
 
+      // Fallback for races past the pre-submit gate (e.g. a bin retired
+      // between load and submit): the backend reports any stops it dropped.
+      try {
+        const result = await response.json();
+        const skipped = result?.data?.skipped_bins;
+        if (Array.isArray(skipped) && skipped.length > 0) {
+          console.warn('⚠️ Backend skipped inactive bins at creation:', skipped);
+        }
+      } catch {
+        // Body already consumed or not JSON — nothing to surface
+      }
+
       // Invalidate shifts cache to trigger refetch and show the updated/new shift immediately
       console.log(`✅ Shift ${isEditMode ? 'updated' : 'created'} successfully, invalidating cache...`);
       queryClient.invalidateQueries({ queryKey: shiftKeys.all });
@@ -2917,6 +2978,43 @@ export function CreateShiftDrawer({
               </div>
             )}
 
+            {/* Inactive bins must be resolved before submit — the backend would
+                silently drop these stops otherwise. */}
+            {inactiveTaskEntries.length > 0 && (
+              <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-2">
+                <p className="text-xs font-semibold text-amber-800">
+                  {inactiveTaskEntries.length} stop{inactiveTaskEntries.length !== 1 ? 's' : ''} can&apos;t be routed — the bin is not in the field
+                </p>
+                {inactiveTaskEntries.map(({ task, index, bin }) => (
+                  <div key={`${task.bin_id}-${index}`} className="flex items-center gap-2 text-xs">
+                    <span className="font-medium text-gray-800 shrink-0">Bin #{bin!.bin_number}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
+                      bin!.status === 'in_storage' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
+                    }`}>
+                      {bin!.status === 'in_storage' ? 'in warehouse' : bin!.status}
+                    </span>
+                    <span className="text-gray-500 truncate flex-1">{task.address}</span>
+                    {bin!.status === 'in_storage' && (
+                      <button
+                        type="button"
+                        onClick={() => convertTaskToDeployment(index)}
+                        className="px-2 py-1 text-[11px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors shrink-0"
+                      >
+                        Deploy from warehouse
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeTaskAt(index)}
+                      className="px-2 py-1 text-[11px] font-medium text-gray-600 bg-white border border-gray-200 rounded hover:bg-gray-100 transition-colors shrink-0"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <button
                 type="button"
@@ -2928,7 +3026,7 @@ export function CreateShiftDrawer({
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting || !driverId || tasks.length === 0 || (tasks.some(t => ['collection', 'placement', 'pickup', 'dropoff'].includes(t.type)) && !truckCapacity)}
+                disabled={isSubmitting || !driverId || tasks.length === 0 || inactiveTaskEntries.length > 0 || (tasks.some(t => ['collection', 'placement', 'pickup', 'dropoff'].includes(t.type)) && !truckCapacity)}
                 className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-all flex items-center gap-2"
               >
                 {isSubmitting ? (
