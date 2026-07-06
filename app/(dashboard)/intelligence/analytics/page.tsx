@@ -1,14 +1,14 @@
-import { BinAnalyticsDashboard } from '@/components/binly/bin-analytics-dashboard';
+import { AnalyticsTabs } from '@/components/binly/analytics-tabs';
 
 export const metadata = {
   title: 'Analytics - Binly Dashboard',
-  description: 'Bin performance analytics and fill rate insights',
+  description: 'Network health trends and bin performance analytics',
 };
 
 export default function AnalyticsPage() {
   return (
     <div className="p-4 md:p-6">
-      <BinAnalyticsDashboard />
+      <AnalyticsTabs />
     </div>
   );
 }
