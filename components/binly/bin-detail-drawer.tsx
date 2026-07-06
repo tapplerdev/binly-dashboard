@@ -8,7 +8,7 @@ import { ZoneIncident, formatIncidentType, getIncidentIcon } from '@/lib/types/z
 import { getMoveRequest, getMoveRequests, cancelMoveRequest } from '@/lib/api/move-requests';
 import { BinWithPriority, getMoveRequestUrgency, getMoveRequestBadgeColor, type MoveRequest, type BinCheck } from '@/lib/types/bin';
 import { AssignMovesModal } from '@/components/binly/assign-moves-modal';
-import { CheckDetailModal } from '@/components/binly/check-detail-modal';
+import { CheckDetailModal, isPreviousLocation } from '@/components/binly/check-detail-modal';
 import { MoveRequestHistoryDetail } from '@/components/binly/move-request-history-detail';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -777,6 +777,17 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onEdit }: BinDet
                                 {format(new Date(check.checkedOnIso), 'PPp')}
                               </span>
                             </div>
+                            {/* Only checks recorded before the bin moved get an
+                                address line — same-address rows stay clean. */}
+                            {isPreviousLocation(check.binLocation, `${bin.current_street}, ${bin.city}, ${bin.zip}`) && (
+                              <div className="flex items-center gap-2">
+                                <MapPin className="w-4 h-4 text-amber-500 shrink-0" />
+                                <span className="text-gray-600 truncate">{check.binLocation}</span>
+                                <Badge className="bg-amber-50 text-amber-700 border border-amber-200 text-xs shrink-0">
+                                  previous location
+                                </Badge>
+                              </div>
+                            )}
                           </div>
                         </div>
                         {check.photoUrl && (
@@ -1246,6 +1257,7 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onEdit }: BinDet
         check={selectedCheck}
         isOpen={isCheckModalOpen}
         onClose={handleCheckModalClose}
+        currentAddress={`${bin.current_street}, ${bin.city}, ${bin.zip}`}
       />
     </>
   );

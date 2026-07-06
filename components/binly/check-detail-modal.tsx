@@ -9,9 +9,28 @@ interface CheckDetailModalProps {
   check: BinCheck | null;
   isOpen: boolean;
   onClose: () => void;
+  /** The bin's CURRENT address — enables the "previous location" label on
+   *  checks recorded before the bin moved. */
+  currentAddress?: string;
 }
 
-export function CheckDetailModal({ check, isOpen, onClose }: CheckDetailModalProps) {
+/**
+ * True when a check's snapshot address differs from the bin's current one —
+ * i.e. the check predates a move. Compares normalized street segments only,
+ * so formatting drift in city/zip (e.g. "94063" vs "94063-2853") doesn't
+ * produce false "previous location" tags.
+ */
+export function isPreviousLocation(
+  checkAddress: string | null | undefined,
+  currentAddress: string | null | undefined
+): boolean {
+  if (!checkAddress || !currentAddress) return false;
+  const streetOf = (a: string) =>
+    (a.split(',')[0] ?? a).toLowerCase().replace(/[^a-z0-9]/g, '');
+  return streetOf(checkAddress) !== streetOf(currentAddress);
+}
+
+export function CheckDetailModal({ check, isOpen, onClose, currentAddress }: CheckDetailModalProps) {
   if (!check) return null;
 
   // Calculate fill percentage change
@@ -149,7 +168,14 @@ export function CheckDetailModal({ check, isOpen, onClose }: CheckDetailModalPro
             <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg md:col-span-2">
               <MapPin className="h-5 w-5 text-gray-600 mt-0.5" />
               <div>
-                <p className="text-xs text-gray-500 font-medium">Bin Location</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-gray-500 font-medium">Bin Location</p>
+                  {isPreviousLocation(check.binLocation, currentAddress) && (
+                    <span className="px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-semibold">
+                      previous location
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm font-semibold text-gray-900">
                   {check.binLocation || check.checkedFrom || 'Unknown location'}
                 </p>
