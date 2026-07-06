@@ -226,7 +226,7 @@ export function NetworkHealthView() {
         <Card className="p-4">
           <p className="text-sm font-semibold text-gray-900 mb-3">Collections & Shifts per Week</p>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={chartData}>
+            <BarChart data={chartData} accessibilityLayer={false}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
               <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={30} />
@@ -243,7 +243,7 @@ export function NetworkHealthView() {
             <span className="ml-2 text-xs font-normal text-gray-400">shaded band = 60–85% target</span>
           </p>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={chartData}>
+            <LineChart data={chartData} accessibilityLayer={false}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
               <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={30} />
@@ -265,7 +265,7 @@ export function NetworkHealthView() {
         <Card className="p-4">
           <p className="text-sm font-semibold text-gray-900 mb-3">Incidents per Week</p>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={chartData}>
+            <BarChart data={chartData} accessibilityLayer={false}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
               <YAxis allowDecimals={false} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={30} />
@@ -278,7 +278,7 @@ export function NetworkHealthView() {
         <Card className="p-4">
           <p className="text-sm font-semibold text-gray-900 mb-3">Bin Moves per Week</p>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={chartData}>
+            <BarChart data={chartData} accessibilityLayer={false}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
               <YAxis allowDecimals={false} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={30} />

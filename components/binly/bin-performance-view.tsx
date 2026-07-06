@@ -121,7 +121,7 @@ export function BinPerformanceView() {
           above 85% = <span className="text-red-600 font-medium">overflow risk (increase cadence)</span>.
         </p>
         <ResponsiveContainer width="100%" height={300}>
-          <ScatterChart margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+          <ScatterChart accessibilityLayer={false} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
             <XAxis
               type="number" dataKey="fill_rate_per_day" name="Fill rate"
               unit="%/d" tick={{ fontSize: 11 }} domain={[0, 'auto']}
