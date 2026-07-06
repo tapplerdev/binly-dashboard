@@ -44,7 +44,15 @@ interface WeeklyPlan {
 async function fetchPlan(): Promise<WeeklyPlan> {
   const r = await fetch(`${API_BASE_URL}/api/analytics/growth/weekly-plan`, { cache: 'no-store' });
   if (!r.ok) throw new Error('Failed to fetch weekly plan');
-  return (await r.json()).data;
+  const d = (await r.json()).data;
+  // Normalize at the boundary: empty sections may arrive as null.
+  return {
+    watching: d.watching ?? [],
+    escalations: d.escalations ?? [],
+    redeploys: d.redeploys ?? [],
+    cadence_ups: d.cadence_ups ?? [],
+    applied_7d: d.applied_7d ?? [],
+  };
 }
 
 /**
