@@ -3,16 +3,19 @@
 import { useState } from 'react';
 import { BinAnalyticsDashboard } from '@/components/binly/bin-analytics-dashboard';
 import { NetworkHealthView } from '@/components/binly/network-health-view';
-import { Activity, LayoutDashboard } from 'lucide-react';
+import { BinPerformanceView } from '@/components/binly/bin-performance-view';
+import { Activity, LayoutDashboard, Target } from 'lucide-react';
 
 /**
  * Analytics is organized by DECISION, not data type:
- *  - Network Health — "is the machine OK this month?" (trends, exec glance)
- *  - Operations     — "what needs collecting now?" (the original snapshot view)
- * Future tabs slot in here: Bin Performance (phase 2), Growth (phase 4).
+ *  - Network Health  — "is the machine OK this month?" (trends, exec glance)
+ *  - Bin Performance — "which bins need cadence changes or relocation?"
+ *  - Operations      — "what needs collecting now?" (the original snapshot view)
+ * Future tab: Growth (phase 4).
  */
 const TABS = [
   { key: 'health', label: 'Network Health', icon: Activity },
+  { key: 'bins', label: 'Bin Performance', icon: Target },
   { key: 'operations', label: 'Operations', icon: LayoutDashboard },
 ] as const;
 
@@ -41,6 +44,7 @@ export function AnalyticsTabs() {
       </div>
 
       {tab === 'health' && <NetworkHealthView />}
+      {tab === 'bins' && <BinPerformanceView />}
       {tab === 'operations' && <BinAnalyticsDashboard />}
     </div>
   );
