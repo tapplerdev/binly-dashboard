@@ -20,6 +20,12 @@ interface BinMarkersLayerProps {
   zIndex?: number;
   /** Statuses to exclude */
   excludeStatuses?: string[];
+  /**
+   * When set, only these bin ids render at full opacity — the rest dim to
+   * 25% (dim, don't remove: spatial context survives filtering). null/undefined
+   * shows everything normally.
+   */
+  highlightBinIds?: Set<string> | null;
 }
 
 const SIZE_MAP = { sm: 16, md: 24, lg: 32 };
@@ -38,6 +44,7 @@ export function BinMarkersLayer({
   onBinClick,
   zIndex = 10,
   excludeStatuses = ['in_storage', 'retired'],
+  highlightBinIds = null,
 }: BinMarkersLayerProps) {
   const map = useMap();
   const { data: hookBins } = useBins();
@@ -112,6 +119,17 @@ export function BinMarkersLayer({
 
     return () => {};
   }, [map, filteredBins, handleClick, markersRef, px, fontSize, showLabels, zIndex, onBinClick]);
+
+  // Dim/undim without recreating markers.
+  useEffect(() => {
+    markersRef.current.forEach((marker, id) => {
+      const el = marker.content as HTMLElement | null;
+      if (!el) return;
+      const dimmed = highlightBinIds != null && !highlightBinIds.has(id);
+      el.style.opacity = dimmed ? '0.25' : '1';
+      marker.zIndex = dimmed ? zIndex - 1 : zIndex;
+    });
+  }, [highlightBinIds, markersRef, zIndex, filteredBins]);
 
   // Full cleanup on unmount
   useEffect(() => {

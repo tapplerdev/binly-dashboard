@@ -4,26 +4,27 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
-import { useHomeData } from '@/components/binly/home/use-home-data';
-import { ExceptionStrip } from '@/components/binly/home/exception-strip';
-import { NeedsAttentionBoard } from '@/components/binly/home/needs-attention-board';
-import { TodaysPlanCard } from '@/components/binly/home/todays-plan-card';
+import { useHomeData, HomeMapFilter } from '@/components/binly/home/use-home-data';
+import { StatChipBand } from '@/components/binly/home/stat-chip-band';
+import { MapHero } from '@/components/binly/home/map-hero';
 import { YesterdayRecap } from '@/components/binly/home/yesterday-recap';
-import { HomeNetworkMap } from '@/components/binly/home/home-network-map';
 import { ActivityFeed } from '@/components/binly/home/activity-feed';
 import { BinDetailDrawer } from '@/components/binly/bin-detail-drawer';
 import { AssignMovesModal } from '@/components/binly/assign-moves-modal';
 import type { MoveRequest } from '@/lib/types/bin';
 
 /**
- * Home — the morning briefing. Answers "what needs my attention right now?"
- * in exception counts and a triage board, promotes into live ops while a
- * shift is running, and pushes analysis/management to the pages that own it.
+ * Home — the bin-status map IS the page (the category norm for fill-driven
+ * bin operations: the morning ritual is "open the app and see the orange
+ * and red dots"). The stat chips above it double as map filters so every
+ * count is verifiable as exactly those dots; the triage rail beside it is
+ * the work queue. Drivers are an overlay that lights up during shifts.
  */
 export default function HomePage() {
   const data = useHomeData();
   const queryClient = useQueryClient();
 
+  const [mapFilter, setMapFilter] = useState<HomeMapFilter>(null);
   const [selectedBinId, setSelectedBinId] = useState<string | null>(null);
   const [moveToAssign, setMoveToAssign] = useState<MoveRequest | null>(null);
 
@@ -55,10 +56,10 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background p-3 md:p-6">
-      <div className="max-w-[1600px] mx-auto space-y-4 md:space-y-5">
-        {/* Slot 0 — header status line */}
+      <div className="max-w-[1600px] mx-auto space-y-3 md:space-y-4">
+        {/* Slim header — nothing competes with the map for the fold */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
+          <div className="flex flex-wrap items-baseline gap-x-3">
             <h1 className="text-xl font-semibold text-gray-900">
               {new Date().toLocaleDateString([], {
                 weekday: 'long',
@@ -66,7 +67,7 @@ export default function HomePage() {
                 day: 'numeric',
               })}
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5">{statusSentence}</p>
+            <p className="text-sm text-gray-500">{statusSentence}</p>
           </div>
           <Link
             href="/operations/shifts"
@@ -76,29 +77,22 @@ export default function HomePage() {
           </Link>
         </div>
 
-        {/* Slot 1 — exception counts */}
-        <ExceptionStrip data={data} />
+        {/* Stat chips — each one filters the map to exactly the bins it counts */}
+        <StatChipBand data={data} activeFilter={mapFilter} onFilterChange={setMapFilter} />
 
-        {/* Slot 2 — triage board */}
-        <NeedsAttentionBoard
+        {/* Map hero + docked triage rail */}
+        <MapHero
           data={data}
+          activeFilter={mapFilter}
           onBinSelect={setSelectedBinId}
           onAssignMove={setMoveToAssign}
         />
 
-        {/* Slots 3 + 4 — today's plan (live-promoting) and yesterday's recap */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-5">
-          <div className="xl:col-span-2">
-            <TodaysPlanCard data={data} />
-          </div>
-          <div className="space-y-4 md:space-y-5">
-            <YesterdayRecap data={data} />
-            <ActivityFeed />
-          </div>
+        {/* Below the fold: yesterday's results + ambient activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
+          <YesterdayRecap data={data} />
+          <ActivityFeed />
         </div>
-
-        {/* Slot 5 — ambient network map */}
-        <HomeNetworkMap onBinClick={setSelectedBinId} />
       </div>
 
       {/* Drawers & modals owned by the page */}

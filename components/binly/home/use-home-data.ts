@@ -14,6 +14,17 @@ import type { Shift } from '@/lib/types/shift';
 
 const OPEN_MOVE_STATUSES = new Set(['pending', 'assigned', 'in_progress', 'overdue']);
 
+/**
+ * The active map filter — each stat chip maps to the exact set of bins it
+ * counts, so clicking a number shows precisely those dots.
+ */
+export type HomeMapFilter =
+  | 'critical'
+  | 'projected'
+  | 'overdue-moves'
+  | 'stale'
+  | null;
+
 function localDateString(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
     d.getDate()
@@ -105,9 +116,29 @@ export function useHomeData() {
     const collectedBins = todaysShifts.reduce((sum, s) => sum + (s.binsCollected || 0), 0);
 
     const criticalCount = priorities.data?.summary.critical ?? 0;
-    const staleCheckCount = (binsWithPriority.data ?? []).filter(
+    const priorityBins = priorities.data?.priorities ?? [];
+    const criticalBinIds = new Set(
+      priorityBins.filter((b) => b.urgency === 'critical').map((b) => b.id)
+    );
+
+    // Projected critical within ~48h: current estimate plus two days of the
+    // bin's own fill velocity crosses the critical line. Both inputs already
+    // ship in the daily-priorities payload — this is the forward-looking
+    // stat every bin-monitoring product headlines.
+    const projectedBins = priorityBins.filter(
+      (b) =>
+        b.urgency !== 'critical' &&
+        b.avg_daily_fill_rate > 0 &&
+        b.estimated_current_fill + 2 * b.avg_daily_fill_rate >= 90
+    );
+    const projectedBinIds = new Set(projectedBins.map((b) => b.id));
+
+    const staleBins = (binsWithPriority.data ?? []).filter(
       (b) => b.status === 'active' && b.has_check_recommendation
-    ).length;
+    );
+    const staleCheckCount = staleBins.length;
+    const staleBinIds = new Set(staleBins.map((b) => b.id));
+    const overdueMoveBinIds = new Set(overdueMoves.map((m) => m.bin_id));
     const missingCount = (binsWithPriority.data ?? []).filter(
       (b) => b.status === 'missing'
     ).length;
@@ -122,7 +153,12 @@ export function useHomeData() {
       plannedBins,
       collectedBins,
       criticalCount,
+      criticalBinIds,
+      projectedCount: projectedBins.length,
+      projectedBinIds,
       staleCheckCount,
+      staleBinIds,
+      overdueMoveBinIds,
       missingCount,
       pendingRecCount,
     };
