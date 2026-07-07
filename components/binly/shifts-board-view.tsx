@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Plus, LayoutGrid, List, Clock } from 'lucide-react';
 import { DriverColumn } from './driver-column';
 import { CreateShiftDrawer } from './shifts-view';
+import { ShiftComposer } from './shift-composer/shift-composer';
 import { ShiftDetailsDrawer } from './shift-details-drawer';
 import { ShiftHistoryView } from './shift-history-view';
 import { EditShiftModal } from './edit-shift-modal';
@@ -96,6 +97,7 @@ export function ShiftsBoardView() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'kanban' | 'table' | 'history'>('kanban');
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
+  const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [selectedShiftForDetails, setSelectedShiftForDetails] = useState<Shift | null>(null);
   const [preselectedDriverId, setPreselectedDriverId] = useState<string | null>(null);
   const [editingShift, setEditingShift] = useState<any>(null);
@@ -185,7 +187,9 @@ export function ShiftsBoardView() {
 
   const handleCreateShift = (driverId?: string) => {
     if (driverId) setPreselectedDriverId(driverId);
-    setIsCreateDrawerOpen(true);
+    // Map-canvas composer is the default create experience; the classic
+    // form drawer stays reachable via "Advanced form" inside it.
+    setIsComposerOpen(true);
   };
 
   const handleSelectShift = (shift: any) => {
@@ -555,6 +559,21 @@ export function ShiftsBoardView() {
       </div>
 
       {/* Create Shift Drawer */}
+      {isComposerOpen && (
+        <ShiftComposer
+          defaultDriverId={preselectedDriverId || undefined}
+          scheduledDate={toLocalDateStr(selectedDate)}
+          onClose={() => {
+            setIsComposerOpen(false);
+            setPreselectedDriverId(null);
+          }}
+          onSwitchToClassic={() => {
+            setIsComposerOpen(false);
+            setIsCreateDrawerOpen(true);
+          }}
+        />
+      )}
+
       {isCreateDrawerOpen && (
         <CreateShiftDrawer
           defaultDriverId={preselectedDriverId || undefined}
