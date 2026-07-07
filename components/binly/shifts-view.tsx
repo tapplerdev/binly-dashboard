@@ -83,6 +83,16 @@ interface WarehouseDeploymentItem {
 }
 
 // Create/Edit Shift Drawer Component
+// ═══════════════════════════════════════════════════════════════════════════
+// RETIRED (2026-07-07): CreateShiftDrawer is no longer mounted anywhere.
+// The map-canvas ShiftComposer (components/binly/shift-composer/) is the
+// single create-shift experience; its Details tab carries this drawer's
+// scheduling, capacity, label, lock-order, and custom start/end features,
+// and service stops are placed directly on the map. This code is kept
+// intact as reference for the remaining unported niches (per-task time
+// windows, placement tasks from potential locations) — delete once those
+// land in the composer or are confirmed unwanted.
+// ═══════════════════════════════════════════════════════════════════════════
 export function CreateShiftDrawer({
   shift,
   onClose,

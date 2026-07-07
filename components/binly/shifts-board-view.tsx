@@ -4,7 +4,6 @@ import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Plus, LayoutGrid, List, Clock } from 'lucide-react';
 import { DriverColumn } from './driver-column';
-import { CreateShiftDrawer } from './shifts-view';
 import { ShiftComposer } from './shift-composer/shift-composer';
 import { ShiftDetailsDrawer } from './shift-details-drawer';
 import { ShiftHistoryView } from './shift-history-view';
@@ -96,7 +95,6 @@ async function fetchShiftTasks(shiftId: string): Promise<any[]> {
 export function ShiftsBoardView() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'kanban' | 'table' | 'history'>('kanban');
-  const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [selectedShiftForDetails, setSelectedShiftForDetails] = useState<Shift | null>(null);
   const [preselectedDriverId, setPreselectedDriverId] = useState<string | null>(null);
@@ -558,7 +556,8 @@ export function ShiftsBoardView() {
         )}
       </div>
 
-      {/* Create Shift Drawer */}
+      {/* Shift composer — the single create experience (classic
+          CreateShiftDrawer is retired; see shifts-view.tsx) */}
       {isComposerOpen && (
         <ShiftComposer
           defaultDriverId={preselectedDriverId || undefined}
@@ -566,26 +565,6 @@ export function ShiftsBoardView() {
           onClose={() => {
             setIsComposerOpen(false);
             setPreselectedDriverId(null);
-          }}
-          onSwitchToClassic={() => {
-            setIsComposerOpen(false);
-            setIsCreateDrawerOpen(true);
-          }}
-        />
-      )}
-
-      {isCreateDrawerOpen && (
-        <CreateShiftDrawer
-          defaultDriverId={preselectedDriverId || undefined}
-          scheduledDate={selectedDate}
-          onClose={() => {
-            setIsCreateDrawerOpen(false);
-            setPreselectedDriverId(null);
-          }}
-          onViewExistingShift={(shiftCreatedAt: number) => {
-            setIsCreateDrawerOpen(false);
-            setPreselectedDriverId(null);
-            setSelectedDate(new Date(shiftCreatedAt * 1000));
           }}
         />
       )}
