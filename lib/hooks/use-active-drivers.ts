@@ -10,27 +10,13 @@ export function useActiveDrivers() {
   const { token } = useAuthStore();
   const queryClient = useQueryClient();
 
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('🚗 useActiveDrivers Hook Called');
-  console.log('   Token:', token ? `${token.substring(0, 20)}...` : 'NONE');
-  console.log('   Backend URL:', BACKEND_URL);
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
   // Fetch initial list of active drivers
   const { data: drivers, isLoading, error } = useQuery({
     queryKey: ['active-drivers'],
     queryFn: async () => {
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('📡 Fetching Active Drivers from API');
-      console.log('   URL:', `${BACKEND_URL}/api/manager/active-drivers`);
-      console.log('   Has Token:', !!token);
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
       const response = await fetch(`${BACKEND_URL}/api/manager/active-drivers`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-
-      console.log('📡 API Response Status:', response.status, response.statusText);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -39,7 +25,6 @@ export function useActiveDrivers() {
       }
 
       const responseData = await response.json();
-      console.log('✅ API Response:', responseData);
 
       // Handle both direct array and wrapped response {data: [...], success: true}
       const rawData = Array.isArray(responseData) ? responseData : responseData.data || [];
@@ -66,9 +51,6 @@ export function useActiveDrivers() {
         lastLocationUpdate: driver.updated_at ? new Date(driver.updated_at * 1000).toISOString() : undefined,
       }));
 
-      console.log('✅ Active Drivers Fetched:', data.length, 'drivers');
-      console.log('   Transformed Drivers:', data);
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       return data;
     },
     enabled: !!token,
@@ -79,13 +61,6 @@ export function useActiveDrivers() {
 
   // Connect to the shared Centrifugo connection (singleton managed by CentrifugoProvider)
   const { subscribe, isConnected } = useCentrifugo();
-
-  console.log('📊 Current State:');
-  console.log('   Drivers Count:', drivers?.length || 0);
-  console.log('   Drivers Data:', JSON.stringify(drivers, null, 2));
-  console.log('   Loading:', isLoading);
-  console.log('   Error:', error);
-  console.log('   Centrifugo Connected:', isConnected);
 
   // Track currently subscribed driver IDs to avoid re-subscribing on location updates
   const subscribedDriverIdsRef = useRef<Set<string>>(new Set());

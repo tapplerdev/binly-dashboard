@@ -115,14 +115,10 @@ interface BackendDriver {
  */
 export async function getShifts(): Promise<Shift[]> {
   try {
-    console.log('🔍 Fetching shifts from backend...');
-
     // Get all drivers with shift info
     const driversResponse = await fetch(`${API_BASE_URL}/api/manager/drivers`, {
       headers: getAuthHeaders(),
     });
-
-    console.log(`📡 Response status: ${driversResponse.status}`);
 
     // Handle authentication errors gracefully
     if (driversResponse.status === 401) {
@@ -136,51 +132,12 @@ export async function getShifts(): Promise<Shift[]> {
     }
 
     const driversData = await driversResponse.json();
-    console.log('📦 Drivers data received:', driversData);
-    console.log('📦 RAW RESPONSE DATA:', JSON.stringify(driversData, null, 2));
-
     const drivers: BackendDriver[] = driversData.data || [];
-    console.log(`👥 Found ${drivers.length} drivers total`);
-
-    // Log each driver's optimization metadata
-    drivers.forEach((driver, idx) => {
-      if (driver.shift_id) {
-        console.log(`🔍 [RAW DRIVER ${idx}] ${driver.driver_name}:`, {
-          shift_id: driver.shift_id,
-          optimization_metadata: driver.optimization_metadata,
-          total_distance_miles: driver.total_distance_miles,
-          estimated_completion_time: driver.estimated_completion_time,
-        });
-      }
-    });
 
     // Filter drivers with shifts and convert to frontend Shift format
-    const driversWithShifts = drivers.filter(driver => driver.shift_id);
-    console.log(`✅ ${driversWithShifts.length} drivers have active shifts`);
-
-    const shifts: Shift[] = driversWithShifts.map(driver => {
-      console.log(`🔍 [SHIFTS API] Converting driver ${driver.driver_name}:`, {
-        shift_id: driver.shift_id,
-        status: driver.status,
-        total_bins: driver.total_bins,
-        has_optimization_metadata: !!driver.optimization_metadata,
-        optimization_metadata: driver.optimization_metadata,
-        total_distance_miles: driver.total_distance_miles,
-        estimated_completion_time: driver.estimated_completion_time,
-      });
-      const shift = convertBackendShiftToFrontend(driver);
-      console.log(`✅ [SHIFTS API] Converted shift for ${driver.driver_name}:`, {
-        id: shift.id,
-        has_optimization_metadata: !!shift.optimization_metadata,
-        optimization_metadata: shift.optimization_metadata,
-        total_distance_miles: shift.total_distance_miles,
-        estimated_completion_time: shift.estimated_completion_time,
-      });
-      return shift;
-    });
-
-    console.log(`📊 Returning ${shifts.length} shifts`);
-    return shifts;
+    return drivers
+      .filter(driver => driver.shift_id)
+      .map(convertBackendShiftToFrontend);
   } catch (error) {
     console.error('❌ Error fetching shifts:', error);
     return [];
@@ -468,7 +425,6 @@ function convertBackendShiftToFrontend(driver: BackendDriver): Shift {
     ? getLocalDateString(driver.start_time)
     : getLocalDateString(driver.updated_at!);
 
-  console.log(`   📅 Shift date for ${driver.driver_name}: ${date} (from timestamp: ${driver.start_time})`);
 
   // Helper: Convert timestamp to 12-hour AM/PM format
   const formatTime12Hour = (timestamp: number): string => {
