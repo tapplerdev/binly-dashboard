@@ -11,7 +11,12 @@ import { X, Clock, Route as RouteIcon, MapPin, Warehouse, Info } from 'lucide-re
 import { useModalClose } from './modal-wrapper';
 import { ZoneMarkersLayer } from './map-layers';
 import { RoutePreviewPolyline, LatLng } from './preview-polyline';
-import { ShiftRoutePreview, PreviewStop, PreviewStopType } from '@/lib/types/route-preview';
+import {
+  ShiftRoutePreview,
+  PreviewStop,
+  PreviewStopType,
+  physicalStopCount,
+} from '@/lib/types/route-preview';
 
 const STOP_STYLES: Record<PreviewStopType, { color: string; label: string }> = {
   collection: { color: '#4880FF', label: 'Collect' },
@@ -165,7 +170,7 @@ export function RoutePreviewMapModal({
                 </span>
                 <span className="flex items-center gap-1.5 text-gray-700">
                   <MapPin className="w-4 h-4 text-primary" />
-                  {preview.stop_count} stops
+                  {physicalStopCount(preview.stops)} stops
                 </span>
               </div>
               <button

@@ -7,7 +7,7 @@ import { getShiftById, getShiftTasks, cancelShift, removeTasksFromShift, getShif
 import { RouteTask, getTaskLabel, getTaskSubtitle, getTaskColor, getTaskBgColor } from '@/lib/types/route-task';
 import { ShiftRouteMap } from './shift-route-map';
 import { RoutePreviewMapModal } from './route-preview-map-modal';
-import { ShiftRoutePreview } from '@/lib/types/route-preview';
+import { ShiftRoutePreview, physicalStopCount } from '@/lib/types/route-preview';
 import { useCentrifugo } from '@/lib/hooks/use-centrifugo';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -665,7 +665,7 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                         <div className="p-3 text-center">
                           <p className="text-xs text-gray-500">Stops</p>
                           <p className="text-sm font-semibold text-gray-900">
-                            {preview.stop_count}
+                            {physicalStopCount(preview.stops)}
                           </p>
                         </div>
                       </div>

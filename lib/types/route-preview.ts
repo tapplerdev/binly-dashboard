@@ -40,6 +40,35 @@ export interface ShiftRoutePreview {
   start_location: PreviewAnchor;
   warehouse: PreviewAnchor;
   stops: PreviewStop[];
-  stop_count: number;
+  stop_count: number; // raw optimizer nodes (each bin-load counted separately)
   capacity: number; // truck bin capacity used for this run
+}
+
+/**
+ * Physical stop count for display: a run of consecutive warehouse loads is ONE
+ * visit (loading 6 bins at the warehouse is one stop, not 6), and the final
+ * return counts once. This is what the driver actually experiences and matches
+ * the collapsed rail in the map modal — unlike the raw stop_count.
+ */
+export function physicalStopCount(stops: PreviewStop[]): number {
+  let count = 0;
+  const returnIdx =
+    stops.length > 0 && stops[stops.length - 1].type === 'warehouse_stop'
+      ? stops.length - 1
+      : -1;
+  let inWarehouseRun = false;
+  for (let i = 0; i < stops.length; i++) {
+    if (i === returnIdx) {
+      count++; // the return to the warehouse is one stop
+      continue;
+    }
+    if (stops[i].type === 'warehouse_stop') {
+      if (!inWarehouseRun) count++; // start of a load run = one visit
+      inWarehouseRun = true;
+    } else {
+      count++;
+      inWarehouseRun = false;
+    }
+  }
+  return count;
 }
