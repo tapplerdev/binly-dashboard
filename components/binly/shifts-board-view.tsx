@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Plus, LayoutGrid, List, Clock } from 'lucide-react';
 import { DriverColumn } from './driver-column';
+import { CreateShiftDrawer } from './shifts-view';
 import { ShiftComposer } from './shift-composer/shift-composer';
 import { ShiftDetailsDrawer } from './shift-details-drawer';
 import { ShiftHistoryView } from './shift-history-view';
@@ -92,10 +93,17 @@ async function fetchShiftTasks(shiftId: string): Promise<any[]> {
   } catch { return []; }
 }
 
+// Temporary (owner request, 2026-07-09): fall back to the classic
+// CreateShiftDrawer as the create-shift experience while the map-canvas
+// ShiftComposer is on hold. Flip to `true` to restore the composer — both
+// are wired below, so this is the only line to change.
+const USE_MAP_COMPOSER = false;
+
 export function ShiftsBoardView() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'kanban' | 'table' | 'history'>('kanban');
   const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [selectedShiftForDetails, setSelectedShiftForDetails] = useState<Shift | null>(null);
   const [preselectedDriverId, setPreselectedDriverId] = useState<string | null>(null);
   const [editingShift, setEditingShift] = useState<any>(null);
@@ -185,9 +193,13 @@ export function ShiftsBoardView() {
 
   const handleCreateShift = (driverId?: string) => {
     if (driverId) setPreselectedDriverId(driverId);
-    // Map-canvas composer is the default create experience; the classic
-    // form drawer stays reachable via "Advanced form" inside it.
-    setIsComposerOpen(true);
+    // Owner is on the classic drawer for now (USE_MAP_COMPOSER=false); flip
+    // the flag to bring the map-canvas composer back as the default.
+    if (USE_MAP_COMPOSER) {
+      setIsComposerOpen(true);
+    } else {
+      setIsCreateDrawerOpen(true);
+    }
   };
 
   const handleSelectShift = (shift: any) => {
@@ -556,8 +568,8 @@ export function ShiftsBoardView() {
         )}
       </div>
 
-      {/* Shift composer — the single create experience (classic
-          CreateShiftDrawer is retired; see shifts-view.tsx) */}
+      {/* Create-shift experience. Toggled by USE_MAP_COMPOSER: the classic
+          CreateShiftDrawer (current default) or the map-canvas ShiftComposer. */}
       {isComposerOpen && (
         <ShiftComposer
           defaultDriverId={preselectedDriverId || undefined}
@@ -565,6 +577,22 @@ export function ShiftsBoardView() {
           onClose={() => {
             setIsComposerOpen(false);
             setPreselectedDriverId(null);
+          }}
+        />
+      )}
+
+      {isCreateDrawerOpen && (
+        <CreateShiftDrawer
+          defaultDriverId={preselectedDriverId || undefined}
+          scheduledDate={selectedDate}
+          onClose={() => {
+            setIsCreateDrawerOpen(false);
+            setPreselectedDriverId(null);
+          }}
+          onViewExistingShift={(shiftCreatedAt: number) => {
+            setIsCreateDrawerOpen(false);
+            setPreselectedDriverId(null);
+            setSelectedDate(new Date(shiftCreatedAt * 1000));
           }}
         />
       )}
