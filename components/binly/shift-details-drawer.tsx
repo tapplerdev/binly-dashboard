@@ -48,6 +48,54 @@ function getSkipReason(taskData: string | null): string | null {
   }
 }
 
+// Compact truck-capacity stepper for the route preview (1..60 bins).
+function CapacityStepper({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  disabled?: boolean;
+}) {
+  const clamp = (v: number) => Math.max(1, Math.min(60, Number.isFinite(v) ? v : 1));
+  return (
+    <div className="inline-flex items-center gap-2">
+      <span className="text-xs text-gray-500">Truck holds</span>
+      <div className="inline-flex items-center rounded-lg border border-gray-200 bg-white">
+        <button
+          type="button"
+          onClick={() => onChange(clamp(value - 1))}
+          disabled={disabled || value <= 1}
+          className="px-2 py-1 text-gray-600 hover:bg-gray-100 disabled:opacity-40 rounded-l-lg"
+          aria-label="Decrease capacity"
+        >
+          −
+        </button>
+        <input
+          type="number"
+          value={value}
+          min={1}
+          max={60}
+          onChange={(e) => onChange(clamp(parseInt(e.target.value, 10)))}
+          disabled={disabled}
+          className="w-12 text-center text-sm border-x border-gray-200 py-1 focus:outline-none disabled:opacity-60"
+        />
+        <button
+          type="button"
+          onClick={() => onChange(clamp(value + 1))}
+          disabled={disabled || value >= 60}
+          className="px-2 py-1 text-gray-600 hover:bg-gray-100 disabled:opacity-40 rounded-r-lg"
+          aria-label="Increase capacity"
+        >
+          +
+        </button>
+      </div>
+      <span className="text-xs text-gray-500">bins</span>
+    </div>
+  );
+}
+
 export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetailsDrawerProps) {
   console.log('🔍 [SHIFT DRAWER] Received shift prop:', {
     id: shift.id,
@@ -85,12 +133,15 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [showPreviewMap, setShowPreviewMap] = useState(false);
+  const [previewCapacity, setPreviewCapacity] = useState<number>(
+    shift.truck_bin_capacity && shift.truck_bin_capacity > 0 ? shift.truck_bin_capacity : 8
+  );
 
   const runPreview = async () => {
     setPreviewLoading(true);
     setPreviewError(null);
     try {
-      const result = await previewShiftRoute(shift.id);
+      const result = await previewShiftRoute(shift.id, previewCapacity);
       setPreview(result);
     } catch (err) {
       setPreviewError(err instanceof Error ? err.message : 'Failed to preview route');
@@ -568,25 +619,33 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                     <div className="w-full rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
                       <p className="text-sm text-gray-600 mb-3">
                         See the optimized route as if the driver started now — including
-                        the warehouse stops and total time.
+                        the warehouse stops and total time. Adjust the truck capacity to
+                        compare routes.
                       </p>
-                      <button
-                        onClick={runPreview}
-                        disabled={previewLoading}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
-                      >
-                        {previewLoading ? (
-                          <>
-                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            Optimizing…
-                          </>
-                        ) : (
-                          <>
-                            <RouteIcon className="w-4 h-4" />
-                            Preview optimized route
-                          </>
-                        )}
-                      </button>
+                      <div className="flex flex-col items-center gap-3">
+                        <CapacityStepper
+                          value={previewCapacity}
+                          onChange={setPreviewCapacity}
+                          disabled={previewLoading}
+                        />
+                        <button
+                          onClick={runPreview}
+                          disabled={previewLoading}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
+                        >
+                          {previewLoading ? (
+                            <>
+                              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              Optimizing…
+                            </>
+                          ) : (
+                            <>
+                              <RouteIcon className="w-4 h-4" />
+                              Preview optimized route
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div className="rounded-lg border border-gray-200 overflow-hidden">
@@ -610,25 +669,39 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between gap-2 p-3">
+                      <div className="p-3 space-y-2">
                         <p className="text-xs text-gray-500">
-                          {preview.optimizer_used} · previewed from the warehouse
+                          {preview.optimizer_used} · optimized for a {preview.capacity}-bin
+                          truck · from the warehouse
+                          {previewCapacity !== preview.capacity && (
+                            <span className="text-amber-600">
+                              {' '}
+                              · re-run to apply {previewCapacity}
+                            </span>
+                          )}
                         </p>
-                        <div className="flex gap-2 shrink-0">
-                          <button
-                            onClick={runPreview}
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <CapacityStepper
+                            value={previewCapacity}
+                            onChange={setPreviewCapacity}
                             disabled={previewLoading}
-                            className="px-3 py-1.5 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-60"
-                          >
-                            {previewLoading ? 'Re-optimizing…' : 'Re-run'}
-                          </button>
-                          <button
-                            onClick={() => setShowPreviewMap(true)}
-                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
-                          >
-                            <MapPin className="w-4 h-4" />
-                            View on map
-                          </button>
+                          />
+                          <div className="flex gap-2 shrink-0">
+                            <button
+                              onClick={runPreview}
+                              disabled={previewLoading}
+                              className="px-3 py-1.5 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-60"
+                            >
+                              {previewLoading ? 'Re-optimizing…' : 'Re-run'}
+                            </button>
+                            <button
+                              onClick={() => setShowPreviewMap(true)}
+                              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
+                            >
+                              <MapPin className="w-4 h-4" />
+                              View on map
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>

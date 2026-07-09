@@ -41,4 +41,5 @@ export interface ShiftRoutePreview {
   warehouse: PreviewAnchor;
   stops: PreviewStop[];
   stop_count: number;
+  capacity: number; // truck bin capacity used for this run
 }

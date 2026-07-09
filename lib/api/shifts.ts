@@ -16,11 +16,16 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
  * Backend: POST /api/manager/shifts/{shiftId}/optimize-preview
  */
 export async function previewShiftRoute(
-  shiftId: string
+  shiftId: string,
+  capacity?: number
 ): Promise<ShiftRoutePreview> {
   const response = await fetch(
     `${API_BASE_URL}/api/manager/shifts/${shiftId}/optimize-preview`,
-    { method: 'POST', headers: getAuthHeaders() }
+    {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: capacity != null ? JSON.stringify({ capacity }) : undefined,
+    }
   );
   if (!response.ok) {
     let message = 'Failed to preview route';
