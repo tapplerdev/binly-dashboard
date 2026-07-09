@@ -27,7 +27,9 @@ function stopTitle(stop: PreviewStop): string {
     case 'collection':
       return stop.bin_number != null ? `Collect Bin #${stop.bin_number}` : 'Collect';
     case 'placement':
-      return stop.new_bin_number != null ? `Place Bin #${stop.new_bin_number}` : 'Place new bin';
+      // Placements are proposed locations with no bin number assigned yet
+      // (new_bin_number is 0), so lead with the action, not "#0".
+      return stop.new_bin_number ? `Place Bin #${stop.new_bin_number}` : 'Place new bin';
     case 'pickup':
       return stop.bin_number != null ? `Pick up Bin #${stop.bin_number}` : 'Pick up';
     case 'dropoff':
@@ -39,6 +41,54 @@ function stopTitle(stop: PreviewStop): string {
     default:
       return 'Stop';
   }
+}
+
+// A placement run reloads at the warehouse for every bin, so the raw stop list is
+// a wall of identical "warehouse" rows. Collapse consecutive warehouse loads into a
+// single "Load N bins" row, mark the final one as the return, and number only the
+// real destinations (1..N) — both for the rail and the map markers.
+type RailRow =
+  | { key: string; kind: 'load'; count: number; address: string }
+  | { key: string; kind: 'return'; address: string }
+  | { key: string; kind: 'work'; stop: PreviewStop; visit: number };
+
+function buildRail(stops: PreviewStop[]): {
+  rows: RailRow[];
+  workStops: { stop: PreviewStop; visit: number }[];
+} {
+  const rows: RailRow[] = [];
+  const workStops: { stop: PreviewStop; visit: number }[] = [];
+  // The route always ends back at the warehouse; treat a trailing warehouse stop
+  // as the return rather than a load.
+  const returnIdx =
+    stops.length > 0 && stops[stops.length - 1].type === 'warehouse_stop'
+      ? stops.length - 1
+      : -1;
+  let visit = 0;
+  let i = 0;
+  while (i < stops.length) {
+    if (i === returnIdx) {
+      rows.push({ key: `ret-${i}`, kind: 'return', address: stops[i].address });
+      i++;
+      continue;
+    }
+    if (stops[i].type === 'warehouse_stop') {
+      const startIdx = i;
+      const address = stops[i].address;
+      let count = 0;
+      while (i < stops.length && i !== returnIdx && stops[i].type === 'warehouse_stop') {
+        count++;
+        i++;
+      }
+      rows.push({ key: `load-${startIdx}`, kind: 'load', count, address });
+    } else {
+      visit++;
+      workStops.push({ stop: stops[i], visit });
+      rows.push({ key: `work-${stops[i].sequence_order}`, kind: 'work', stop: stops[i], visit });
+      i++;
+    }
+  }
+  return { rows, workStops };
 }
 
 /** Fits the map to all preview points once, on mount. */
@@ -65,13 +115,25 @@ export function RoutePreviewMapModal({
 
   // Ordered path for the polyline: start anchor → every stop (the final stop is the
   // return-to-warehouse). Memoized so the polyline effect doesn't re-run each render.
-  const path = useMemo<LatLng[]>(
-    () => [
+  const { rows, workStops } = useMemo(() => buildRail(preview.stops), [preview]);
+
+  const path = useMemo<LatLng[]>(() => {
+    const raw: LatLng[] = [
       { latitude: preview.start_location.latitude, longitude: preview.start_location.longitude },
       ...preview.stops.map((s) => ({ latitude: s.latitude, longitude: s.longitude })),
-    ],
-    [preview]
-  );
+    ];
+    // Collapse consecutive duplicate points (a run of warehouse reloads) so the
+    // polyline shows each warehouse visit once, not N overlapping points.
+    const out: LatLng[] = [];
+    for (const p of raw) {
+      const last = out[out.length - 1];
+      if (last && Math.abs(last.latitude - p.latitude) < 1e-6 && Math.abs(last.longitude - p.longitude) < 1e-6) {
+        continue;
+      }
+      out.push(p);
+    }
+    return out;
+  }, [preview]);
 
   const center = useMemo(
     () => ({ lat: preview.warehouse.latitude, lng: preview.warehouse.longitude }),
@@ -134,25 +196,38 @@ export function RoutePreviewMapModal({
                 <p className="p-4 text-sm text-gray-500">No stops to route.</p>
               ) : (
                 <ol className="divide-y divide-gray-50">
-                  {preview.stops.map((stop) => {
-                    const style = STOP_STYLES[stop.type];
+                  {rows.map((row) => {
+                    if (row.kind === 'load' || row.kind === 'return') {
+                      const title =
+                        row.kind === 'return'
+                          ? 'Return to warehouse'
+                          : `Load ${row.count} ${row.count === 1 ? 'bin' : 'bins'} at warehouse`;
+                      return (
+                        <li key={row.key} className="flex items-start gap-3 px-4 py-3 bg-slate-50/60">
+                          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-900 text-white shrink-0">
+                            <Warehouse className="w-3.5 h-3.5" />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{title}</p>
+                            <p className="text-xs text-gray-500 truncate">{row.address}</p>
+                          </div>
+                        </li>
+                      );
+                    }
+                    const style = STOP_STYLES[row.stop.type];
                     return (
-                      <li key={stop.sequence_order} className="flex items-start gap-3 px-4 py-3">
+                      <li key={row.key} className="flex items-start gap-3 px-4 py-3">
                         <span
                           className="flex items-center justify-center w-6 h-6 rounded-full text-white text-xs font-semibold shrink-0"
                           style={{ backgroundColor: style.color }}
                         >
-                          {stop.type === 'warehouse_stop' ? (
-                            <Warehouse className="w-3.5 h-3.5" />
-                          ) : (
-                            stop.sequence_order
-                          )}
+                          {row.visit}
                         </span>
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">
-                            {stopTitle(stop)}
+                            {stopTitle(row.stop)}
                           </p>
-                          <p className="text-xs text-gray-500 truncate">{stop.address}</p>
+                          <p className="text-xs text-gray-500 truncate">{row.stop.address}</p>
                         </div>
                       </li>
                     );
@@ -184,24 +259,21 @@ export function RoutePreviewMapModal({
                     </div>
                   </AdvancedMarker>
 
-                  {/* Numbered stop markers in optimized order */}
-                  {preview.stops.map((stop) => {
+                  {/* Destination markers numbered in visit order. Warehouse loads
+                      all sit on the warehouse marker above, so they're not repeated. */}
+                  {workStops.map(({ stop, visit }) => {
                     const style = STOP_STYLES[stop.type];
                     return (
                       <AdvancedMarker
                         key={stop.sequence_order}
                         position={{ lat: stop.latitude, lng: stop.longitude }}
-                        title={`${stop.sequence_order}. ${stopTitle(stop)}`}
+                        title={`${visit}. ${stopTitle(stop)}`}
                       >
                         <div
                           className="flex items-center justify-center w-7 h-7 rounded-full text-white text-xs font-bold shadow-md border-2 border-white"
                           style={{ backgroundColor: style.color }}
                         >
-                          {stop.type === 'warehouse_stop' ? (
-                            <Warehouse className="w-3.5 h-3.5" />
-                          ) : (
-                            stop.sequence_order
-                          )}
+                          {visit}
                         </div>
                       </AdvancedMarker>
                     );
