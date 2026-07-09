@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, ArrowUp, ArrowDown, Warehouse, SkipForward, AlertTriangle, ChevronDown, ChevronUp, Navigation, Hash, Image as ImageIcon, ClipboardCheck } from 'lucide-react';
+import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, ArrowUp, ArrowDown, Warehouse, SkipForward, AlertTriangle, ChevronDown, ChevronUp, Navigation, Route as RouteIcon, Hash, Image as ImageIcon, ClipboardCheck } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shift';
-import { getShiftById, getShiftTasks, cancelShift, removeTasksFromShift, getShiftTasksWithHistory } from '@/lib/api/shifts';
+import { getShiftById, getShiftTasks, cancelShift, removeTasksFromShift, getShiftTasksWithHistory, previewShiftRoute } from '@/lib/api/shifts';
 import { RouteTask, getTaskLabel, getTaskSubtitle, getTaskColor, getTaskBgColor } from '@/lib/types/route-task';
 import { ShiftRouteMap } from './shift-route-map';
+import { RoutePreviewMapModal } from './route-preview-map-modal';
+import { ShiftRoutePreview } from '@/lib/types/route-preview';
 import { useCentrifugo } from '@/lib/hooks/use-centrifugo';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -77,6 +79,25 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'warning' | 'info'>('success');
   const [fullscreenPhoto, setFullscreenPhoto] = useState<string | null>(null);
+
+  // Route preview (dry-run optimization for a not-yet-started shift)
+  const [preview, setPreview] = useState<ShiftRoutePreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [showPreviewMap, setShowPreviewMap] = useState(false);
+
+  const runPreview = async () => {
+    setPreviewLoading(true);
+    setPreviewError(null);
+    try {
+      const result = await previewShiftRoute(shift.id);
+      setPreview(result);
+    } catch (err) {
+      setPreviewError(err instanceof Error ? err.message : 'Failed to preview route');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
 
   // Function to load shift details
   const loadShiftDetails = async () => {
@@ -536,9 +557,88 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                 <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
             ) : usingTasks ? (
-              <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
-                <p className="text-sm text-gray-500">Task-based route map coming soon</p>
-              </div>
+              shift.status === 'scheduled' ? (
+                <div className="space-y-3">
+                  {previewError && (
+                    <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+                      {previewError}
+                    </div>
+                  )}
+                  {!preview ? (
+                    <div className="w-full rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
+                      <p className="text-sm text-gray-600 mb-3">
+                        See the optimized route as if the driver started now — including
+                        the warehouse stops and total time.
+                      </p>
+                      <button
+                        onClick={runPreview}
+                        disabled={previewLoading}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
+                      >
+                        {previewLoading ? (
+                          <>
+                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Optimizing…
+                          </>
+                        ) : (
+                          <>
+                            <RouteIcon className="w-4 h-4" />
+                            Preview optimized route
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-gray-200 overflow-hidden">
+                      <div className="grid grid-cols-3 divide-x divide-gray-100 bg-gray-50">
+                        <div className="p-3 text-center">
+                          <p className="text-xs text-gray-500">Est. time</p>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {preview.total_duration_formatted}
+                          </p>
+                        </div>
+                        <div className="p-3 text-center">
+                          <p className="text-xs text-gray-500">Distance</p>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {preview.total_distance_km.toFixed(1)} km
+                          </p>
+                        </div>
+                        <div className="p-3 text-center">
+                          <p className="text-xs text-gray-500">Stops</p>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {preview.stop_count}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 p-3">
+                        <p className="text-xs text-gray-500">
+                          {preview.optimizer_used} · previewed from the warehouse
+                        </p>
+                        <div className="flex gap-2 shrink-0">
+                          <button
+                            onClick={runPreview}
+                            disabled={previewLoading}
+                            className="px-3 py-1.5 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-60"
+                          >
+                            {previewLoading ? 'Re-optimizing…' : 'Re-run'}
+                          </button>
+                          <button
+                            onClick={() => setShowPreviewMap(true)}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
+                          >
+                            <MapPin className="w-4 h-4" />
+                            View on map
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
+                  <p className="text-sm text-gray-500">Task-based route map coming soon</p>
+                </div>
+              )
             ) : (
               <ShiftRouteMap
                 bins={bins}
@@ -1215,6 +1315,10 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
             onClick={(e) => e.stopPropagation()}
           />
         </div>
+      )}
+
+      {showPreviewMap && preview && (
+        <RoutePreviewMapModal preview={preview} onClose={() => setShowPreviewMap(false)} />
       )}
 
     </>

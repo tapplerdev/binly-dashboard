@@ -4,8 +4,36 @@
  */
 
 import { Shift, ShiftStatus } from '@/lib/types/shift';
+import { ShiftRoutePreview } from '@/lib/types/route-preview';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
+/**
+ * Preview a scheduled shift's optimized route WITHOUT starting it — a dry-run of
+ * the same OR-Tools optimization the driver's start-shift runs, anchored at the
+ * warehouse (no live GPS). Returns the ordered stops (including synthesized
+ * warehouse stops) plus total time/distance. Nothing is persisted.
+ * Backend: POST /api/manager/shifts/{shiftId}/optimize-preview
+ */
+export async function previewShiftRoute(
+  shiftId: string
+): Promise<ShiftRoutePreview> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/manager/shifts/${shiftId}/optimize-preview`,
+    { method: 'POST', headers: getAuthHeaders() }
+  );
+  if (!response.ok) {
+    let message = 'Failed to preview route';
+    try {
+      const body = await response.json();
+      message = body?.error || body?.message || message;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new Error(message);
+  }
+  return response.json();
+}
 
 /**
  * Get auth token from localStorage (Zustand persist storage)
