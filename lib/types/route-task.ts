@@ -93,6 +93,13 @@ export function getTaskLabel(task: RouteTask): string {
       return collectionLabel;
 
     case 'placement':
+      // Redeployment (Phase 2): one placement task placing a specific
+      // existing warehouse bin — label it as the move it is.
+      if (task.placement_source === 'redeployment' || task.move_request_id) {
+        return task.bin_number
+          ? `Redeployment · Bin #${task.bin_number}`
+          : 'Redeployment';
+      }
       const placementLabel = task.new_bin_number
         ? `Placement #${task.new_bin_number}`
         : 'Placement';
