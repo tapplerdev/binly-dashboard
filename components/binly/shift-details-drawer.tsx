@@ -5,6 +5,7 @@ import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, A
 import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shift';
 import { getShiftById, getShiftTasks, cancelShift, removeTasksFromShift, getShiftTasksWithHistory, previewShiftRoute } from '@/lib/api/shifts';
 import { RouteTask, getTaskLabel, getTaskSubtitle, getTaskColor, getTaskBgColor } from '@/lib/types/route-task';
+import { groupWarehouseRuns, WarehouseRunCard } from './shift-task-card';
 import { ShiftRouteMap } from './shift-route-map';
 import { RoutePreviewMapModal } from './route-preview-map-modal';
 import { ShiftRoutePreview, physicalStopCount } from '@/lib/types/route-preview';
@@ -778,16 +779,34 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
               ) : (
                 <div className="space-y-2">
                   {(() => {
-                    const filteredTasks = tasks.filter(t => t.task_type !== 'warehouse_stop');
-                    const sortedTasks = [...filteredTasks].sort((a, b) => a.sequence_order - b.sequence_order);
-                    const firstUncompletedIndex = sortedTasks.findIndex(
-                      t => t.is_completed === 0 && !t.skipped && !t.is_deleted
+                    // Group contiguous warehouse rows into one "Load N bins" card —
+                    // same WarehouseRunCard the kanban driver column uses. (The old
+                    // rendering filtered warehouse stops out entirely, which also made
+                    // the sequence numbering jump over them.)
+                    const sortedTasks = [...tasks].sort((a, b) => a.sequence_order - b.sequence_order);
+                    const groups = groupWarehouseRuns(sortedTasks);
+                    // The driver's current stop = first group with an unprocessed task.
+                    const currentGroupIndex = groups.findIndex(g =>
+                      g.kind === 'single'
+                        ? g.task.is_completed === 0 && !g.task.skipped && !g.task.is_deleted
+                        : g.tasks.some(t => t.is_completed === 0 && !t.skipped && !t.is_deleted)
                     );
 
-                    return sortedTasks.map((task, index) => {
+                    return groups.map((group, gIndex) => {
+                    if (group.kind === 'warehouse_run') {
+                      return (
+                        <WarehouseRunCard
+                          key={group.tasks[0].id}
+                          tasks={group.tasks}
+                          isReturn={group.isReturn}
+                          isCurrentRun={shift.status === 'active' && gIndex === currentGroupIndex}
+                        />
+                      );
+                    }
+                    const task = group.task;
                     const isCompleted = task.is_completed === 1;
                     const isSkipped = task.skipped === true;
-                    const isInProgress = shift.status === 'active' && index === firstUncompletedIndex && !isCompleted && !isSkipped;
+                    const isInProgress = shift.status === 'active' && gIndex === currentGroupIndex && !isCompleted && !isSkipped;
                     const completedTime = task.completed_at
                       ? new Date(task.completed_at * 1000).toLocaleTimeString('en-US', {
                           hour: '2-digit',
