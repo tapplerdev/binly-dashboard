@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useShiftHistoryTasks } from '@/lib/hooks/use-shift-history-tasks';
 import { ShiftHistoryEntry } from '@/lib/api/shifts';
 import { ShiftHistoryTask } from '@/lib/api/shifts';
+import { groupWarehouseRuns } from './shift-task-card';
 import {
   X, Package, MapPin, ArrowRightLeft, Warehouse, SkipForward,
   CheckCircle2, XCircle, Clock, ChevronRight, Hash, Loader2,
@@ -280,6 +281,127 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
+// ── Warehouse Run Card ──────────────────────────────────────────────────────
+// The optimizer persists ONE warehouse_stop row per bin loaded, so an ended
+// placement shift renders as a wall of identical "Warehouse" cards. Physically
+// the driver made one stop per reload run — collapse each contiguous run into
+// a single card ("Warehouse — Load 6 bins"), keep skip reasons visible (audit),
+// and let the manager expand to the individual rows on demand.
+
+function WarehouseRunHistoryCard({
+  tasks,
+  isReturn,
+  index,
+}: {
+  tasks: ShiftHistoryTask[];
+  isReturn: boolean;
+  index: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const total = tasks.length;
+  const loaded = tasks.filter((t) => t.is_completed === 1 && !t.skipped);
+  const skippedRows = tasks.filter((t) => t.skipped);
+  const pending = total - loaded.length - skippedRows.length;
+  const label = isReturn
+    ? 'Warehouse — Return'
+    : `Warehouse — Load ${total} ${total === 1 ? 'bin' : 'bins'}`;
+  const lastLoadedAt = loaded.length
+    ? Math.max(...loaded.map((t) => t.completed_at ?? 0))
+    : null;
+
+  return (
+    <div className="rounded-lg border border-gray-200 border-l-4 border-l-teal-500 bg-white overflow-hidden hover:shadow-sm transition-shadow">
+      {/* Header row — mirrors TaskCard's layout */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
+        <span className="text-xs font-bold text-gray-400 w-6">{index + 1}</span>
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-50 border border-gray-200">
+          <Warehouse className="w-4 h-4 text-teal-600" />
+        </div>
+        <span className="text-sm font-semibold text-gray-900 flex-1">{label}</span>
+        {/* Aggregate status for the whole run */}
+        {pending === 0 && skippedRows.length === 0 ? (
+          <div className="text-right">
+            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-700 border border-green-200">
+              <CheckCircle2 className="w-3 h-3" /> Completed by driver
+            </div>
+            {lastLoadedAt && <div className="text-xs text-gray-400 mt-1">{formatTime(lastLoadedAt)}</div>}
+          </div>
+        ) : pending === 0 && loaded.length === 0 ? (
+          <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
+            <SkipForward className="w-3 h-3" /> Skipped by driver
+          </div>
+        ) : loaded.length === 0 && skippedRows.length === 0 ? (
+          <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+            <XCircle className="w-3 h-3" /> Incomplete
+          </div>
+        ) : (
+          <div className="text-right">
+            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
+              {loaded.length} loaded
+              {skippedRows.length > 0 && ` · ${skippedRows.length} skipped`}
+              {pending > 0 && ` · ${pending} pending`}
+            </div>
+            {lastLoadedAt && <div className="text-xs text-gray-400 mt-1">{formatTime(lastLoadedAt)}</div>}
+          </div>
+        )}
+      </div>
+
+      {/* Body */}
+      <div className="px-4 py-3 bg-white space-y-2 text-xs text-gray-600">
+        {tasks[0]?.address && <Row label="Address" value={tasks[0].address} />}
+
+        {/* Skip reasons stay visible without expanding — they're the audit trail */}
+        {skippedRows.map((t) => {
+          const reason = getSkipReason(t.task_data);
+          return (
+            <div key={t.id} className="flex items-start gap-1.5 text-amber-700">
+              <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+              <span>
+                <span className="font-medium">Skipped{t.completed_at ? ` ${formatTime(t.completed_at)}` : ''}:</span>{' '}
+                {reason ?? 'no reason given'}
+              </span>
+            </div>
+          );
+        })}
+
+        {/* Expand to the raw per-bin rows */}
+        {!isReturn && total > 1 && (
+          <button
+            onClick={() => setExpanded((e) => !e)}
+            className="flex items-center gap-1 pt-1 text-gray-400 hover:text-gray-600 font-medium transition-colors"
+          >
+            {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            {expanded ? 'Hide' : 'Show'} {total} individual loads
+          </button>
+        )}
+        {expanded && (
+          <div className="pt-1 space-y-1">
+            {tasks.map((t, i) => (
+              <div key={t.id} className="flex items-center gap-2 pl-1">
+                <span className="text-gray-400 w-10 shrink-0">#{i + 1}</span>
+                {t.skipped ? (
+                  <span className="inline-flex items-center gap-1 text-orange-600">
+                    <SkipForward className="w-3 h-3" /> Skipped
+                  </span>
+                ) : t.is_completed === 1 ? (
+                  <span className="inline-flex items-center gap-1 text-green-600">
+                    <CheckCircle2 className="w-3 h-3" /> Loaded
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-gray-400">
+                    <XCircle className="w-3 h-3" /> Pending
+                  </span>
+                )}
+                {t.completed_at && <span className="text-gray-400">{formatTime(t.completed_at)}</span>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Timeline View ──────────────────────────────────────────────────────────
 
 function TimelineView({ shift, tasks }: { shift: ShiftHistoryEntry; tasks: ShiftHistoryTask[] }) {
@@ -296,22 +418,29 @@ function TimelineView({ shift, tasks }: { shift: ShiftHistoryEntry; tasks: Shift
     });
   }
 
-  // Add task completion/skip events
+  // Add task completion/skip events. Warehouse loads are batch-completed by the
+  // driver's one-tap "Load N bins" (identical completed_at), so merge those into
+  // one event instead of N copies of "Driver completed Warehouse stop".
+  const warehouseLoadBatches = new Map<number, number>(); // completed_at → count
   tasks.forEach(task => {
     if (task.is_completed === 1 && task.completed_at) {
-      const taskLabel = task.task_type === 'collection' ? `Bin #${task.bin_number}` :
-                        task.task_type === 'placement' ? `Placement at ${task.address?.substring(0, 30)}` :
-                        task.task_type === 'pickup' ? `Pickup Bin #${task.bin_number}` :
-                        task.task_type === 'dropoff' ? `Dropoff Bin #${task.bin_number}` :
-                        'Warehouse stop';
+      if (task.task_type === 'warehouse_stop' && !task.skipped) {
+        warehouseLoadBatches.set(task.completed_at, (warehouseLoadBatches.get(task.completed_at) ?? 0) + 1);
+      } else {
+        const taskLabel = task.task_type === 'collection' ? `Bin #${task.bin_number}` :
+                          task.task_type === 'placement' ? `Placement at ${task.address?.substring(0, 30)}` :
+                          task.task_type === 'pickup' ? `Pickup Bin #${task.bin_number}` :
+                          task.task_type === 'dropoff' ? `Dropoff Bin #${task.bin_number}` :
+                          'Warehouse stop';
 
-      events.push({
-        type: task.skipped ? 'task_skipped' : 'task_completed',
-        time: task.completed_at,
-        label: task.skipped ? `Driver skipped ${taskLabel}` : `Driver completed ${taskLabel}`,
-        subtitle: task.skipped ? getSkipReason(task.task_data) : task.address,
-        color: task.skipped ? 'orange' : 'green'
-      });
+        events.push({
+          type: task.skipped ? 'task_skipped' : 'task_completed',
+          time: task.completed_at,
+          label: task.skipped ? `Driver skipped ${taskLabel}` : `Driver completed ${taskLabel}`,
+          subtitle: task.skipped ? getSkipReason(task.task_data) : task.address,
+          color: task.skipped ? 'orange' : 'green'
+        });
+      }
     }
 
     // Add task removal events
@@ -328,6 +457,16 @@ function TimelineView({ shift, tasks }: { shift: ShiftHistoryEntry; tasks: Shift
         color: 'red'
       });
     }
+  });
+
+  // Emit one merged event per warehouse load batch
+  warehouseLoadBatches.forEach((count, time) => {
+    events.push({
+      type: 'task_completed',
+      time,
+      label: count === 1 ? 'Driver completed warehouse stop' : `Driver loaded ${count} bins at the warehouse`,
+      color: 'green'
+    });
   });
 
   // Add shift end event with completion stats
@@ -567,6 +706,13 @@ export function ShiftHistoryDetailDrawer({ shift, onClose }: Props) {
 
   const filteredTasks = getFilteredTasks();
 
+  // "All" collapses contiguous warehouse rows into one card per PHYSICAL stop —
+  // the optimizer writes one row per bin loaded, so a 20-placement shift would
+  // otherwise render 21 near-identical "Warehouse" cards.
+  const allGroups = groupWarehouseRuns(
+    [...activeTasks].sort((a, b) => a.sequence_order - b.sequence_order)
+  );
+
   return (
     <>
       {/* Backdrop with fade animation */}
@@ -658,7 +804,7 @@ export function ShiftHistoryDetailDrawer({ shift, onClose }: Props) {
             <TabButton
               active={activeFilter === 'all'}
               onClick={() => setActiveFilter('all')}
-              count={activeTasks.length}
+              count={allGroups.length}
             >
               All
             </TabButton>
@@ -725,6 +871,28 @@ export function ShiftHistoryDetailDrawer({ shift, onClose }: Props) {
             <TimelineView shift={shift} tasks={tasks ?? []} />
           ) : activeFilter === 'removed' ? (
             <RemovedTasksView deletedTasks={deletedTasks} />
+          ) : activeFilter === 'all' ? (
+            allGroups.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-2">
+                <Package className="w-10 h-10 text-gray-200" />
+                <p className="text-sm">No tasks in this category</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {allGroups.map((group, gi) =>
+                  group.kind === 'single' ? (
+                    <TaskCard key={group.task.id} task={group.task} index={gi} />
+                  ) : (
+                    <WarehouseRunHistoryCard
+                      key={group.tasks[0].id}
+                      tasks={group.tasks}
+                      isReturn={group.isReturn}
+                      index={gi}
+                    />
+                  )
+                )}
+              </div>
+            )
           ) : filteredTasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-2">
               <Package className="w-10 h-10 text-gray-200" />

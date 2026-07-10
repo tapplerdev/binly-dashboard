@@ -40,16 +40,18 @@ const TASK_ICONS: Record<string, { icon: typeof MapPin; color: string; bg: strin
 
 type AnyTask = TaskCardProps['task'] & { [key: string]: any };
 
-export type TaskGroup =
-  | { kind: 'single'; task: AnyTask; index: number }
-  | { kind: 'warehouse_run'; tasks: AnyTask[]; indices: number[]; isReturn: boolean };
+export type TaskGroup<T = AnyTask> =
+  | { kind: 'single'; task: T; index: number }
+  | { kind: 'warehouse_run'; tasks: T[]; indices: number[]; isReturn: boolean };
 
-export function groupWarehouseRuns(tasks: AnyTask[]): TaskGroup[] {
-  const groups: TaskGroup[] = [];
+// Generic over the task shape so both the live view (RouteTask) and the shift
+// history drawer (ShiftHistoryTask) can share the one grouping implementation.
+export function groupWarehouseRuns<T extends { task_type: string }>(tasks: T[]): TaskGroup<T>[] {
+  const groups: TaskGroup<T>[] = [];
   let i = 0;
   while (i < tasks.length) {
     if (tasks[i].task_type === 'warehouse_stop') {
-      const run: AnyTask[] = [];
+      const run: T[] = [];
       const indices: number[] = [];
       while (i < tasks.length && tasks[i].task_type === 'warehouse_stop') {
         run.push(tasks[i]);
