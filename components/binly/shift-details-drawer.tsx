@@ -893,13 +893,26 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                             ) : null;
                           })()}
 
-                          {task.task_type === 'placement' && isCompleted && !isSkipped && task.new_bin_number && (
+                          {task.task_type === 'placement' && isCompleted && !isSkipped && (
                             <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-500 font-medium">Converted to</span>
-                              <div className="flex items-center gap-1 px-2 py-1 bg-green-50 border border-green-200 rounded-full">
-                                <Hash className="w-3 h-3 text-green-700" />
-                                <span className="text-xs font-semibold text-green-700">Bin #{task.new_bin_number}</span>
-                              </div>
+                              {task.photo_url && (
+                                <button
+                                  onClick={() => setFullscreenPhoto(task.photo_url!)}
+                                  className="relative w-14 h-14 rounded-lg overflow-hidden border-2 border-green-200 hover:border-green-500 transition-colors group flex-shrink-0"
+                                >
+                                  <img src={task.photo_url} alt="Placement" className="w-full h-full object-cover" />
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <ImageIcon className="w-4 h-4 text-white" />
+                                  </div>
+                                  <div className="absolute bottom-0 left-0 right-0 bg-green-600/80 text-white text-[8px] text-center py-0.5 font-medium">Placed</div>
+                                </button>
+                              )}
+                              {task.new_bin_number && (
+                                <div className="flex items-center gap-1 px-2 py-1 bg-green-50 border border-green-200 rounded-full flex-shrink-0">
+                                  <Hash className="w-3 h-3 text-green-700" />
+                                  <span className="text-xs font-semibold text-green-700">Bin #{task.new_bin_number}</span>
+                                </div>
+                              )}
                             </div>
                           )}
 

@@ -93,8 +93,8 @@ export function getTaskLabel(task: RouteTask): string {
 
     case 'placement':
       const placementLabel = task.new_bin_number
-        ? `Place New Bin #${task.new_bin_number}`
-        : 'Place New Bin';
+        ? `Placement #${task.new_bin_number}`
+        : 'Placement';
       console.log('🔍 [TASK LABEL] Placement label:', placementLabel);
       return placementLabel;
 
