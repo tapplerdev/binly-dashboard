@@ -162,6 +162,28 @@ import { BinMarkersLayer, ZoneMarkersLayer, WarehouseMarkerLayer } from '@/compo
 - Layers fetch their own data via hooks — no need to pass data manually
 - Rendering matches `live-map-view.tsx` (the gold standard)
 
+### Redeployments vs Placements (REQUIRED domain rule for shift-task UI)
+
+Backend Phase 2 (2026-07): a **redeployment** (existing bin leaving the warehouse for
+a field spot) is executed as ONE `route_tasks` row with `task_type='placement'` —
+but it is tracked as a **move request** (the Move Requests table, urgency, audit
+trail). The internal task_type must NEVER leak to users:
+
+- **Discriminate** with `isRedeployPlacement()` from
+  `components/binly/shift-task-card.tsx` (checks `placement_source === 'redeployment'`,
+  falls back to `move_request_id != null` — among placements, only redeployments
+  carry a move). Both `tasks/detailed` and shift-history feeds emit `placement_source`.
+- **Redeployment** = teal + `Truck` icon + label **"Redeployment · Bin #N"**
+  (`bin_number` — the existing bin). Completion finalized an existing bin, nothing
+  was created.
+- **Plain placement** (new bin from a potential location: `potential_location_id`
+  set, no move link) = orange + `Package`/`MapPin` + "Placement #N"
+  (`new_bin_number`). Completion CREATED a bin ("Converted to Bin #N").
+- Shared label logic: `getTaskLabel()` in `lib/types/route-task.ts` already handles
+  both — prefer it over hand-rolled labels.
+- Metrics caveat: anything counting "placements" includes redeployments; filter by
+  `placement_source` if a metric needs new-bin installs only.
+
 ### Component Architecture
 
 #### Base UI Components (`components/ui/`)
