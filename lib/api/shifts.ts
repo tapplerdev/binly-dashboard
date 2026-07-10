@@ -398,6 +398,7 @@ export interface ShiftHistoryTask {
   // Placement
   potential_location_id: string | null;
   new_bin_number: number | null;
+  placement_source: string | null; // 'potential_location' | 'redeployment' | legacy 'warehouse'
   placement_address: string | null;
   placement_created_bin_id: string | null;
   placement_created_bin_number: number | null;

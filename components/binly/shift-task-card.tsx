@@ -1,13 +1,29 @@
 'use client';
 
 import { useState } from 'react';
-import { MapPin, Package, ArrowRightLeft, Warehouse, Wrench, Check, SkipForward, Circle, Navigation, Image as ImageIcon } from 'lucide-react';
+import { MapPin, Package, ArrowRightLeft, Warehouse, Wrench, Check, SkipForward, Circle, Navigation, Image as ImageIcon, Truck } from 'lucide-react';
+
+// A redeployment rides the placement rails (Phase 2): ONE placement task
+// carrying its move. Detect via placement_source, falling back to the move
+// linkage — among placements, only redeployments carry a move_request_id.
+export function isRedeployPlacement(t: {
+  task_type: string;
+  placement_source?: string | null;
+  move_request_id?: string | null;
+}): boolean {
+  return (
+    t.task_type === 'placement' &&
+    (t.placement_source === 'redeployment' || !!t.move_request_id)
+  );
+}
 
 interface TaskCardProps {
   task: {
     id?: string;
     task_type: string;
     bin_number?: number | null;
+    placement_source?: string | null;
+    move_request_id?: string | null;
     address?: string | null;
     is_completed: number;
     skipped?: boolean;
@@ -162,7 +178,10 @@ export function ShiftTaskCard({ task, isCurrentTask = false }: TaskCardProps) {
   const [fullscreenPhoto, setFullscreenPhoto] = useState<string | null>(null);
   const isDone = task.is_completed === 1 && !task.skipped;
   const isSkipped = task.skipped;
-  const iconConfig = TASK_ICONS[task.task_type] || TASK_ICONS.collection;
+  const redeploy = isRedeployPlacement(task);
+  const iconConfig = redeploy
+    ? { icon: Truck, color: 'text-teal-600', bg: 'bg-teal-50' }
+    : TASK_ICONS[task.task_type] || TASK_ICONS.collection;
   const Icon = iconConfig.icon;
 
   const displayFill = task.updated_fill_percentage ?? task.fill_percentage ?? 0;
@@ -171,9 +190,11 @@ export function ShiftTaskCard({ task, isCurrentTask = false }: TaskCardProps) {
     ? 'Warehouse'
     : task.task_type === 'service'
       ? (task.task_label || 'Service Stop')
-      : task.bin_number
-        ? `Bin #${task.bin_number}`
-        : task.task_type.charAt(0).toUpperCase() + task.task_type.slice(1);
+      : redeploy
+        ? (task.bin_number ? `Redeployment · Bin #${task.bin_number}` : 'Redeployment')
+        : task.bin_number
+          ? `Bin #${task.bin_number}`
+          : task.task_type.charAt(0).toUpperCase() + task.task_type.slice(1);
 
   const addr = task.address || '';
   const truncAddr = addr.length > 35 ? addr.slice(0, 33) + '…' : addr;

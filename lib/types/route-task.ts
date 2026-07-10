@@ -29,6 +29,7 @@ export interface RouteTask {
   // Placement task fields
   potential_location_id?: string | null;
   new_bin_number?: string | null;
+  placement_source?: string | null; // 'potential_location' | 'redeployment' | legacy 'warehouse'
 
   // Move request task fields
   move_request_id?: string | null;

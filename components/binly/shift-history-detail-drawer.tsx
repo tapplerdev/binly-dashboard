@@ -4,12 +4,12 @@ import { useState } from 'react';
 import { useShiftHistoryTasks } from '@/lib/hooks/use-shift-history-tasks';
 import { ShiftHistoryEntry } from '@/lib/api/shifts';
 import { ShiftHistoryTask } from '@/lib/api/shifts';
-import { groupWarehouseRuns } from './shift-task-card';
+import { groupWarehouseRuns, isRedeployPlacement } from './shift-task-card';
 import {
   X, Package, MapPin, ArrowRightLeft, Warehouse, SkipForward,
   CheckCircle2, XCircle, Clock, ChevronRight, Hash, Loader2,
   AlertTriangle, MoveRight, ArrowRight, Trash2, ChevronDown, ChevronUp,
-  ClipboardCheck,
+  ClipboardCheck, Truck,
 } from 'lucide-react';
 
 type FilterType = 'all' | 'collections' | 'placements' | 'moves' | 'services' | 'timeline' | 'removed';
@@ -52,7 +52,17 @@ const TASK_CONFIG: Record<string, { label: string; icon: React.ElementType; colo
 // ── Task Card ──────────────────────────────────────────────────────────────
 
 function TaskCard({ task, index }: { task: ShiftHistoryTask; index: number }) {
-  const cfg = TASK_CONFIG[task.task_type] ?? TASK_CONFIG.collection;
+  const redeploy = isRedeployPlacement(task);
+  const cfg = redeploy
+    ? {
+        label: task.bin_number != null
+          ? `Redeployment · Bin #${task.bin_number}`
+          : 'Redeployment',
+        icon: Truck,
+        color: 'text-teal-600',
+        borderColor: 'border-l-teal-500',
+      }
+    : TASK_CONFIG[task.task_type] ?? TASK_CONFIG.collection;
   const Icon = cfg.icon;
   const completed = task.is_completed === 1 && !task.skipped;
   const skipped = task.skipped;
@@ -176,8 +186,26 @@ function TaskCard({ task, index }: { task: ShiftHistoryTask; index: number }) {
           </>
         )}
 
-        {/* ── Placement ──────────────────────────────────── */}
-        {task.task_type === 'placement' && (
+        {/* ── Redeployment (Phase 2: one placement task placing a specific
+               warehouse bin — nothing is created/converted) ──────────────── */}
+        {task.task_type === 'placement' && redeploy && (
+          <>
+            <Row label="Destination" value={task.address ?? '—'} />
+            {task.bin_number != null && (
+              <div className="flex items-center gap-2 pt-0.5">
+                <span className="text-gray-400 font-medium">
+                  {completed ? 'Redeployed' : skipped ? 'Not placed' : 'Bin'}
+                </span>
+                <span className="flex items-center gap-1 font-semibold text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full">
+                  <Hash className="w-3 h-3" /> Bin #{task.bin_number}
+                </span>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── Placement (new bin from a potential location) ─ */}
+        {task.task_type === 'placement' && !redeploy && (
           <>
             <Row label="Location" value={task.placement_address ?? task.address ?? '—'} />
             {task.placement_created_bin_number != null ? (
@@ -428,7 +456,11 @@ function TimelineView({ shift, tasks }: { shift: ShiftHistoryEntry; tasks: Shift
         warehouseLoadBatches.set(task.completed_at, (warehouseLoadBatches.get(task.completed_at) ?? 0) + 1);
       } else {
         const taskLabel = task.task_type === 'collection' ? `Bin #${task.bin_number}` :
-                          task.task_type === 'placement' ? `Placement at ${task.address?.substring(0, 30)}` :
+                          task.task_type === 'placement' ? (
+                            isRedeployPlacement(task)
+                              ? `Redeployment · Bin #${task.bin_number}`
+                              : `Placement at ${task.address?.substring(0, 30)}`
+                          ) :
                           task.task_type === 'pickup' ? `Pickup Bin #${task.bin_number}` :
                           task.task_type === 'dropoff' ? `Dropoff Bin #${task.bin_number}` :
                           'Warehouse stop';
@@ -446,7 +478,9 @@ function TimelineView({ shift, tasks }: { shift: ShiftHistoryEntry; tasks: Shift
     // Add task removal events
     if (task.is_deleted && task.deleted_at) {
       const taskLabel = task.task_type === 'collection' ? `Bin #${task.bin_number}` :
-                        task.task_type === 'placement' ? `Placement` :
+                        task.task_type === 'placement' ? (
+                          isRedeployPlacement(task) ? 'Redeployment' : 'Placement'
+                        ) :
                         `Move`;
 
       events.push({

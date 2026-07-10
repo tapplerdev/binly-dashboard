@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { X, Check, SkipForward, Circle, Navigation, MapPin, Package, ArrowRightLeft, Warehouse, Wrench, Loader2, ChevronDown, Trash2, ArrowRight, ArrowLeft, Plus } from 'lucide-react';
+import { X, Check, SkipForward, Circle, Navigation, MapPin, Package, ArrowRightLeft, Warehouse, Wrench, Loader2, ChevronDown, Trash2, ArrowRight, ArrowLeft, Plus, Truck } from 'lucide-react';
+import { isRedeployPlacement } from './shift-task-card';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getShiftTasks, removeTasksFromShift, addTasksToShift, createShiftWithTasks, cancelShift } from '@/lib/api/shifts';
 import { BinSelectionMap } from './bin-selection-map';
@@ -52,10 +53,24 @@ const TASK_ICONS: Record<string, { icon: typeof MapPin; color: string; bg: strin
   service:        { icon: Wrench,         color: 'text-green-600',  bg: 'bg-green-50',  label: 'Service' },
 };
 
+// Redeployments are placement tasks carrying their move (Phase 2) — teal
+// truck identity, distinct from new-bin placements.
+const REDEPLOY_ICON = { icon: Truck, color: 'text-teal-600', bg: 'bg-teal-50', label: 'Redeployment' };
+
+function getTaskIcon(task: any) {
+  if (isRedeployPlacement(task)) return REDEPLOY_ICON;
+  return getTaskIcon(task);
+}
+
 function getTaskLabel(task: any): string {
   if (task.task_type === 'warehouse_stop') return 'Warehouse';
   if (task.task_type === 'service') return task.task_label || 'Service Stop';
-  if (task.task_type === 'placement') return 'Placement';
+  if (task.task_type === 'placement') {
+    if (isRedeployPlacement(task)) {
+      return task.bin_number ? `Redeployment — Bin #${task.bin_number}` : 'Redeployment';
+    }
+    return 'Placement';
+  }
   if (task.task_type === 'pickup') return task.bin_number ? `Pick Up — Bin #${task.bin_number}` : 'Pick Up';
   if (task.task_type === 'dropoff') return task.bin_number ? `Drop Off — Bin #${task.bin_number}` : 'Drop Off';
   if (task.bin_number) return `Bin #${task.bin_number}`;
@@ -85,7 +100,7 @@ function getMoveRequestTag(task: any, allTasks: any[]): string | null {
 function TaskRow({ task, isSelected, isSelectable, isInProgress, isDone, isSkipped, isPendingRemove, isPendingMove, onToggle, allTasks }: {
   task: any; isSelected: boolean; isSelectable: boolean; isInProgress: boolean; isDone: boolean; isSkipped: boolean; isPendingRemove: boolean; isPendingMove: boolean; onToggle: () => void; allTasks?: any[];
 }) {
-  const iconConfig = TASK_ICONS[task.task_type] || TASK_ICONS.collection;
+  const iconConfig = getTaskIcon(task);
   const Icon = iconConfig.icon;
   const subtext = getTaskSubtext(task);
   const moveTag = allTasks ? getMoveRequestTag(task, allTasks) : null;
@@ -538,7 +553,7 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
                     ))}
                     {/* Pending adds shown as green dashed cards */}
                     {pendingAdds.map((task, i) => {
-                      const iconConfig = TASK_ICONS[task.task_type] || TASK_ICONS.collection;
+                      const iconConfig = getTaskIcon(task);
                       const Icon = iconConfig.icon;
                       return (
                         <div key={`add-${i}`} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border-2 border-dashed border-green-300 bg-green-50">
@@ -640,7 +655,7 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
                           <>
                             <div className="text-xs text-gray-400 font-medium px-1 mb-1">Existing ({targetDriverTasks.length})</div>
                             {targetDriverTasks.map((task: any) => {
-                              const ic = TASK_ICONS[task.task_type] || TASK_ICONS.collection;
+                              const ic = getTaskIcon(task);
                               const Icon = ic.icon;
                               return (
                                 <div key={task.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-gray-100 bg-gray-50 opacity-70">
@@ -656,7 +671,7 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
                         )}
                         <div className="text-xs text-green-600 font-medium px-1 mb-1 mt-3"><Plus className="w-3 h-3 inline mr-1" />Incoming ({stagedMove.tasks.length})</div>
                         {stagedMove.tasks.map((task: any) => {
-                          const ic = TASK_ICONS[task.task_type] || TASK_ICONS.collection;
+                          const ic = getTaskIcon(task);
                           const Icon = ic.icon;
                           return (
                             <div key={task.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg border-2 border-dashed border-green-300 bg-green-50">
@@ -673,7 +688,7 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
                           <>
                             <div className="text-xs text-blue-600 font-medium px-1 mb-1 mt-3"><Plus className="w-3 h-3 inline mr-1" />Also adding ({stagedMove.additionalTasks.length})</div>
                             {stagedMove.additionalTasks.map((task: any, i: number) => {
-                              const ic = TASK_ICONS[task.task_type] || TASK_ICONS.collection;
+                              const ic = getTaskIcon(task);
                               const Icon = ic.icon;
                               return (
                                 <div key={`ta-${i}`} className="flex items-center gap-2.5 px-3 py-2 rounded-lg border-2 border-dashed border-blue-300 bg-blue-50">
