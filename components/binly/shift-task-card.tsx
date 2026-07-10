@@ -75,10 +75,15 @@ export function WarehouseRunCard({
   tasks,
   isReturn,
   isCurrentRun = false,
+  stopNumber,
 }: {
   tasks: AnyTask[];
   isReturn: boolean;
   isCurrentRun?: boolean;
+  /** Logical stop number (1-based, counting each run as ONE stop). Renders the
+   *  same blue badge as single-task cards when provided; omit for surfaces
+   *  that don't number (kanban column). */
+  stopNumber?: number;
 }) {
   const total = tasks.length;
   const done = tasks.filter((t) => t.is_completed === 1).length;
@@ -99,6 +104,13 @@ export function WarehouseRunCard({
           : 'bg-white border-l-4 border-gray-300 hover:bg-gray-50'
       }`}
     >
+      {stopNumber !== undefined && (
+        <div className="flex-shrink-0">
+          <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center">
+            <span className="text-xs font-bold text-white">{stopNumber}</span>
+          </div>
+        </div>
+      )}
       <div className="flex-shrink-0">
         <div className="w-7 h-7 rounded-md flex items-center justify-center bg-gray-100">
           <Warehouse className="w-3.5 h-3.5 text-gray-600" />

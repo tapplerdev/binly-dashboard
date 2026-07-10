@@ -800,6 +800,7 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                           tasks={group.tasks}
                           isReturn={group.isReturn}
                           isCurrentRun={shift.status === 'active' && gIndex === currentGroupIndex}
+                          stopNumber={gIndex + 1}
                         />
                       );
                     }
@@ -837,10 +838,13 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                             : 'bg-white border-l-4 border-gray-300 hover:bg-gray-50'
                         }`}
                       >
-                        {/* Sequence Number Badge */}
+                        {/* Stop Number Badge — logical stop position (a whole
+                            warehouse run counts as ONE stop), not the raw DB
+                            sequence_order, which advances once per bin-row and
+                            made the visible numbering jump (…12 → 16…). */}
                         <div className="flex-shrink-0">
                           <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center">
-                            <span className="text-xs font-bold text-white">{task.sequence_order}</span>
+                            <span className="text-xs font-bold text-white">{gIndex + 1}</span>
                           </div>
                         </div>
 
