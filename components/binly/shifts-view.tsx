@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Calendar, List, User, X, Search, ChevronDown, ChevronUp, Filter, MapPin, Loader2, Trash2, GripVertical, Package, MapPinned, Warehouse, MoveRight, Plus, Pencil, ArrowUp, ArrowDown, ClipboardCheck, Settings, CalendarClock, Camera, Clock } from 'lucide-react';
+import { Calendar, List, User, X, Search, ChevronDown, ChevronUp, Filter, MapPin, Loader2, Trash2, GripVertical, Package, MapPinned, Warehouse, MoveRight, Plus, Pencil, ArrowUp, ArrowDown, ClipboardCheck, Settings, CalendarClock, Camera, Clock, Truck } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel, ShiftStatus } from '@/lib/types/shift';
 import { ShiftDetailsDrawer } from './shift-details-drawer';
 import { BinSelectionMap } from './bin-selection-map';
 import { MoveRequestSelectionMap } from './move-request-selection-map';
 import { PlacementLocationSelectionMap } from './placement-location-selection-map';
+import { RedeploymentPickerModal } from './redeployment-picker-modal';
 import { RouteSelectionMap } from './route-selection-map';
 import { Route, getRouteLabel } from '@/lib/types/route';
 import { RouteTask } from '@/lib/types/route-task';
@@ -158,11 +159,6 @@ export function CreateShiftDrawer({
   const [showMoveRequestSelection, setShowMoveRequestSelection] = useState(false);
   const [warehouseDeployments, setWarehouseDeployments] = useState<WarehouseDeploymentItem[]>([]);
   const [showWarehouseDeployment, setShowWarehouseDeployment] = useState(false);
-  const [warehouseBins, setWarehouseBins] = useState<Bin[]>([]);
-  const [selectedDeployBinId, setSelectedDeployBinId] = useState('');
-  const [deployAddress, setDeployAddress] = useState('');
-  const [deployLat, setDeployLat] = useState('');
-  const [deployLon, setDeployLon] = useState('');
 
   // Shift options (merged from CustomShiftDrawer)
   const [shiftLabel, setShiftLabel] = useState('');
@@ -677,37 +673,9 @@ export function CreateShiftDrawer({
     setShowMoveRequestSelection(true);
   };
 
-  const openWarehouseDeployment = async () => {
-    // Load in_storage bins on open
-    try {
-      const all = await getBins();
-      setWarehouseBins(all.filter(b => b.status === 'in_storage'));
-    } catch {
-      setWarehouseBins([]);
-    }
-    setSelectedDeployBinId('');
-    setDeployAddress('');
-    setDeployLat('');
-    setDeployLon('');
+  const openWarehouseDeployment = () => {
+    // The picker modal loads its own in_storage bins + growth suggestions.
     setShowWarehouseDeployment(true);
-  };
-
-  const handleAddDeployment = () => {
-    const bin = warehouseBins.find(b => b.id === selectedDeployBinId);
-    if (!bin || !deployAddress.trim()) return;
-    const lat = parseFloat(deployLat);
-    const lon = parseFloat(deployLon);
-    if (isNaN(lat) || isNaN(lon)) return;
-    // Prevent duplicates
-    if (warehouseDeployments.some(d => d.bin_id === bin.id)) return;
-    setWarehouseDeployments(prev => [
-      ...prev,
-      { bin_id: bin.id, bin_number: bin.bin_number, destination_address: deployAddress.trim(), destination_latitude: lat, destination_longitude: lon },
-    ]);
-    setSelectedDeployBinId('');
-    setDeployAddress('');
-    setDeployLat('');
-    setDeployLon('');
   };
 
   const removeDeployment = (binId: string) => {
@@ -2261,12 +2229,12 @@ export function CreateShiftDrawer({
                 <button
                   type="button"
                   onClick={openWarehouseDeployment}
-                  className="col-span-2 flex items-center gap-2 px-4 py-3 border-2 border-dashed border-purple-300 hover:border-purple-500 hover:bg-purple-50 rounded-lg transition-all text-sm font-medium text-purple-700"
+                  className="col-span-2 flex items-center gap-2 px-4 py-3 border-2 border-dashed border-teal-300 hover:border-teal-500 hover:bg-teal-50 rounded-lg transition-all text-sm font-medium text-teal-700"
                 >
-                  <Warehouse className="w-4 h-4" />
-                  Deploy from Warehouse
+                  <Truck className="w-4 h-4" />
+                  Redeployment
                   {warehouseDeployments.length > 0 && (
-                    <span className="ml-auto bg-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                    <span className="ml-auto bg-teal-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                       {warehouseDeployments.length}
                     </span>
                   )}
@@ -2274,109 +2242,26 @@ export function CreateShiftDrawer({
               </div>
             </div>
 
-            {/* Warehouse Deployments Panel */}
-            {showWarehouseDeployment && (
-              <div className="border border-purple-200 rounded-xl bg-purple-50/40 p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                    <Warehouse className="w-4 h-4 text-purple-600" />
-                    Deploy Bins from Warehouse
-                  </h3>
-                  <button type="button" onClick={() => setShowWarehouseDeployment(false)} className="text-gray-400 hover:text-gray-600">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {warehouseBins.length === 0 ? (
-                  <p className="text-sm text-gray-500">No bins currently in warehouse storage.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {/* Bin selector */}
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 mb-1 block">Select bin to deploy</label>
-                      <select
-                        value={selectedDeployBinId}
-                        onChange={e => setSelectedDeployBinId(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
-                      >
-                        <option value="">-- Choose a bin --</option>
-                        {warehouseBins
-                          .filter(b => !warehouseDeployments.some(d => d.bin_id === b.id))
-                          .map(b => (
-                            <option key={b.id} value={b.id}>
-                              Bin #{b.bin_number} — {b.current_street}, {b.city}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-
-                    {/* Destination address */}
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 mb-1 block">Destination address</label>
-                      <input
-                        type="text"
-                        value={deployAddress}
-                        onChange={e => setDeployAddress(e.target.value)}
-                        placeholder="123 Main St, City"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-                      />
-                    </div>
-
-                    {/* Coordinates */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-xs font-medium text-gray-600 mb-1 block">Latitude</label>
-                        <input
-                          type="number"
-                          step="any"
-                          value={deployLat}
-                          onChange={e => setDeployLat(e.target.value)}
-                          placeholder="e.g. 25.7617"
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-gray-600 mb-1 block">Longitude</label>
-                        <input
-                          type="number"
-                          step="any"
-                          value={deployLon}
-                          onChange={e => setDeployLon(e.target.value)}
-                          placeholder="e.g. -80.1918"
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-                        />
-                      </div>
-                    </div>
-
+            {/* Staged redeployments (picked in the map modal) */}
+            {warehouseDeployments.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {warehouseDeployments.map(d => (
+                  <span
+                    key={d.bin_id}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-full"
+                  >
+                    <Truck className="w-3.5 h-3.5 text-teal-600" />
+                    Bin #{d.bin_number} → {d.destination_address.length > 34 ? d.destination_address.slice(0, 32) + '…' : d.destination_address}
                     <button
                       type="button"
-                      onClick={handleAddDeployment}
-                      disabled={!selectedDeployBinId || !deployAddress.trim() || !deployLat || !deployLon}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
+                      onClick={() => removeDeployment(d.bin_id)}
+                      className="text-teal-500 hover:text-red-500"
+                      title="Remove redeployment"
                     >
-                      <Plus className="w-4 h-4" />
-                      Add Deployment
+                      <X className="w-3.5 h-3.5" />
                     </button>
-                  </div>
-                )}
-
-                {/* Queued deployments list */}
-                {warehouseDeployments.length > 0 && (
-                  <div className="space-y-2 pt-2 border-t border-purple-200">
-                    <p className="text-xs font-semibold text-gray-600">Queued deployments ({warehouseDeployments.length})</p>
-                    {warehouseDeployments.map(d => (
-                      <div key={d.bin_id} className="flex items-start justify-between bg-white border border-purple-200 rounded-lg px-3 py-2 text-sm">
-                        <div>
-                          <p className="font-medium text-gray-900">Bin #{d.bin_number}</p>
-                          <p className="text-xs text-gray-500">{d.destination_address}</p>
-                        </div>
-                        <button type="button" onClick={() => removeDeployment(d.bin_id)} className="text-gray-400 hover:text-red-500 mt-0.5">
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                  </span>
+                ))}
               </div>
             )}
 
@@ -3135,6 +3020,18 @@ export function CreateShiftDrawer({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Redeployment Picker Modal (map + suggested spots) */}
+      {showWarehouseDeployment && (
+        <RedeploymentPickerModal
+          onClose={() => setShowWarehouseDeployment(false)}
+          onConfirm={(items) => {
+            setWarehouseDeployments(items);
+            setShowWarehouseDeployment(false);
+          }}
+          initialDeployments={warehouseDeployments}
+        />
       )}
 
       {/* Bin Selection Map Modal */}

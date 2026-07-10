@@ -21,7 +21,7 @@ import {
   Wand2,
   Loader2,
   Trash2,
-  PackagePlus,
+  Truck,
   Import,
   MapPin,
   AlertTriangle,
@@ -564,8 +564,8 @@ export function ShiftComposer({ onClose, defaultDriverId, scheduledDate }: Shift
                     position={{ lat: d.destination_latitude, lng: d.destination_longitude }}
                     zIndex={60}
                   >
-                    <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-bold border-2 border-white shadow-lg">
-                      <PackagePlus className="w-3 h-3" /> #{d.bin_number}
+                    <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-teal-600 text-white text-[11px] font-bold border-2 border-white shadow-lg">
+                      <Truck className="w-3 h-3" /> #{d.bin_number}
                     </div>
                   </AdvancedMarker>
                 ))}
@@ -612,8 +612,8 @@ export function ShiftComposer({ onClose, defaultDriverId, scheduledDate }: Shift
                   {selectedIds.length} stop{selectedIds.length === 1 ? '' : 's'}
                 </span>
                 {deployments.length > 0 && (
-                  <span className="text-emerald-700 font-medium">
-                    +{deployments.length} deploy
+                  <span className="text-teal-700 font-medium">
+                    +{deployments.length} redeploy
                   </span>
                 )}
                 {serviceStops.length > 0 && (
@@ -905,16 +905,16 @@ function DeployPanel({
                 key={bin.id}
                 className="flex items-center gap-2 p-2 rounded-xl hover:bg-gray-50 transition-card"
               >
-                <PackagePlus
+                <Truck
                   className={cn(
                     'w-4 h-4 shrink-0',
-                    placed ? 'text-emerald-600' : 'text-gray-400'
+                    placed ? 'text-teal-600' : 'text-gray-400'
                   )}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-gray-900">Bin #{bin.bin_number}</p>
                   {placed && (
-                    <p className="text-xs text-emerald-700 truncate">
+                    <p className="text-xs text-teal-700 truncate">
                       → {placed.destination_address}
                     </p>
                   )}
