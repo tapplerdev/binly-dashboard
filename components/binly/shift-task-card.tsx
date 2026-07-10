@@ -32,6 +32,118 @@ const TASK_ICONS: Record<string, { icon: typeof MapPin; color: string; bg: strin
   service:        { icon: Wrench,         color: 'text-green-600',  bg: 'bg-green-50' },
 };
 
+// ── Warehouse-run grouping ───────────────────────────────────────────────────
+// The optimizer writes ONE warehouse_stop row per bin loaded, so a placement
+// route renders as a wall of identical "Warehouse" cards. Physically the driver
+// makes one stop per reload run — group consecutive warehouse_stop tasks so the
+// list reads "Load 5 bins → place → Load 6 bins → place → Return".
+
+type AnyTask = TaskCardProps['task'] & { [key: string]: any };
+
+export type TaskGroup =
+  | { kind: 'single'; task: AnyTask; index: number }
+  | { kind: 'warehouse_run'; tasks: AnyTask[]; indices: number[]; isReturn: boolean };
+
+export function groupWarehouseRuns(tasks: AnyTask[]): TaskGroup[] {
+  const groups: TaskGroup[] = [];
+  let i = 0;
+  while (i < tasks.length) {
+    if (tasks[i].task_type === 'warehouse_stop') {
+      const run: AnyTask[] = [];
+      const indices: number[] = [];
+      while (i < tasks.length && tasks[i].task_type === 'warehouse_stop') {
+        run.push(tasks[i]);
+        indices.push(i);
+        i++;
+      }
+      // A lone trailing warehouse stop is the end-of-route return, not a load.
+      const isReturn = i === tasks.length && run.length === 1;
+      groups.push({ kind: 'warehouse_run', tasks: run, indices, isReturn });
+    } else {
+      groups.push({ kind: 'single', task: tasks[i], index: i });
+      i++;
+    }
+  }
+  return groups;
+}
+
+// One card for a whole reload run. Mirrors ShiftTaskCard's visual states:
+// done (all loads completed), current (run contains the active task), pending.
+export function WarehouseRunCard({
+  tasks,
+  isReturn,
+  isCurrentRun = false,
+}: {
+  tasks: AnyTask[];
+  isReturn: boolean;
+  isCurrentRun?: boolean;
+}) {
+  const total = tasks.length;
+  const done = tasks.filter((t) => t.is_completed === 1).length;
+  const allDone = done === total;
+  const label = isReturn
+    ? 'Return to warehouse'
+    : `Load ${total} ${total === 1 ? 'bin' : 'bins'}`;
+  const addr = tasks[0].address || '';
+  const truncAddr = addr.length > 35 ? addr.slice(0, 33) + '…' : addr;
+
+  return (
+    <div
+      className={`flex items-center gap-2 p-2.5 rounded-lg border transition-fast ${
+        allDone
+          ? 'bg-green-50 border-l-4 border-green-500 opacity-75'
+          : isCurrentRun
+          ? 'bg-blue-50 border-l-4 border-blue-600 ring-1 ring-blue-100'
+          : 'bg-white border-l-4 border-gray-300 hover:bg-gray-50'
+      }`}
+    >
+      <div className="flex-shrink-0">
+        <div className="w-7 h-7 rounded-md flex items-center justify-center bg-gray-100">
+          <Warehouse className="w-3.5 h-3.5 text-gray-600" />
+        </div>
+      </div>
+      <div className="flex-shrink-0">
+        {allDone ? (
+          <div className="w-5 h-5 bg-green-600 rounded-full flex items-center justify-center">
+            <Check className="w-3 h-3 text-white" />
+          </div>
+        ) : isCurrentRun ? (
+          <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center animate-pulse">
+            <Navigation className="w-3 h-3 text-white" />
+          </div>
+        ) : (
+          <div className="w-5 h-5 bg-gray-200 rounded-full flex items-center justify-center">
+            <Circle className="w-2.5 h-2.5 text-gray-400" />
+          </div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <p
+            className={`text-xs font-medium truncate ${
+              allDone ? 'text-gray-500' : isCurrentRun ? 'text-blue-900 font-semibold' : 'text-gray-800'
+            }`}
+          >
+            {label}
+          </p>
+          {isCurrentRun && (
+            <span className="px-1.5 py-0.5 bg-blue-600 text-white text-[10px] rounded-full font-medium whitespace-nowrap">
+              Active
+            </span>
+          )}
+        </div>
+        <p className={`text-[11px] truncate ${allDone ? 'text-gray-400' : 'text-gray-500'}`}>{truncAddr}</p>
+      </div>
+      {/* Partial-load progress, e.g. loading mid-run */}
+      {!allDone && done > 0 && (
+        <span className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
+          {done}/{total}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function ShiftTaskCard({ task, isCurrentTask = false }: TaskCardProps) {
   const [fullscreenPhoto, setFullscreenPhoto] = useState<string | null>(null);
   const isDone = task.is_completed === 1 && !task.skipped;

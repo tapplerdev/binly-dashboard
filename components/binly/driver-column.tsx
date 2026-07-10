@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Plus, Info, X, Loader2 } from 'lucide-react';
-import { ShiftTaskCard } from './shift-task-card';
+import { ShiftTaskCard, WarehouseRunCard, groupWarehouseRuns } from './shift-task-card';
 import { cancelShift } from '@/lib/api/shifts';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -117,13 +117,25 @@ export function DriverColumn({ driver, shift, tasks, isToday, onCreateShift, onS
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5" style={{ maxHeight: '480px' }}>
         {hasShift ? (
           tasks.length > 0 ? (
-            tasks.map((task: any, i: number) => (
-              <ShiftTaskCard
-                key={task.id || i}
-                task={task}
-                isCurrentTask={i === currentTaskIndex && shift!.status === 'active'}
-              />
-            ))
+            // Collapse each run of consecutive warehouse loads into one card
+            // ("Load 5 bins") — the driver makes one stop per reload, not one
+            // per bin. Single tasks keep their original index semantics.
+            groupWarehouseRuns(tasks).map((group) =>
+              group.kind === 'single' ? (
+                <ShiftTaskCard
+                  key={group.task.id || group.index}
+                  task={group.task}
+                  isCurrentTask={group.index === currentTaskIndex && shift!.status === 'active'}
+                />
+              ) : (
+                <WarehouseRunCard
+                  key={group.tasks[0].id || `wh-${group.indices[0]}`}
+                  tasks={group.tasks}
+                  isReturn={group.isReturn}
+                  isCurrentRun={shift!.status === 'active' && group.indices.includes(currentTaskIndex)}
+                />
+              )
+            )
           ) : (
             <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
               No tasks loaded

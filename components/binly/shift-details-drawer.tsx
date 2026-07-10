@@ -356,7 +356,10 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
   // Exclude warehouse_stop and service tasks from bin counts — they aren't "collected" bins
   const usingTasks = tasks.length > 0;
   const binTasks = usingTasks
-    ? tasks.filter(t => t.stop_type !== 'warehouse_stop' && t.stop_type !== 'service')
+    // NOTE: route tasks carry task_type (stop_type doesn't exist on RouteTask) —
+    // filtering on the wrong key made this a no-op, so Progress showed the raw
+    // 23-row count (every warehouse load) instead of the 11 real bins.
+    ? tasks.filter(t => t.task_type !== 'warehouse_stop' && t.task_type !== 'service')
     : bins;
   const totalItems = binTasks.length;
   const completedItems = binTasks.filter(t => t.is_completed === 1).length;
@@ -364,7 +367,9 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
   const collectedCount = completedItems;
   const remainingItems = totalItems - completedItems;
   const progressPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
-  const totalWeight = 145; // Mock for now - backend doesn't track weight yet
+  // Hidden (card renders only when > 0) until the backend tracks real weight —
+  // the old hardcoded 145 was presented as live data, which misleads.
+  const totalWeight = 0;
 
   // Live Est. Complete calculation
   // Uses actual pace: (time elapsed / tasks completed) × tasks remaining
