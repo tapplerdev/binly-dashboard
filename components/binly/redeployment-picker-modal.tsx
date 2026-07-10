@@ -1,11 +1,13 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
-import { Map as GoogleMap, AdvancedMarker } from '@vis.gl/react-google-maps';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Map as GoogleMap, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { useQuery } from '@tanstack/react-query';
-import { X, Truck, Sparkles, MapPin, Loader2, Wand2 } from 'lucide-react';
+import { X, Truck, Sparkles, MapPin, Loader2, Wand2, ChevronDown, ChevronUp, Crosshair, Eye } from 'lucide-react';
 import { useModalClose } from '@/components/binly/modal-wrapper';
 import { BinMarkersLayer, ZoneMarkersLayer, WarehouseMarkerLayer } from '@/components/binly/map-layers';
+import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
+import { hereReverseGeocode, HerePlaceDetails } from '@/lib/services/geocoding.service';
 import { useBins } from '@/lib/hooks/use-bins';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import type { Bin } from '@/lib/types/bin';
@@ -47,20 +49,6 @@ async function fetchCandidates(): Promise<{ candidates: ScoredCandidate[] }> {
   return (await r.json()).data;
 }
 
-/** Maps JS is already loaded via the dashboard-level APIProvider. */
-function reverseGeocode(lat: number, lng: number): Promise<string> {
-  return new Promise((resolve) => {
-    const fallback = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-    try {
-      new google.maps.Geocoder().geocode({ location: { lat, lng } }, (results, status) => {
-        resolve(status === 'OK' && results?.[0] ? results[0].formatted_address : fallback);
-      });
-    } catch {
-      resolve(fallback);
-    }
-  });
-}
-
 function candidateAddress(c: ScoredCandidate): string {
   if (c.street && c.city) return `${c.street}, ${c.city}${c.zip ? ' ' + c.zip : ''}`;
   return c.address;
@@ -74,6 +62,18 @@ function daysInStorage(bin: Bin): number | null {
   return days >= 0 ? days : null;
 }
 
+/** Pans the map when a suggestion's View button fires (timestamp forces re-pan). */
+function MapController({ target }: { target: { lat: number; lng: number; ts: number } | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map || !target) return;
+    map.panTo({ lat: target.lat, lng: target.lng });
+    const zoom = map.getZoom() ?? 12;
+    if (zoom < 14) map.setZoom(15);
+  }, [map, target]);
+  return null;
+}
+
 interface RedeploymentPickerModalProps {
   onClose: () => void;
   /** Replaces the staged list wholesale — the modal is the source of truth while open. */
@@ -82,16 +82,21 @@ interface RedeploymentPickerModalProps {
 }
 
 /**
- * Map-first picker for redeployments: choose stored bins on the left, give
- * each a destination by clicking the map or using an AI-suggested spot
- * (Growth candidate scoring). Stages RedeploymentItem[] — the backend mints
- * the redeployment move + placement task from it at shift creation.
+ * Map-first picker for redeployments. Each stored bin expands into its own
+ * chooser: AI-suggested spots (Growth candidate scoring, View pans the map),
+ * click-on-map placement (HERE reverse geocode), or a typed address (HERE
+ * autocomplete). Stages RedeploymentItem[] — the backend mints the
+ * redeployment move + placement task from it at shift creation.
  */
 export function RedeploymentPickerModal({ onClose, onConfirm, initialDeployments = [] }: RedeploymentPickerModalProps) {
   const { handleClose, backdropClass, containerClass } = useModalClose(onClose);
   const [deployments, setDeployments] = useState<RedeploymentItem[]>(initialDeployments);
+  const [expandedBinId, setExpandedBinId] = useState<string | null>(null);
   const [placingBin, setPlacingBin] = useState<Bin | null>(null);
   const [geocoding, setGeocoding] = useState(false);
+  const [addressText, setAddressText] = useState('');
+  const [focusTarget, setFocusTarget] = useState<{ lat: number; lng: number; ts: number } | null>(null);
+  const [focusedCandidateId, setFocusedCandidateId] = useState<string | null>(null);
 
   const { data: allBins = [], isLoading: binsLoading } = useBins();
   const { data: warehouse } = useWarehouseLocation();
@@ -126,6 +131,10 @@ export function RedeploymentPickerModal({ onClose, onConfirm, initialDeployments
     () => new Set(deployments.map((d) => `${d.destination_latitude},${d.destination_longitude}`)),
     [deployments],
   );
+  const availableSuggestions = useMemo(
+    () => suggestions.filter((c) => !usedSpots.has(`${c.latitude},${c.longitude}`)),
+    [suggestions, usedSpots],
+  );
 
   const assign = useCallback((bin: Bin, address: string, lat: number, lng: number) => {
     setDeployments((prev) => [
@@ -140,14 +149,21 @@ export function RedeploymentPickerModal({ onClose, onConfirm, initialDeployments
     ]);
   }, []);
 
+  const toggleExpanded = (bin: Bin) => {
+    setAddressText('');
+    setPlacingBin(null);
+    setExpandedBinId((prev) => (prev === bin.id ? null : bin.id));
+  };
+
   const handleMapClick = useCallback(
     async (lat: number, lng: number) => {
       if (!placingBin) return;
       const bin = placingBin;
       setPlacingBin(null);
       setGeocoding(true);
-      const address = await reverseGeocode(lat, lng);
+      const result = await hereReverseGeocode(lat, lng);
       setGeocoding(false);
+      const address = result?.formattedAddress || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       // If the bin got a destination while the geocode was in flight (e.g.
       // the user used a suggestion meanwhile), the later action wins.
       setDeployments((prev) =>
@@ -168,25 +184,37 @@ export function RedeploymentPickerModal({ onClose, onConfirm, initialDeployments
     [placingBin],
   );
 
-  // Apply a suggestion to the armed bin if one is armed, else the first
-  // bin without a destination (stored bins are fungible).
+  /** Assign a suggestion to an explicit bin (expanded row) or the best guess (map marker). */
   const applySuggestion = useCallback(
-    (c: ScoredCandidate) => {
+    (c: ScoredCandidate, explicitBin?: Bin) => {
       if (c.latitude == null || c.longitude == null) return;
       if (usedSpots.has(`${c.latitude},${c.longitude}`)) return;
-      const bin = placingBin ?? unplacedBins[0];
+      const expanded = expandedBinId ? warehouseBins.find((b) => b.id === expandedBinId) : undefined;
+      const bin = explicitBin ?? placingBin ?? expanded ?? unplacedBins[0];
       if (!bin) return;
       setPlacingBin(null);
+      setFocusedCandidateId(null);
       assign(bin, candidateAddress(c), c.latitude, c.longitude);
     },
-    [placingBin, unplacedBins, usedSpots, assign],
+    [usedSpots, expandedBinId, warehouseBins, placingBin, unplacedBins, assign],
   );
+
+  const viewSuggestion = (c: ScoredCandidate) => {
+    if (c.latitude == null || c.longitude == null) return;
+    setFocusedCandidateId(c.id);
+    setFocusTarget({ lat: c.latitude, lng: c.longitude, ts: Date.now() });
+  };
+
+  const handlePlaceSelect = (bin: Bin, place: HerePlaceDetails) => {
+    const address = place.formattedAddress || `${place.street}, ${place.city} ${place.zip}`;
+    assign(bin, address, place.latitude, place.longitude);
+    setAddressText('');
+    setFocusTarget({ lat: place.latitude, lng: place.longitude, ts: Date.now() });
+  };
 
   // Pair every unplaced bin (list order) with the best unused suggestions.
   const autoAssign = useCallback(() => {
-    const spots = suggestions.filter(
-      (c) => !usedSpots.has(`${c.latitude},${c.longitude}`),
-    );
+    const spots = [...availableSuggestions];
     setDeployments((prev) => {
       const next = [...prev];
       const placed = new Set(prev.map((d) => d.bin_id));
@@ -206,7 +234,8 @@ export function RedeploymentPickerModal({ onClose, onConfirm, initialDeployments
       return next;
     });
     setPlacingBin(null);
-  }, [suggestions, usedSpots, warehouseBins]);
+    setFocusedCandidateId(null);
+  }, [availableSuggestions, warehouseBins]);
 
   const removeDeployment = (binId: string) =>
     setDeployments((prev) => prev.filter((d) => d.bin_id !== binId));
@@ -227,7 +256,7 @@ export function RedeploymentPickerModal({ onClose, onConfirm, initialDeployments
             </div>
             <div className="flex-1">
               <h2 className="text-base font-semibold text-gray-900">Redeployment</h2>
-              <p className="text-xs text-gray-500">Deploy stored bins to the field — click the map or use a suggested spot</p>
+              <p className="text-xs text-gray-500">Pick a bin, then choose a suggested spot, click the map, or type an address</p>
             </div>
             <button type="button" onClick={handleClose} className="text-gray-400 hover:text-gray-600">
               <X className="w-5 h-5" />
@@ -235,154 +264,191 @@ export function RedeploymentPickerModal({ onClose, onConfirm, initialDeployments
           </div>
 
           <div className="flex-1 flex min-h-0">
-            {/* Left rail */}
-            <div className="w-[360px] border-r border-gray-200 bg-gray-50 flex flex-col min-h-0">
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                <div>
-                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                    Warehouse · {warehouseBins.length} {warehouseBins.length === 1 ? 'bin' : 'bins'}
-                  </p>
-                  {binsLoading ? (
-                    <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
-                      <Loader2 className="w-4 h-4 animate-spin" /> Loading bins…
-                    </div>
-                  ) : warehouseBins.length === 0 ? (
-                    <p className="text-sm text-gray-500 py-2">No bins currently in warehouse storage.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {warehouseBins.map((bin) => {
-                        const placed = deployedByBin.get(bin.id);
-                        const arming = placingBin?.id === bin.id;
-                        const days = daysInStorage(bin);
-                        return (
-                          <div
-                            key={bin.id}
-                            className={cn(
-                              'flex items-center gap-2 rounded-lg border px-3 py-2 bg-white text-sm',
-                              placed && 'border-teal-200 bg-teal-50',
-                              arming && 'border-teal-500 ring-1 ring-teal-200',
-                              !placed && !arming && 'border-gray-200',
-                            )}
-                          >
-                            <Truck className={cn('w-4 h-4 shrink-0', placed || arming ? 'text-teal-600' : 'text-gray-400')} />
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-gray-900">
-                                Bin #{bin.bin_number}
-                                {days != null && days > 0 && (
-                                  <span className="ml-2 text-[11px] font-normal text-gray-400">in storage {days}d</span>
-                                )}
-                              </p>
-                              {placed ? (
-                                <p className="text-xs text-teal-700 truncate">→ {placed.destination_address}</p>
-                              ) : arming ? (
-                                <p className="text-xs text-teal-600">Click the map or a suggested spot…</p>
-                              ) : null}
-                            </div>
-                            {placed ? (
-                              <button
-                                type="button"
-                                onClick={() => removeDeployment(bin.id)}
-                                className="text-gray-400 hover:text-red-500 shrink-0"
-                                title="Remove destination"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            ) : arming ? (
-                              <button
-                                type="button"
-                                onClick={() => setPlacingBin(null)}
-                                className="text-xs font-medium text-gray-500 hover:text-gray-700 shrink-0"
-                              >
-                                Cancel
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => setPlacingBin(bin)}
-                                className="text-xs font-medium text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-md px-2 py-1 shrink-0"
-                              >
-                                Place →
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {suggestions.length > 0 && (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" /> Suggested spots
-                      </p>
-                      {unplacedBins.length > 0 && (
+            {/* Left rail — expandable bin rows */}
+            <div className="w-[380px] border-r border-gray-200 bg-gray-50 flex flex-col min-h-0">
+              <div className="flex items-center justify-between px-4 pt-4 pb-2">
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+                  Warehouse · {warehouseBins.length} {warehouseBins.length === 1 ? 'bin' : 'bins'}
+                </p>
+                {unplacedBins.length > 0 && availableSuggestions.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={autoAssign}
+                    className="flex items-center gap-1 text-[11px] font-medium text-teal-700 hover:text-teal-900"
+                  >
+                    <Wand2 className="w-3 h-3" /> Auto-assign {Math.min(unplacedBins.length, availableSuggestions.length)}
+                  </button>
+                )}
+              </div>
+              <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
+                {binsLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Loading bins…
+                  </div>
+                ) : warehouseBins.length === 0 ? (
+                  <p className="text-sm text-gray-500 py-2">No bins currently in warehouse storage.</p>
+                ) : (
+                  warehouseBins.map((bin) => {
+                    const placed = deployedByBin.get(bin.id);
+                    const expanded = expandedBinId === bin.id;
+                    const arming = placingBin?.id === bin.id;
+                    const days = daysInStorage(bin);
+                    return (
+                      <div
+                        key={bin.id}
+                        className={cn(
+                          'rounded-lg border bg-white',
+                          placed && !expanded && 'border-teal-200',
+                          expanded && 'border-teal-500 ring-1 ring-teal-100',
+                          !placed && !expanded && 'border-gray-200',
+                        )}
+                      >
+                        {/* Row header */}
                         <button
                           type="button"
-                          onClick={autoAssign}
-                          className="flex items-center gap-1 text-[11px] font-medium text-teal-700 hover:text-teal-900"
+                          onClick={() => toggleExpanded(bin)}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left"
                         >
-                          <Wand2 className="w-3 h-3" /> Auto-assign {Math.min(unplacedBins.length, suggestions.filter((c) => !usedSpots.has(`${c.latitude},${c.longitude}`)).length)}
-                        </button>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      {suggestions.map((c) => {
-                        const used = usedSpots.has(`${c.latitude},${c.longitude}`);
-                        return (
-                          <div
-                            key={c.id}
-                            className={cn(
-                              'rounded-lg border border-gray-200 bg-white px-3 py-2',
-                              used && 'opacity-50',
-                            )}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="text-[11px] font-bold text-teal-800 bg-teal-50 border border-teal-200 rounded-full px-2 py-0.5">
-                                {Math.round(c.score)}
-                              </span>
-                              <span className="flex-1 text-sm text-gray-900 truncate">{c.street || c.address}</span>
-                              {!used && (
-                                <button
-                                  type="button"
-                                  onClick={() => applySuggestion(c)}
-                                  disabled={!placingBin && unplacedBins.length === 0}
-                                  className="text-xs font-medium text-teal-700 hover:text-teal-900 disabled:opacity-40 border border-teal-200 bg-teal-50 hover:bg-teal-100 rounded-md px-2 py-0.5"
-                                >
-                                  Use
-                                </button>
+                          <Truck className={cn('w-4 h-4 shrink-0', placed || expanded ? 'text-teal-600' : 'text-gray-400')} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900">
+                              Bin #{bin.bin_number}
+                              {days != null && days > 0 && (
+                                <span className="ml-2 text-[11px] font-normal text-gray-400">in storage {days}d</span>
                               )}
-                            </div>
-                            <p className="text-[11px] text-gray-400 mt-0.5">
-                              {c.city} · nearest bin {Math.round(c.nearest_bin_m)} m
                             </p>
+                            {placed && (
+                              <p className="text-xs text-teal-700 truncate">→ {placed.destination_address}</p>
+                            )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                          {placed && (
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeDeployment(bin.id);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  removeDeployment(bin.id);
+                                }
+                              }}
+                              className="text-gray-400 hover:text-red-500 shrink-0 cursor-pointer"
+                              title="Remove destination"
+                            >
+                              <X className="w-4 h-4" />
+                            </span>
+                          )}
+                          {expanded ? (
+                            <ChevronUp className="w-4 h-4 text-gray-400 shrink-0" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+                          )}
+                        </button>
+
+                        {/* Expanded chooser */}
+                        {expanded && (
+                          <div className="border-t border-gray-100 px-3 py-3 space-y-3">
+                            {/* AI suggestions */}
+                            {availableSuggestions.length > 0 && (
+                              <div>
+                                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-1.5">
+                                  <Sparkles className="w-3 h-3" /> Suggested spots
+                                </p>
+                                <div className="space-y-1.5">
+                                  {availableSuggestions.slice(0, 4).map((c) => (
+                                    <div
+                                      key={c.id}
+                                      className={cn(
+                                        'flex items-center gap-2 rounded-md border px-2 py-1.5',
+                                        focusedCandidateId === c.id ? 'border-teal-400 bg-teal-50/60' : 'border-gray-200',
+                                      )}
+                                    >
+                                      <span className="text-[11px] font-bold text-teal-800 bg-teal-50 border border-teal-200 rounded-full px-1.5 py-0.5">
+                                        {Math.round(c.score)}
+                                      </span>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-xs text-gray-900 truncate">{c.street || c.address}</p>
+                                        <p className="text-[10px] text-gray-400">{c.city} · nearest bin {Math.round(c.nearest_bin_m)} m</p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => viewSuggestion(c)}
+                                        className="text-gray-400 hover:text-teal-700"
+                                        title="View on map"
+                                      >
+                                        <Eye className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => applySuggestion(c, bin)}
+                                        className="text-[11px] font-medium text-teal-700 hover:text-teal-900 border border-teal-200 bg-teal-50 hover:bg-teal-100 rounded px-1.5 py-0.5"
+                                      >
+                                        Use
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Manual placement */}
+                            <div>
+                              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                                Or place manually
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => setPlacingBin(arming ? null : bin)}
+                                className={cn(
+                                  'w-full flex items-center justify-center gap-1.5 text-xs font-medium rounded-md border px-2 py-1.5 mb-2',
+                                  arming
+                                    ? 'border-teal-500 bg-teal-600 text-white'
+                                    : 'border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100',
+                                )}
+                              >
+                                <Crosshair className="w-3.5 h-3.5" />
+                                {arming ? 'Click the map… (cancel)' : 'Click on the map'}
+                              </button>
+                              <HerePlacesAutocomplete
+                                value={addressText}
+                                onChange={setAddressText}
+                                onPlaceSelect={(place) => handlePlaceSelect(bin, place)}
+                                placeholder="Or type an address…"
+                                userLocation={warehouse ? { lat: warehouse.latitude, lng: warehouse.longitude } : undefined}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
 
-            {/* Map */}
+            {/* Map — same setup as the live map (disableDefaultUI, shared layers) */}
             <div className={cn('flex-1 relative', placingBin && 'cursor-crosshair')}>
               <GoogleMap
                 mapId="binly-redeployment-picker"
                 defaultCenter={center}
                 defaultZoom={12}
+                minZoom={3}
+                maxZoom={20}
                 mapTypeId="hybrid"
                 gestureHandling="greedy"
-                disableDefaultUI={false}
-                streetViewControl={false}
+                disableDefaultUI={true}
                 className="w-full h-full"
                 onClick={(e) => {
                   const ll = e.detail.latLng;
                   if (ll) void handleMapClick(ll.lat, ll.lng);
                 }}
               >
-                <BinMarkersLayer size="sm" showLabels={false} zIndex={1} />
+                <MapController target={focusTarget} />
+                <BinMarkersLayer zIndex={1} />
                 <ZoneMarkersLayer />
                 <WarehouseMarkerLayer />
 
@@ -391,7 +457,7 @@ export function RedeploymentPickerModal({ onClose, onConfirm, initialDeployments
                     <AdvancedMarker
                       key={c.id}
                       position={{ lat: c.latitude, lng: c.longitude }}
-                      zIndex={40}
+                      zIndex={focusedCandidateId === c.id ? 50 : 40}
                       onClick={(e) => {
                         e.stop();
                         applySuggestion(c);
@@ -400,6 +466,7 @@ export function RedeploymentPickerModal({ onClose, onConfirm, initialDeployments
                       <div
                         className={cn(
                           'w-8 h-8 rounded-full bg-white border-2 border-teal-500 flex items-center justify-center text-[11px] font-bold text-teal-800 shadow',
+                          focusedCandidateId === c.id && 'ring-4 ring-teal-300 scale-110',
                           usedSpots.has(`${c.latitude},${c.longitude}`) && 'opacity-40',
                         )}
                       >
@@ -431,7 +498,7 @@ export function RedeploymentPickerModal({ onClose, onConfirm, initialDeployments
                   ) : (
                     <>
                       <MapPin className="w-4 h-4 text-teal-600" />
-                      Click a suggested spot or anywhere on the map to place Bin #{placingBin!.bin_number}
+                      Click anywhere on the map to place Bin #{placingBin!.bin_number}
                     </>
                   )}
                 </div>
