@@ -38,17 +38,21 @@ import {
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
+export type BinDetailTab = 'overview' | 'checks' | 'moves' | 'incidents' | 'history';
+
 interface BinDetailDrawerProps {
   bin: BinWithPriority;
   onClose: () => void;
   onScheduleMove?: (bin: BinWithPriority) => void;
   onEdit?: (bin: BinWithPriority) => void;
+  /** Tab to open on — deep links (e.g. no-go-zone incident → incidents tab). */
+  initialTab?: BinDetailTab;
 }
 
-export function BinDetailDrawer({ bin, onClose, onScheduleMove, onEdit }: BinDetailDrawerProps) {
+export function BinDetailDrawer({ bin, onClose, onScheduleMove, onEdit, initialTab }: BinDetailDrawerProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'overview' | 'checks' | 'moves' | 'incidents' | 'history'>('overview');
+  const [activeTab, setActiveTab] = useState<BinDetailTab>(initialTab ?? 'overview');
   const [isClosing, setIsClosing] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedCheck, setSelectedCheck] = useState<BinCheck | null>(null);

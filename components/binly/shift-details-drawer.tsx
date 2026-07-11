@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, ArrowUp, ArrowDown, Warehouse, SkipForward, AlertTriangle, ChevronDown, ChevronUp, Navigation, Route as RouteIcon, Image as ImageIcon, ClipboardCheck, Truck } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shift';
 import { getShiftById, getShiftTasks, cancelShift, removeTasksFromShift, getShiftTasksWithHistory, previewShiftRoute } from '@/lib/api/shifts';
@@ -34,6 +34,8 @@ interface ShiftDetailsDrawerProps {
   shift: Shift;
   onClose: () => void;
   onEditShift?: () => void;
+  /** Deep link (no-go-zone incident): scroll to + ring the tasks for this bin. */
+  highlightBinId?: string | null;
 }
 
 // Helper function to parse skip reason from task_data
@@ -97,7 +99,16 @@ function CapacityStepper({
   );
 }
 
-export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetailsDrawerProps) {
+export function ShiftDetailsDrawer({ shift, onClose, onEditShift, highlightBinId }: ShiftDetailsDrawerProps) {
+  // Scrolls the first highlighted task row into view once it mounts.
+  const highlightScrolledRef = useRef(false);
+  const highlightRef = (node: HTMLDivElement | null) => {
+    if (node && !highlightScrolledRef.current) {
+      highlightScrolledRef.current = true;
+      node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  };
+
   console.log('🔍 [SHIFT DRAWER] Received shift prop:', {
     id: shift.id,
     driverName: shift.driverName,
@@ -826,9 +837,11 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                       task.task_type === 'service' ? ClipboardCheck :
                       Circle;
 
+                    const isHighlighted = !!highlightBinId && task.bin_id === highlightBinId;
                     return (
                       <div
                         key={task.id}
+                        ref={isHighlighted ? highlightRef : undefined}
                         className={`flex items-center gap-2 p-2.5 rounded-lg border transition-fast ${
                           isSkipped
                             ? 'bg-yellow-50 border-l-4 border-yellow-500 opacity-75'
@@ -837,7 +850,7 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift }: ShiftDetails
                             : isInProgress
                             ? 'bg-blue-50 border-l-4 border-blue-600 shadow-lg ring-2 ring-blue-100'
                             : 'bg-white border-l-4 border-gray-300 hover:bg-gray-50'
-                        }`}
+                        }${isHighlighted ? ' ring-2 ring-amber-400' : ''}`}
                       >
                         {/* Stop Number Badge — logical stop position (a whole
                             warehouse run counts as ONE stop), not the raw DB

@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { ShiftsBoardView } from '@/components/binly/shifts-board-view';
 
 export const metadata = {
@@ -6,5 +7,10 @@ export const metadata = {
 };
 
 export default function ShiftsPage() {
-  return <ShiftsBoardView />;
+  // Suspense: ShiftsBoardView reads useSearchParams (incident deep links)
+  return (
+    <Suspense>
+      <ShiftsBoardView />
+    </Suspense>
+  );
 }

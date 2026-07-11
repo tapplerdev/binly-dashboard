@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { KpiCard } from '@/components/binly/kpi-card';
 import { BulkCreateBinModal } from '@/components/binly/bulk-create-bin-modal';
-import { BinDetailDrawer } from '@/components/binly/bin-detail-drawer';
+import { BinDetailDrawer, type BinDetailTab } from '@/components/binly/bin-detail-drawer';
 import { RetireBinModal } from '@/components/binly/bin-modals';
 import { ScheduleMoveModalWithMap } from '@/components/binly/schedule-move-modal-with-map';
 import { EditBinDialog } from '@/components/binly/edit-bin-dialog';
@@ -54,6 +54,7 @@ function BinsPageContent() {
   const [statusFilter, setStatusFilter] = useState<BinStatusFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBin, setSelectedBin] = useState<BinWithPriority | null>(null);
+  const [drawerInitialTab, setDrawerInitialTab] = useState<BinDetailTab | undefined>(undefined);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [selectedBins, setSelectedBins] = useState<Set<string>>(new Set());
@@ -139,13 +140,15 @@ function BinsPageContent() {
     staleTime: 10000,
   });
 
-  // Handle deep-link query params: ?editBin=<id> or ?scheduleBin=<id>
+  // Handle deep-link query params: ?editBin=<id>, ?scheduleBin=<id>, or
+  // ?bin=<id>[&tab=incidents] (no-go-zone incident → bin drawer).
   // Fires once allBins is loaded so we can find the bin object
   useEffect(() => {
     if (!allBins) return;
 
     const editBinId = searchParams.get('editBin');
     const scheduleBinId = searchParams.get('scheduleBin');
+    const viewBinId = searchParams.get('bin');
 
     if (editBinId) {
       const bin = allBins.find((b) => b.id === editBinId);
@@ -160,6 +163,15 @@ function BinsPageContent() {
       if (bin) {
         setModalTargetBin(bin);
         setShowScheduleModal(true);
+        router.replace('/administration/bins', { scroll: false });
+      }
+    } else if (viewBinId) {
+      const bin = allBins.find((b) => b.id === viewBinId);
+      if (bin) {
+        const tab = searchParams.get('tab');
+        const validTabs: BinDetailTab[] = ['overview', 'checks', 'moves', 'incidents', 'history'];
+        setDrawerInitialTab(validTabs.includes(tab as BinDetailTab) ? (tab as BinDetailTab) : undefined);
+        setSelectedBin(bin);
         router.replace('/administration/bins', { scroll: false });
       }
     }
@@ -920,7 +932,11 @@ function BinsPageContent() {
       {selectedBin && (
         <BinDetailDrawer
           bin={selectedBin}
-          onClose={() => setSelectedBin(null)}
+          initialTab={drawerInitialTab}
+          onClose={() => {
+            setSelectedBin(null);
+            setDrawerInitialTab(undefined);
+          }}
           onUpdate={() => refetch()}
           onScheduleMove={(bin) => {
             setSelectedBin(null);

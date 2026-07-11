@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Plus, LayoutGrid, List, Clock } from 'lucide-react';
 import { DriverColumn } from './driver-column';
@@ -105,6 +106,9 @@ export function ShiftsBoardView() {
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [selectedShiftForDetails, setSelectedShiftForDetails] = useState<Shift | null>(null);
+  const [highlightBinId, setHighlightBinId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [preselectedDriverId, setPreselectedDriverId] = useState<string | null>(null);
   const [editingShift, setEditingShift] = useState<any>(null);
   const queryClient = useQueryClient();
@@ -220,6 +224,28 @@ export function ShiftsBoardView() {
     };
     setSelectedShiftForDetails(frontendShift);
   };
+
+  // Deep link from no-go-zone incidents: /operations/shifts?id=<shiftId>[&bin=<binId>]
+  // — jump the board to the shift's day, open its details drawer, and highlight
+  // the incident bin's task. Consumed once; the param is kept until the shift
+  // list has loaded so a slow fetch doesn't eat the link.
+  const deepLinkConsumed = useRef(false);
+  useEffect(() => {
+    if (deepLinkConsumed.current || !allShifts) return;
+    const shiftId = searchParams.get('id');
+    if (!shiftId) return;
+    const shift = allShifts.find((s: any) => s.id === shiftId);
+    if (!shift) return;
+    deepLinkConsumed.current = true;
+    setSelectedDate(
+      shift.scheduled_date
+        ? new Date(shift.scheduled_date.split('T')[0] + 'T12:00:00')
+        : new Date((shift.start_time || shift.created_at) * 1000),
+    );
+    setHighlightBinId(searchParams.get('bin'));
+    handleSelectShift(shift);
+    router.replace('/operations/shifts', { scroll: false });
+  }, [allShifts, searchParams, router]);
 
   const handleReoptimize = async (shiftId: string) => {
     try {
@@ -601,7 +627,11 @@ export function ShiftsBoardView() {
       {selectedShiftForDetails && (
         <ShiftDetailsDrawer
           shift={selectedShiftForDetails}
-          onClose={() => setSelectedShiftForDetails(null)}
+          highlightBinId={highlightBinId}
+          onClose={() => {
+            setSelectedShiftForDetails(null);
+            setHighlightBinId(null);
+          }}
         />
       )}
 

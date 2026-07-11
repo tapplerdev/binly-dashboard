@@ -180,7 +180,7 @@ export function ZoneDetailsDrawer({ zone, onClose }: ZoneDetailsDrawerProps) {
                           <p className="text-sm font-medium text-gray-900">#{incident.bin_number}</p>
                           {incident.bin_id && (
                             <a
-                              href={`/administration/bins?bin=${incident.bin_id}`}
+                              href={`/administration/bins?bin=${incident.bin_id}&tab=incidents`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-0.5"
@@ -229,7 +229,7 @@ export function ZoneDetailsDrawer({ zone, onClose }: ZoneDetailsDrawerProps) {
                   {/* Shift link */}
                   {incident.shift_id && (
                     <a
-                      href={`/operations/shifts?id=${incident.shift_id}`}
+                      href={`/operations/shifts?id=${incident.shift_id}${incident.bin_id ? `&bin=${incident.bin_id}` : ''}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors"
