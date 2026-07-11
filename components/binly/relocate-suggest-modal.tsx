@@ -121,7 +121,7 @@ export function RelocateSuggestModal({
                 >
                   <span
                     className={`inline-flex items-center justify-center w-9 h-6 rounded-lg font-bold text-white text-xs shrink-0 ${
-                      c.score >= 60 ? 'bg-green-600' : c.score >= 35 ? 'bg-amber-500' : 'bg-gray-400'
+                      c.score >= 75 ? 'bg-green-600' : c.score >= 45 ? 'bg-amber-500' : 'bg-gray-400'
                     }`}
                   >
                     {c.score}

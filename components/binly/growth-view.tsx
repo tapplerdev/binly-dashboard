@@ -84,9 +84,11 @@ function hexColor(value: number, breaks: number[]): string {
   return YIELD_PALETTE[Math.min(idx, YIELD_PALETTE.length - 1)];
 }
 
-/** ONE score encoding shared by pins and table chips — same score, same color. */
+/** ONE score encoding shared by pins and table chips — same score, same color.
+ * Cutoffs recalibrated 2026-07 for the yield+gap score (0–100 ceiling; the old
+ * formula topped out at 65 before penalties, hence the old 60/35). */
 function scoreTier(c: Candidate): string {
-  return c.in_no_go_zone ? 'bg-gray-400' : c.score >= 60 ? 'bg-green-600' : c.score >= 35 ? 'bg-amber-500' : 'bg-gray-400';
+  return c.in_no_go_zone ? 'bg-gray-400' : c.score >= 75 ? 'bg-green-600' : c.score >= 45 ? 'bg-amber-500' : 'bg-gray-400';
 }
 
 /**
@@ -556,8 +558,7 @@ export function GrowthView() {
           <p className="text-[10px] text-gray-400 mb-2 flex items-center gap-2 flex-wrap">
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-green-500" /> nearby yield</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-blue-400" /> whitespace</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-300" /> incident risk</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-orange-300" /> cannibalization</span>
+            <span className="flex items-center gap-1"><AlertTriangle className="w-2.5 h-2.5 text-red-400" /> risk shown for context — not scored</span>
           </p>
         </div>
         <div className="flex-1 overflow-y-auto overflow-x-auto">
@@ -598,20 +599,24 @@ export function GrowthView() {
                     )}
                   </td>
                   <td className="px-3 py-2 w-32">
+                    {/* Score = 55·yield + 45·gap (2026-07 calibration). Risk &
+                        cannibalization are informational only — not in the score. */}
                     <div
                       className="flex h-2 rounded-full overflow-hidden bg-gray-100"
                       title={
-                        `Nearby yield +${(c.yield_prior * 40).toFixed(0)} · Whitespace +${(c.gap * 25).toFixed(0)} · ` +
-                        `Incident risk −${(c.incident_risk * 20).toFixed(0)} · Cannibalization −${(c.cannibalization * 15).toFixed(0)}`
+                        `Nearby yield +${(c.yield_prior * 55).toFixed(0)} · Whitespace +${(c.gap * 45).toFixed(0)}` +
+                        (c.incident_risk >= 0.25 ? ` · incident risk ${(c.incident_risk * 100).toFixed(0)}% (context only, not scored)` : '') +
+                        (c.cannibalization >= 0.25 ? ` · cannibalization ${(c.cannibalization * 100).toFixed(0)}% (context only, not scored)` : '')
                       }
                     >
-                      <div className="bg-green-500" style={{ width: `${c.yield_prior * 40}%` }} />
-                      <div className="bg-blue-400" style={{ width: `${c.gap * 25}%` }} />
-                      <div className="bg-red-300" style={{ width: `${c.incident_risk * 20}%` }} />
-                      <div className="bg-orange-300" style={{ width: `${c.cannibalization * 15}%` }} />
+                      <div className="bg-green-500" style={{ width: `${c.yield_prior * 55}%` }} />
+                      <div className="bg-blue-400" style={{ width: `${c.gap * 45}%` }} />
                     </div>
                     <p className="text-[10px] text-gray-400 mt-0.5 tabular-nums">
-                      +{(c.yield_prior * 40 + c.gap * 25).toFixed(0)} / −{(c.incident_risk * 20 + c.cannibalization * 15).toFixed(0)}
+                      +{(c.yield_prior * 55 + c.gap * 45).toFixed(0)}
+                      {c.incident_risk >= 0.25 && (
+                        <span className="text-red-400 ml-1" title="Near incident activity — context only, not scored">⚠ risk</span>
+                      )}
                     </p>
                   </td>
                   <td className="px-3 py-2">
