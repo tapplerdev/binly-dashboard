@@ -62,16 +62,30 @@ function daysInStorage(bin: Bin): number | null {
   return days >= 0 ? days : null;
 }
 
-/** Pans the map when a suggestion's View button fires (timestamp forces re-pan). */
+/** Flies the camera to a spot (timestamp forces re-pan). Same pan+zoom the placement modal uses. */
 function MapController({ target }: { target: { lat: number; lng: number; ts: number } | null }) {
   const map = useMap();
   useEffect(() => {
     if (!map || !target) return;
     map.panTo({ lat: target.lat, lng: target.lng });
-    const zoom = map.getZoom() ?? 12;
-    if (zoom < 14) map.setZoom(15);
+    map.setZoom(16);
   }, [map, target]);
   return null;
+}
+
+/** Teal score pin — same teardrop geometry as MapMarkerPin (components/ui/map-marker-pin.tsx). */
+function CandidatePin({ score, size = 40 }: { score: number; size?: number }) {
+  return (
+    <div style={{ width: size, height: size, position: 'relative' }}>
+      <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-lg">
+        <circle cx="24" cy="18" r="14" fill="#0d9488" stroke="white" strokeWidth="2.5" />
+        <path d="M 24 32 L 17 32 L 24 45 L 31 32 Z" fill="#0d9488" />
+        <text x="24" y="22.5" textAnchor="middle" fill="white" fontSize="13" fontWeight="700">
+          {Math.round(score)}
+        </text>
+      </svg>
+    </div>
+  );
 }
 
 interface RedeploymentPickerModalProps {
@@ -195,6 +209,7 @@ export function RedeploymentPickerModal({ onClose, onConfirm, initialDeployments
       setPlacingBin(null);
       setFocusedCandidateId(null);
       assign(bin, candidateAddress(c), c.latitude, c.longitude);
+      setFocusTarget({ lat: c.latitude, lng: c.longitude, ts: Date.now() });
     },
     [usedSpots, expandedBinId, warehouseBins, placingBin, unplacedBins, assign],
   );
@@ -243,6 +258,10 @@ export function RedeploymentPickerModal({ onClose, onConfirm, initialDeployments
   const center = warehouse
     ? { lat: warehouse.latitude, lng: warehouse.longitude }
     : DEFAULT_CENTER;
+
+  // The bin a map-pin click (or a focused pin's "Use for…" popup) assigns to.
+  const expandedBin = expandedBinId ? warehouseBins.find((b) => b.id === expandedBinId) : undefined;
+  const markerTargetBin = placingBin ?? expandedBin ?? unplacedBins[0];
 
   return (
     <>
@@ -452,29 +471,58 @@ export function RedeploymentPickerModal({ onClose, onConfirm, initialDeployments
                 <ZoneMarkersLayer />
                 <WarehouseMarkerLayer />
 
-                {suggestions.map((c) =>
-                  c.latitude != null && c.longitude != null ? (
+                {availableSuggestions.map((c) => {
+                  const focused = focusedCandidateId === c.id;
+                  return (
                     <AdvancedMarker
                       key={c.id}
-                      position={{ lat: c.latitude, lng: c.longitude }}
-                      zIndex={focusedCandidateId === c.id ? 50 : 40}
+                      position={{ lat: c.latitude!, lng: c.longitude! }}
+                      zIndex={focused ? 55 : 40}
                       onClick={(e) => {
                         e.stop();
-                        applySuggestion(c);
+                        // With a bin in context (row expanded / click-armed) the pin
+                        // assigns directly; otherwise it focuses and opens the popup.
+                        const contextBin = placingBin ?? expandedBin;
+                        if (contextBin) applySuggestion(c, contextBin);
+                        else viewSuggestion(c);
                       }}
                     >
-                      <div
-                        className={cn(
-                          'w-8 h-8 rounded-full bg-white border-2 border-teal-500 flex items-center justify-center text-[11px] font-bold text-teal-800 shadow',
-                          focusedCandidateId === c.id && 'ring-4 ring-teal-300 scale-110',
-                          usedSpots.has(`${c.latitude},${c.longitude}`) && 'opacity-40',
+                      <div className="relative cursor-pointer transition-all duration-300 hover:scale-110 animate-scale-in">
+                        {focused && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-12 h-12 rounded-full bg-teal-400 opacity-40 animate-ping" />
+                          </div>
                         )}
-                      >
-                        {Math.round(c.score)}
+                        <div className="relative z-10">
+                          <CandidatePin score={c.score} />
+                        </div>
+                        {focused && (
+                          <div
+                            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-white rounded-lg shadow-lg border border-gray-200 min-w-[190px] max-w-[260px] animate-slide-in-up z-50 cursor-default"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <p className="text-xs font-semibold text-gray-900">{c.street || c.address}</p>
+                            <p className="text-[11px] text-gray-500 mb-1.5">
+                              {c.city} · score {Math.round(c.score)} · nearest bin {Math.round(c.nearest_bin_m)} m
+                            </p>
+                            {markerTargetBin ? (
+                              <button
+                                type="button"
+                                onClick={() => applySuggestion(c, markerTargetBin)}
+                                className="w-full text-[11px] font-medium text-white bg-teal-600 hover:bg-teal-700 rounded px-2 py-1"
+                              >
+                                Use for Bin #{markerTargetBin.bin_number}
+                              </button>
+                            ) : (
+                              <p className="text-[11px] text-gray-400">All bins have destinations</p>
+                            )}
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white" />
+                          </div>
+                        )}
                       </div>
                     </AdvancedMarker>
-                  ) : null,
-                )}
+                  );
+                })}
 
                 {deployments.map((d) => (
                   <AdvancedMarker
@@ -482,7 +530,7 @@ export function RedeploymentPickerModal({ onClose, onConfirm, initialDeployments
                     position={{ lat: d.destination_latitude, lng: d.destination_longitude }}
                     zIndex={60}
                   >
-                    <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-teal-600 text-white text-[11px] font-bold border-2 border-white shadow-lg">
+                    <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-teal-600 text-white text-[11px] font-bold border-2 border-white shadow-lg animate-scale-in">
                       <Truck className="w-3 h-3" /> #{d.bin_number}
                     </div>
                   </AdvancedMarker>
