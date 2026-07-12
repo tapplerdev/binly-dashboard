@@ -12,6 +12,7 @@ import { HerePlaceDetails, hereReverseGeocode } from '@/lib/services/geocoding.s
 import { inputStyles, cn } from '@/lib/utils';
 import { sendChatMessage, LocationRecommendation } from '@/lib/api/chat';
 import { AreaAutocomplete, type TargetArea } from '@/components/ui/area-autocomplete';
+import { TargetAreaOverlay } from '@/components/binly/target-area-overlay';
 import { useBins } from '@/lib/hooks/use-bins';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { useNoGoZones, useNearbyIncidents } from '@/lib/hooks/use-zones';
@@ -1312,6 +1313,8 @@ export function CreatePotentialLocationDialog({
               >
                 <MapClickHandler onMapClick={handleMapClick} />
                 <MapCenterController center={mapCenter} onComplete={() => setMapCenter(null)} />
+                {/* Picked AI-suggest area: fly there + hex-highlight the search box */}
+                <TargetAreaOverlay area={aiArea} />
 
                 {/* Shared context layers — same rendering as live map */}
                 <BinMarkersLayer size="md" zIndex={1} />
