@@ -174,6 +174,20 @@ counties, and unknown cities return `found=false`, and it falls back to the HERE
 search bbox + hexes — the geometry the recommender actually sweeps. TIGER covers
 incorporated cities only; neighborhoods are deliberately not licensed.
 
+### Placement modal — tabs + shared basket (core+halo)
+
+`create-potential-location-dialog.tsx` has two first-class INPUT tabs — Manual
+and AI Recommendations (`ai-recommend-panel.tsx`) — feeding one shared review
+basket (`placement-review-basket.tsx`) that groups picks as **In-area /
+Near-area / Manual** before a single Create-N submit. Queue items are the shared
+`QueuedLocation` (`lib/types/placement.ts`): `id`, `source` ('manual'|'ai'),
+plus AI enrichment (`score`, `reasoning`, `locality`, `distanceFromAreaMi`,
+`areaMatch`). The AI tab's "Strictly inside ⟷ Include nearby matches" toggle
+sets `include_nearby` on the recommender: on = also surface profile-matching
+spots just outside the area (`locality:'near_area'`, with distance-past-edge +
+match strength); off = strictly in-area. Map click is scoped to the Manual tab;
+submit uses a synchronous re-entry guard.
+
 ### Redeployments vs Placements (REQUIRED domain rule for shift-task UI)
 
 Backend Phase 2 (2026-07): a **redeployment** (existing bin leaving the warehouse for
