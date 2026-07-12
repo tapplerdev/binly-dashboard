@@ -38,7 +38,18 @@ export interface ChatResponse {
   };
 }
 
-export async function sendChatMessage(message: string, conversationId?: string): Promise<ChatResponse> {
+export interface ChatTargetArea {
+  label: string;
+  lat: number;
+  lng: number;
+  bbox?: [number, number, number, number]; // west, south, east, north
+}
+
+export async function sendChatMessage(
+  message: string,
+  conversationId?: string,
+  targetArea?: ChatTargetArea | null,
+): Promise<ChatResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 240000); // 4 minute timeout
 
@@ -46,7 +57,11 @@ export async function sendChatMessage(message: string, conversationId?: string):
     const resp = await fetch(`${API_URL}/api/manager/chat`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ message, conversation_id: conversationId }),
+      body: JSON.stringify({
+        message,
+        conversation_id: conversationId,
+        ...(targetArea ? { target_area: targetArea } : {}),
+      }),
       signal: controller.signal,
     });
 

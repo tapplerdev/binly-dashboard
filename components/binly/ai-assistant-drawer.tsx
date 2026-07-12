@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { X, Send, Sparkles, TrendingUp, Route, AlertTriangle, Zap, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { sendChatMessage } from '@/lib/api/chat';
+import { AreaAutocomplete, type TargetArea } from '@/components/ui/area-autocomplete';
 
 interface AIAssistantDrawerProps {
   onClose: () => void;
@@ -30,6 +31,7 @@ export function AIAssistantDrawer({ onClose, isClosing = false }: AIAssistantDra
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>();
+  const [targetArea, setTargetArea] = useState<TargetArea | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -60,7 +62,7 @@ export function AIAssistantDrawer({ onClose, isClosing = false }: AIAssistantDra
     setIsLoading(true);
 
     try {
-      const result = await sendChatMessage(text, conversationId);
+      const result = await sendChatMessage(text, conversationId, targetArea);
       if (result.conversation_id) {
         setConversationId(result.conversation_id);
       }
@@ -181,6 +183,11 @@ export function AIAssistantDrawer({ onClose, isClosing = false }: AIAssistantDra
 
       {/* Input Footer */}
       <div className="p-4 border-t border-gray-200 bg-white">
+        {/* Target area — resolved city/district passed structurally to the
+            recommender, so "Brentwood" can't silently mean the wrong one */}
+        <div className="flex items-center gap-2 mb-2 min-h-[26px]">
+          <AreaAutocomplete value={targetArea} onChange={setTargetArea} />
+        </div>
         <div className="flex items-end gap-2">
           <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 hover:border-primary/30 transition-all duration-200">
             <textarea
