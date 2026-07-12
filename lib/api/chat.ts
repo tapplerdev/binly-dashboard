@@ -26,6 +26,10 @@ export interface LocationRecommendation {
   nearest_bin_distance_miles: number;
   area_avg_fill_rate: number;
   median_income?: number;
+  // Core+halo enrichment (present when a target area is set):
+  locality?: 'in_area' | 'near_area';
+  distance_from_area_mi?: number;
+  area_match?: number; // 0..1 similarity to the area profile
 }
 
 export interface ChatResponse {
@@ -34,6 +38,9 @@ export interface ChatResponse {
   conversation_id: string;
   recommendations?: {
     count: number;
+    requested?: number;
+    in_area_count?: number;
+    nearby_count?: number;
     recommendations: LocationRecommendation[];
   };
 }
@@ -50,6 +57,7 @@ export async function sendChatMessage(
   message: string,
   conversationId?: string,
   targetArea?: ChatTargetArea | null,
+  includeNearby?: boolean,
 ): Promise<ChatResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 240000); // 4 minute timeout
@@ -62,6 +70,7 @@ export async function sendChatMessage(
         message,
         conversation_id: conversationId,
         ...(targetArea ? { target_area: targetArea } : {}),
+        ...(includeNearby !== undefined ? { include_nearby: includeNearby } : {}),
       }),
       signal: controller.signal,
     });

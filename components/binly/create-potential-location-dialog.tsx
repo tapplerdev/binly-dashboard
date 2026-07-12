@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { APIProvider, Map as GoogleMap, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
-import { MapPin, X, Loader2, Search, Plus, Layers, FileText, Map as MapIcon, Sparkles, Info } from 'lucide-react';
+import { MapPin, X, Loader2, Search, Plus, Layers, FileText, Map as MapIcon, Sparkles, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 // OLD: Google Places Autocomplete (commented out for rollback)
 // import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
@@ -11,8 +11,11 @@ import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete
 import { HerePlaceDetails, hereReverseGeocode } from '@/lib/services/geocoding.service';
 import { inputStyles, cn } from '@/lib/utils';
 import { sendChatMessage, LocationRecommendation } from '@/lib/api/chat';
-import { AreaAutocomplete, type TargetArea } from '@/components/ui/area-autocomplete';
+import { type TargetArea } from '@/components/ui/area-autocomplete';
 import { TargetAreaOverlay } from '@/components/binly/target-area-overlay';
+import { AiRecommendPanel } from '@/components/binly/ai-recommend-panel';
+import { PlacementReviewBasket } from '@/components/binly/placement-review-basket';
+import type { QueuedLocation } from '@/lib/types/placement';
 import { useBins } from '@/lib/hooks/use-bins';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { useNoGoZones, useNearbyIncidents } from '@/lib/hooks/use-zones';
@@ -22,15 +25,6 @@ import { NoGoZonePin } from '@/components/ui/no-go-zone-pin';
 import { BinMarkersLayer, ZoneMarkersLayer, WarehouseMarkerLayer } from '@/components/binly/map-layers';
 import { useModalClose } from '@/components/binly/modal-wrapper';
 import { MapMarkerPin } from '@/components/ui/map-marker-pin';
-
-interface QueuedLocation {
-  street: string;
-  city: string;
-  zip: string;
-  latitude: number;
-  longitude: number;
-  notes?: string;
-}
 
 interface CreatePotentialLocationDialogProps {
   open: boolean;
@@ -129,16 +123,20 @@ export function CreatePotentialLocationDialog({
   });
 
   // AI Suggest state
-  const [showAiExplainer, setShowAiExplainer] = useState(false);
-  const [showAiSuggest, setShowAiSuggest] = useState(false);
   const [aiCount, setAiCount] = useState('10');
   const [aiArea, setAiArea] = useState<TargetArea | null>(null);
   const [aiMode, setAiMode] = useState<'auto' | 'infill' | 'expand'>('auto');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
+  // Which input method is active. AI is now a first-class tab, not a card.
+  const [activeTab, setActiveTab] = useState<'manual' | 'ai'>('manual');
+  // Core+halo: also surface profile-matching spots just outside the area.
+  const [includeNearby, setIncludeNearby] = useState(true);
 
   // Ref for coordinate debounce timer
   const coordinateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Synchronous in-flight guard for submit (see handleSubmit).
+  const submittingRef = useRef(false);
 
   // Reset form when modal closes
   useEffect(() => {
@@ -164,10 +162,11 @@ export function CreatePotentialLocationDialog({
       setHasInteractedWithMap(false);
       setIsGeocodingCoordinates(false);
       setViewMode('form');
-      setShowAiSuggest(false);
       setAiLoading(false);
       setAiError('');
       setAiArea(null);
+      setActiveTab('manual');
+      setIncludeNearby(true);
       // Clear debounce timer if modal closes
       if (coordinateTimerRef.current) {
         clearTimeout(coordinateTimerRef.current);
@@ -214,12 +213,16 @@ export function CreatePotentialLocationDialog({
   // Handle map click
   const handleMapClick = useCallback(
     (lat: number, lng: number) => {
+      // Click-to-place only fills the manual form. On the AI tab the map is for
+      // reviewing suggestions, so a click there shouldn't silently populate a
+      // hidden form that then gets created on submit.
+      if (activeTab !== 'manual') return;
       setMarkerPosition({ lat, lng });
       setMapCenter({ lat, lng });
       setHasInteractedWithMap(true);
       reverseGeocode(lat, lng);
     },
-    [reverseGeocode]
+    [reverseGeocode, activeTab]
   );
 
   // Handle place selection from autocomplete - only pan/zoom, no marker
@@ -504,6 +507,8 @@ export function CreatePotentialLocationDialog({
     }
 
     const newLocation: QueuedLocation = {
+      id: crypto.randomUUID(),
+      source: 'manual',
       street: formData.street,
       city: formData.city,
       zip: formData.zip,
@@ -558,15 +563,24 @@ export function CreatePotentialLocationDialog({
         ? `Recommend ${count} locations for new bins in the pinned target area${modeStr}`
         : `Recommend ${count} locations for new bins${modeStr}`;
 
-      const result = await sendChatMessage(prompt, undefined, aiArea);
+      const areaShort = aiArea ? aiArea.label.split(',')[0].trim() : undefined;
+      const result = await sendChatMessage(prompt, undefined, aiArea, aiArea ? includeNearby : undefined);
 
       if (result.recommendations?.recommendations?.length) {
         const newLocations: QueuedLocation[] = result.recommendations.recommendations.map((rec: LocationRecommendation) => ({
+          id: crypto.randomUUID(),
+          source: 'ai',
           street: rec.address.split(',')[0]?.trim() || rec.address,
           city: rec.city,
           zip: rec.zip,
           latitude: rec.latitude,
           longitude: rec.longitude,
+          score: rec.score,
+          reasoning: rec.reasoning,
+          locality: rec.locality,
+          distanceFromAreaMi: rec.distance_from_area_mi,
+          areaMatch: rec.area_match,
+          areaLabel: areaShort,
           notes: `AI recommended (Score: ${rec.score}) — ${rec.reasoning}`,
         }));
 
@@ -576,8 +590,6 @@ export function CreatePotentialLocationDialog({
           const unique = newLocations.filter(l => !existing.has(`${l.latitude.toFixed(4)},${l.longitude.toFixed(4)}`));
           return [...prev, ...unique];
         });
-        setShowAiSuggest(false);
-        setAiArea(null);
       } else {
         setAiError('No recommendations returned. Try a different city or count.');
       }
@@ -586,7 +598,7 @@ export function CreatePotentialLocationDialog({
     } finally {
       setAiLoading(false);
     }
-  }, [aiCount, aiArea]);
+  }, [aiCount, aiArea, aiMode, includeNearby]);
 
   // Get auth token from Zustand persist storage
   const getAuthToken = (): string | null => {
@@ -604,8 +616,14 @@ export function CreatePotentialLocationDialog({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    // Re-entry guard: the form's Enter key and the basket's Create button can
+    // both fire within one frame, before setLoading(true) commits — which would
+    // POST the same batch twice. A synchronous ref closes the window that the
+    // async `loading` state cannot (both calls would read the same stale value).
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setError('');
     setLoading(true);
 
@@ -735,6 +753,7 @@ export function CreatePotentialLocationDialog({
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
+      submittingRef.current = false; // release the in-flight guard on every exit
     }
   };
 
@@ -816,6 +835,30 @@ export function CreatePotentialLocationDialog({
                 </div>
               )}
 
+              {/* Input method tabs — AI is first-class, not a card buried in the form */}
+              <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
+                {([
+                  { key: 'manual' as const, label: 'Manual', Icon: Pencil },
+                  { key: 'ai' as const, label: 'AI Recommendations', Icon: Sparkles },
+                ]).map(({ key, label, Icon }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setActiveTab(key)}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-card',
+                      activeTab === key ? 'bg-white text-primary card-shadow' : 'text-gray-600 hover:text-gray-900',
+                    )}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* MANUAL TAB — address form */}
+              {activeTab === 'manual' && (
+                <div className="space-y-4">
               {/* Reverse Geocoding Indicator */}
               {reverseGeocoding && (
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2">
@@ -978,318 +1021,47 @@ export function CreatePotentialLocationDialog({
                 />
               </div>
 
-              {/* Queue - Show queued locations as full detail cards */}
-              {locationQueue.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-green-600" />
-                      <p className="text-sm font-semibold text-gray-900">
-                        Queued Locations ({locationQueue.length})
-                      </p>
-                      {locationQueue.some(l => l.notes?.startsWith('AI recommended')) && (
-                        <button
-                          type="button"
-                          onClick={() => setShowAiExplainer(!showAiExplainer)}
-                          className="flex items-center gap-1 text-[10px] text-purple-600 hover:text-purple-800 font-medium bg-purple-50 px-2 py-0.5 rounded-full"
-                        >
-                          <Info className="w-3 h-3" />
-                          {showAiExplainer ? 'Hide' : 'How AI scored these'}
-                        </button>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setLocationQueue([])}
-                      className="text-xs text-red-600 hover:text-red-800 font-medium"
-                    >
-                      Clear All
-                    </button>
-                  </div>
-
-                  {/* AI Explainer Panel */}
-                  {showAiExplainer && (
-                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-xs text-gray-700 space-y-2">
-                      <p className="font-semibold text-purple-800">How AI selects these locations</p>
-                      <div className="space-y-1.5">
-                        <p><span className="font-medium text-gray-900">Nearest bin fill rate (30%)</span> — Uses the actual fill rate of the closest existing bin, not a city average. A spot near a bin filling at 12%/day scores higher than one near a 3%/day bin.</p>
-                        <p><span className="font-medium text-gray-900">Geographic gap (20%)</span> — Finds midpoints between existing bins that are too far apart. Larger gaps in high-demand areas score higher.</p>
-                        <p><span className="font-medium text-gray-900">Population density (20%)</span> — More people nearby = more potential donors. Uses census population data by zip code.</p>
-                        <p><span className="font-medium text-gray-900">Traffic flow (15%)</span> — Queries real-time road traffic data. Busier streets = higher visibility = more donations.</p>
-                        <p><span className="font-medium text-gray-900">Neighborhood income (15%)</span> — Higher income correlates with more disposable clothing. Uses census median household income.</p>
-                      </div>
-                      <div className="border-t border-purple-200 pt-2 mt-2 space-y-1">
-                        <p className="text-purple-700">Locations are automatically filtered to exclude:</p>
-                        <p>- Active no-go zones (vandalism, theft, complaints)</p>
-                        <p>- Areas near shopping malls or Safeway stores</p>
-                        <p>- Spots within 0.3 miles of an existing bin</p>
-                        <p>- Addresses that couldn't be resolved to a real street</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Scrollable queue container */}
-                  <div className="max-h-[300px] overflow-y-auto space-y-3">
-                    {locationQueue.map((loc, index) => (
-                      <div
-                        key={index}
-                        className="bg-green-50 border-2 border-green-200 rounded-xl p-4 space-y-3"
-                      >
-                        {/* Header with remove button */}
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-lg bg-green-600 text-white flex items-center justify-center text-xs font-bold">
-                              {index + 1}
-                            </div>
-                            <p className="text-xs font-semibold text-green-900 uppercase tracking-wide">
-                              Location {index + 1}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setMapCenter({ lat: loc.latitude, lng: loc.longitude })}
-                              className="w-6 h-6 rounded-lg hover:bg-blue-100 flex items-center justify-center transition-colors"
-                              title="Locate on map"
-                            >
-                              <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setLocationQueue((prev) => prev.filter((_, i) => i !== index));
-                              }}
-                              className="w-6 h-6 rounded-lg hover:bg-red-100 flex items-center justify-center transition-colors"
-                              title="Remove from queue"
-                            >
-                              <X className="w-4 h-4 text-red-600" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Address details */}
-                        <div className="space-y-2">
-                          <div>
-                            <p className="text-xs font-semibold text-gray-600 mb-1">Street Address</p>
-                            <p className="text-sm text-gray-900">{loc.street}</p>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <p className="text-xs font-semibold text-gray-600 mb-1">City</p>
-                              <p className="text-sm text-gray-900">{loc.city}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs font-semibold text-gray-600 mb-1">ZIP</p>
-                              <p className="text-sm text-gray-900">{loc.zip}</p>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <p className="text-xs font-semibold text-gray-600 mb-1">Latitude</p>
-                              <p className="text-xs text-gray-700 font-mono">{loc.latitude.toFixed(6)}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs font-semibold text-gray-600 mb-1">Longitude</p>
-                              <p className="text-xs text-gray-700 font-mono">{loc.longitude.toFixed(6)}</p>
-                            </div>
-                          </div>
-
-                          {loc.notes && (
-                            <div>
-                              {loc.notes.startsWith('AI recommended') ? (
-                                <>
-                                  <p className="text-xs font-semibold text-gray-600 mb-1">AI Reasoning</p>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {(() => {
-                                      const scoreMatch = loc.notes.match(/Score: ([\d.]+)/);
-                                      const gapMatch = loc.notes.match(/([\d.]+) mi gap/);
-                                      const rateMatch = loc.notes.match(/fill rate ([\d.]+)%/);
-                                      const incomeMatch = loc.notes.match(/income \$(\d+k)/);
-                                      const popMatch = loc.notes.match(/pop (\d+k)/);
-                                      const trafficMatch = loc.notes.match(/(low|moderate|high) traffic/);
-                                      const areaMatch = loc.notes.match(/(commercial|community|residential|mixed) area/);
-                                      return (
-                                        <>
-                                          {scoreMatch && <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">Score: {scoreMatch[1]}</span>}
-                                          {gapMatch && <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{gapMatch[1]} mi gap</span>}
-                                          {rateMatch && <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">{rateMatch[1]}%/day</span>}
-                                          {incomeMatch && <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">${incomeMatch[1]}</span>}
-                                          {popMatch && <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">{popMatch[1]} pop</span>}
-                                          {trafficMatch && <span className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full ${trafficMatch[1] === 'high' ? 'bg-red-100 text-red-700' : trafficMatch[1] === 'moderate' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>{trafficMatch[1]} traffic</span>}
-                                          {areaMatch && <span className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full ${areaMatch[1] === 'commercial' ? 'bg-indigo-100 text-indigo-700' : areaMatch[1] === 'community' ? 'bg-cyan-100 text-cyan-700' : 'bg-gray-100 text-gray-600'}`}>{areaMatch[1]}</span>}
-                                        </>
-                                      );
-                                    })()}
-                                  </div>
-                                </>
-                              ) : (
-                                <>
-                                  <p className="text-xs font-semibold text-gray-600 mb-1">Notes</p>
-                                  <p className="text-xs text-gray-700">{loc.notes}</p>
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              {/* Add to basket (manual entry — only when the form is complete) */}
+              {formData.street && formData.city && formData.zip && markerPosition && (
+                <Button type="button" variant="outline" onClick={handleAddToQueue} className="w-full gap-2" disabled={loading}>
+                  <Plus className="w-4 h-4" /> Add to basket
+                </Button>
+              )}
                 </div>
               )}
+              {/* end MANUAL tab */}
 
-              {/* Actions */}
-              <div className="space-y-3 pt-4">
-                {/* AI Suggest */}
-                {!showAiSuggest ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowAiSuggest(true)}
-                    className="w-full gap-2 border-purple-200 text-purple-700 hover:bg-purple-50 hover:border-purple-300"
-                    disabled={loading || aiLoading}
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    AI Suggest Locations
-                  </Button>
-                ) : (
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-purple-700 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" /> AI Location Suggestions
-                      </span>
-                      <button onClick={() => { setShowAiSuggest(false); setAiError(''); }} className="text-purple-400 hover:text-purple-600">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    {/* Mode selector */}
-                    <div className="space-y-1.5">
-                      {([
-                        {
-                          key: 'auto' as const,
-                          label: 'Smart Mix',
-                          desc: 'AI picks the best strategy — fills gaps near top performers and explores promising new areas',
-                        },
-                        {
-                          key: 'infill' as const,
-                          label: 'Near Existing Bins',
-                          desc: 'Place bins close to your best performers — same corridors, proven demand',
-                        },
-                        {
-                          key: 'expand' as const,
-                          label: 'New Territory',
-                          desc: 'Find locations in cities where you have no bins yet',
-                        },
-                      ]).map(m => (
-                        <button
-                          key={m.key}
-                          type="button"
-                          onClick={() => setAiMode(m.key)}
-                          className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-all ${
-                            aiMode === m.key
-                              ? 'bg-purple-600 text-white'
-                              : 'bg-white text-gray-700 border border-purple-200 hover:bg-purple-50'
-                          }`}
-                        >
-                          <div className="font-medium">{m.label}</div>
-                          <div className={`text-[10px] mt-0.5 leading-snug ${aiMode === m.key ? 'text-purple-200' : 'text-gray-400'}`}>
-                            {m.desc}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
+              {/* AI TAB — first-class recommender */}
+              {activeTab === 'ai' && (
+                <AiRecommendPanel
+                  mode={aiMode}
+                  onModeChange={setAiMode}
+                  count={aiCount}
+                  onCountChange={setAiCount}
+                  area={aiArea}
+                  onAreaChange={setAiArea}
+                  includeNearby={includeNearby}
+                  onIncludeNearbyChange={setIncludeNearby}
+                  onGenerate={handleAiSuggest}
+                  loading={aiLoading}
+                  error={aiError}
+                />
+              )}
 
-                    {/* Count + City + Go */}
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        min="1"
-                        max="100"
-                        value={aiCount}
-                        onChange={(e) => setAiCount(e.target.value)}
-                        placeholder="Count"
-                        className="w-16 text-sm border border-purple-200 rounded-md px-2 py-1.5 bg-white text-gray-700"
-                      />
-                      <div className="flex-1 min-w-0 flex items-center border border-purple-200 rounded-md px-2 py-1.5 bg-white">
-                        <AreaAutocomplete
-                          value={aiArea}
-                          onChange={setAiArea}
-                          placeholder="City or district (optional)…"
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        onClick={handleAiSuggest}
-                        disabled={aiLoading}
-                        size="sm"
-                        className="bg-purple-600 hover:bg-purple-700 text-white px-3"
-                      >
-                        {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Go'}
-                      </Button>
-                    </div>
-                    {aiError && <p className="text-xs text-red-500">{aiError}</p>}
-                    {aiLoading && <p className="text-xs text-purple-500">
-                      {aiMode === 'infill' ? 'Finding spots near your best bins...'
-                        : aiMode === 'expand' ? 'Searching new cities with good demographics...'
-                        : 'Analyzing areas, scoring locations...'}
-                    </p>}
-                  </div>
-                )}
+              {/* Shared review basket — both tabs feed it, then submit together */}
+              <PlacementReviewBasket
+                items={locationQueue}
+                onRemove={(id) => setLocationQueue((prev) => prev.filter((l) => l.id !== id))}
+                onSubmit={() => handleSubmit()}
+                submitting={loading}
+                areaLabel={aiArea ? aiArea.label.split(',')[0].trim() : undefined}
+              />
 
-                {/* Add to Queue Button - only show if form has data */}
-                {formData.street && formData.city && formData.zip && markerPosition && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleAddToQueue}
-                    className="w-full gap-2"
-                    disabled={loading}
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add to Queue
-                  </Button>
-                )}
+              {/* Cancel */}
+              <Button type="button" variant="outline" onClick={handleClose} className="w-full" disabled={loading}>
+                Cancel
+              </Button>
 
-                {/* Cancel and Submit Row */}
-                <div className="flex gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleClose}
-                    className="flex-1"
-                    disabled={loading}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="flex-1 gap-2"
-                    disabled={loading || (locationQueue.length === 0 && !markerPosition)}
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Creating...
-                      </>
-                    ) : (
-                      <>
-                        {locationQueue.length > 0 ? (
-                          <>
-                            <Layers className="w-4 h-4" />
-                            Create All ({locationQueue.length + (formData.street && formData.city && formData.zip && markerPosition ? 1 : 0)})
-                          </>
-                        ) : (
-                          <>
-                            <MapPin className="w-4 h-4" />
-                            Create Location
-                          </>
-                        )}
-                      </>
-                    )}
-                </Button>
-                </div>
-              </div>
             </form>
           </div>
 
