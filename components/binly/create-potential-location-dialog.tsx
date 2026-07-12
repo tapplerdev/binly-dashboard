@@ -166,7 +166,7 @@ export function CreatePotentialLocationDialog({
       setShowAiSuggest(false);
       setAiLoading(false);
       setAiError('');
-      setAiCity('');
+      setAiArea(null);
       // Clear debounce timer if modal closes
       if (coordinateTimerRef.current) {
         clearTimeout(coordinateTimerRef.current);
