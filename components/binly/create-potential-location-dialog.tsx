@@ -11,6 +11,7 @@ import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete
 import { HerePlaceDetails, hereReverseGeocode } from '@/lib/services/geocoding.service';
 import { inputStyles, cn } from '@/lib/utils';
 import { sendChatMessage, LocationRecommendation } from '@/lib/api/chat';
+import { AreaAutocomplete, type TargetArea } from '@/components/ui/area-autocomplete';
 import { useBins } from '@/lib/hooks/use-bins';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { useNoGoZones, useNearbyIncidents } from '@/lib/hooks/use-zones';
@@ -130,7 +131,7 @@ export function CreatePotentialLocationDialog({
   const [showAiExplainer, setShowAiExplainer] = useState(false);
   const [showAiSuggest, setShowAiSuggest] = useState(false);
   const [aiCount, setAiCount] = useState('10');
-  const [aiCity, setAiCity] = useState('');
+  const [aiArea, setAiArea] = useState<TargetArea | null>(null);
   const [aiMode, setAiMode] = useState<'auto' | 'infill' | 'expand'>('auto');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
@@ -549,11 +550,14 @@ export function CreatePotentialLocationDialog({
       if (aiMode === 'infill') modeStr = ' mode infill';
       else if (aiMode === 'expand') modeStr = ' mode expand';
 
-      const prompt = aiCity
-        ? `Recommend ${count} locations for new bins in ${aiCity}${modeStr}`
+      // With a picked area, the prose deliberately does NOT name the place:
+      // the structured target_area carries the geometry (bbox), and naming it
+      // would make the model set target_city, which outranks the injection.
+      const prompt = aiArea
+        ? `Recommend ${count} locations for new bins in the pinned target area${modeStr}`
         : `Recommend ${count} locations for new bins${modeStr}`;
 
-      const result = await sendChatMessage(prompt);
+      const result = await sendChatMessage(prompt, undefined, aiArea);
 
       if (result.recommendations?.recommendations?.length) {
         const newLocations: QueuedLocation[] = result.recommendations.recommendations.map((rec: LocationRecommendation) => ({
@@ -572,7 +576,7 @@ export function CreatePotentialLocationDialog({
           return [...prev, ...unique];
         });
         setShowAiSuggest(false);
-        setAiCity('');
+        setAiArea(null);
       } else {
         setAiError('No recommendations returned. Try a different city or count.');
       }
@@ -581,7 +585,7 @@ export function CreatePotentialLocationDialog({
     } finally {
       setAiLoading(false);
     }
-  }, [aiCount, aiCity]);
+  }, [aiCount, aiArea]);
 
   // Get auth token from Zustand persist storage
   const getAuthToken = (): string | null => {
@@ -1206,13 +1210,13 @@ export function CreatePotentialLocationDialog({
                         placeholder="Count"
                         className="w-16 text-sm border border-purple-200 rounded-md px-2 py-1.5 bg-white text-gray-700"
                       />
-                      <input
-                        type="text"
-                        value={aiCity}
-                        onChange={(e) => setAiCity(e.target.value)}
-                        placeholder="City (optional)"
-                        className="flex-1 text-sm border border-purple-200 rounded-md px-2 py-1.5 bg-white text-gray-700"
-                      />
+                      <div className="flex-1 min-w-0 flex items-center border border-purple-200 rounded-md px-2 py-1.5 bg-white">
+                        <AreaAutocomplete
+                          value={aiArea}
+                          onChange={setAiArea}
+                          placeholder="City or district (optional)…"
+                        />
+                      </div>
                       <Button
                         type="button"
                         onClick={handleAiSuggest}
