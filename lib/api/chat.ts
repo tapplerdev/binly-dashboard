@@ -40,6 +40,7 @@ export interface ChatResponse {
 
 export interface ChatTargetArea {
   label: string;
+  type?: string; // HERE area type (city / district / county) — gates the true-boundary lookup backend-side
   lat: number;
   lng: number;
   bbox?: [number, number, number, number]; // west, south, east, north
