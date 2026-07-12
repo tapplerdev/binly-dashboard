@@ -162,6 +162,18 @@ import { BinMarkersLayer, ZoneMarkersLayer, WarehouseMarkerLayer } from '@/compo
 - Layers fetch their own data via hooks — no need to pass data manually
 - Rendering matches `live-map-view.tsx` (the gold standard)
 
+### Target-area overlay (city boundaries)
+
+`TargetAreaOverlay` (mounted inside the Create Potential Location dialog's map)
+draws a picked area when the AI Suggest picker resolves one. It fetches the
+area's TRUE legal boundary via `getAreaBoundary()` (`lib/api/areas.ts` → backend
+`GET /api/areas/boundary`, TIGER city polygons) and, when found, draws that real
+polygon (annexation slivers, holes, MultiPolygons) on a dedicated
+`google.maps.Data` layer plus h3 hexes tiling the real shape. Districts,
+counties, and unknown cities return `found=false`, and it falls back to the HERE
+search bbox + hexes — the geometry the recommender actually sweeps. TIGER covers
+incorporated cities only; neighborhoods are deliberately not licensed.
+
 ### Redeployments vs Placements (REQUIRED domain rule for shift-task UI)
 
 Backend Phase 2 (2026-07): a **redeployment** (existing bin leaving the warehouse for
