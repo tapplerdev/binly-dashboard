@@ -33,6 +33,19 @@ interface CreatePotentialLocationDialogProps {
 
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 
+/** Count active bins inside a picked area (its bbox, or a ~3 km box around the
+ *  center when the picker gave no bbox) — drives the AI tab's "this area has N
+ *  bins" transparency line. */
+function binsInArea(bins: Bin[], area: TargetArea): number {
+  const [w, s, e, n] = area.bbox ?? [area.lng - 0.03, area.lat - 0.03, area.lng + 0.03, area.lat + 0.03];
+  return bins.filter((b) => {
+    if (!isMappableBin(b) || b.status !== 'active') return false;
+    const lat = b.latitude, lng = b.longitude;
+    return typeof lat === 'number' && typeof lng === 'number' &&
+      lng >= w && lng <= e && lat >= s && lat <= n;
+  }).length;
+}
+
 // Map click handler component
 function MapClickHandler({
   onMapClick,
@@ -552,8 +565,13 @@ export function CreatePotentialLocationDialog({
     setAiError('');
 
     try {
+      // Scope-first: when the user targets a specific area, do a broad sweep of
+      // it (the mode selector is hidden — infill/expand within one area just
+      // produced a confusing 2-vs-10 count spread). The network-strategy modes
+      // only apply to untargeted, whole-network runs.
       let modeStr = '';
-      if (aiMode === 'infill') modeStr = ' mode infill';
+      if (aiArea) modeStr = ' mode expand';
+      else if (aiMode === 'infill') modeStr = ' mode infill';
       else if (aiMode === 'expand') modeStr = ' mode expand';
 
       // With a picked area, the prose deliberately does NOT name the place:
@@ -1040,6 +1058,7 @@ export function CreatePotentialLocationDialog({
                   onCountChange={setAiCount}
                   area={aiArea}
                   onAreaChange={setAiArea}
+                  areaBinCount={aiArea ? binsInArea(bins, aiArea) : null}
                   includeNearby={includeNearby}
                   onIncludeNearbyChange={setIncludeNearby}
                   onGenerate={handleAiSuggest}

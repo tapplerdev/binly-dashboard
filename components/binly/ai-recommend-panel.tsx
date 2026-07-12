@@ -9,6 +9,7 @@ import {
   Loader2,
   Check,
   AlertCircle,
+  MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AreaAutocomplete, type TargetArea } from '@/components/ui/area-autocomplete';
@@ -22,6 +23,9 @@ export interface AiRecommendPanelProps {
   onCountChange: (c: string) => void;
   area: TargetArea | null;
   onAreaChange: (a: TargetArea | null) => void;
+  /** Existing bins inside the picked area (null when no area). Drives the
+   *  "this area has N bins" transparency line. */
+  areaBinCount: number | null;
   includeNearby: boolean; // "Include nearby matches" toggle
   onIncludeNearbyChange: (b: boolean) => void;
   onGenerate: () => void; // parent runs the API call
@@ -70,12 +74,14 @@ export function AiRecommendPanel({
   onCountChange,
   area,
   onAreaChange,
+  areaBinCount,
   includeNearby,
   onIncludeNearbyChange,
   onGenerate,
   loading,
   error,
 }: AiRecommendPanelProps) {
+  const areaName = area ? area.label.split(',')[0].trim() : '';
   return (
     <div className="flex flex-col gap-6">
       {/* 1. Heading */}
@@ -86,59 +92,12 @@ export function AiRecommendPanel({
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-gray-900">AI Recommendations</h3>
           <p className="mt-0.5 text-sm text-gray-500">
-            Describe an area and let the recommender propose and score spots.
+            Search your whole network, or target a specific area.
           </p>
         </div>
       </div>
 
-      {/* 2. Mode selector — three first-class option cards */}
-      <div className="flex flex-col gap-3" role="radiogroup" aria-label="Recommendation strategy">
-        {MODE_OPTIONS.map((option) => {
-          const Icon = option.icon;
-          const isActive = mode === option.value;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              role="radio"
-              aria-checked={isActive}
-              onClick={() => onModeChange(option.value)}
-              className={cn(
-                'group relative flex w-full items-start gap-3.5 rounded-2xl border p-4 text-left transition-card cursor-pointer',
-                isActive
-                  ? 'border-primary bg-[#EDF0FF] card-shadow'
-                  : 'border-gray-200 bg-white hover:border-primary/40 hover:bg-[#EDF0FF]/40 card-shadow-hover'
-              )}
-            >
-              <div
-                className={cn(
-                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-card',
-                  isActive ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500 group-hover:text-primary'
-                )}
-              >
-                <Icon className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className={cn('text-sm font-semibold', isActive ? 'text-primary' : 'text-gray-900')}>
-                  {option.label}
-                </div>
-                <p className="mt-1 text-xs leading-relaxed text-gray-500">{option.description}</p>
-              </div>
-              <div
-                className={cn(
-                  'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-card',
-                  isActive ? 'border-primary bg-primary text-white' : 'border-gray-300 bg-white text-transparent'
-                )}
-                aria-hidden="true"
-              >
-                <Check className="h-3 w-3" strokeWidth={3} />
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* 3. Count + target area */}
+      {/* 2. Scope — count + target area (the primary choice: where to look) */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-[7rem_1fr]">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="ai-recommend-count" className="text-xs font-medium text-gray-600">
@@ -163,40 +122,114 @@ export function AiRecommendPanel({
         </div>
       </div>
 
-      {/* 4. Segmented toggle — strictly inside / include nearby */}
-      <div className={cn('flex flex-col gap-1.5 transition-card', !area && 'opacity-60')}>
-        <div className="inline-flex w-full rounded-xl bg-gray-100 p-1" role="tablist" aria-label="Area boundary matching">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={!includeNearby}
-            onClick={() => onIncludeNearbyChange(false)}
-            className={cn(
-              'flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-card cursor-pointer',
-              !includeNearby ? 'bg-primary text-white card-shadow' : 'text-gray-500 hover:text-gray-700'
-            )}
-          >
-            Strictly inside
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={includeNearby}
-            onClick={() => onIncludeNearbyChange(true)}
-            className={cn(
-              'flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-card cursor-pointer',
-              includeNearby ? 'bg-primary text-white card-shadow' : 'text-gray-500 hover:text-gray-700'
-            )}
-          >
-            Include nearby matches
-          </button>
+      {/* 3a. NO area → network-strategy modes (this is where they matter) */}
+      {!area && (
+        <div className="flex flex-col gap-2.5">
+          <span className="text-xs font-medium text-gray-600">Strategy across your network</span>
+          <div className="flex flex-col gap-3" role="radiogroup" aria-label="Recommendation strategy">
+            {MODE_OPTIONS.map((option) => {
+              const Icon = option.icon;
+              const isActive = mode === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={isActive}
+                  onClick={() => onModeChange(option.value)}
+                  className={cn(
+                    'group relative flex w-full items-start gap-3.5 rounded-2xl border p-4 text-left transition-card cursor-pointer',
+                    isActive
+                      ? 'border-primary bg-[#EDF0FF] card-shadow'
+                      : 'border-gray-200 bg-white hover:border-primary/40 hover:bg-[#EDF0FF]/40 card-shadow-hover'
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-card',
+                      isActive ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500 group-hover:text-primary'
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className={cn('text-sm font-semibold', isActive ? 'text-primary' : 'text-gray-900')}>
+                      {option.label}
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-gray-500">{option.description}</p>
+                  </div>
+                  <div
+                    className={cn(
+                      'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-card',
+                      isActive ? 'border-primary bg-primary text-white' : 'border-gray-300 bg-white text-transparent'
+                    )}
+                    aria-hidden="true"
+                  >
+                    <Check className="h-3 w-3" strokeWidth={3} />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <p className="text-[11px] leading-relaxed text-gray-400">
-          {includeNearby
-            ? 'Also surfaces spots just outside the area that match its profile.'
-            : 'Only spots inside the area boundary.'}
-        </p>
-      </div>
+      )}
+
+      {/* 3b. Area picked → transparency line + boundary toggle (modes don't apply
+             — the system reads whether the area is covered and adapts). */}
+      {area && (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start gap-2 rounded-xl bg-[#EDF0FF]/60 px-3.5 py-2.5">
+            <MapPin className="mt-px h-4 w-4 shrink-0 text-primary" />
+            <p className="text-xs leading-relaxed text-gray-700">
+              {areaBinCount != null && areaBinCount > 0 ? (
+                <>
+                  <span className="font-semibold text-gray-900">{areaName}</span> has {areaBinCount}{' '}
+                  {areaBinCount === 1 ? 'bin' : 'bins'} — I&apos;ll find good spots in the gaps between them.
+                </>
+              ) : (
+                <>
+                  No bins in <span className="font-semibold text-gray-900">{areaName}</span> yet — I&apos;ll
+                  explore it fresh.
+                </>
+              )}
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <div className="inline-flex w-full rounded-xl bg-gray-100 p-1" role="tablist" aria-label="Area boundary matching">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={!includeNearby}
+                onClick={() => onIncludeNearbyChange(false)}
+                className={cn(
+                  'flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-card cursor-pointer',
+                  !includeNearby ? 'bg-primary text-white card-shadow' : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                Strictly inside
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={includeNearby}
+                onClick={() => onIncludeNearbyChange(true)}
+                className={cn(
+                  'flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-card cursor-pointer',
+                  includeNearby ? 'bg-primary text-white card-shadow' : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                Include nearby matches
+              </button>
+            </div>
+            <p className="text-[11px] leading-relaxed text-gray-400">
+              {includeNearby
+                ? `Also surfaces spots just outside ${areaName} that match its profile.`
+                : `Only spots inside the ${areaName} boundary.`}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* 6. Inline error banner */}
       {error && (
