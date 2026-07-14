@@ -26,6 +26,8 @@ const typeLabels: Record<string, string> = {
   route_split: 'Split Route',
   route_merge: 'Merge Routes',
   driver_assign: 'Driver Assignment',
+  bin_missing_candidate: 'Likely Missing',
+  bin_access_issue: 'Access Issue',
 };
 
 /** Rec types whose verb is one click away (the modal already exists). */

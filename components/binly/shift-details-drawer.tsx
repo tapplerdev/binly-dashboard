@@ -828,6 +828,12 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift, highlightBinId
                       : null;
 
                     const redeploy = isRedeployPlacement(task);
+                    // An incident completion (e.g. inaccessible/damaged) closes the stop
+                    // with NO fill reading or photos — surface the incident so a
+                    // "couldn't service" reads differently from a genuinely-empty bin
+                    // (which would otherwise both show "0% Fill").
+                    const incidentLabel = task.incident_type ? task.incident_type.replace(/_/g, ' ') : null;
+                    const isIncident = !!incidentLabel && isCompleted && !isSkipped;
                     const TaskIcon =
                       task.task_type === 'collection' ? Trash2 :
                       task.task_type === 'placement' ? (redeploy ? Truck : MapPin) :
@@ -845,6 +851,8 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift, highlightBinId
                         className={`flex items-center gap-2 p-2.5 rounded-lg border transition-fast ${
                           isSkipped
                             ? 'bg-yellow-50 border-l-4 border-yellow-500 opacity-75'
+                            : isIncident
+                            ? 'bg-orange-50 border-l-4 border-orange-500'
                             : isCompleted
                             ? 'bg-green-50 border-l-4 border-green-500 opacity-75'
                             : isInProgress
@@ -875,6 +883,10 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift, highlightBinId
                             <div className="w-5 h-5 bg-yellow-500 rounded-full flex items-center justify-center">
                               <SkipForward className="w-3 h-3 text-white" />
                             </div>
+                          ) : isIncident ? (
+                            <div className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center">
+                              <AlertTriangle className="w-3 h-3 text-white" />
+                            </div>
                           ) : isCompleted ? (
                             <div className="w-5 h-5 bg-green-600 rounded-full flex items-center justify-center">
                               <Check className="w-3 h-3 text-white" />
@@ -904,7 +916,10 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift, highlightBinId
                             {isSkipped && completedTime && (
                               <span className="text-[10px] text-yellow-700 italic whitespace-nowrap">Skipped @ {completedTime}</span>
                             )}
-                            {!isSkipped && isCompleted && completedTime && (
+                            {isIncident && completedTime && (
+                              <span className="text-[10px] text-orange-700 font-medium whitespace-nowrap">Reported @ {completedTime}</span>
+                            )}
+                            {!isSkipped && !isIncident && isCompleted && completedTime && (
                               <span className="text-[10px] text-green-600 whitespace-nowrap">Completed @ {completedTime}</span>
                             )}
                             {isInProgress && (
@@ -969,11 +984,29 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift, highlightBinId
                                   </button>
                                 )}
                               </div>
-                              <div className="text-right">
-                                <p className="text-xs font-semibold text-gray-900 whitespace-nowrap">
-                                  {task.updated_fill_percentage ?? task.fill_percentage}% Fill
-                                </p>
-                              </div>
+                              {isIncident ? (
+                                <div className="flex items-center gap-1.5 px-2 py-1 bg-orange-50 border border-orange-200 rounded-lg whitespace-nowrap">
+                                  {task.incident_photo_url && (
+                                    <button
+                                      onClick={() => setFullscreenPhoto(task.incident_photo_url!)}
+                                      className="relative w-8 h-8 rounded overflow-hidden border-2 border-orange-300 hover:border-orange-500 transition-colors flex-shrink-0"
+                                    >
+                                      <img src={task.incident_photo_url} alt="Incident" className="w-full h-full object-cover" />
+                                    </button>
+                                  )}
+                                  <AlertTriangle className="w-3.5 h-3.5 text-orange-600 flex-shrink-0" />
+                                  <span className="text-[11px] font-semibold text-orange-800 capitalize">{incidentLabel}</span>
+                                  {task.updated_fill_percentage != null && (
+                                    <span className="text-[11px] text-orange-700">· {task.updated_fill_percentage}%</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="text-right">
+                                  <p className="text-xs font-semibold text-gray-900 whitespace-nowrap">
+                                    {task.updated_fill_percentage ?? task.fill_percentage}% Fill
+                                  </p>
+                                </div>
+                              )}
                             </>
                           )}
                         </div>

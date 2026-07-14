@@ -61,6 +61,13 @@ export interface RouteTask {
   skipped: boolean;
   updated_fill_percentage?: number | null;
   photo_url?: string | null;
+  after_photo_url?: string | null;
+
+  // Incident (from zone_incidents reported on this shift for the bin). An incident
+  // completion (e.g. 'inaccessible', 'damaged') closes the stop with NO fill reading
+  // or photos, so the UI shows the incident instead of a misleading "0% Fill".
+  incident_type?: string | null;
+  incident_photo_url?: string | null;
 
   // Metadata
   task_data?: any;
