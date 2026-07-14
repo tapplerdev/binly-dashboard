@@ -59,7 +59,7 @@ const REDEPLOY_ICON = { icon: Truck, color: 'text-teal-600', bg: 'bg-teal-50', l
 
 function getTaskIcon(task: any) {
   if (isRedeployPlacement(task)) return REDEPLOY_ICON;
-  return getTaskIcon(task);
+  return TASK_ICONS[task.task_type] || TASK_ICONS.collection;
 }
 
 function getTaskLabel(task: any): string {
