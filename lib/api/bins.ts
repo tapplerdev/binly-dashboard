@@ -56,6 +56,8 @@ export interface BinMove {
   movedTo: string;
   movedOnIso: string;
   movedOn: string;
+  /** Links this raw move row to its bin_move_request (redeployment/relocation/store), when one exists. */
+  moveRequestId?: string;
 }
 
 /**

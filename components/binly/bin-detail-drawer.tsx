@@ -208,9 +208,21 @@ export function BinDetailDrawer({ bin, onClose, onScheduleMove, onEdit, initialT
       });
     }
 
-    // Add completed moves (historical location changes)
+    // Every completed move-request (redeployment/relocation/store) also writes a raw
+    // `moves` row linked back via move_request_id. Without dedup that move shows TWICE:
+    // once as its proper "Redeployment"/"Relocation" card above, and again below as a
+    // generic "Location Change" card that ignores the category. The move-request card is
+    // canonical (it carries the category + audit trail), so skip any raw move already
+    // represented by a request. Standalone rows — legacy driver-app moves (POST
+    // /bins/{id}/moves) with no request — still render as historical "Location Change".
+    const representedRequestIds = new Set(
+      (allMoveRequests || []).map((r) => r.id).filter(Boolean)
+    );
+
+    // Add completed moves (historical location changes not already shown as a request)
     if (moves) {
       moves.forEach((move) => {
+        if (move.moveRequestId && representedRequestIds.has(move.moveRequestId)) return;
         timeline.push({
           type: 'completed_move',
           date: new Date(move.movedOnIso).getTime() / 1000, // Convert to Unix timestamp
