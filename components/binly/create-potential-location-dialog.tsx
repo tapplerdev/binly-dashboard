@@ -1071,6 +1071,10 @@ export function CreatePotentialLocationDialog({
               <PlacementReviewBasket
                 items={locationQueue}
                 onRemove={(id) => setLocationQueue((prev) => prev.filter((l) => l.id !== id))}
+                onLocate={(item) => {
+                  setMapCenter({ lat: item.latitude, lng: item.longitude });
+                  setViewMode('map'); // mobile: reveal the map so the pin is visible (no-op on desktop split view)
+                }}
                 onSubmit={() => handleSubmit()}
                 submitting={loading}
                 areaLabel={aiArea ? aiArea.label.split(',')[0].trim() : undefined}

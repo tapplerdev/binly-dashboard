@@ -26,6 +26,8 @@ import { cn } from '@/lib/utils';
 export interface PlacementReviewBasketProps {
   items: QueuedLocation[];
   onRemove: (id: string) => void;
+  /** Pan the map to a queued pick's coordinates. */
+  onLocate?: (item: QueuedLocation) => void;
   onSubmit: () => void;
   submitting: boolean;
   /** e.g. "Brentwood" — used in group headers when present. */
@@ -89,9 +91,10 @@ interface BasketRowProps {
   item: QueuedLocation;
   tone: GroupTone;
   onRemove: (id: string) => void;
+  onLocate?: (item: QueuedLocation) => void;
 }
 
-function BasketRow({ item, tone, onRemove }: BasketRowProps) {
+function BasketRow({ item, tone, onRemove, onLocate }: BasketRowProps) {
   const styles = GROUP_TONE_STYLES[tone];
   const isAi = item.source === 'ai';
   const isNearArea = isAi && item.locality === 'near_area';
@@ -160,6 +163,22 @@ function BasketRow({ item, tone, onRemove }: BasketRowProps) {
         )}
       </div>
 
+      {/* Locate on map */}
+      {onLocate && (
+        <button
+          type="button"
+          onClick={() => onLocate(item)}
+          aria-label="Show on map"
+          title="Show on map"
+          className={cn(
+            'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-card',
+            'hover:bg-blue-50 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-200'
+          )}
+        >
+          <MapPin className="h-4 w-4" strokeWidth={2} />
+        </button>
+      )}
+
       {/* Remove */}
       <button
         type="button"
@@ -184,6 +203,7 @@ interface GroupSectionProps {
   headerIcon: React.ReactNode;
   items: QueuedLocation[];
   onRemove: (id: string) => void;
+  onLocate?: (item: QueuedLocation) => void;
 }
 
 function GroupSection({
@@ -194,6 +214,7 @@ function GroupSection({
   headerIcon,
   items,
   onRemove,
+  onLocate,
 }: GroupSectionProps) {
   if (items.length === 0) return null;
 
@@ -213,7 +234,7 @@ function GroupSection({
       {helper && <p className="-mt-1 mb-2 pl-6 text-[11px] text-gray-400">{helper}</p>}
       <ul className="space-y-2">
         {items.map((item) => (
-          <BasketRow key={item.id} item={item} tone={tone} onRemove={onRemove} />
+          <BasketRow key={item.id} item={item} tone={tone} onRemove={onRemove} onLocate={onLocate} />
         ))}
       </ul>
     </section>
@@ -223,6 +244,7 @@ function GroupSection({
 export function PlacementReviewBasket({
   items,
   onRemove,
+  onLocate,
   onSubmit,
   submitting,
   areaLabel,
@@ -280,6 +302,7 @@ export function PlacementReviewBasket({
               }
               items={inArea}
               onRemove={onRemove}
+              onLocate={onLocate}
             />
 
             <GroupSection
@@ -290,6 +313,7 @@ export function PlacementReviewBasket({
               headerIcon={<ArrowUpRight className="h-4 w-4" strokeWidth={2.5} />}
               items={nearArea}
               onRemove={onRemove}
+              onLocate={onLocate}
             />
 
             <GroupSection
@@ -299,6 +323,7 @@ export function PlacementReviewBasket({
               headerIcon={<Pencil className="h-4 w-4" strokeWidth={2.5} />}
               items={manual}
               onRemove={onRemove}
+              onLocate={onLocate}
             />
           </div>
         )}
