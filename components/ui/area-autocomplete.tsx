@@ -20,6 +20,10 @@ const TYPE_LABELS: Record<string, string> = {
   county: 'county',
   locality: 'city',
   administrativeArea: 'county/area',
+  street: 'address',
+  houseNumber: 'address',
+  address: 'address',
+  intersection: 'address',
 };
 
 interface AreaAutocompleteProps {
@@ -62,10 +66,12 @@ export function AreaAutocomplete({ value, onChange, placeholder = 'Target a city
       const seq = ++requestSeqRef.current;
       setLoading(true);
       try {
-        // ,CA constraint matches the backend's geocoder — the fleet is
-        // California-only, and it keeps common city names unambiguous.
+        // US-wide: Binly places bins nationwide. A common name that exists in
+        // several states (Springfield, Fremont…) returns multiple options; each
+        // option's title carries the state (e.g. "Germantown, TN, United States"),
+        // so the user disambiguates by picking the right one.
         const url =
-          `https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(q + ', CA, USA')}` +
+          `https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(q + ', USA')}` +
           `&in=countryCode:USA&limit=6&apiKey=${HERE_KEY}`;
         const resp = await fetch(url);
         const data = await resp.json();
@@ -73,7 +79,10 @@ export function AreaAutocomplete({ value, onChange, placeholder = 'Target a city
         const areas: TargetArea[] = [];
         const seen = new Set<string>();
         for (const item of data.items ?? []) {
-          if (!['locality', 'administrativeArea'].includes(item.resultType)) continue;
+          // Cities/districts (locality, administrativeArea) AND specific addresses
+          // (street, houseNumber, address, intersection) — a precise address is a
+          // valid target; the recommender sweeps a radius around the point.
+          if (!['locality', 'administrativeArea', 'street', 'houseNumber', 'address', 'intersection'].includes(item.resultType)) continue;
           // States/countries aren't placement targets; districts arrive as
           // resultType=locality with localityType=district (HERE v7).
           if (item.administrativeAreaType === 'state' || item.administrativeAreaType === 'country') continue;
