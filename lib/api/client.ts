@@ -80,9 +80,32 @@ function handleUnauthorized(): void {
   window.location.assign('/login');
 }
 
+// Origins the JWT may be sent to: our backend (both env spellings in use) plus
+// relative URLs (same-origin). Guards against a future copy-paste handing apiFetch
+// a third-party URL and silently leaking the token cross-origin.
+const BACKEND_ORIGINS = [
+  process.env.NEXT_PUBLIC_API_URL,
+  process.env.NEXT_PUBLIC_BACKEND_URL,
+  'https://ropacal-backend-production.up.railway.app', // hardcoded in a few call sites
+  'http://localhost:8080',
+]
+  .filter((u): u is string => Boolean(u))
+  .map((u) => new URL(u).origin);
+
+function isBackendUrl(input: string | URL): boolean {
+  const s = input.toString();
+  if (s.startsWith('/')) return true; // relative → same-origin
+  try {
+    return BACKEND_ORIGINS.includes(new URL(s).origin);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * fetch() with the JWT attached and central 401 handling.
  * Drop-in replacement: same arguments, returns the same Response.
+ * The token is only ever attached to backend origins (see BACKEND_ORIGINS).
  */
 export async function apiFetch(
   input: string | URL,
@@ -90,7 +113,7 @@ export async function apiFetch(
 ): Promise<Response> {
   const headers = new Headers(init.headers);
 
-  if (!headers.has('Authorization')) {
+  if (!headers.has('Authorization') && isBackendUrl(input)) {
     const token = getAuthToken();
     if (token) {
       headers.set('Authorization', `Bearer ${token}`);

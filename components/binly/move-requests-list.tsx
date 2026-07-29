@@ -46,21 +46,6 @@ import { format } from 'date-fns';
 type SortColumn = 'bin_number' | 'scheduled_date' | 'created_at' | 'urgency' | 'status' | 'assigned_driver_name' | 'move_type';
 type MoveFilterOption = 'overdue' | 'urgent' | 'pending' | 'assigned' | 'in_progress' | 'completed' | 'cancelled' | 'store' | 'relocation' | 'redeployment';
 
-// Get auth token helper function
-function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const authStorage = localStorage.getItem('binly-auth-storage');
-    if (!authStorage) return null;
-    const parsed = JSON.parse(authStorage);
-    return parsed?.state?.token || null;
-  } catch {
-    return null;
-  }
-}
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
 export function MoveRequestsList() {
   // State
   const queryClient = useQueryClient();
