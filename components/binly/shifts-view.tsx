@@ -29,6 +29,7 @@ import { useAuthStore } from '@/lib/auth/store';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
 import { HerePlaceDetails } from '@/lib/services/geocoding.service';
+import { apiFetch } from '@/lib/api/client';
 
 // NOTE: the legacy ShiftsView component tree (list/timeline/live views) was
 // removed with the retired assign-route endpoint — it was not mounted by any
@@ -370,7 +371,7 @@ export function CreateShiftDrawer({
         const url = `${API_URL}/api/manager/shifts/${shift.id}/tasks/history`;
         console.log('📋 [EDIT MODE] Fetching from URL:', url);
 
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -397,7 +398,7 @@ export function CreateShiftDrawer({
         // Also fetch the shift details to get truck_bin_capacity
         const shiftUrl = `${API_URL}/api/manager/shifts/${shift.id}`;
         console.log('📋 [EDIT MODE] Fetching shift details from:', shiftUrl);
-        const shiftResponse = await fetch(shiftUrl, {
+        const shiftResponse = await apiFetch(shiftUrl, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
 
@@ -1410,7 +1411,7 @@ export function CreateShiftDrawer({
 
       console.log('✅ [PROXIMITY WARNING] User confirmed - proceeding with shift update');
 
-      const response = await fetch(`${API_URL}/api/manager/shifts/${shift.id}`, {
+      const response = await apiFetch(`${API_URL}/api/manager/shifts/${shift.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -1678,7 +1679,7 @@ export function CreateShiftDrawer({
           // Continue with submission even if check fails (don't block the user)
         }
 
-        response = await fetch(`${API_URL}/api/manager/shifts/${shift.id}`, {
+        response = await apiFetch(`${API_URL}/api/manager/shifts/${shift.id}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -1688,7 +1689,7 @@ export function CreateShiftDrawer({
         });
       } else {
         // Create mode: POST endpoint
-        response = await fetch(`${API_URL}/api/manager/shifts/create-with-tasks`, {
+        response = await apiFetch(`${API_URL}/api/manager/shifts/create-with-tasks`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -2853,7 +2854,7 @@ export function CreateShiftDrawer({
                         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
                         const token = localStorage.getItem('binly-auth-storage');
                         const authToken = token ? JSON.parse(token)?.state?.token : null;
-                        await fetch(`${API_URL}/api/manager/shifts/${conflictShift.id}/cancel`, {
+                        await apiFetch(`${API_URL}/api/manager/shifts/${conflictShift.id}/cancel`, {
                           method: 'PUT',
                           headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {},
                         });

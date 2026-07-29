@@ -14,22 +14,9 @@ import { PriorityBinsBanner } from './priority-bins-banner';
 import { useDrivers } from '@/lib/hooks/use-drivers';
 import { Shift } from '@/lib/types/shift';
 import { reoptimizeShift } from '@/lib/api/shifts';
+import { apiFetch, getAuthHeaders } from '@/lib/api/client';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
-function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const authStorage = localStorage.getItem('binly-auth-storage');
-    if (!authStorage) return null;
-    return JSON.parse(authStorage)?.state?.token || null;
-  } catch { return null; }
-}
-
-function getAuthHeaders(): HeadersInit {
-  const token = getAuthToken();
-  return token ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` } : { 'Content-Type': 'application/json' };
-}
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -52,7 +39,7 @@ async function fetchAllShifts(): Promise<any[]> {
   // Fetch active/ready/paused shifts
   for (const status of ['active', 'ready', 'paused']) {
     try {
-      const resp = await fetch(`${API_BASE_URL}/api/manager/shifts?status=${status}&limit=50`, { headers });
+      const resp = await apiFetch(`${API_BASE_URL}/api/manager/shifts?status=${status}&limit=50`, { headers });
       if (resp.ok) {
         const data = await resp.json();
         const shifts = data?.data?.shifts || [];
@@ -63,7 +50,7 @@ async function fetchAllShifts(): Promise<any[]> {
 
   // Fetch recent ended shifts (for past date view)
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/manager/shifts?status=ended&limit=50`, { headers });
+    const resp = await apiFetch(`${API_BASE_URL}/api/manager/shifts?status=ended&limit=50`, { headers });
     if (resp.ok) {
       const data = await resp.json();
       const shifts = data?.data?.shifts || [];
@@ -85,7 +72,7 @@ async function fetchAllShifts(): Promise<any[]> {
 // Fetch tasks for a specific shift
 async function fetchShiftTasks(shiftId: string): Promise<any[]> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/shifts/${shiftId}/tasks/detailed`, {
+    const resp = await apiFetch(`${API_BASE_URL}/api/shifts/${shiftId}/tasks/detailed`, {
       headers: getAuthHeaders(),
     });
     if (!resp.ok) return [];

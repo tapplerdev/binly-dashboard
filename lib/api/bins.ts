@@ -5,42 +5,9 @@
 
 import { Bin, BinWithPriority, PotentialLocation, BinCheck } from '@/lib/types/bin';
 import { ZoneIncident } from '@/lib/types/zone';
+import { apiFetch, getAuthHeaders } from './client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
-/**
- * Get auth token from localStorage (Zustand persist storage)
- */
-function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-
-  try {
-    const authStorage = localStorage.getItem('binly-auth-storage');
-    if (!authStorage) return null;
-
-    const parsed = JSON.parse(authStorage);
-    return parsed?.state?.token || null;
-  } catch (error) {
-    console.error('Failed to get auth token:', error);
-    return null;
-  }
-}
-
-/**
- * Get headers with authentication
- */
-function getAuthHeaders(): HeadersInit {
-  const token = getAuthToken();
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  return headers;
-}
 
 export type BinSortOption = 'priority' | 'bin_number' | 'fill_percentage' | 'days_since_check' | 'status' | 'location';
 export type BinFilterOption = 'all' | 'next_move_request' | 'missing' | 'pending_move' | 'in_storage' | 'high_fill' | 'medium_fill' | 'low_fill';
@@ -66,7 +33,7 @@ export interface BinMove {
  */
 export async function getBins(): Promise<Bin[]> {
   try {
-    const response = await fetch(`${API_URL}/api/bins`, {
+    const response = await apiFetch(`${API_URL}/api/bins`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -137,7 +104,7 @@ export interface BinChangeLogEntry {
  */
 export async function getBinChangeLog(binId: string): Promise<BinChangeLogEntry[]> {
   try {
-    const response = await fetch(`${API_URL}/api/bins/${binId}/change-log`, {
+    const response = await apiFetch(`${API_URL}/api/bins/${binId}/change-log`, {
       method: 'GET',
       headers: getAuthHeaders(),
       cache: 'no-store',
@@ -165,7 +132,7 @@ export async function reactivateBin(binId: string, params: {
   city?: string;
   zip?: string;
 }): Promise<{ message: string; status: string; street: string; city: string }> {
-  const response = await fetch(`${API_URL}/api/manager/bins/${binId}/reactivate`, {
+  const response = await apiFetch(`${API_URL}/api/manager/bins/${binId}/reactivate`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(params),
@@ -207,7 +174,7 @@ export async function updateBin(
   }
 ): Promise<Bin> {
   try {
-    const response = await fetch(`${API_URL}/api/bins/${id}`, {
+    const response = await apiFetch(`${API_URL}/api/bins/${id}`, {
       method: 'PATCH',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -245,7 +212,7 @@ export async function getBinActiveMoveRequests(
   binId: string
 ): Promise<BinActiveMoveRequest[]> {
   try {
-    const response = await fetch(
+    const response = await apiFetch(
       `${API_URL}/api/manager/bins/${binId}/active-move-requests`,
       { method: 'GET', headers: getAuthHeaders() }
     );
@@ -265,7 +232,7 @@ export async function getBinActiveMoveRequests(
  */
 export async function getBinChecks(binId: string): Promise<BinCheck[]> {
   try {
-    const response = await fetch(`${API_URL}/api/bins/${binId}/checks`, {
+    const response = await apiFetch(`${API_URL}/api/bins/${binId}/checks`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -292,7 +259,7 @@ export async function getBinChecks(binId: string): Promise<BinCheck[]> {
  */
 export async function getBinMoves(binId: string): Promise<BinMove[]> {
   try {
-    const response = await fetch(`${API_URL}/api/bins/${binId}/moves`, {
+    const response = await apiFetch(`${API_URL}/api/bins/${binId}/moves`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -332,7 +299,7 @@ export async function getBinsWithPriority(options?: {
 
     const url = `${API_URL}/api/bins/priority${params.toString() ? `?${params.toString()}` : ''}`;
 
-    const response = await fetch(url, {
+    const response = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -369,7 +336,7 @@ export async function createBin(bin: {
   source_potential_location_id?: string | null;
 }): Promise<Bin> {
   try {
-    const response = await fetch(`${API_URL}/api/bins`, {
+    const response = await apiFetch(`${API_URL}/api/bins`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(bin),
@@ -394,7 +361,7 @@ export async function createBin(bin: {
  */
 export async function getPotentialLocations(): Promise<PotentialLocation[]> {
   try {
-    const response = await fetch(`${API_URL}/api/potential-locations`, {
+    const response = await apiFetch(`${API_URL}/api/potential-locations`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -421,7 +388,7 @@ export async function getPotentialLocations(): Promise<PotentialLocation[]> {
  */
 export async function deletePotentialLocation(id: string): Promise<void> {
   try {
-    const response = await fetch(`${API_URL}/api/potential-locations/${id}`, {
+    const response = await apiFetch(`${API_URL}/api/potential-locations/${id}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -444,7 +411,7 @@ export async function deletePotentialLocation(id: string): Promise<void> {
  */
 export async function getBinIncidents(binId: string): Promise<ZoneIncident[]> {
   try {
-    const response = await fetch(`${API_URL}/api/bins/${binId}/incidents`, {
+    const response = await apiFetch(`${API_URL}/api/bins/${binId}/incidents`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -477,7 +444,7 @@ export async function convertPotentialLocationToBin(
   }
 ): Promise<Bin> {
   try {
-    const response = await fetch(`${API_URL}/api/potential-locations/${id}/convert`, {
+    const response = await apiFetch(`${API_URL}/api/potential-locations/${id}/convert`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -533,7 +500,7 @@ export interface ActiveShiftDependency {
  */
 export async function checkBinDependencies(binId: string): Promise<ActiveShiftDependency[]> {
   try {
-    const response = await fetch(`${API_URL}/api/bins/${binId}/active-shift-dependencies`, {
+    const response = await apiFetch(`${API_URL}/api/bins/${binId}/active-shift-dependencies`, {
       method: 'GET',
       headers: getAuthHeaders(),
       cache: 'no-store',

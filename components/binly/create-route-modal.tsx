@@ -8,6 +8,7 @@ import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { LassoSelect } from './lasso-select';
+import { apiFetch } from '@/lib/api/client';
 
 interface CreateRouteModalProps {
   onClose: () => void;
@@ -629,7 +630,7 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
         const requestBody = { bin_ids: formData.bin_ids };
         console.log('🚀 API Request to optimize-preview:', requestBody);
 
-        const response = await fetch('https://ropacal-backend-production.up.railway.app/api/routes/optimize-preview', {
+        const response = await apiFetch('https://ropacal-backend-production.up.railway.app/api/routes/optimize-preview', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

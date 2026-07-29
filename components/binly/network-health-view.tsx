@@ -18,6 +18,7 @@ import {
   ReferenceArea,
   CartesianGrid,
 } from 'recharts';
+import { apiFetch } from '@/lib/api/client';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -43,7 +44,7 @@ interface FleetState {
 }
 
 async function fetchTimeseries(): Promise<{ weeks: WeekBucket[]; fleet: FleetState }> {
-  const resp = await fetch(`${API_BASE_URL}/api/analytics/timeseries?weeks=12`, {
+  const resp = await apiFetch(`${API_BASE_URL}/api/analytics/timeseries?weeks=12`, {
     cache: 'no-store',
   });
   if (!resp.ok) throw new Error(`Failed to fetch timeseries: ${resp.statusText}`);

@@ -3,41 +3,9 @@
  * Connects dashboard to ropacal-backend driver management endpoints
  */
 
+import { apiFetch, getAuthHeaders } from './client';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
-
-/**
- * Get auth token from localStorage (Zustand persist storage)
- */
-function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-
-  try {
-    const authStorage = localStorage.getItem('binly-auth-storage');
-    if (!authStorage) return null;
-
-    const parsed = JSON.parse(authStorage);
-    return parsed?.state?.token || null;
-  } catch (error) {
-    console.error('Failed to get auth token:', error);
-    return null;
-  }
-}
-
-/**
- * Get headers with authentication
- */
-function getAuthHeaders(): HeadersInit {
-  const token = getAuthToken();
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  return headers;
-}
 
 // Backend driver response type
 interface BackendDriver {
@@ -74,7 +42,7 @@ export interface Driver {
  */
 export async function getDrivers(): Promise<Driver[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/manager/drivers`, {
+    const response = await apiFetch(`${API_BASE_URL}/api/manager/drivers`, {
       headers: getAuthHeaders(),
     });
 

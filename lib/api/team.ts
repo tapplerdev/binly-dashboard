@@ -1,3 +1,5 @@
+import { apiFetch } from './client';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 export interface Driver {
@@ -32,7 +34,7 @@ export interface DriverShift {
 }
 
 export async function getAllDrivers(token: string): Promise<Driver[]> {
-  const response = await fetch(`${API_URL}/api/manager/drivers`, {
+  const response = await apiFetch(`${API_URL}/api/manager/drivers`, {
     headers: {
       'Authorization': `Bearer ${token}`,
     },
@@ -47,7 +49,7 @@ export async function getAllDrivers(token: string): Promise<Driver[]> {
 }
 
 export async function getDriverShiftHistory(driverId: string, token: string): Promise<DriverShift[]> {
-  const response = await fetch(`${API_URL}/api/manager/drivers/${driverId}/shifts`, {
+  const response = await apiFetch(`${API_URL}/api/manager/drivers/${driverId}/shifts`, {
     headers: {
       'Authorization': `Bearer ${token}`,
     },

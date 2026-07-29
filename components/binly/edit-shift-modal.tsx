@@ -11,6 +11,7 @@ import { PlacementLocationSelectionMap } from './placement-location-selection-ma
 import { useBins } from '@/lib/hooks/use-bins';
 import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
 import { MoveRequest, getMoveRequests } from '@/lib/api/move-requests';
+import { apiFetch } from '@/lib/api/client';
 import { useModalClose } from '@/components/binly/modal-wrapper';
 
 interface EditShiftModalProps {
@@ -459,7 +460,7 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
           if (stagedReassign.mode === 'replace' && stagedReassign.targetShiftId) {
             await cancelShift(stagedReassign.targetShiftId);
           }
-          await fetch(`${API_URL}/api/manager/shifts/${shift.id}`, {
+          await apiFetch(`${API_URL}/api/manager/shifts/${shift.id}`, {
             method: 'PATCH', headers: patchHeaders,
             body: JSON.stringify({ driver_id: stagedReassign.targetDriverId, reoptimize: true }),
           });

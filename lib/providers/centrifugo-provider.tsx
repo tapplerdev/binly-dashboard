@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Centrifuge, Subscription } from 'centrifuge';
+import { apiFetch } from '@/lib/api/client';
 
 const CENTRIFUGO_URL = 'wss://binly-centrifugo-service-production.up.railway.app/connection/websocket';
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
@@ -54,7 +55,7 @@ export function CentrifugoProvider({ token, children }: CentrifugoProviderProps)
 
   const fetchCentrifugoToken = useCallback(async (): Promise<string> => {
     if (!token) throw new Error('Auth token required for Centrifugo');
-    const response = await fetch(`${BACKEND_URL}/api/centrifugo/token`, {
+    const response = await apiFetch(`${BACKEND_URL}/api/centrifugo/token`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) throw new Error(`Centrifugo token fetch failed: ${response.status}`);

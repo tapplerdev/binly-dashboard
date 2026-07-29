@@ -1,47 +1,14 @@
 import { Route } from '@/lib/types/route';
+import { apiFetch, getAuthHeaders } from './client';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
-/**
- * Get auth token from localStorage (Zustand persist storage)
- */
-function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-
-  try {
-    const authStorage = localStorage.getItem('binly-auth-storage');
-    if (!authStorage) return null;
-
-    const parsed = JSON.parse(authStorage);
-    return parsed?.state?.token || null;
-  } catch (error) {
-    console.error('Failed to get auth token:', error);
-    return null;
-  }
-}
-
-/**
- * Get headers with authentication
- */
-function getAuthHeaders(): HeadersInit {
-  const token = getAuthToken();
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  return headers;
-}
 
 /**
  * Get all available routes with their bin IDs
  */
 export async function getRoutes(): Promise<Route[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/routes`, {
+    const response = await apiFetch(`${API_BASE_URL}/api/routes`, {
       headers: getAuthHeaders(),
     });
 
@@ -73,7 +40,7 @@ export async function getRoutes(): Promise<Route[]> {
     const routesWithBins = await Promise.all(
       routes.map(async (route: Route) => {
         try {
-          const detailsResponse = await fetch(`${API_BASE_URL}/api/routes/${route.id}`, {
+          const detailsResponse = await apiFetch(`${API_BASE_URL}/api/routes/${route.id}`, {
             headers: getAuthHeaders(),
           });
           if (detailsResponse.ok) {
@@ -134,7 +101,7 @@ export async function getRoutes(): Promise<Route[]> {
  * Get a specific route by ID with bins
  */
 export async function getRoute(routeId: string): Promise<Route | null> {
-  const response = await fetch(`${API_BASE_URL}/api/routes/${routeId}`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/routes/${routeId}`, {
     headers: getAuthHeaders(),
   });
 
@@ -160,7 +127,7 @@ export async function createRoute(data: {
   bin_ids: string[];
   estimated_duration_hours?: number;
 }): Promise<Route> {
-  const response = await fetch(`${API_BASE_URL}/api/routes`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/routes`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
@@ -187,7 +154,7 @@ export async function updateRoute(
     estimated_duration_hours?: number;
   }
 ): Promise<Route> {
-  const response = await fetch(`${API_BASE_URL}/api/routes/${routeId}`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/routes/${routeId}`, {
     method: 'PATCH',
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
@@ -204,7 +171,7 @@ export async function updateRoute(
  * Delete a route
  */
 export async function deleteRoute(routeId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/routes/${routeId}`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/routes/${routeId}`, {
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
@@ -218,7 +185,7 @@ export async function deleteRoute(routeId: string): Promise<void> {
  * Duplicate an existing route
  */
 export async function duplicateRoute(routeId: string, name: string): Promise<Route> {
-  const response = await fetch(`${API_BASE_URL}/api/routes/${routeId}/duplicate`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/routes/${routeId}/duplicate`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({ name }),

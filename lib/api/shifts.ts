@@ -5,6 +5,7 @@
 
 import { Shift, ShiftStatus } from '@/lib/types/shift';
 import { ShiftRoutePreview } from '@/lib/types/route-preview';
+import { apiFetch, getAuthHeaders } from './client';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -19,7 +20,7 @@ export async function previewShiftRoute(
   shiftId: string,
   capacity?: number
 ): Promise<ShiftRoutePreview> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE_URL}/api/manager/shifts/${shiftId}/optimize-preview`,
     {
       method: 'POST',
@@ -38,40 +39,6 @@ export async function previewShiftRoute(
     throw new Error(message);
   }
   return response.json();
-}
-
-/**
- * Get auth token from localStorage (Zustand persist storage)
- */
-function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-
-  try {
-    const authStorage = localStorage.getItem('binly-auth-storage');
-    if (!authStorage) return null;
-
-    const parsed = JSON.parse(authStorage);
-    return parsed?.state?.token || null;
-  } catch (error) {
-    console.error('Failed to get auth token:', error);
-    return null;
-  }
-}
-
-/**
- * Get headers with authentication
- */
-function getAuthHeaders(): HeadersInit {
-  const token = getAuthToken();
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  return headers;
 }
 
 // Backend shift response types (matching Go models)
@@ -149,7 +116,7 @@ interface BackendDriver {
 export async function getShifts(): Promise<Shift[]> {
   try {
     // Get all drivers with shift info
-    const driversResponse = await fetch(`${API_BASE_URL}/api/manager/drivers`, {
+    const driversResponse = await apiFetch(`${API_BASE_URL}/api/manager/drivers`, {
       headers: getAuthHeaders(),
     });
 
@@ -183,7 +150,7 @@ export async function getShifts(): Promise<Shift[]> {
  */
 export async function getShiftDetailsByDriverId(driverId: string): Promise<BackendShiftDetails> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/manager/driver-shift-details?driver_id=${driverId}`, {
+    const response = await apiFetch(`${API_BASE_URL}/api/manager/driver-shift-details?driver_id=${driverId}`, {
       headers: getAuthHeaders(),
     });
 
@@ -208,7 +175,7 @@ export async function getShiftDetails(driverId: string): Promise<BackendShiftDet
  * Gets a specific shift by its ID (includes all tasks)
  */
 export async function getShiftById(shiftId: string): Promise<BackendShiftDetails> {
-  const response = await fetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}`, {
     headers: getAuthHeaders(),
   });
 
@@ -227,7 +194,7 @@ export async function getShiftById(shiftId: string): Promise<BackendShiftDetails
 export async function cancelShift(shiftId: string): Promise<void> {
   console.log('🚫 Cancelling shift:', shiftId);
   try {
-    const response = await fetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}/cancel`, {
+    const response = await apiFetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}/cancel`, {
       method: 'POST',
       headers: getAuthHeaders(),
     });
@@ -263,7 +230,7 @@ export async function removeTasksFromShift(
   console.log('🗑️ Removing tasks from shift:', { shiftId, taskIds, reason });
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}/tasks/remove`, {
+    const response = await apiFetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}/tasks/remove`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({
@@ -297,7 +264,7 @@ export async function removeTasksFromShift(
  */
 export async function clearAllShifts(): Promise<void> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/manager/shifts/clear`, {
+    const response = await apiFetch(`${API_BASE_URL}/api/manager/shifts/clear`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -368,7 +335,7 @@ export async function getShiftHistory(params?: {
   if (params?.limit) url.searchParams.set('limit', String(params.limit));
   if (params?.offset) url.searchParams.set('offset', String(params.offset));
 
-  const response = await fetch(url.toString(), { headers: getAuthHeaders() });
+  const response = await apiFetch(url.toString(), { headers: getAuthHeaders() });
   if (!response.ok) throw new Error(`Failed to fetch shift history: ${response.statusText}`);
   const data = await response.json();
   return data.data as ShiftHistoryResponse;
@@ -423,7 +390,7 @@ export interface ShiftHistoryTask {
 }
 
 export async function getShiftHistoryTasks(shiftId: string): Promise<ShiftHistoryTask[]> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE_URL}/api/manager/shifts/history/${shiftId}/tasks`,
     { headers: getAuthHeaders() }
   );
@@ -531,7 +498,7 @@ export async function getShiftTasks(shiftId: string): Promise<any[]> {
     console.log(`🔍 [API] Request URL:`, url);
     console.log(`🔍 [API] Auth headers:`, JSON.stringify(getAuthHeaders(), null, 2));
 
-    const response = await fetch(url, {
+    const response = await apiFetch(url, {
       headers: getAuthHeaders(),
     });
 
@@ -575,7 +542,7 @@ export async function getShiftTasksWithHistory(shiftId: string): Promise<any[]> 
     console.log(`📜 [API] Fetching task history for shift ${shiftId}...`);
     const url = `${API_BASE_URL}/api/manager/shifts/${shiftId}/tasks/history`;
 
-    const response = await fetch(url, {
+    const response = await apiFetch(url, {
       headers: getAuthHeaders(),
     });
 
@@ -600,7 +567,7 @@ export async function addTasksToShift(
   shiftId: string,
   tasks: { task_type: string; bin_id?: string; potential_location_id?: string; move_request_id?: string }[],
 ): Promise<any> {
-  const response = await fetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}`, {
     method: 'PATCH',
     headers: getAuthHeaders(),
     body: JSON.stringify({ add_tasks: tasks, reoptimize: true }),
@@ -621,7 +588,7 @@ export async function createShiftWithTasks(
   driverId: string,
   tasks: { task_type: string; bin_id?: string; potential_location_id?: string; move_request_id?: string }[],
 ): Promise<any> {
-  const response = await fetch(`${API_BASE_URL}/api/manager/shifts/create-with-tasks`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/manager/shifts/create-with-tasks`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({
@@ -644,7 +611,7 @@ export async function createShiftWithTasks(
  * Re-optimize a shift's route
  */
 export async function reoptimizeShift(shiftId: string): Promise<any> {
-  const response = await fetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}`, {
     method: 'PATCH',
     headers: getAuthHeaders(),
     body: JSON.stringify({ reoptimize: true }),
@@ -678,7 +645,7 @@ export interface ShiftDriverProximity {
  */
 export async function checkShiftDriverProximity(shiftId: string): Promise<ShiftDriverProximity> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}/driver-proximity`, {
+    const response = await apiFetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}/driver-proximity`, {
       method: 'GET',
       headers: getAuthHeaders(),
       cache: 'no-store',

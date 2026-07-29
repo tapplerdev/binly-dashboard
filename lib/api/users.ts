@@ -1,3 +1,5 @@
+import { apiFetch } from './client';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 export interface User {
@@ -22,7 +24,7 @@ export interface CreateUserResponse {
 }
 
 export async function getAllUsers(token: string): Promise<User[]> {
-  const response = await fetch(`${API_URL}/api/manager/users`, {
+  const response = await apiFetch(`${API_URL}/api/manager/users`, {
     headers: {
       'Authorization': `Bearer ${token}`,
     },
@@ -37,7 +39,7 @@ export async function getAllUsers(token: string): Promise<User[]> {
 }
 
 export async function createUser(request: CreateUserRequest, token: string): Promise<CreateUserResponse> {
-  const response = await fetch(`${API_URL}/api/manager/users`, {
+  const response = await apiFetch(`${API_URL}/api/manager/users`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,

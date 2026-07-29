@@ -34,27 +34,10 @@ import {
   Camera,
 } from 'lucide-react';
 
+import { apiFetch, getAuthHeaders } from '@/lib/api/client';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
-
-function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const authStorage = localStorage.getItem('binly-auth-storage');
-    if (!authStorage) return null;
-    const parsed = JSON.parse(authStorage);
-    return parsed?.state?.token ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function getAuthHeaders(): HeadersInit {
-  const headers: HeadersInit = { 'Content-Type': 'application/json' };
-  const token = getAuthToken();
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  return headers;
-}
 
 function reverseGeocode(lat: number, lng: number): Promise<string> {
   return new Promise((resolve) => {
@@ -252,7 +235,7 @@ export function ShiftComposer({ onClose, defaultDriverId, scheduledDate }: Shift
     setPreviewLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/routes/optimize-preview`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/routes/optimize-preview`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -352,7 +335,7 @@ export function ShiftComposer({ onClose, defaultDriverId, scheduledDate }: Shift
         }),
       };
 
-      const res = await fetch(`${API_BASE_URL}/api/manager/shifts/create-with-tasks`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/manager/shifts/create-with-tasks`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(payload),

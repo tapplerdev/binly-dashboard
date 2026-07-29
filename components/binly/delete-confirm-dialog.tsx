@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Trash2, X, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { checkPotentialLocationDependencies, ActiveShiftDependency } from '@/lib/api/potential-locations';
+import { apiFetch } from '@/lib/api/client';
 import { ActiveShiftWarningDialog } from './active-shift-warning-dialog';
 import { useModalClose } from '@/components/binly/modal-wrapper';
 
@@ -79,7 +80,7 @@ export function DeleteConfirmDialog({
         return;
       }
 
-      const response = await fetch(
+      const response = await apiFetch(
         `https://ropacal-backend-production.up.railway.app/api/potential-locations/${location.id}`,
         {
           method: 'DELETE',

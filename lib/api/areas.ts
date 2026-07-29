@@ -1,4 +1,5 @@
 import type { TargetArea } from '@/components/ui/area-autocomplete';
+import { apiFetch } from './client';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -38,7 +39,7 @@ export async function getAreaBoundary(area: TargetArea): Promise<AreaBoundary | 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
-    const resp = await fetch(`${API_URL}/api/areas/boundary?${params.toString()}`, {
+    const resp = await apiFetch(`${API_URL}/api/areas/boundary?${params.toString()}`, {
       signal: controller.signal,
     });
     if (!resp.ok) return null;

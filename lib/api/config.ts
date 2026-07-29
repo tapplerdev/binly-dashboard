@@ -4,6 +4,7 @@
  */
 
 import { WarehouseLocation } from '@/lib/types/config';
+import { apiFetch } from './client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -13,7 +14,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
  */
 export async function getWarehouseLocation(): Promise<WarehouseLocation> {
   try {
-    const response = await fetch(`${API_URL}/api/config/warehouse`, {
+    const response = await apiFetch(`${API_URL}/api/config/warehouse`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -42,7 +43,7 @@ export async function updateWarehouseLocation(
   location: WarehouseLocation
 ): Promise<WarehouseLocation> {
   try {
-    const response = await fetch(`${API_URL}/api/config/warehouse`, {
+    const response = await apiFetch(`${API_URL}/api/config/warehouse`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',

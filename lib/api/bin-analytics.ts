@@ -1,16 +1,6 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
+import { apiFetch, getAuthHeaders } from './client';
 
-function getAuthHeaders(): HeadersInit {
-  if (typeof window === 'undefined') return { 'Content-Type': 'application/json' };
-  try {
-    const authStorage = localStorage.getItem('binly-auth-storage');
-    if (!authStorage) return { 'Content-Type': 'application/json' };
-    const token = JSON.parse(authStorage)?.state?.token;
-    return token
-      ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
-      : { 'Content-Type': 'application/json' };
-  } catch { return { 'Content-Type': 'application/json' }; }
-}
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
 
 export interface BinPerformance {
   id: string;
@@ -61,7 +51,7 @@ export interface AnalyticsData {
 
 export async function fetchBinAnalytics(): Promise<AnalyticsData> {
   // Fetch daily priorities (has per-bin fill rates and predictions)
-  const prioritiesResp = await fetch(`${API_BASE_URL}/api/manager/bins/daily-priorities`, {
+  const prioritiesResp = await apiFetch(`${API_BASE_URL}/api/manager/bins/daily-priorities`, {
     headers: getAuthHeaders(),
   });
   if (!prioritiesResp.ok) throw new Error('Failed to fetch priorities');
@@ -69,7 +59,7 @@ export async function fetchBinAnalytics(): Promise<AnalyticsData> {
   const priorities = prioritiesJson.data;
 
   // Fetch area performance
-  const areasResp = await fetch(`${API_BASE_URL}/api/analytics/areas?group_by=city&metric=fill_rate&limit=20`, {
+  const areasResp = await apiFetch(`${API_BASE_URL}/api/analytics/areas?group_by=city&metric=fill_rate&limit=20`, {
     headers: getAuthHeaders(),
   });
   let areas: AreaStats[] = [];

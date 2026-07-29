@@ -3,26 +3,9 @@
  * Manages notification preferences and notification history log
  */
 
+import { apiFetch, getAuthHeaders } from './client';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
-function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const authStorage = localStorage.getItem('binly-auth-storage');
-    if (!authStorage) return null;
-    const parsed = JSON.parse(authStorage);
-    return parsed?.state?.token || null;
-  } catch {
-    return null;
-  }
-}
-
-function getAuthHeaders(): HeadersInit {
-  const token = getAuthToken();
-  const headers: HeadersInit = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  return headers;
-}
 
 export interface NotificationSettings {
   drift_alerts_enabled: boolean;
@@ -70,7 +53,7 @@ export interface NotificationLogResponse {
 }
 
 export async function getNotificationSettings(): Promise<NotificationSettings> {
-  const response = await fetch(`${API_URL}/api/manager/notification-settings`, {
+  const response = await apiFetch(`${API_URL}/api/manager/notification-settings`, {
     headers: getAuthHeaders(),
     cache: 'no-store',
   });
@@ -85,7 +68,7 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
 export async function updateNotificationSettings(
   settings: NotificationSettings
 ): Promise<{ status: string; settings: NotificationSettings }> {
-  const response = await fetch(`${API_URL}/api/manager/notification-settings`, {
+  const response = await apiFetch(`${API_URL}/api/manager/notification-settings`, {
     method: 'PUT',
     headers: getAuthHeaders(),
     body: JSON.stringify(settings),
@@ -118,7 +101,7 @@ export async function triggerDigest(
   const params = new URLSearchParams({ window });
   if (force) params.set('force', 'true');
 
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_URL}/api/manager/daily-digest?${params}`,
     {
       method: 'POST',
@@ -145,7 +128,7 @@ export async function getNotificationLog(
   });
   if (type) params.set('type', type);
 
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_URL}/api/manager/notification-log?${params}`,
     {
       headers: getAuthHeaders(),

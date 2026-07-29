@@ -3,26 +3,9 @@
  * Per-user notification inbox, read status, and preferences
  */
 
+import { apiFetch, getAuthHeaders } from './client';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
-function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const authStorage = localStorage.getItem('binly-auth-storage');
-    if (!authStorage) return null;
-    const parsed = JSON.parse(authStorage);
-    return parsed?.state?.token || null;
-  } catch {
-    return null;
-  }
-}
-
-function getAuthHeaders(): HeadersInit {
-  const token = getAuthToken();
-  const headers: HeadersInit = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  return headers;
-}
 
 export interface UserNotification {
   id: string;
@@ -58,7 +41,7 @@ export interface NotificationPreferences {
 
 export async function getNotifications(page = 1, limit = 20): Promise<NotificationsResponse> {
   const params = new URLSearchParams({ page: String(page), limit: String(limit) });
-  const res = await fetch(`${API_URL}/api/notifications?${params}`, {
+  const res = await apiFetch(`${API_URL}/api/notifications?${params}`, {
     headers: getAuthHeaders(),
     cache: 'no-store',
   });
@@ -67,7 +50,7 @@ export async function getNotifications(page = 1, limit = 20): Promise<Notificati
 }
 
 export async function getUnreadCount(): Promise<{ unread_count: number }> {
-  const res = await fetch(`${API_URL}/api/notifications/unread-count`, {
+  const res = await apiFetch(`${API_URL}/api/notifications/unread-count`, {
     headers: getAuthHeaders(),
     cache: 'no-store',
   });
@@ -76,14 +59,14 @@ export async function getUnreadCount(): Promise<{ unread_count: number }> {
 }
 
 export async function markNotificationRead(id: string): Promise<void> {
-  await fetch(`${API_URL}/api/notifications/${id}/read`, {
+  await apiFetch(`${API_URL}/api/notifications/${id}/read`, {
     method: 'PATCH',
     headers: getAuthHeaders(),
   });
 }
 
 export async function markAllNotificationsRead(): Promise<{ marked_count: number }> {
-  const res = await fetch(`${API_URL}/api/notifications/read-all`, {
+  const res = await apiFetch(`${API_URL}/api/notifications/read-all`, {
     method: 'PATCH',
     headers: getAuthHeaders(),
   });
@@ -92,7 +75,7 @@ export async function markAllNotificationsRead(): Promise<{ marked_count: number
 }
 
 export async function getNotificationPreferences(): Promise<NotificationPreferences> {
-  const res = await fetch(`${API_URL}/api/notifications/preferences`, {
+  const res = await apiFetch(`${API_URL}/api/notifications/preferences`, {
     headers: getAuthHeaders(),
     cache: 'no-store',
   });
@@ -103,7 +86,7 @@ export async function getNotificationPreferences(): Promise<NotificationPreferen
 export async function updateNotificationPreferences(
   prefs: Omit<NotificationPreferences, 'user_id'>
 ): Promise<{ status: string; preferences: NotificationPreferences }> {
-  const res = await fetch(`${API_URL}/api/notifications/preferences`, {
+  const res = await apiFetch(`${API_URL}/api/notifications/preferences`, {
     method: 'PUT',
     headers: getAuthHeaders(),
     body: JSON.stringify(prefs),

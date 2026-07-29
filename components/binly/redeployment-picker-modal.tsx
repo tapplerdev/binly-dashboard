@@ -12,6 +12,7 @@ import { useBins } from '@/lib/hooks/use-bins';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import type { Bin } from '@/lib/types/bin';
 import { cn } from '@/lib/utils';
+import { apiFetch } from '@/lib/api/client';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -44,7 +45,7 @@ interface ScoredCandidate {
 }
 
 async function fetchCandidates(): Promise<{ candidates: ScoredCandidate[] }> {
-  const r = await fetch(`${API_BASE_URL}/api/analytics/growth/candidates`, { cache: 'no-store' });
+  const r = await apiFetch(`${API_BASE_URL}/api/analytics/growth/candidates`, { cache: 'no-store' });
   if (!r.ok) throw new Error('Failed to fetch growth candidates');
   return (await r.json()).data;
 }

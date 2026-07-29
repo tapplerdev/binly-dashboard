@@ -1,12 +1,6 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
+import { apiFetch, getAuthHeaders } from './client';
 
-function getAuthHeaders(): HeadersInit {
-  if (typeof window === 'undefined') return { 'Content-Type': 'application/json' };
-  try {
-    const token = JSON.parse(localStorage.getItem('binly-auth-storage') || '{}')?.state?.token;
-    return token ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } : { 'Content-Type': 'application/json' };
-  } catch { return { 'Content-Type': 'application/json' }; }
-}
+const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
 
 export interface RoutePerformanceData {
   route_id: string;
@@ -21,7 +15,7 @@ export interface RoutePerformanceData {
 
 export async function getRoutePerformance(): Promise<Record<string, RoutePerformanceData>> {
   try {
-    const resp = await fetch(`${API_URL}/api/manager/routes/performance`, {
+    const resp = await apiFetch(`${API_URL}/api/manager/routes/performance`, {
       headers: getAuthHeaders(),
     });
     if (!resp.ok) return {};
@@ -39,7 +33,7 @@ export interface BinCollectionStats {
 
 export async function getBinCollectionStats(): Promise<Record<string, BinCollectionStats>> {
   try {
-    const resp = await fetch(`${API_URL}/api/manager/bins/collection-stats`, {
+    const resp = await apiFetch(`${API_URL}/api/manager/bins/collection-stats`, {
       headers: getAuthHeaders(),
     });
     if (!resp.ok) return {};
@@ -59,7 +53,7 @@ export interface DurationEstimate {
 
 export async function estimateRouteDuration(binIds: string[]): Promise<DurationEstimate | null> {
   try {
-    const resp = await fetch(`${API_URL}/api/manager/routes/estimate-duration`, {
+    const resp = await apiFetch(`${API_URL}/api/manager/routes/estimate-duration`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ bin_ids: binIds }),
@@ -110,7 +104,7 @@ export interface SmartReoptimizeResponse {
 
 export async function smartReoptimize(routeIds: string[], maxBinsPerRoute: number, lowPerformerThreshold: number): Promise<SmartReoptimizeResponse | null> {
   try {
-    const resp = await fetch(`${API_URL}/api/manager/routes/smart-reoptimize`, {
+    const resp = await apiFetch(`${API_URL}/api/manager/routes/smart-reoptimize`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ route_ids: routeIds, max_bins_per_route: maxBinsPerRoute, low_performer_threshold: lowPerformerThreshold }),

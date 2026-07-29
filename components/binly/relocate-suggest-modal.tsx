@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useModalClose } from '@/components/binly/modal-wrapper';
 import { createMoveRequest, MoveRequestConflictError } from '@/lib/api/move-requests';
+import { apiFetch } from '@/lib/api/client';
 import { MapPin, AlertTriangle } from 'lucide-react';
 
 const API_BASE_URL =
@@ -52,7 +53,7 @@ export function RelocateSuggestModal({
   const { data, isLoading } = useQuery({
     queryKey: ['growth-candidates'],
     queryFn: async () => {
-      const r = await fetch(`${API_BASE_URL}/api/analytics/growth/candidates`, { cache: 'no-store' });
+      const r = await apiFetch(`${API_BASE_URL}/api/analytics/growth/candidates`, { cache: 'no-store' });
       if (!r.ok) throw new Error('Failed to fetch candidates');
       return r.json().then(j => j.data as { candidates: ScoredCandidate[] });
     },

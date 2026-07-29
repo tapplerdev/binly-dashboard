@@ -12,6 +12,7 @@ import { useModalClose } from '@/components/binly/modal-wrapper';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { WarehouseMarkerLayer } from '@/components/binly/map-layers';
 import { getBins } from '@/lib/api/bins';
+import { apiFetch } from '@/lib/api/client';
 import { WeeklyGrowthPlan } from '@/components/binly/weekly-growth-plan';
 import type { Bin } from '@/lib/types/bin';
 
@@ -67,13 +68,13 @@ interface HexBucket {
 }
 
 async function fetchBinYields(): Promise<BinYield[]> {
-  const r = await fetch(`${API_BASE_URL}/api/analytics/growth/bin-yield`, { cache: 'no-store' });
+  const r = await apiFetch(`${API_BASE_URL}/api/analytics/growth/bin-yield`, { cache: 'no-store' });
   if (!r.ok) throw new Error('Failed to fetch bin yields');
   return (await r.json()).data ?? [];
 }
 
 async function fetchCandidates(): Promise<{ candidates: Candidate[]; warehouse_available: number }> {
-  const r = await fetch(`${API_BASE_URL}/api/analytics/growth/candidates`, { cache: 'no-store' });
+  const r = await apiFetch(`${API_BASE_URL}/api/analytics/growth/candidates`, { cache: 'no-store' });
   if (!r.ok) throw new Error('Failed to fetch candidates');
   return (await r.json()).data;
 }

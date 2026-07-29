@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Calendar, Route, AlertTriangle, Clock, MapPin, Sparkles, Loader2, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
 import { fetchBinAnalytics, BinPerformance } from '@/lib/api/bin-analytics';
+import { apiFetch, getAuthHeaders } from '@/lib/api/client';
 
 interface RouteTemplate {
   id: string;
@@ -17,16 +18,8 @@ interface RouteTemplate {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
 
-function getAuthHeaders(): HeadersInit {
-  if (typeof window === 'undefined') return { 'Content-Type': 'application/json' };
-  try {
-    const token = JSON.parse(localStorage.getItem('binly-auth-storage') || '{}')?.state?.token;
-    return token ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } : { 'Content-Type': 'application/json' };
-  } catch { return { 'Content-Type': 'application/json' }; }
-}
-
 async function fetchRoutes(): Promise<RouteTemplate[]> {
-  const resp = await fetch(`${API_URL}/api/routes`, { headers: getAuthHeaders() });
+  const resp = await apiFetch(`${API_URL}/api/routes`, { headers: getAuthHeaders() });
   if (!resp.ok) return [];
   const data = await resp.json();
   return Array.isArray(data) ? data : data.data || data.routes || [];

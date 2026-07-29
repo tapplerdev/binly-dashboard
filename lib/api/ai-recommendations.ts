@@ -1,18 +1,6 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
+import { apiFetch, getAuthHeaders } from './client';
 
-function getAuthHeaders(): HeadersInit {
-  if (typeof window === 'undefined') return { 'Content-Type': 'application/json' };
-  try {
-    const authStorage = localStorage.getItem('binly-auth-storage');
-    if (!authStorage) return { 'Content-Type': 'application/json' };
-    const token = JSON.parse(authStorage)?.state?.token;
-    return token
-      ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
-      : { 'Content-Type': 'application/json' };
-  } catch {
-    return { 'Content-Type': 'application/json' };
-  }
-}
+const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
 
 export interface AIRecommendation {
   id: string;
@@ -49,7 +37,7 @@ export async function getRecommendations(status?: string, type?: string): Promis
   if (status) params.append('status', status);
   if (type) params.append('type', type);
 
-  const resp = await fetch(`${API_URL}/api/manager/ai-recommendations?${params}`, {
+  const resp = await apiFetch(`${API_URL}/api/manager/ai-recommendations?${params}`, {
     headers: getAuthHeaders(),
   });
   if (!resp.ok) throw new Error('Failed to fetch recommendations');
@@ -57,7 +45,7 @@ export async function getRecommendations(status?: string, type?: string): Promis
 }
 
 export async function getPendingCount(): Promise<number> {
-  const resp = await fetch(`${API_URL}/api/manager/ai-recommendations/pending-count`, {
+  const resp = await apiFetch(`${API_URL}/api/manager/ai-recommendations/pending-count`, {
     headers: getAuthHeaders(),
   });
   if (!resp.ok) return 0;
@@ -66,7 +54,7 @@ export async function getPendingCount(): Promise<number> {
 }
 
 export async function acceptRecommendation(id: string): Promise<void> {
-  const resp = await fetch(`${API_URL}/api/manager/ai-recommendations/${id}/accept`, {
+  const resp = await apiFetch(`${API_URL}/api/manager/ai-recommendations/${id}/accept`, {
     method: 'PUT',
     headers: getAuthHeaders(),
   });
@@ -74,7 +62,7 @@ export async function acceptRecommendation(id: string): Promise<void> {
 }
 
 export async function dismissRecommendation(id: string): Promise<void> {
-  const resp = await fetch(`${API_URL}/api/manager/ai-recommendations/${id}/dismiss`, {
+  const resp = await apiFetch(`${API_URL}/api/manager/ai-recommendations/${id}/dismiss`, {
     method: 'PUT',
     headers: getAuthHeaders(),
   });
@@ -82,7 +70,7 @@ export async function dismissRecommendation(id: string): Promise<void> {
 }
 
 export async function snoozeRecommendation(id: string, snoozeUntil?: number): Promise<void> {
-  const resp = await fetch(`${API_URL}/api/manager/ai-recommendations/${id}/snooze`, {
+  const resp = await apiFetch(`${API_URL}/api/manager/ai-recommendations/${id}/snooze`, {
     method: 'PUT',
     headers: getAuthHeaders(),
     body: JSON.stringify({ snooze_until: snoozeUntil }),

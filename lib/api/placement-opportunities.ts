@@ -1,18 +1,6 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
+import { apiFetch, getAuthHeaders } from './client';
 
-function getAuthHeaders(): HeadersInit {
-  if (typeof window === 'undefined') return { 'Content-Type': 'application/json' };
-  try {
-    const authStorage = localStorage.getItem('binly-auth-storage');
-    if (!authStorage) return { 'Content-Type': 'application/json' };
-    const token = JSON.parse(authStorage)?.state?.token;
-    return token
-      ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
-      : { 'Content-Type': 'application/json' };
-  } catch {
-    return { 'Content-Type': 'application/json' };
-  }
-}
+const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
 
 export interface CityOpportunity {
   city: string;
@@ -36,7 +24,7 @@ export interface OpportunitiesResponse {
 }
 
 export async function getPlacementOpportunities(): Promise<OpportunitiesResponse> {
-  const resp = await fetch(`${API_URL}/api/manager/placement/opportunities`, {
+  const resp = await apiFetch(`${API_URL}/api/manager/placement/opportunities`, {
     headers: getAuthHeaders(),
   });
   if (!resp.ok) throw new Error(`Failed to fetch opportunities: ${resp.statusText}`);

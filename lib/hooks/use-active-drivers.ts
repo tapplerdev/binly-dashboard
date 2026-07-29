@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { useCentrifugo } from './use-centrifugo';
 import { useAuthStore } from '@/lib/auth/store';
+import { apiFetch } from '@/lib/api/client';
 import { ActiveDriver, DriverLocation } from '../types/active-driver';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
@@ -14,7 +15,7 @@ export function useActiveDrivers() {
   const { data: drivers, isLoading, error } = useQuery({
     queryKey: ['active-drivers'],
     queryFn: async () => {
-      const response = await fetch(`${BACKEND_URL}/api/manager/active-drivers`, {
+      const response = await apiFetch(`${BACKEND_URL}/api/manager/active-drivers`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 

@@ -1,16 +1,6 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
+import { apiFetch, getAuthHeaders } from './client';
 
-function getAuthHeaders(): HeadersInit {
-  if (typeof window === 'undefined') return { 'Content-Type': 'application/json' };
-  try {
-    const authStorage = localStorage.getItem('binly-auth-storage');
-    if (!authStorage) return { 'Content-Type': 'application/json' };
-    const token = JSON.parse(authStorage)?.state?.token;
-    return token
-      ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
-      : { 'Content-Type': 'application/json' };
-  } catch { return { 'Content-Type': 'application/json' }; }
-}
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
 
 export interface PriorityBin {
   id: string;
@@ -36,7 +26,7 @@ export interface DailyPrioritiesResponse {
 }
 
 export async function getDailyPriorities(): Promise<DailyPrioritiesResponse> {
-  const resp = await fetch(`${API_BASE_URL}/api/manager/bins/daily-priorities`, {
+  const resp = await apiFetch(`${API_BASE_URL}/api/manager/bins/daily-priorities`, {
     headers: getAuthHeaders(),
   });
   if (!resp.ok) throw new Error('Failed to fetch daily priorities');

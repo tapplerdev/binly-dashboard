@@ -5,6 +5,7 @@ import { Check, X, Loader2, Package, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { inputStyles } from '@/lib/utils';
 import { checkPotentialLocationDependencies, ActiveShiftDependency } from '@/lib/api/potential-locations';
+import { apiFetch } from '@/lib/api/client';
 import { ActiveShiftWarningDialog } from './active-shift-warning-dialog';
 import { useModalClose } from '@/components/binly/modal-wrapper';
 
@@ -92,7 +93,7 @@ export function ConvertToBinDialog({
         payload.bin_number = parseInt(binNumber, 10);
       }
 
-      const response = await fetch(
+      const response = await apiFetch(
         `https://ropacal-backend-production.up.railway.app/api/potential-locations/${location.id}/convert`,
         {
           method: 'POST',

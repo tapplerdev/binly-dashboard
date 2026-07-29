@@ -3,41 +3,9 @@
  * Handles all potential location-related API requests to the backend
  */
 
+import { apiFetch, getAuthHeaders } from './client';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
-/**
- * Get auth token from localStorage (Zustand persist storage)
- */
-function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-
-  try {
-    const authStorage = localStorage.getItem('binly-auth-storage');
-    if (!authStorage) return null;
-
-    const parsed = JSON.parse(authStorage);
-    return parsed?.state?.token || null;
-  } catch (error) {
-    console.error('Failed to get auth token:', error);
-    return null;
-  }
-}
-
-/**
- * Get headers with authentication
- */
-function getAuthHeaders(): HeadersInit {
-  const token = getAuthToken();
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  return headers;
-}
 
 export interface PotentialLocation {
   id: string;
@@ -76,7 +44,7 @@ export async function getPotentialLocations(
   status: PotentialLocationStatus = 'active'
 ): Promise<PotentialLocation[]> {
   try {
-    const response = await fetch(`${API_URL}/api/potential-locations?status=${status}`, {
+    const response = await apiFetch(`${API_URL}/api/potential-locations?status=${status}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -105,7 +73,7 @@ export async function getPotentialLocationById(
   id: string
 ): Promise<PotentialLocation> {
   try {
-    const response = await fetch(`${API_URL}/api/potential-locations/${id}`, {
+    const response = await apiFetch(`${API_URL}/api/potential-locations/${id}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -143,7 +111,7 @@ export async function getNearbyPotentialLocations(
       ? `${API_URL}/api/bins/${binId}/nearby-potential-locations?max_distance=${maxDistance}`
       : `${API_URL}/api/bins/${binId}/nearby-potential-locations`;
 
-    const response = await fetch(url, {
+    const response = await apiFetch(url, {
       method: 'GET',
       headers: getAuthHeaders(),
       cache: 'no-store',
@@ -191,7 +159,7 @@ export async function checkPotentialLocationDependencies(
   potentialLocationId: string
 ): Promise<ActiveShiftDependency[]> {
   try {
-    const response = await fetch(
+    const response = await apiFetch(
       `${API_URL}/api/potential-locations/${potentialLocationId}/active-shift-dependencies`,
       {
         method: 'GET',

@@ -3,42 +3,9 @@
  */
 
 import { MoveRequest, MoveRequestStatus, MoveRequestType, MoveRequestHistoryEvent } from '@/lib/types/bin';
+import { apiFetch, getAuthHeaders } from './client';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
-/**
- * Get auth token from localStorage (Zustand persist storage)
- */
-function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-
-  try {
-    const authStorage = localStorage.getItem('binly-auth-storage');
-    if (!authStorage) return null;
-
-    const parsed = JSON.parse(authStorage);
-    return parsed?.state?.token || null;
-  } catch (error) {
-    console.error('Failed to get auth token:', error);
-    return null;
-  }
-}
-
-/**
- * Get headers with authentication
- */
-function getAuthHeaders(): HeadersInit {
-  const token = getAuthToken();
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  return headers;
-}
 
 /**
  * Get all move requests with optional filters
@@ -69,7 +36,7 @@ export async function getMoveRequests(params?: GetMoveRequestsParams): Promise<M
 
   const url = `${API_BASE_URL}/api/manager/bins/move-requests${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
 
-  const response = await fetch(url, {
+  const response = await apiFetch(url, {
     method: 'GET',
     headers: getAuthHeaders(),
   });
@@ -126,7 +93,7 @@ export class MoveRequestConflictError extends Error {
 }
 
 export async function createMoveRequest(params: CreateMoveRequestParams): Promise<MoveRequest> {
-  const response = await fetch(`${API_BASE_URL}/api/manager/bins/schedule-move`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/manager/bins/schedule-move`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(params),
@@ -170,7 +137,7 @@ export async function assignMoveToShift(params: AssignMoveToShiftParams): Promis
   console.log('   API URL:', url);
 
   try {
-    const response = await fetch(url, {
+    const response = await apiFetch(url, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(body),
@@ -227,7 +194,7 @@ export async function bulkAssignMoves(params: BulkAssignMovesParams): Promise<vo
  * Cancel a move request
  */
 export async function cancelMoveRequest(moveRequestId: string, reason?: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/manager/bins/move-requests/${moveRequestId}/cancel`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/manager/bins/move-requests/${moveRequestId}/cancel`, {
     method: 'PUT',
     headers: getAuthHeaders(),
     body: JSON.stringify({ reason }),
@@ -268,7 +235,7 @@ export async function updateMoveRequest(
   moveRequestId: string,
   params: UpdateMoveRequestParams
 ): Promise<MoveRequest> {
-  const response = await fetch(`${API_BASE_URL}/api/manager/bins/move-requests/${moveRequestId}`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/manager/bins/move-requests/${moveRequestId}`, {
     method: 'PUT',
     headers: getAuthHeaders(),
     body: JSON.stringify(params),
@@ -299,7 +266,7 @@ export async function bulkCancelMoves(moveRequestIds: string[], reason?: string)
  * Get a single move request by ID
  */
 export async function getMoveRequest(moveRequestId: string): Promise<MoveRequest> {
-  const response = await fetch(`${API_BASE_URL}/api/manager/bins/move-requests/${moveRequestId}`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/manager/bins/move-requests/${moveRequestId}`, {
     method: 'GET',
     headers: getAuthHeaders(),
   });
@@ -331,7 +298,7 @@ export async function assignMoveToUser(params: AssignMoveToUserParams): Promise<
   console.log('   API URL:', url);
 
   try {
-    const response = await fetch(url, {
+    const response = await apiFetch(url, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify({ user_id }),
@@ -363,7 +330,7 @@ export async function assignMoveToUser(params: AssignMoveToUserParams): Promise<
  * TODO: Backend needs to implement proper endpoint - for now this is a workaround
  */
 export async function clearMoveAssignment(moveRequestId: string): Promise<void> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE_URL}/api/manager/bins/move-requests/${moveRequestId}/clear-assignment`,
     {
       method: 'PUT',
@@ -382,7 +349,7 @@ export async function clearMoveAssignment(moveRequestId: string): Promise<void> 
 export async function getMoveRequestHistory(
   moveRequestId: string
 ): Promise<MoveRequestHistoryEvent[]> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE_URL}/api/manager/bins/move-requests/${moveRequestId}/history`,
     {
       method: 'GET',
@@ -427,7 +394,7 @@ export async function checkMoveRequestDependencies(
   moveRequestId: string
 ): Promise<ActiveShiftDependency[]> {
   try {
-    const response = await fetch(
+    const response = await apiFetch(
       `${API_BASE_URL}/api/manager/bins/move-requests/${moveRequestId}/active-shift-dependencies`,
       {
         method: 'GET',
@@ -465,7 +432,7 @@ export interface DriverPendingMove {
 }
 
 export async function getDriverPendingMoves(driverId: string): Promise<DriverPendingMove[]> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE_URL}/api/manager/drivers/${driverId}/pending-moves`,
     { headers: getAuthHeaders() }
   );

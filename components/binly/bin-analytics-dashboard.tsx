@@ -7,12 +7,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { Activity, TrendingUp, AlertTriangle, MapPin, ArrowUpDown, ChevronDown, Loader2, X, ArrowLeft, Maximize2, Camera, Calendar } from 'lucide-react';
 import { fetchBinAnalytics, BinPerformance } from '@/lib/api/bin-analytics';
+import { apiFetch } from '@/lib/api/client';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
-function getAuthHeaders(): HeadersInit {
-  if (typeof window === 'undefined') return {};
-  try { const t = JSON.parse(localStorage.getItem('binly-auth-storage') || '{}')?.state?.token; return t ? { Authorization: `Bearer ${t}` } : {}; } catch { return {}; }
-}
 
 // Bin detail drawer — slides in from right with check history + photos
 function BinDetailDrawer({ bin, onClose }: { bin: BinPerformance; onClose: () => void }) {
@@ -21,7 +18,7 @@ function BinDetailDrawer({ bin, onClose }: { bin: BinPerformance; onClose: () =>
 
   useEffect(() => {
     setLoading(true);
-    fetch(`${API_BASE_URL}/api/bins/${bin.id}/checks`, { headers: getAuthHeaders() })
+    apiFetch(`${API_BASE_URL}/api/bins/${bin.id}/checks`)
       .then(r => r.json())
       .then(d => { setChecks(Array.isArray(d) ? d : d.data || d.checks || []); setLoading(false); })
       .catch(() => setLoading(false));

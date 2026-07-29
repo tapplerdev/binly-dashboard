@@ -11,6 +11,7 @@ import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete
 import { HerePlaceDetails, hereReverseGeocode } from '@/lib/services/geocoding.service';
 import { inputStyles, cn } from '@/lib/utils';
 import { sendChatMessage, LocationRecommendation } from '@/lib/api/chat';
+import { apiFetch } from '@/lib/api/client';
 import { type TargetArea } from '@/components/ui/area-autocomplete';
 import { TargetAreaOverlay } from '@/components/binly/target-area-overlay';
 import { AiRecommendPanel } from '@/components/binly/ai-recommend-panel';
@@ -733,7 +734,7 @@ export function CreatePotentialLocationDialog({
       // Use environment variable or default to production
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://ropacal-backend-production.up.railway.app';
 
-      const response = await fetch(
+      const response = await apiFetch(
         `${apiUrl}/api/potential-locations`,
         {
           method: 'POST',

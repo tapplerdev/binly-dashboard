@@ -7,6 +7,7 @@ import { Toast } from '@/components/ui/toast';
 import { CalendarCheck, Eye, ArrowUpRight, Warehouse, TrendingUp } from 'lucide-react';
 import { RelocateSuggestModal } from '@/components/binly/relocate-suggest-modal';
 import { acceptRecommendation } from '@/lib/api/ai-recommendations';
+import { apiFetch } from '@/lib/api/client';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -42,7 +43,7 @@ interface WeeklyPlan {
 }
 
 async function fetchPlan(): Promise<WeeklyPlan> {
-  const r = await fetch(`${API_BASE_URL}/api/analytics/growth/weekly-plan`, { cache: 'no-store' });
+  const r = await apiFetch(`${API_BASE_URL}/api/analytics/growth/weekly-plan`, { cache: 'no-store' });
   if (!r.ok) throw new Error('Failed to fetch weekly plan');
   const d = (await r.json()).data;
   // Normalize at the boundary: empty sections may arrive as null.

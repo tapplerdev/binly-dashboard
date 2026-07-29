@@ -1,4 +1,4 @@
-import { getAuthHeaders } from './config';
+import { apiFetch, getAuthHeaders } from './client';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -63,7 +63,7 @@ export async function getAppErrorLogs(params?: GetErrorLogsParams): Promise<AppE
   if (params?.is_resolved !== undefined) queryParams.append('is_resolved', String(params.is_resolved));
   if (params?.limit) queryParams.append('limit', String(params.limit));
 
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE_URL}/manager/logs/app-errors?${queryParams.toString()}`,
     {
       headers: getAuthHeaders(),
@@ -81,7 +81,7 @@ export async function getAppErrorLogs(params?: GetErrorLogsParams): Promise<AppE
  * Get error log statistics
  */
 export async function getAppErrorStats(): Promise<AppErrorStats> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE_URL}/manager/logs/app-error-stats`,
     {
       headers: getAuthHeaders(),
@@ -102,7 +102,7 @@ export async function resolveAppErrorLog(
   errorLogId: string,
   notes?: string
 ): Promise<{ status: string; id: string }> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE_URL}/manager/logs/app-errors/${errorLogId}/resolve`,
     {
       method: 'PATCH',

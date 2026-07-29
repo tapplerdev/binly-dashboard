@@ -3,30 +3,9 @@
  */
 
 import { CreateManagerIncidentRequest, NoGoZone, ZoneIncident, NearbyIncident } from '@/lib/types/zone';
+import { apiFetch, getAuthHeaders } from './client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
-/**
- * Get auth token from localStorage (Zustand persist storage)
- */
-function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const authStorage = localStorage.getItem('binly-auth-storage');
-    if (!authStorage) return null;
-    const parsed = JSON.parse(authStorage);
-    return parsed?.state?.token || null;
-  } catch {
-    return null;
-  }
-}
-
-function getAuthHeaders(): HeadersInit {
-  const token = getAuthToken();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  return headers;
-}
 
 /**
  * Fetch all no-go zones
@@ -37,7 +16,7 @@ export async function getNoGoZones(status?: string): Promise<NoGoZone[]> {
       ? `${API_URL}/api/no-go-zones?status=${status}`
       : `${API_URL}/api/no-go-zones`;
 
-    const response = await fetch(url, {
+    const response = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -62,7 +41,7 @@ export async function getNoGoZones(status?: string): Promise<NoGoZone[]> {
  */
 export async function getNoGoZone(id: string): Promise<NoGoZone> {
   try {
-    const response = await fetch(`${API_URL}/api/no-go-zones/${id}`, {
+    const response = await apiFetch(`${API_URL}/api/no-go-zones/${id}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -87,7 +66,7 @@ export async function getNoGoZone(id: string): Promise<NoGoZone> {
  */
 export async function getZoneIncidents(zoneId: string): Promise<ZoneIncident[]> {
   try {
-    const response = await fetch(`${API_URL}/api/no-go-zones/${zoneId}/incidents`, {
+    const response = await apiFetch(`${API_URL}/api/no-go-zones/${zoneId}/incidents`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -116,7 +95,7 @@ export async function getFieldObservations(status?: 'all' | 'pending' | 'verifie
       ? `${API_URL}/api/field-observations?status=${status}`
       : `${API_URL}/api/field-observations`;
 
-    const response = await fetch(url, {
+    const response = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -141,7 +120,7 @@ export async function getFieldObservations(status?: 'all' | 'pending' | 'verifie
  */
 export async function verifyFieldObservation(incidentId: string): Promise<ZoneIncident> {
   try {
-    const response = await fetch(`${API_URL}/api/field-observations/${incidentId}/verify`, {
+    const response = await apiFetch(`${API_URL}/api/field-observations/${incidentId}/verify`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -165,7 +144,7 @@ export async function verifyFieldObservation(incidentId: string): Promise<ZoneIn
  */
 export async function getShiftIncidents(shiftId: string): Promise<ZoneIncident[]> {
   try {
-    const response = await fetch(`${API_URL}/api/shifts/${shiftId}/incidents`, {
+    const response = await apiFetch(`${API_URL}/api/shifts/${shiftId}/incidents`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -192,7 +171,7 @@ export async function getShiftIncidents(shiftId: string): Promise<ZoneIncident[]
 export async function createManagerIncidentReport(
   payload: CreateManagerIncidentRequest,
 ): Promise<{ incident_id: string; zone_id: string; message: string }> {
-  const response = await fetch(`${API_URL}/api/manager/incident-report`, {
+  const response = await apiFetch(`${API_URL}/api/manager/incident-report`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(payload),
@@ -216,7 +195,7 @@ export async function getNearbyIncidents(
   radius: number = 800,
 ): Promise<NearbyIncident[]> {
   try {
-    const response = await fetch(
+    const response = await apiFetch(
       `${API_URL}/api/incidents/nearby?lat=${lat}&lng=${lng}&radius=${radius}`,
       { headers: { 'Content-Type': 'application/json' }, cache: 'no-store' },
     );

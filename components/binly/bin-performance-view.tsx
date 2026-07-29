@@ -7,6 +7,7 @@ import { Toast } from '@/components/ui/toast';
 import { BinDetailDrawer } from '@/components/binly/bin-detail-drawer';
 import { RelocateSuggestModal } from '@/components/binly/relocate-suggest-modal';
 import { getBins } from '@/lib/api/bins';
+import { apiFetch } from '@/lib/api/client';
 import type { Bin, BinWithPriority } from '@/lib/types/bin';
 import {
   ResponsiveContainer,
@@ -42,7 +43,7 @@ interface ScorecardRow {
 }
 
 async function fetchScorecard(): Promise<ScorecardRow[]> {
-  const resp = await fetch(`${API_BASE_URL}/api/analytics/bin-scorecard`, { cache: 'no-store' });
+  const resp = await apiFetch(`${API_BASE_URL}/api/analytics/bin-scorecard`, { cache: 'no-store' });
   if (!resp.ok) throw new Error(`Failed to fetch scorecard: ${resp.statusText}`);
   const json = await resp.json();
   return json.data ?? [];
