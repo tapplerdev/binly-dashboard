@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import Image from 'next/image';
 import { LoginForm } from '@/components/binly/login-form';
 
@@ -24,8 +25,13 @@ export default function LoginPage() {
               </h1>
             </div>
 
-            {/* Login Form */}
-            <LoginForm />
+            {/* Login Form.
+                Suspense is REQUIRED, not defensive: LoginForm reads ?org= with
+                useSearchParams, and Next fails the production build for any
+                page that does so outside a Suspense boundary. */}
+            <Suspense fallback={<div className="h-[22rem]" />}>
+              <LoginForm />
+            </Suspense>
           </div>
         </div>
       </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useLogin } from '@/lib/auth/queries';
 import { useAuthStore } from '@/lib/auth/store';
 import { Button } from '@/components/ui/button';
@@ -10,11 +10,19 @@ import { inputStyles } from '@/lib/utils';
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { mutate: login, isPending, isError, error } = useLogin();
-  const { setAuth, setRememberedEmail, rememberedEmail } = useAuthStore();
+  const {
+    setAuth,
+    setRememberedEmail,
+    rememberedEmail,
+    setRememberedOrganization,
+    rememberedOrganization,
+  } = useAuthStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [organization, setOrganization] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
 
   // Load remembered email on mount
@@ -25,16 +33,39 @@ export function LoginForm() {
     }
   }, [rememberedEmail]);
 
+  // Organization: ?org= wins over the remembered value, so a tenant can be sent
+  // a bookmarkable link (/login?org=acme) that lands on the right organization
+  // even on a browser that last signed into a different one.
+  useEffect(() => {
+    const fromUrl = searchParams.get('org');
+    if (fromUrl) {
+      setOrganization(fromUrl);
+    } else if (rememberedOrganization) {
+      setOrganization(rememberedOrganization);
+    }
+  }, [searchParams, rememberedOrganization]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     login(
-      { email, password },
+      { email, password, organization: organization || undefined },
       {
         onSuccess: (data) => {
           if (data.token && data.user) {
             // Save auth state
             setAuth(data.token, data.user);
+
+            // Remember the slug the server actually resolved, not the raw
+            // input. Under the single-org grace the field can be left blank and
+            // the server still returns the organization — persisting its slug
+            // means the field is pre-filled and correct from the next login on,
+            // BEFORE a second tenant makes it mandatory.
+            if (data.organization?.slug) {
+              setRememberedOrganization(data.organization.slug);
+            } else if (organization) {
+              setRememberedOrganization(organization);
+            }
 
             // Handle Remember Me
             if (rememberMe) {
@@ -62,6 +93,23 @@ export function LoginForm() {
           onChange={(e) => setEmail(e.target.value)}
           required
           disabled={isPending}
+          className={inputStyles()}
+        />
+      </div>
+
+      {/* Organization slug. Optional while one organization exists (the server
+          infers it); required as soon as a second is provisioned. */}
+      <div>
+        <input
+          type="text"
+          placeholder="Organization (optional)"
+          value={organization}
+          onChange={(e) => setOrganization(e.target.value)}
+          disabled={isPending}
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          autoComplete="organization"
           className={inputStyles()}
         />
       </div>

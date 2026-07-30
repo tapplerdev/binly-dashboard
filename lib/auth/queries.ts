@@ -23,7 +23,22 @@ export function useLogin() {
           body: JSON.stringify(validated),
         });
 
-        // Check if response is ok before parsing JSON
+        // Organization-selection failures carry a real reason and must NOT be
+        // reported as bad credentials. Before this, a user who omitted their
+        // org slug (400) or whose organization was suspended (403) was told
+        // "Invalid email or password" and had no way to discover the actual
+        // problem. 401 stays deliberately opaque: the backend returns the same
+        // 401 for a wrong password and an unknown slug so login cannot be used
+        // to enumerate tenant slugs, and echoing anything more here would
+        // reintroduce exactly that.
+        if (response.status === 400 || response.status === 403) {
+          const body = await response.json().catch(() => null);
+          throw new Error(
+            body?.error ||
+              'Your organization could not be determined. Check the organization field.'
+          );
+        }
+
         if (!response.ok) {
           throw new Error('Invalid email or password');
         }

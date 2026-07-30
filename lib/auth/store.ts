@@ -6,11 +6,19 @@ interface AuthState {
   token: string | null;
   user: User | null;
   rememberedEmail: string | null;
+  /**
+   * Last organization slug used to sign in. Remembered independently of
+   * "Remember Me": the slug is not a credential, and re-typing it every login
+   * is the friction that makes people get it wrong. Cleared only by an explicit
+   * sign-in with a different slug.
+   */
+  rememberedOrganization: string | null;
   isAuthenticated: boolean;
 
   setAuth: (token: string, user: User) => void;
   clearAuth: () => void;
   setRememberedEmail: (email: string | null) => void;
+  setRememberedOrganization: (slug: string | null) => void;
 }
 
 /**
@@ -23,6 +31,7 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       user: null,
       rememberedEmail: null,
+      rememberedOrganization: null,
       isAuthenticated: false,
 
       setAuth: (token, user) => {
@@ -39,6 +48,9 @@ export const useAuthStore = create<AuthState>()(
 
       setRememberedEmail: (email) =>
         set({ rememberedEmail: email }),
+
+      setRememberedOrganization: (slug) =>
+        set({ rememberedOrganization: slug }),
     }),
     {
       name: 'binly-auth-storage',
