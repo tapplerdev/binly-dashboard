@@ -104,14 +104,20 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Organization slug. Optional while one organization exists (the server
-          infers it); required as soon as a second is provisioned. */}
+      {/* Organization ID — the organizations.slug value, called "Organization
+          ID" everywhere a customer can see it.
+
+          Genuinely optional, and expected to stay blank. The server infers the
+          organization from the email address and only asks for this when one
+          address is registered with more than one organization. Leaving it here
+          matters for that case and for ?org= links; it is not a field most
+          people will ever fill in. */}
       <div>
         <label
           htmlFor="organization"
           className="block text-sm text-gray-600 mb-1"
         >
-          Organization <span className="text-gray-400">(optional)</span>
+          Organization ID <span className="text-gray-400">(optional)</span>
         </label>
         <input
           id="organization"
