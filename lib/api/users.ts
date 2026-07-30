@@ -49,8 +49,20 @@ export async function createUser(request: CreateUserRequest, token: string): Pro
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to create user');
+    // The API's error shape is {success:false, error:"..."} — read `error`,
+    // not `message` (this was the one call site of 14 reading the wrong
+    // field, so every failure here collapsed to the generic fallback).
+    // Tolerate a non-JSON body too: a proxy or middleware that answers in
+    // plain text must surface its text, not a JSON.parse SyntaxError.
+    let message = 'Failed to create user';
+    const body = await response.text();
+    try {
+      const parsed = JSON.parse(body);
+      message = parsed.error || parsed.message || message;
+    } catch {
+      if (body.trim()) message = body.trim().slice(0, 200);
+    }
+    throw new Error(message);
   }
 
   return await response.json();
