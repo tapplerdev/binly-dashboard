@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Centrifuge, Subscription } from 'centrifuge';
 import { apiFetch } from '@/lib/api/client';
+import { useAuthStore } from '@/lib/auth/store';
 
 const CENTRIFUGO_URL = 'wss://binly-centrifugo-service-production.up.railway.app/connection/websocket';
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
@@ -17,6 +18,16 @@ interface CentrifugoContextValue {
    *  — all handlers receive every publication (fan-out). Returns an unsubscribe fn. */
   subscribe: (channel: string, handler: (data: unknown) => void) => () => void;
   isConnected: boolean;
+  /**
+   * The org-wide operational feed channel for THIS tenant, or null while the
+   * organization is still being resolved.
+   *
+   * Never hardcode 'company:events' again. That channel is shared across every
+   * tenant and is authorized on role alone, so any admin of any organization
+   * receives every organization's feed. It is being removed; consumers must
+   * read this value and skip their effect while it is null.
+   */
+  companyChannel: string | null;
 }
 
 const CentrifugoContext = createContext<CentrifugoContextValue | null>(null);
@@ -36,6 +47,52 @@ interface CentrifugoProviderProps {
 
 export function CentrifugoProvider({ token, children }: CentrifugoProviderProps) {
   const [status, setStatus] = useState<CentrifugoStatus>('disconnected');
+
+  const organization = useAuthStore((s) => s.organization);
+  const setOrganization = useAuthStore((s) => s.setOrganization);
+  // null = not yet known. Distinguished from "known to be absent" so we do not
+  // subscribe to the wrong channel and immediately switch.
+  const [orgResolved, setOrgResolved] = useState(organization !== null);
+
+  // Backfill the organization for sessions that predate it being stored.
+  // Without this, everyone already signed in when this shipped would have a null
+  // organization forever — the dashboard persists auth to localStorage and never
+  // re-validates — so companyChannel would stay null and the dashboard would go
+  // SILENT rather than degrade. Runs once per session.
+  useEffect(() => {
+    if (!token || organization) {
+      if (organization) setOrgResolved(true);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch(`${BACKEND_URL}/api/auth/status`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setOrganization(data.organization ?? null);
+      } catch {
+        // Non-fatal: leave orgResolved true so we fall back to the legacy
+        // channel rather than going silent.
+      } finally {
+        if (!cancelled) setOrgResolved(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, organization, setOrganization]);
+
+  // During the migration the backend publishes to BOTH names, so the scoped
+  // channel is live and safe to use. A null organization after resolution means
+  // a pre-tenancy backend, where the legacy channel is the only one that exists.
+  const companyChannel = !orgResolved
+    ? null
+    : organization
+      ? `company:${organization.id}:events`
+      : 'company:events';
 
   // Single Centrifuge client for the entire app session
   const clientRef = useRef<Centrifuge | null>(null);
@@ -226,7 +283,7 @@ export function CentrifugoProvider({ token, children }: CentrifugoProviderProps)
 
   return (
     <CentrifugoContext.Provider
-      value={{ status, subscribe, isConnected: status === 'connected' }}
+      value={{ status, subscribe, isConnected: status === 'connected', companyChannel }}
     >
       {children}
     </CentrifugoContext.Provider>

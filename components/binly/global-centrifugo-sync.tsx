@@ -30,14 +30,16 @@ import type { UserNotification } from '@/lib/api/notifications';
 
 export function GlobalCentrifugoSync() {
   const queryClient = useQueryClient();
-  const { subscribe, isConnected } = useCentrifugo();
+  const { subscribe, isConnected, companyChannel } = useCentrifugo();
   const addNotification = useNotificationStore((s) => s.addNotification);
   const currentUserId = useAuthStore((s) => s.user?.id);
 
   useEffect(() => {
-    if (!isConnected) return;
+    // companyChannel is null until the organization resolves; subscribing
+    // to the shared 'company:events' would cross tenants.
+    if (!isConnected || !companyChannel) return;
 
-    const unsubscribe = subscribe('company:events', (raw: unknown) => {
+    const unsubscribe = subscribe(companyChannel, (raw: unknown) => {
       const event = raw as { type: string; data: unknown };
       console.log('📡 [GlobalCentrifugoSync] received event:', event.type, event.data);
 
@@ -207,7 +209,7 @@ export function GlobalCentrifugoSync() {
     });
 
     return unsubscribe;
-  }, [isConnected, subscribe, queryClient, addNotification, currentUserId]);
+  }, [isConnected, subscribe, queryClient, addNotification, currentUserId, companyChannel]);
 
   return null;
 }

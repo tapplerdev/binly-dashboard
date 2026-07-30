@@ -217,12 +217,14 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift, highlightBinId
   }, [shift.id]);
 
   // Centrifugo subscription for real-time shift updates
-  const { subscribe, isConnected } = useCentrifugo();
+  const { subscribe, isConnected, companyChannel } = useCentrifugo();
 
   useEffect(() => {
-    if (!isConnected) return;
+    // companyChannel is null until the organization resolves; subscribing
+    // to the shared 'company:events' would cross tenants.
+    if (!isConnected || !companyChannel) return;
 
-    const unsubscribe = subscribe('company:events', (raw: unknown) => {
+    const unsubscribe = subscribe(companyChannel, (raw: unknown) => {
       const event = raw as { type: string; data: Record<string, unknown> };
 
       // Only handle events for this specific shift
@@ -236,7 +238,7 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift, highlightBinId
     });
 
     return unsubscribe;
-  }, [isConnected, subscribe, shift.id]);
+  }, [isConnected, subscribe, shift.id, companyChannel]);
 
   const handleClose = () => {
     setIsClosing(true);

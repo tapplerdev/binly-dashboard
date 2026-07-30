@@ -63,8 +63,9 @@ export function LoginForm() {
       {
         onSuccess: (data) => {
           if (data.token && data.user) {
-            // Save auth state
-            setAuth(data.token, data.user);
+            // Save auth state, including the organization — the per-tenant
+            // Centrifugo channel keys on its UUID.
+            setAuth(data.token, data.user, data.organization ?? null);
 
             // ONLY ever persist the slug the server resolved — never the raw
             // input. A typed slug that the server did not confirm has no

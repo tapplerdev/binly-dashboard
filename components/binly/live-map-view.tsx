@@ -224,12 +224,14 @@ export function LiveMapView() {
 
   // Centrifugo — UI state only: close the potential-location drawer if the open location is
   // deleted or converted. All cache updates are handled by GlobalCentrifugoSync in the layout.
-  const { subscribe, isConnected } = useCentrifugo();
+  const { subscribe, isConnected, companyChannel } = useCentrifugo();
 
   useEffect(() => {
-    if (!isConnected) return;
+    // companyChannel is null until the organization resolves; subscribing
+    // to the shared 'company:events' would cross tenants.
+    if (!isConnected || !companyChannel) return;
 
-    const unsubscribe = subscribe('company:events', (raw: unknown) => {
+    const unsubscribe = subscribe(companyChannel, (raw: unknown) => {
       const event = raw as { type: string; data: unknown };
 
       if (
@@ -242,7 +244,7 @@ export function LiveMapView() {
     });
 
     return unsubscribe;
-  }, [isConnected, subscribe]);
+  }, [isConnected, subscribe, companyChannel]);
 
   // Check URL params for bin ID and zoom to it
   useEffect(() => {
