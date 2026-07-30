@@ -125,12 +125,25 @@ function platformRewrite(input: string | URL, headers: Headers): string | URL {
   const { isPlatform, actingOrg } = useAuthStore.getState();
   if (!isPlatform || !actingOrg) return input;
 
+  // Only OUR backend. Substring-matching the whole URL rewrote third-party
+  // calls too: a Google Maps request became
+  // maps.googleapis.com/maps/api/platform/act/geocode/... with the tenant slug
+  // attached as a header to Google.
+  if (!isBackendUrl(input)) return input;
+
   const asString = typeof input === 'string' ? input : input.toString();
-  if (asString.includes('/api/platform/')) return input;
-  if (!asString.includes('/api/')) return input;
+  const url = new URL(asString, typeof window !== 'undefined' ? window.location.origin : undefined);
+
+  // Match on the PATHNAME, not the whole string — a query parameter containing
+  // '/api/' must not trigger or suppress the rewrite, and String.replace only
+  // swaps the first occurrence, so a path prefix containing '/api/' would
+  // otherwise be the part that got rewritten.
+  if (!url.pathname.startsWith('/api/')) return input;
+  if (url.pathname.startsWith('/api/platform/')) return input; // already a platform route
 
   headers.set('X-Act-As-Org', actingOrg.slug);
-  return asString.replace('/api/', '/api/platform/act/');
+  url.pathname = url.pathname.replace(/^\/api\//, '/api/platform/act/');
+  return url.toString();
 }
 
 export async function apiFetch(
@@ -149,7 +162,20 @@ export async function apiFetch(
   const response = await fetch(platformRewrite(input, headers), { ...init, headers });
 
   if (response.status === 401) {
-    handleUnauthorized();
+    // An operator who has signed in but not yet chosen an organization is a
+    // LEGITIMATE state, not a dead session. In it, platformRewrite leaves URLs
+    // alone, so every tenant query 401s with a perfectly valid platform token —
+    // and logging them out here made operator mode impossible to use: the
+    // dashboard mounts, fires ~11 requests, and the first 401 hard-navigates
+    // back to /login before the org switcher can be touched.
+    //
+    // Suppressed only for that exact window. Once an organization is selected,
+    // requests are rewritten onto /api/platform/act and a 401 means what it
+    // always meant.
+    const { isPlatform, actingOrg } = useAuthStore.getState();
+    if (!(isPlatform && !actingOrg)) {
+      handleUnauthorized();
+    }
   }
 
   return response;

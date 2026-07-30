@@ -67,7 +67,21 @@ export const useAuthStore = create<AuthState>()(
       setAuth: (token, user, organization = null) => {
         // Set cookie for middleware to read
         document.cookie = `binly-auth-token=${token}; path=/; max-age=${60 * 60 * 24 * 7}`; // 7 days
-        set({ token, user, organization, isAuthenticated: true });
+        // Clear any PLATFORM state. The store is persisted whole, so an
+        // operator session that went cold left isPlatform/actingOrg behind —
+        // and the next tenant to sign in on that browser had every request
+        // rewritten to /api/platform/act with a tenant token, 401ing forever
+        // with no way out short of clearing site data.
+        set({
+          token,
+          user,
+          organization,
+          isAuthenticated: true,
+          isPlatform: false,
+          platformEmail: null,
+          platformOrgs: [],
+          actingOrg: null,
+        });
       },
 
       clearAuth: () => {

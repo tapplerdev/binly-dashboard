@@ -104,19 +104,6 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Email Input */}
-      <div>
-        <input
-          type="email"
-          placeholder="Email Address"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          disabled={isPending}
-          className={inputStyles()}
-        />
-      </div>
-
       {/* Organization slug. Optional while one organization exists (the server
           infers it); required as soon as a second is provisioned. */}
       <div>
@@ -143,6 +130,19 @@ export function LoginForm() {
              "ropacal" — and autofill fires onChange, so the wrong value would
              be submitted and then remembered. */
           autoComplete="off"
+          className={inputStyles()}
+        />
+      </div>
+
+      {/* Email Input */}
+      <div>
+        <input
+          type="email"
+          placeholder="Email Address"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          disabled={isPending}
           className={inputStyles()}
         />
       </div>

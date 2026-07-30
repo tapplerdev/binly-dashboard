@@ -32,7 +32,10 @@ export function PlatformOrgSwitcher() {
 
   // Load the operator's reachable organizations once per session.
   useEffect(() => {
-    if (!isPlatform || !token || platformOrgs.length > 0) return;
+    // Deliberately NOT gated on platformOrgs.length: the store is persisted, so
+    // gating on it meant the list was fetched once and never refreshed for the
+    // life of localStorage — a newly provisioned tenant would never appear.
+    if (!isPlatform || !token) return;
     let cancelled = false;
     setLoading(true);
     (async () => {
@@ -53,15 +56,26 @@ export function PlatformOrgSwitcher() {
     return () => {
       cancelled = true;
     };
-  }, [isPlatform, token, platformOrgs.length, setPlatformOrgs]);
+  }, [isPlatform, token, setPlatformOrgs]);
 
   if (!isPlatform) return null;
 
   const onSwitch = (slug: string) => {
     const next = platformOrgs.find((o) => o.slug === slug) ?? null;
     setActingOrg(next);
-    // Every cached query belongs to the PREVIOUS tenant. Drop it all.
+
+    // Clearing the cache is NOT enough on its own. queryClient.clear() removes
+    // the entries and cancels retries, but it notifies cache listeners rather
+    // than the observers that back useQuery — so the previous tenant's bins and
+    // shifts stay RENDERED under the new tenant's name until some refetch
+    // interval happens to fire. That is worse than doing nothing, because the
+    // banner lends confidence to stale data from another customer.
+    //
+    // A full reload is deliberate and cheap here: it guarantees no component
+    // anywhere is still holding another organization's rows, which matters more
+    // than the switching animation. Every in-flight request dies with the page.
     queryClient.clear();
+    window.location.assign('/');
   };
 
   return (
@@ -80,9 +94,16 @@ export function PlatformOrgSwitcher() {
           {loading ? 'Loading organizations…' : 'Select an organization…'}
         </option>
         {platformOrgs.map((o: Organization) => (
-          <option key={o.id} value={o.slug}>
+          <option
+            key={o.id}
+            value={o.slug}
+            // ActAsOrg 403s every request for a non-active organization, and a
+            // 403 does not trigger the logout path — so selecting one just
+            // renders an empty dashboard under a banner promising full access.
+            disabled={o.status !== undefined && o.status !== 'active'}
+          >
             {o.name}
-            {o.status !== 'active' ? ` (${o.status})` : ''}
+            {o.status && o.status !== 'active' ? ` (${o.status} — unavailable)` : ''}
           </option>
         ))}
       </select>

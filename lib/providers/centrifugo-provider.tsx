@@ -49,6 +49,14 @@ export function CentrifugoProvider({ token, children }: CentrifugoProviderProps)
   const [status, setStatus] = useState<CentrifugoStatus>('disconnected');
 
   const organization = useAuthStore((s) => s.organization);
+  // For a cross-tenant operator the acting organization IS the tenant whose feed
+  // should be delivered. Without this the backfill effect below wrote the first
+  // selected org into the tenant `organization` slot, its own guard then
+  // permanently disarmed, and the socket stayed pinned to that org for the whole
+  // session — delivering one customer's events into a dashboard labelled with
+  // another's.
+  const isPlatform = useAuthStore((s) => s.isPlatform);
+  const actingOrg = useAuthStore((s) => s.actingOrg);
   const setOrganization = useAuthStore((s) => s.setOrganization);
   // null = not yet known. Distinguished from "known to be absent" so we do not
   // subscribe to the wrong channel and immediately switch.
@@ -60,6 +68,11 @@ export function CentrifugoProvider({ token, children }: CentrifugoProviderProps)
   // re-validates — so companyChannel would stay null and the dashboard would go
   // SILENT rather than degrade. Runs once per session.
   useEffect(() => {
+    // Operators resolve their org from the switcher, never from auth status.
+    if (isPlatform) {
+      setOrgResolved(true);
+      return;
+    }
     if (!token || organization) {
       if (organization) setOrgResolved(true);
       return;
@@ -83,16 +96,22 @@ export function CentrifugoProvider({ token, children }: CentrifugoProviderProps)
     return () => {
       cancelled = true;
     };
-  }, [token, organization, setOrganization]);
+  }, [token, organization, setOrganization, isPlatform]);
 
   // During the migration the backend publishes to BOTH names, so the scoped
   // channel is live and safe to use. A null organization after resolution means
   // a pre-tenancy backend, where the legacy channel is the only one that exists.
-  const companyChannel = !orgResolved
-    ? null
-    : organization
-      ? `company:${organization.id}:events`
-      : 'company:events';
+  const companyChannel = isPlatform
+    ? // Operator: follow the switcher. Null until an organization is chosen, so
+      // no feed is delivered rather than the wrong one.
+      actingOrg
+      ? `company:${actingOrg.id}:events`
+      : null
+    : !orgResolved
+      ? null
+      : organization
+        ? `company:${organization.id}:events`
+        : 'company:events';
 
   // Single Centrifuge client for the entire app session
   const clientRef = useRef<Centrifuge | null>(null);
