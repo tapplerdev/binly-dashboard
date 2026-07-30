@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useLogin } from '@/lib/auth/queries';
 import { useAuthStore } from '@/lib/auth/store';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,6 @@ import { inputStyles } from '@/lib/utils';
 
 export function LoginForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { mutate: login, isPending, isError, error } = useLogin();
   const {
     setAuth,
@@ -34,16 +33,27 @@ export function LoginForm() {
   }, [rememberedEmail]);
 
   // Organization: ?org= wins over the remembered value, so a tenant can be sent
-  // a bookmarkable link (/login?org=acme) that lands on the right organization
-  // even on a browser that last signed into a different one.
+  // a bookmarkable /login?org=acme link that lands on the right organization
+  // even on a browser that last signed into a different one. `?org=` with an
+  // EMPTY value explicitly means "no organization" and clears the remembered
+  // one — that is the escape hatch for someone stuck behind a wrong stored slug
+  // (which otherwise only produces an opaque 401).
+  //
+  // Read from window.location rather than useSearchParams deliberately.
+  // useSearchParams calls bailoutToClientRendering() during SSR, which strips
+  // the ENTIRE form out of the prerendered HTML — measured: the static
+  // login.html lost its <form>, all four inputs and the submit button, so the
+  // app's entry page painted an empty card until hydration and rendered nothing
+  // at all without JS. This effect is client-only anyway, so window.location is
+  // both sufficient and free of that cost, and it needs no Suspense boundary.
   useEffect(() => {
-    const fromUrl = searchParams.get('org');
-    if (fromUrl) {
-      setOrganization(fromUrl);
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('org')) {
+      setOrganization(params.get('org') ?? '');
     } else if (rememberedOrganization) {
       setOrganization(rememberedOrganization);
     }
-  }, [searchParams, rememberedOrganization]);
+  }, [rememberedOrganization]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,15 +66,14 @@ export function LoginForm() {
             // Save auth state
             setAuth(data.token, data.user);
 
-            // Remember the slug the server actually resolved, not the raw
-            // input. Under the single-org grace the field can be left blank and
-            // the server still returns the organization — persisting its slug
-            // means the field is pre-filled and correct from the next login on,
-            // BEFORE a second tenant makes it mandatory.
+            // ONLY ever persist the slug the server resolved — never the raw
+            // input. A typed slug that the server did not confirm has no
+            // business being remembered: on a pre-tenancy backend the field is
+            // ignored entirely, so a typo would still "succeed", get stored,
+            // and then start failing with an opaque 401 the day tenancy flips.
+            // No fallback branch on purpose.
             if (data.organization?.slug) {
               setRememberedOrganization(data.organization.slug);
-            } else if (organization) {
-              setRememberedOrganization(organization);
             }
 
             // Handle Remember Me
@@ -100,16 +109,29 @@ export function LoginForm() {
       {/* Organization slug. Optional while one organization exists (the server
           infers it); required as soon as a second is provisioned. */}
       <div>
+        <label
+          htmlFor="organization"
+          className="block text-sm text-gray-600 mb-1"
+        >
+          Organization <span className="text-gray-400">(optional)</span>
+        </label>
         <input
+          id="organization"
+          name="organization"
           type="text"
-          placeholder="Organization (optional)"
+          placeholder="e.g. acme"
           value={organization}
           onChange={(e) => setOrganization(e.target.value)}
           disabled={isPending}
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
-          autoComplete="organization"
+          /* NOT autoComplete="organization": that token means the user's
+             COMPANY NAME, so Chrome and password managers would offer
+             "Ropacal Waste Management LLC" for a field that needs the slug
+             "ropacal" — and autofill fires onChange, so the wrong value would
+             be submitted and then remembered. */
+          autoComplete="off"
           className={inputStyles()}
         />
       </div>

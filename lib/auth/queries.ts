@@ -33,9 +33,18 @@ export function useLogin() {
         // reintroduce exactly that.
         if (response.status === 400 || response.status === 403) {
           const body = await response.json().catch(() => null);
+          // Only assert an organization problem when the server actually said
+          // so. The backend's malformed-body 400 is text/plain ("Invalid
+          // request body"), so json() rejects and body is null — blaming the
+          // organization field there would send the user chasing the wrong
+          // thing.
+          if (body?.error) {
+            throw new Error(body.error);
+          }
           throw new Error(
-            body?.error ||
-              'Your organization could not be determined. Check the organization field.'
+            response.status === 403
+              ? 'Your organization is not active. Contact your administrator.'
+              : 'The server rejected the request. Please try again.'
           );
         }
 

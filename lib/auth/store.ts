@@ -43,7 +43,21 @@ export const useAuthStore = create<AuthState>()(
       clearAuth: () => {
         // Clear cookie
         document.cookie = 'binly-auth-token=; path=/; max-age=0';
-        set({ token: null, user: null, isAuthenticated: false });
+        // rememberedOrganization is cleared too. Leaving it behind strands the
+        // next person on this browser: they get the PREVIOUS user's slug
+        // pre-filled, the backend's users lookup is
+        // (organization_id, email) so it misses, and the response is the same
+        // opaque 401 it returns for a wrong password. Correct credentials,
+        // "invalid email or password", no way to discover why. Shared work
+        // devices make that a routine occurrence, not an edge case.
+        // rememberedEmail is deliberately NOT cleared — it is the existing
+        // "Remember Me" behaviour and is explicitly opt-in.
+        set({
+          token: null,
+          user: null,
+          isAuthenticated: false,
+          rememberedOrganization: null,
+        });
       },
 
       setRememberedEmail: (email) =>
