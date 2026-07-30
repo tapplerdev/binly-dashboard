@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Building2 } from 'lucide-react';
+import { Dropdown } from '@/components/ui/dropdown';
 import { apiFetch } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/auth/store';
 import type { Organization } from '@/lib/auth/types';
@@ -62,6 +64,7 @@ export function PlatformOrgSwitcher() {
 
   const onSwitch = (slug: string) => {
     const next = platformOrgs.find((o) => o.slug === slug) ?? null;
+    if (!next || next.slug === actingOrg?.slug) return;
     setActingOrg(next);
 
     // Clearing the cache is NOT enough on its own. queryClient.clear() removes
@@ -78,37 +81,43 @@ export function PlatformOrgSwitcher() {
     window.location.assign('/');
   };
 
+  const options = platformOrgs.map((o: Organization) => ({
+    value: o.slug,
+    label: o.name,
+    // ActAsOrg 403s every request for a non-active organization, and a 403 does
+    // not trigger the logout path — so selecting one would just render an empty
+    // dashboard under a banner promising full access.
+    disabled: o.status !== undefined && o.status !== 'active',
+    hint: o.status && o.status !== 'active' ? `· ${o.status}` : undefined,
+  }));
+
+  const placeholder = loading
+    ? 'Loading…'
+    : options.length === 0
+    ? 'No organizations available'
+    : 'Select an organization…';
+
   return (
     <div className="flex items-center gap-3">
-      <span className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-        Binly Operator
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-100">
+        <Building2 className="h-4 w-4 text-amber-700" />
       </span>
-      <select
-        aria-label="Act as organization"
+
+      <span className="text-xs font-semibold uppercase tracking-wider text-gray-600">
+        Organization
+      </span>
+
+      <Dropdown
         value={actingOrg?.slug ?? ''}
-        onChange={(e) => onSwitch(e.target.value)}
-        disabled={loading}
-        className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 disabled:opacity-50"
-      >
-        <option value="">
-          {loading ? 'Loading organizations…' : 'Select an organization…'}
-        </option>
-        {platformOrgs.map((o: Organization) => (
-          <option
-            key={o.id}
-            value={o.slug}
-            // ActAsOrg 403s every request for a non-active organization, and a
-            // 403 does not trigger the logout path — so selecting one just
-            // renders an empty dashboard under a banner promising full access.
-            disabled={o.status !== undefined && o.status !== 'active'}
-          >
-            {o.name}
-            {o.status && o.status !== 'active' ? ` (${o.status} — unavailable)` : ''}
-          </option>
-        ))}
-      </select>
+        options={options}
+        onChange={onSwitch}
+        placeholder={placeholder}
+        disabled={loading || options.length === 0}
+        triggerClassName="min-w-[220px]"
+      />
+
       {platformEmail && (
-        <span className="hidden text-xs text-gray-500 md:inline">{platformEmail}</span>
+        <span className="ml-auto hidden text-xs text-gray-500 md:inline">{platformEmail}</span>
       )}
     </div>
   );

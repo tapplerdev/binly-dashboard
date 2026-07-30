@@ -7,17 +7,37 @@ import { cn } from '@/lib/utils';
 interface DropdownOption {
   value: string;
   label: string;
+  /** Renders the row muted and unselectable. */
+  disabled?: boolean;
+  /** Muted text after the label — a status, a count, a hint. */
+  hint?: string;
 }
 
 interface DropdownProps {
-  label: string;
+  /** Inline prefix inside the trigger ("Status:"). Omit when an external label already names the field. */
+  label?: string;
   value: string;
   options: DropdownOption[];
   onChange: (value: string) => void;
   className?: string;
+  /** Trigger text when nothing is selected. */
+  placeholder?: string;
+  /** Disables the whole control. */
+  disabled?: boolean;
+  /** Extra classes for the trigger button — width, in practice. */
+  triggerClassName?: string;
 }
 
-export function Dropdown({ label, value, options, onChange, className }: DropdownProps) {
+export function Dropdown({
+  label,
+  value,
+  options,
+  onChange,
+  className,
+  placeholder = 'Select...',
+  disabled = false,
+  triggerClassName,
+}: DropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -50,6 +70,7 @@ export function Dropdown({ label, value, options, onChange, className }: Dropdow
     <div className={cn('relative', className)} ref={dropdownRef}>
       <button
         type="button"
+        disabled={disabled}
         onClick={() => {
           if (isOpen) {
             handleCloseDropdown();
@@ -57,10 +78,16 @@ export function Dropdown({ label, value, options, onChange, className }: Dropdow
             setIsOpen(true);
           }
         }}
-        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700 min-w-[140px]"
+        className={cn(
+          'flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg transition-colors text-sm font-medium text-gray-700 min-w-[140px]',
+          disabled ? 'cursor-not-allowed opacity-60' : 'hover:bg-gray-50',
+          triggerClassName
+        )}
       >
         {label && <span className="text-gray-500">{label}:</span>}
-        <span className="text-gray-900">{selectedOption?.label || 'Select...'}</span>
+        <span className={cn(selectedOption ? 'text-gray-900' : 'text-gray-500')}>
+          {selectedOption?.label || placeholder}
+        </span>
         <ChevronDown
           className={cn(
             'w-4 h-4 text-gray-400 transition-transform ml-auto',
@@ -80,7 +107,12 @@ export function Dropdown({ label, value, options, onChange, className }: Dropdow
             <button
               key={option.value}
               type="button"
+              disabled={option.disabled}
               onClick={() => {
+                // Guarded as well as disabled: a disabled row must never fire
+                // onChange, and callers use it for choices that would break the
+                // page if selected.
+                if (option.disabled) return;
                 onChange(option.value);
                 handleCloseDropdown();
               }}
@@ -88,12 +120,17 @@ export function Dropdown({ label, value, options, onChange, className }: Dropdow
                 'w-full px-4 py-2.5 text-left text-sm transition-colors',
                 index === 0 && 'rounded-t-lg',
                 index === options.length - 1 && 'rounded-b-lg',
-                option.value === value
+                option.disabled
+                  ? 'cursor-not-allowed text-gray-400'
+                  : option.value === value
                   ? 'bg-blue-50 text-primary font-semibold'
                   : 'text-gray-700 hover:bg-gray-50'
               )}
             >
               {option.label}
+              {option.hint && (
+                <span className="ml-1.5 text-xs font-normal text-gray-400">{option.hint}</span>
+              )}
             </button>
           ))}
         </div>

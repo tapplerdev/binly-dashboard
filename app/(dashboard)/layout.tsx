@@ -45,8 +45,11 @@ export default function DashboardLayout({
             {/* Top Navigation Bar */}
             <TopNavBar onOpenAIAssistant={() => setIsAIDrawerOpen(true)} />
 
+            {/* White, not amber. The banner above is the warning; tinting this
+                row the same colour made two stacked alarm bars and diluted the
+                one that matters. This is a control, so it reads as chrome. */}
             {isPlatform && (
-              <div className="border-b border-amber-200 bg-amber-50 px-4 py-2">
+              <div className="border-b border-gray-200 bg-white px-4 py-2.5">
                 <PlatformOrgSwitcher />
               </div>
             )}
