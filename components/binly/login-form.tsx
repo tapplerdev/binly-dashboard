@@ -17,6 +17,7 @@ export function LoginForm() {
     rememberedEmail,
     setRememberedOrganization,
     rememberedOrganization,
+    setPlatformAuth,
   } = useAuthStore();
 
   const [email, setEmail] = useState('');
@@ -62,6 +63,15 @@ export function LoginForm() {
       { email, password, organization: organization || undefined },
       {
         onSuccess: (data) => {
+          // Cross-tenant operator: no user, no organization, and the org is
+          // chosen afterwards from the switcher rather than typed here.
+          if (data.platform && data.token) {
+            setPlatformAuth(data.token, data.email ?? email);
+            if (rememberMe) setRememberedEmail(email);
+            router.push('/');
+            return;
+          }
+
           if (data.token && data.user) {
             // Save auth state, including the organization — the per-tenant
             // Centrifugo channel keys on its UUID.

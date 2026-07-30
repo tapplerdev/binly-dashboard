@@ -107,6 +107,32 @@ function isBackendUrl(input: string | URL): boolean {
  * Drop-in replacement: same arguments, returns the same Response.
  * The token is only ever attached to backend origins (see BACKEND_ORIGINS).
  */
+/**
+ * Redirect a tenant API call onto the platform act-as surface when the current
+ * session is a cross-tenant operator one.
+ *
+ * This is the ENTIRE client-side cost of operator mode, and it works because
+ * apiFetch is a genuine chokepoint: every file that talks to the backend goes
+ * through it. The only raw fetch to our own API is the login call itself, which
+ * is pre-auth and must stay raw.
+ *
+ * A platform token carries no org_id and is REJECTED by every /api route, so
+ * without this rewrite an operator's dashboard would 401 everywhere rather than
+ * degrade. `/api/platform/*` calls are left alone — they are already platform
+ * routes and must not be rewritten into `/api/platform/act/platform/...`.
+ */
+function platformRewrite(input: string | URL, headers: Headers): string | URL {
+  const { isPlatform, actingOrg } = useAuthStore.getState();
+  if (!isPlatform || !actingOrg) return input;
+
+  const asString = typeof input === 'string' ? input : input.toString();
+  if (asString.includes('/api/platform/')) return input;
+  if (!asString.includes('/api/')) return input;
+
+  headers.set('X-Act-As-Org', actingOrg.slug);
+  return asString.replace('/api/', '/api/platform/act/');
+}
+
 export async function apiFetch(
   input: string | URL,
   init: RequestInit = {}
@@ -120,7 +146,7 @@ export async function apiFetch(
     }
   }
 
-  const response = await fetch(input, { ...init, headers });
+  const response = await fetch(platformRewrite(input, headers), { ...init, headers });
 
   if (response.status === 401) {
     handleUnauthorized();

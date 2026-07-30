@@ -22,12 +22,28 @@ interface AuthState {
   rememberedOrganization: string | null;
   isAuthenticated: boolean;
 
+  /**
+   * PLATFORM (cross-tenant operator) session. When true the token is a platform
+   * token: it carries no org_id and is rejected by every tenant route, so every
+   * API call must be redirected through /api/platform/act with an
+   * X-Act-As-Org header. apiFetch does that automatically — see lib/api/client.ts.
+   */
+  isPlatform: boolean;
+  platformEmail: string | null;
+  /** Every organization this operator can act on. */
+  platformOrgs: Organization[];
+  /** The organization currently being acted on. Null until one is chosen. */
+  actingOrg: Organization | null;
+
   setAuth: (token: string, user: User, organization?: Organization | null) => void;
   clearAuth: () => void;
   setRememberedEmail: (email: string | null) => void;
   setRememberedOrganization: (slug: string | null) => void;
   /** Backfill the organization for a session that predates it being stored. */
   setOrganization: (organization: Organization | null) => void;
+  setPlatformAuth: (token: string, email: string) => void;
+  setPlatformOrgs: (orgs: Organization[]) => void;
+  setActingOrg: (org: Organization | null) => void;
 }
 
 /**
@@ -43,6 +59,10 @@ export const useAuthStore = create<AuthState>()(
       rememberedEmail: null,
       rememberedOrganization: null,
       isAuthenticated: false,
+      isPlatform: false,
+      platformEmail: null,
+      platformOrgs: [],
+      actingOrg: null,
 
       setAuth: (token, user, organization = null) => {
         // Set cookie for middleware to read
@@ -68,6 +88,10 @@ export const useAuthStore = create<AuthState>()(
           organization: null,
           isAuthenticated: false,
           rememberedOrganization: null,
+          isPlatform: false,
+          platformEmail: null,
+          platformOrgs: [],
+          actingOrg: null,
         });
       },
 
@@ -78,6 +102,24 @@ export const useAuthStore = create<AuthState>()(
         set({ rememberedOrganization: slug }),
 
       setOrganization: (organization) => set({ organization }),
+
+      setPlatformAuth: (token, email) => {
+        document.cookie = `binly-auth-token=${token}; path=/; max-age=${60 * 60}`; // 1h, matches the platform token TTL
+        set({
+          token,
+          isAuthenticated: true,
+          isPlatform: true,
+          platformEmail: email,
+          // An operator is not a tenant user and belongs to no organization.
+          // Both stay null so nothing downstream mistakes them for one.
+          user: null,
+          organization: null,
+          actingOrg: null,
+        });
+      },
+
+      setPlatformOrgs: (orgs) => set({ platformOrgs: orgs }),
+      setActingOrg: (org) => set({ actingOrg: org }),
     }),
     {
       name: 'binly-auth-storage',

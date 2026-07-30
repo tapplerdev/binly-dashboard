@@ -9,13 +9,17 @@ import { AIAssistantDrawer } from '@/components/binly/ai-assistant-drawer';
 import { CentrifugoProvider } from '@/lib/providers/centrifugo-provider';
 import { GlobalCentrifugoSync } from '@/components/binly/global-centrifugo-sync';
 import { useAuthStore } from '@/lib/auth/store';
+import {
+  PlatformActingBanner,
+  PlatformOrgSwitcher,
+} from '@/components/binly/platform-org-switcher';
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { token } = useAuthStore();
+  const { token, isPlatform } = useAuthStore();
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
   const [isAIDrawerClosing, setIsAIDrawerClosing] = useState(false);
 
@@ -34,8 +38,18 @@ export default function DashboardLayout({
         <div className="flex h-screen overflow-hidden bg-gray-100 relative">
           <Sidebar />
           <div className="flex-1 flex flex-col overflow-hidden relative">
+            {/* Cross-tenant operator chrome. Both render null for a normal
+                tenant session, so mounting them unconditionally is safe. */}
+            <PlatformActingBanner />
+
             {/* Top Navigation Bar */}
             <TopNavBar onOpenAIAssistant={() => setIsAIDrawerOpen(true)} />
+
+            {isPlatform && (
+              <div className="border-b border-amber-200 bg-amber-50 px-4 py-2">
+                <PlatformOrgSwitcher />
+              </div>
+            )}
 
             {/* Main Content */}
             <main className="flex-1 overflow-y-auto relative">

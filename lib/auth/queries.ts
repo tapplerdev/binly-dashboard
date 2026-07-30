@@ -59,6 +59,15 @@ export function useLogin() {
           throw new Error('Invalid email or password');
         }
 
+        // A PLATFORM (cross-tenant operator) session carries no user and no
+        // organization — an operator is neither — so it must be checked before
+        // the tenant shape is demanded, or a successful operator login would be
+        // rejected here as malformed.
+        if (data.platform) {
+          if (!data.token) throw new Error('Invalid response from server');
+          return data;
+        }
+
         if (!data.token || !data.user) {
           throw new Error('Invalid response from server');
         }
