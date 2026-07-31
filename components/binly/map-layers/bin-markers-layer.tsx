@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useCallback, useMemo } from 'react';
+import { markerLabelCss } from '@/lib/map/marker-label';
 import { useMap } from '@vis.gl/react-google-maps';
 import { useBins } from '@/lib/hooks/use-bins';
 import { Bin, isMappableBin, MappableBin, getBinMarkerColor } from '@/lib/types/bin';
@@ -94,7 +95,8 @@ export function BinMarkersLayer({
         background:${bgColor};border:2px solid #fff;
         box-shadow:0 2px 6px rgba(0,0,0,0.4);
         display:flex;align-items:center;justify-content:center;
-        color:#fff;font-size:${fontSize}px;font-weight:700;
+        color:#fff;
+        ${markerLabelCss(px, String(bin.bin_number), fontSize)};
         font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
         cursor:pointer;transition:transform .15s;
       `;

@@ -14,7 +14,7 @@ import { sendChatMessage, LocationRecommendation } from '@/lib/api/chat';
 import { apiFetch } from '@/lib/api/client';
 import { type TargetArea } from '@/components/ui/area-autocomplete';
 import { TargetAreaOverlay } from '@/components/binly/target-area-overlay';
-import { AiRecommendPanel } from '@/components/binly/ai-recommend-panel';
+import { AiRecommendPanel, DEFAULT_RADIUS_MILES } from '@/components/binly/ai-recommend-panel';
 import { PlacementReviewBasket } from '@/components/binly/placement-review-basket';
 import { DataAttribution } from '@/components/binly/data-attribution';
 import type { QueuedLocation } from '@/lib/types/placement';
@@ -147,6 +147,11 @@ export function CreatePotentialLocationDialog({
   const [activeTab, setActiveTab] = useState<'manual' | 'ai'>('manual');
   // Core+halo: also surface profile-matching spots just outside the area.
   const [includeNearby, setIncludeNearby] = useState(true);
+  // Search radius for untargeted expansion sweeps. Deliberately PER-SEARCH: it
+  // is plain useState, so it resets to the default every time the dialog opens
+  // rather than persisting per organization. "How far am I willing to drive"
+  // changes with the errand, not with the tenant.
+  const [aiRadiusMiles, setAiRadiusMiles] = useState(DEFAULT_RADIUS_MILES);
 
   // Ref for coordinate debounce timer
   const coordinateTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -182,6 +187,10 @@ export function CreatePotentialLocationDialog({
       setAiArea(null);
       setActiveTab('manual');
       setIncludeNearby(true);
+      // Per-search, so it must actually reset. The dialog stays mounted between
+      // opens, so useState's initial value fires only once — without this line
+      // a radius set last time would silently apply to the next search.
+      setAiRadiusMiles(DEFAULT_RADIUS_MILES);
       // Clear debounce timer if modal closes
       if (coordinateTimerRef.current) {
         clearTimeout(coordinateTimerRef.current);
@@ -584,7 +593,17 @@ export function CreatePotentialLocationDialog({
         : `Recommend ${count} locations for new bins${modeStr}`;
 
       const areaShort = aiArea ? aiArea.label.split(',')[0].trim() : undefined;
-      const result = await sendChatMessage(prompt, undefined, aiArea, aiArea ? includeNearby : undefined);
+      // The radius only governs the EXPANSION path, so send it only when that
+      // path can run: no pinned area, and not infill. Sending it otherwise
+      // would put a number in the logs that changed nothing.
+      const sendRadius = !aiArea && aiMode !== 'infill' ? aiRadiusMiles : undefined;
+      const result = await sendChatMessage(
+        prompt,
+        undefined,
+        aiArea,
+        aiArea ? includeNearby : undefined,
+        sendRadius
+      );
 
       if (result.recommendations?.recommendations?.length) {
         const newLocations: QueuedLocation[] = result.recommendations.recommendations.map((rec: LocationRecommendation) => ({
@@ -1063,6 +1082,8 @@ export function CreatePotentialLocationDialog({
                   areaBinCount={aiArea ? binsInArea(bins, aiArea) : null}
                   includeNearby={includeNearby}
                   onIncludeNearbyChange={setIncludeNearby}
+                  radiusMiles={aiRadiusMiles}
+                  onRadiusChange={setAiRadiusMiles}
                   onGenerate={handleAiSuggest}
                   loading={aiLoading}
                   error={aiError}

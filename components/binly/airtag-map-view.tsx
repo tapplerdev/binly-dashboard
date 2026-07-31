@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { markerLabelCss } from '@/lib/map/marker-label';
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps';
 import { Loader2, Radio, AlertCircle, BatteryWarning, BatteryFull, Search, RefreshCw, ChevronDown, HelpCircle } from 'lucide-react';
 import { useAirTags, useSyncAirTags } from '@/lib/hooks/use-airtags';
@@ -226,7 +227,8 @@ function AirTagMarkerLayer({
         background:${AIRTAG_MARKER_COLOR};border:2px solid #fff;
         box-shadow:0 2px 6px rgba(0,0,0,0.4);
         display:flex;align-items:center;justify-content:center;
-        color:#fff;font-size:11px;font-weight:700;
+        color:#fff;
+        ${markerLabelCss(32, String(loc.bin_number), 11)};
         font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
         cursor:pointer;transition:transform .15s;
         position:relative;

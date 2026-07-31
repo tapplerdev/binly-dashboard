@@ -27,8 +27,15 @@ import { BinDetailDrawer } from './bin-detail-drawer';
 import { PotentialLocationDetailsDrawer } from './potential-location-details-drawer';
 import { MapSearchBar } from './map-search-bar';
 import { PotentialLocationPin } from '@/components/ui/potential-location-pin';
+import { useMapDefaultCenter } from '@/lib/hooks/use-map-center';
+import { markerLabelCss } from '@/lib/map/marker-label';
+import { RecenterOnWarehouse } from '@/components/binly/map-layers';
 
 // Default map center (San Jose, CA area - center of bin operations)
+// Fallback only. The real default is the organization's warehouse — see
+// useMapDefaultCenter. This constant used to BE the default, hardcoded to San
+// Jose in 24 files, so a Toronto operator opened the Live Map over Silicon
+// Valley.
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 const DEFAULT_ZOOM = 11;
 
@@ -149,17 +156,19 @@ function BinClusterLayer({
       if (prevMarkers.has(bin.id)) return; // already tracked
 
       const bgColor = getBinMarkerColor(bin.fill_percentage, bin.status as any);
+      const label = String(bin.bin_number);
       const el = document.createElement('div');
       el.style.cssText = `
         width:32px;height:32px;border-radius:50%;
         background:${bgColor};border:2px solid #fff;
         box-shadow:0 2px 6px rgba(0,0,0,0.4);
         display:flex;align-items:center;justify-content:center;
-        color:#fff;font-size:11px;font-weight:700;
+        color:#fff;
+        ${markerLabelCss(32, label, 11)};
         font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
         cursor:pointer;transition:transform .15s;
       `;
-      el.textContent = String(bin.bin_number);
+      el.textContent = label;
       el.title = `Bin #${bin.bin_number} — ${bin.status === 'missing' ? 'MISSING' : `${bin.fill_percentage ?? 0}%`}`;
       el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.15)'; });
       el.addEventListener('mouseleave', () => { el.style.transform = ''; });
@@ -193,6 +202,11 @@ function BinClusterLayer({
 }
 
 export function LiveMapView() {
+  // Opens on this organization's warehouse. Covers the warm-cache case, where
+  // the warehouse is already known at mount; RecenterOnWarehouse below covers
+  // the cold one, since defaultCenter is only read once.
+  const { center: orgCenter } = useMapDefaultCenter();
+
   const router = useRouter();
   const { data: warehouse } = useWarehouseLocation();
 
@@ -783,7 +797,7 @@ export function LiveMapView() {
       <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''} libraries={['marker']}>
         <Map
           mapId="binly-live-map"
-          defaultCenter={DEFAULT_CENTER}
+          defaultCenter={orgCenter}
           defaultZoom={DEFAULT_ZOOM}
           minZoom={3}
           maxZoom={20}
@@ -801,6 +815,10 @@ export function LiveMapView() {
           }}
           style={{ width: '100%', height: '100%' }}
         >
+        {/* Opens the map on the warehouse when it resolves after mount.
+            Fires once, so a user who has panned away stays where they are. */}
+        <RecenterOnWarehouse />
+
         {/* Map controller for search navigation */}
         <MapController
           targetLocation={targetLocation}

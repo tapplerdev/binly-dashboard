@@ -28,6 +28,9 @@ export interface AiRecommendPanelProps {
   areaBinCount: number | null;
   includeNearby: boolean; // "Include nearby matches" toggle
   onIncludeNearbyChange: (b: boolean) => void;
+  /** How far from the warehouse an expansion city may sit. Per-search, resets each open. */
+  radiusMiles: number;
+  onRadiusChange: (miles: number) => void;
   onGenerate: () => void; // parent runs the API call
   loading: boolean;
   error: string; // '' when no error
@@ -39,6 +42,19 @@ interface ModeOption {
   description: string;
   icon: LucideIcon;
 }
+
+// Slider ends, mirroring minExpansionRadiusMiles / maxExpansionRadiusMiles in
+// the Go handler. Below ~5 mi a search returns the warehouse's own city and
+// nothing else; above ~150 the shortlist fills with places no truck will reach
+// and every extra mile costs paid API calls. The server clamps to the same band
+// regardless of what arrives.
+const RADIUS_MIN = 5;
+const RADIUS_MAX = 150;
+
+/** Matches expansionRadiusMiles in the Go handler — what a caller gets when the
+ *  slider is untouched. Exported so the dialog seeds its state from one place
+ *  and the two cannot drift. */
+export const DEFAULT_RADIUS_MILES = 75;
 
 const MODE_OPTIONS: ModeOption[] = [
   {
@@ -77,6 +93,8 @@ export function AiRecommendPanel({
   areaBinCount,
   includeNearby,
   onIncludeNearbyChange,
+  radiusMiles,
+  onRadiusChange,
   onGenerate,
   loading,
   error,
@@ -171,6 +189,43 @@ export function AiRecommendPanel({
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* 3a-ii. Search radius — how far from the warehouse to look.
+             Shown only when it CHANGES something: with no target area (an
+             untargeted sweep) and not in infill mode, which searches around
+             existing bins and ignores this entirely. A control that silently
+             does nothing is worse than no control. */}
+      {!area && mode !== 'infill' && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-xs font-medium text-gray-600">Search radius</span>
+            <span className="text-xs font-semibold tabular-nums text-gray-900">
+              {radiusMiles} mi from the warehouse
+            </span>
+          </div>
+          <input
+            type="range"
+            min={RADIUS_MIN}
+            max={RADIUS_MAX}
+            step={5}
+            value={radiusMiles}
+            onChange={(e) => onRadiusChange(Number(e.target.value))}
+            aria-label="Search radius in miles from the warehouse"
+            className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-gray-200 accent-primary"
+          />
+          <div className="flex justify-between text-[11px] text-gray-400">
+            <span>{RADIUS_MIN} mi</span>
+            <span>{RADIUS_MAX} mi</span>
+          </div>
+          <p className="text-[11px] leading-relaxed text-gray-400">
+            {radiusMiles <= 30
+              ? 'Tight — cities a truck can service and be back the same day.'
+              : radiusMiles <= 75
+                ? 'Balanced — the usual working range for a metro yard.'
+                : 'Wide — expansion territory, with drives to match.'}
+          </p>
         </div>
       )}
 

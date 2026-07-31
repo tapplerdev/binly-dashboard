@@ -46,6 +46,7 @@ export async function sendChatMessage(
   conversationId?: string,
   targetArea?: ChatTargetArea | null,
   includeNearby?: boolean,
+  expansionRadiusMiles?: number,
 ): Promise<ChatResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 240000); // 4 minute timeout
@@ -59,6 +60,12 @@ export async function sendChatMessage(
         conversation_id: conversationId,
         ...(targetArea ? { target_area: targetArea } : {}),
         ...(includeNearby !== undefined ? { include_nearby: includeNearby } : {}),
+        // The distance slider. Sent as a top-level field so the backend injects
+        // it into the tool call deterministically — routed through the prose
+        // instead, the model is free to ignore or "round" it.
+        ...(expansionRadiusMiles !== undefined
+          ? { expansion_radius_miles: expansionRadiusMiles }
+          : {}),
       }),
       signal: controller.signal,
     });
