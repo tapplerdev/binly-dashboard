@@ -6,6 +6,7 @@ import { Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import {
   ZoneMarkersLayer,
   WarehouseMarkerLayer,
+  RecenterOnWarehouse,
 } from '@/components/binly/map-layers';
 import { useModalClose } from '@/components/binly/modal-wrapper';
 import { RouteSelectionMap } from '@/components/binly/route-selection-map';
@@ -587,6 +588,8 @@ export function ShiftComposer({ onClose, defaultDriverId, scheduledDate }: Shift
                   preview={previewValid ? preview : null}
                   warehouse={warehouse ?? null}
                 />
+                {/* Opens on this organization's warehouse, not a hardcoded city. */}
+                <RecenterOnWarehouse />
               </Map>
 
               {/* Stat bar overlay */}

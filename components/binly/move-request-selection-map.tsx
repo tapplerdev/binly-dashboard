@@ -9,6 +9,7 @@ import { NoGoZonePin } from '@/components/ui/no-go-zone-pin';
 import { X, Search, Filter, MapPin, MapIcon, List } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { RecenterOnWarehouse } from '@/components/binly/map-layers';
 
 // Default map center (San Jose, CA area)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -398,6 +399,8 @@ export function MoveRequestSelectionMap({ onClose, onConfirm, moveRequests, init
                       </div>
                     </AdvancedMarker>
                   ))}
+                  {/* Opens on this organization's warehouse, not a hardcoded city. */}
+                  <RecenterOnWarehouse />
                 </Map>
               </APIProvider>
             )}

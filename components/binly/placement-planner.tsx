@@ -9,6 +9,7 @@ import { CityOpportunity } from '@/lib/api/placement-opportunities';
 import { sendChatMessage, LocationRecommendation } from '@/lib/api/chat';
 import { useBins } from '@/lib/hooks/use-bins';
 import { cn } from '@/lib/utils';
+import { RecenterOnWarehouse } from '@/components/binly/map-layers';
 
 const DEFAULT_CENTER = { lat: 37.5, lng: -122.05 };
 const DEFAULT_ZOOM = 10;
@@ -535,6 +536,8 @@ export function PlacementPlanner({ onClose }: { onClose: () => void }) {
                   </div>
                 </AdvancedMarker>
               ))}
+            {/* Opens on this organization's warehouse, not a hardcoded city. */}
+            <RecenterOnWarehouse />
           </GoogleMap>
         </APIProvider>
       </div>

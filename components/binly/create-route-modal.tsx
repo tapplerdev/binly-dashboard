@@ -9,6 +9,7 @@ import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { LassoSelect } from './lasso-select';
 import { apiFetch } from '@/lib/api/client';
+import { RecenterOnWarehouse } from '@/components/binly/map-layers';
 
 interface CreateRouteModalProps {
   onClose: () => void;
@@ -1124,6 +1125,8 @@ export function CreateRouteModal({ onClose, onSubmit, editRoute, existingRoutes:
                   routeStats={currentRouteStats}
                   onStatsChange={setCurrentRouteStats}
                 />
+                {/* Opens on this organization's warehouse, not a hardcoded city. */}
+                <RecenterOnWarehouse />
               </Map>
             </APIProvider>
           </div>

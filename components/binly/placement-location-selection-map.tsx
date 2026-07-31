@@ -7,7 +7,7 @@ import { X, Search, MapPin, Filter, MapIcon, List } from 'lucide-react';
 import { NoGoZonePin } from '@/components/ui/no-go-zone-pin';
 import { PotentialLocationPin } from '@/components/ui/potential-location-pin';
 import { useNoGoZones } from '@/lib/hooks/use-zones';
-import { BinMarkersLayer, WarehouseMarkerLayer } from '@/components/binly/map-layers';
+import { BinMarkersLayer, WarehouseMarkerLayer, RecenterOnWarehouse} from '@/components/binly/map-layers';
 
 // Default map center (San Jose, CA area)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -328,6 +328,8 @@ export function PlacementLocationSelectionMap({ onClose, onConfirm, potentialLoc
                 {/* Shared context layers */}
                 <BinMarkersLayer size="sm" showLabels={false} zIndex={1} />
                 <WarehouseMarkerLayer />
+                {/* Opens on this organization's warehouse, not a hardcoded city. */}
+                <RecenterOnWarehouse />
               </Map>
             </APIProvider>
 

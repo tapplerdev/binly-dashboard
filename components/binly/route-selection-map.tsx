@@ -10,6 +10,7 @@ import { getBins } from '@/lib/api/bins';
 import { X, MapPin, Calendar, Loader2, Search, ChevronDown, Package, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
+import { RecenterOnWarehouse } from '@/components/binly/map-layers';
 
 // Default map center (San Jose, CA area)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -265,6 +266,8 @@ export function RouteSelectionMap({ onClose, onConfirm }: RouteSelectionMapProps
                       </div>
                     </AdvancedMarker>
                   )}
+                  {/* Opens on this organization's warehouse, not a hardcoded city. */}
+                  <RecenterOnWarehouse />
                 </GoogleMap>
               </APIProvider>
 

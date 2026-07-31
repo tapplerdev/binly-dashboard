@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { ActiveDriver } from '@/lib/types/active-driver';
 import { Loader2, MapPin } from 'lucide-react';
+import { RecenterOnWarehouse } from '@/components/binly/map-layers';
 
 // San Jose warehouse location (default center)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -188,6 +189,8 @@ export function LiveOpsMap({
             </div>
           </div>
         )}
+        {/* Opens on this organization's warehouse, not a hardcoded city. */}
+        <RecenterOnWarehouse />
       </Map>
     </APIProvider>
   );

@@ -24,7 +24,7 @@ import { useNoGoZones, useNearbyIncidents } from '@/lib/hooks/use-zones';
 import { formatIncidentType } from '@/lib/types/zone';
 import { Bin, isMappableBin, getBinMarkerColor } from '@/lib/types/bin';
 import { NoGoZonePin } from '@/components/ui/no-go-zone-pin';
-import { BinMarkersLayer, ZoneMarkersLayer, WarehouseMarkerLayer } from '@/components/binly/map-layers';
+import { BinMarkersLayer, ZoneMarkersLayer, WarehouseMarkerLayer, RecenterOnWarehouse} from '@/components/binly/map-layers';
 import { useModalClose } from '@/components/binly/modal-wrapper';
 import { MapMarkerPin } from '@/components/ui/map-marker-pin';
 
@@ -237,14 +237,64 @@ export function CreatePotentialLocationDialog({
   // Handle map click
   const handleMapClick = useCallback(
     (lat: number, lng: number) => {
-      // Click-to-place only fills the manual form. On the AI tab the map is for
-      // reviewing suggestions, so a click there shouldn't silently populate a
-      // hidden form that then gets created on submit.
-      if (activeTab !== 'manual') return;
-      setMarkerPosition({ lat, lng });
-      setMapCenter({ lat, lng });
       setHasInteractedWithMap(true);
-      reverseGeocode(lat, lng);
+
+      // The same gesture has to mean different things on the two tabs, because
+      // only one of them has a form on screen.
+      //
+      // MANUAL: fill the form, then the user reviews and presses "Add to
+      // basket". They get to edit the address before it counts.
+      //
+      // AI: the form isn't rendered, so a click goes STRAIGHT into the basket.
+      // That is deliberate rather than a shortcut — the basket is shared between
+      // both tabs and already has a "Manual" group, so a hand-placed pin has an
+      // obvious home next to what the AI proposed, and anything wrong is one
+      // click to remove. Blocking the click instead (the old behaviour) meant
+      // spotting a good corner while reviewing suggestions forced a tab switch
+      // to record it.
+      if (activeTab === 'manual') {
+        setMarkerPosition({ lat, lng });
+        setMapCenter({ lat, lng });
+        reverseGeocode(lat, lng);
+        return;
+      }
+
+      // Queue immediately with the coordinates, then fill the address in when
+      // the reverse geocode lands. The row appears at once — waiting on a
+      // network round-trip would make the map feel unresponsive, and the pick
+      // is already fully valid without a street name.
+      const id = crypto.randomUUID();
+      setLocationQueue((prev) => [
+        ...prev,
+        {
+          id,
+          source: 'manual',
+          street: 'Locating…',
+          city: '',
+          zip: '',
+          latitude: lat,
+          longitude: lng,
+          notes: 'Placed by hand on the map',
+        },
+      ]);
+      hereReverseGeocode(lat, lng)
+        .then((res) => {
+          if (!res) return;
+          setLocationQueue((prev) =>
+            prev.map((q) =>
+              q.id === id
+                ? { ...q, street: res.street || q.street, city: res.city, zip: res.zip }
+                : q
+            )
+          );
+        })
+        .catch(() => {
+          // Leave the placeholder. A failed lookup must not delete the user's
+          // pick — the coordinates are the part that matters.
+          setLocationQueue((prev) =>
+            prev.map((q) => (q.id === id ? { ...q, street: 'Dropped pin' } : q))
+          );
+        });
     },
     [reverseGeocode, activeTab]
   );
@@ -1178,6 +1228,8 @@ export function CreatePotentialLocationDialog({
                   </AdvancedMarker>
                 )}
 
+                {/* Opens on this organization's warehouse, not a hardcoded city. */}
+                <RecenterOnWarehouse />
               </GoogleMap>
             </APIProvider>
 
@@ -1209,34 +1261,24 @@ export function CreatePotentialLocationDialog({
               </div>
             )}
 
-            {/* Search Bar Overlay */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 w-full max-w-md px-4 z-10">
-              <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-2">
-                {/* OLD: Google Places Autocomplete (commented for rollback) */}
-                {/* <PlacesAutocomplete
-                  value={searchQuery}
-                  onChange={setSearchQuery}
-                  onPlaceSelect={handlePlaceSelect}
-                  placeholder="Search for an address..."
-                  className="border-0 focus:ring-0"
-                /> */}
-                {/* NEW: HERE Maps Autocomplete */}
-                <HerePlacesAutocomplete
-                  value={searchQuery}
-                  onChange={setSearchQuery}
-                  onPlaceSelect={handlePlaceSelect}
-                  placeholder="Search for an address..."
-                  className="border-0 focus:ring-0"
-                />
-              </div>
-            </div>
+            {/* The map search-bar overlay was REMOVED. It was the third way to do
+                one job in this modal: the Manual tab already has address
+                autocomplete in the form, and the AI tab has the Target-area
+                picker. All it uniquely offered was panning the map, which drag
+                and zoom already do. Its handlers (searchQuery/handlePlaceSelect)
+                still serve the form field. */}
 
-            {/* Instructions */}
+            {/* Instructions — worded per tab.
+                On the AI tab this used to read "Click anywhere on the map to
+                place a location" while the map showed ten AI pins, which reads
+                like a description of what just happened rather than an offer. */}
             {!hasInteractedWithMap && (
               <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-sm rounded-full shadow-lg border border-gray-200 px-4 py-2">
                 <p className="text-xs text-gray-700 font-medium flex items-center gap-2 whitespace-nowrap">
                   <MapPin className="w-3.5 h-3.5 text-orange-500" />
-                  Click anywhere on the map to place a location
+                  {activeTab === 'ai'
+                    ? 'Click the map to add one of your own'
+                    : 'Click anywhere on the map to place a location'}
                 </p>
               </div>
             )}

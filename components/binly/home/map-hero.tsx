@@ -8,6 +8,7 @@ import {
   BinMarkersLayer,
   WarehouseMarkerLayer,
   ZoneMarkersLayer,
+  RecenterOnWarehouse,
 } from '@/components/binly/map-layers';
 import { useBins } from '@/lib/hooks/use-bins';
 import { isMappableBin } from '@/lib/types/bin';
@@ -94,6 +95,8 @@ export function MapHero({ data, activeFilter, onBinSelect, onAssignMove }: MapHe
               )
           )}
           <AutoFit highlightIds={highlightIds} />
+          {/* Opens on this organization's warehouse, not a hardcoded city. */}
+          <RecenterOnWarehouse />
         </Map>
 
         {/* Live badge */}

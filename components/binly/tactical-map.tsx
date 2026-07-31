@@ -6,7 +6,7 @@ import { Map as MapIcon, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
 import { Map } from '@vis.gl/react-google-maps';
-import { BinMarkersLayer, ZoneMarkersLayer, WarehouseMarkerLayer } from '@/components/binly/map-layers';
+import { BinMarkersLayer, ZoneMarkersLayer, WarehouseMarkerLayer, RecenterOnWarehouse} from '@/components/binly/map-layers';
 
 // Default map center (San Jose, CA area)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -59,6 +59,8 @@ export function TacticalMap({ className }: TacticalMapProps) {
             {noGoZonesEnabled && <ZoneMarkersLayer />}
             {fillLevelsEnabled && <BinMarkersLayer />}
             <WarehouseMarkerLayer />
+            {/* Opens on this organization's warehouse, not a hardcoded city. */}
+            <RecenterOnWarehouse />
           </Map>
         )}
 

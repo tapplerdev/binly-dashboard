@@ -17,6 +17,7 @@ import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
 import { ActiveShiftWarningDialog } from './active-shift-warning-dialog';
 import { PotentialLocationPin } from '@/components/ui/potential-location-pin';
 import { MapMarkerPin } from '@/components/ui/map-marker-pin';
+import { RecenterOnWarehouse } from '@/components/binly/map-layers';
 
 // ─── Reason options by context ──────────────────────────────────────────────
 
@@ -1519,6 +1520,8 @@ export function EditBinDialog({ open, onOpenChange, bin }: EditBinDialogProps) {
                       </div>
                     </AdvancedMarker>
                   ))}
+                {/* Opens on this organization's warehouse, not a hardcoded city. */}
+                <RecenterOnWarehouse />
               </Map>
             </APIProvider>
 

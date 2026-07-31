@@ -7,6 +7,7 @@ import { X, Search, Lasso, AlertCircle, Save } from 'lucide-react';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { LassoSelect } from './lasso-select';
 import { useModalClose } from '@/components/binly/modal-wrapper';
+import { RecenterOnWarehouse } from '@/components/binly/map-layers';
 
 // Default map center (San Jose, CA)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -239,6 +240,8 @@ export function TemplateEditorModal({
                     </AdvancedMarker>
                   );
                 })}
+                {/* Opens on this organization's warehouse, not a hardcoded city. */}
+                <RecenterOnWarehouse />
               </Map>
             </APIProvider>
 

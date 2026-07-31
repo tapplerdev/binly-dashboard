@@ -83,6 +83,10 @@ export function useRecenterOnWarehouse(
     if (!enabled || done.current || !map || !ready) return;
     if (center === FALLBACK_CENTER) return; // nothing real to move to
     done.current = true;
-    map.panTo(center);
+    // setCenter, not panTo. This is "the camera should have opened here", not
+    // "move the user somewhere" — panTo animates, which reads as the map
+    // drifting on its own a beat after it appears. A jump is correct: it fixes a
+    // starting position, and the fallback was never a real location.
+    map.setCenter(center);
   }, [map, ready, center, enabled]);
 }

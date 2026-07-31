@@ -6,6 +6,7 @@ import { Route } from '@/lib/types/route';
 import { useBins } from '@/lib/hooks/use-bins';
 import { Bin, isMappableBin } from '@/lib/types/bin';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
+import { RecenterOnWarehouse } from '@/components/binly/map-layers';
 
 // Default map center (San Jose, CA area)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -232,6 +233,8 @@ export function RouteMapView({ route }: RouteMapViewProps) {
             </AdvancedMarker>
           );
         })}
+        {/* Opens on this organization's warehouse, not a hardcoded city. */}
+        <RecenterOnWarehouse />
       </Map>
     </APIProvider>
   );

@@ -7,6 +7,7 @@ import { Loader2, Radio, AlertCircle, BatteryWarning, BatteryFull, Search, Refre
 import { useAirTags, useSyncAirTags } from '@/lib/hooks/use-airtags';
 import type { AirTagLocation } from '@/lib/api/airtags';
 import { AirTagDetailDrawer } from './airtag-detail-drawer';
+import { RecenterOnWarehouse } from '@/components/binly/map-layers';
 
 // Default map center (San Jose, CA area - center of bin operations)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -563,6 +564,8 @@ export function AirTagMapView() {
             locations={filteredLocations}
             onMarkerClick={handleMarkerClick}
           />
+          {/* Opens on this organization's warehouse, not a hardcoded city. */}
+          <RecenterOnWarehouse />
         </Map>
       </APIProvider>
     </div>

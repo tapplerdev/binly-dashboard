@@ -16,6 +16,7 @@ import { SmartRoutesModal } from './smart-routes-modal';
 import { AIRouteOptimizerModal } from './ai-route-optimizer-modal';
 import { TemplateEditorModal } from './template-editor-modal';
 import { DeleteConfirmationModal } from './delete-confirmation-modal';
+import { RecenterOnWarehouse } from '@/components/binly/map-layers';
 
 // Default map center (San Jose, CA)
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
@@ -713,6 +714,8 @@ export function BinTemplateBuilder() {
                   </AdvancedMarker>
                 );
               })}
+              {/* Opens on this organization's warehouse, not a hardcoded city. */}
+              <RecenterOnWarehouse />
             </GoogleMap>
           </APIProvider>
         )}

@@ -14,6 +14,7 @@ import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete
 import { HerePlaceDetails, hereReverseGeocode } from '@/lib/services/geocoding.service';
 import { MapMarkerPin } from '@/components/ui/map-marker-pin';
 import { useModalClose } from '@/components/binly/modal-wrapper';
+import { RecenterOnWarehouse } from '@/components/binly/map-layers';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -297,6 +298,8 @@ export function ReportIncidentModal({ onClose }: ReportIncidentModalProps) {
                   </div>
                 </AdvancedMarker>
               )}
+              {/* Opens on this organization's warehouse, not a hardcoded city. */}
+              <RecenterOnWarehouse />
             </Map>
 
             {/* Address mode tap hint */}
