@@ -1,20 +1,23 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { User, Settings, Bell, Building2, LogOut, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/auth/store';
+import { useQueryClient } from '@tanstack/react-query';
+import { endSession } from '@/lib/auth/session';
 
 export function ProfilePill() {
-  const router = useRouter();
   const { user, clearAuth } = useAuthStore();
+  const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = () => {
-    clearAuth();
-    router.push('/login');
+    // Full page load, not router.push — see lib/auth/session.ts. A client-side
+    // navigation leaves the React Query cache intact, so the next organization
+    // to log in on this tab renders the previous one's bins.
+    endSession(queryClient, clearAuth);
   };
 
   // Get user initials for avatar

@@ -8,6 +8,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/lib/auth/store';
+import { useQueryClient } from '@tanstack/react-query';
+import { endSession } from '@/lib/auth/session';
 import { useNotificationStore } from '@/lib/stores/notification-store';
 import { useNotifications, useUnreadCount, useMarkRead, useMarkAllRead } from '@/lib/hooks/use-notifications';
 import type { UserNotification } from '@/lib/api/notifications';
@@ -74,6 +76,7 @@ export function TopNavBar({ onOpenAIAssistant }: TopNavBarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, clearAuth } = useAuthStore();
+  const queryClient = useQueryClient();
   // DB-backed notifications
   const { data: notifData } = useNotifications(1);
   const { data: unreadData } = useUnreadCount();
@@ -131,8 +134,10 @@ export function TopNavBar({ onOpenAIAssistant }: TopNavBarProps) {
   };
 
   const handleLogout = () => {
-    clearAuth();
-    router.push('/login');
+    // Full page load, not router.push — see lib/auth/session.ts. A client-side
+    // navigation leaves the React Query cache intact, so the next organization
+    // to log in on this tab renders the previous one's bins.
+    endSession(queryClient, clearAuth);
   };
 
   // Close dropdowns when clicking outside

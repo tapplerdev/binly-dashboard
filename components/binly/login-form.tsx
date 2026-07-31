@@ -1,15 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { useLogin } from '@/lib/auth/queries';
 import { useAuthStore } from '@/lib/auth/store';
+import { useQueryClient } from '@tanstack/react-query';
+import { beginSession } from '@/lib/auth/session';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { inputStyles } from '@/lib/utils';
 
 export function LoginForm() {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const { mutate: login, isPending, isError, error } = useLogin();
   const {
     setAuth,
@@ -68,7 +69,10 @@ export function LoginForm() {
           if (data.platform && data.token) {
             setPlatformAuth(data.token, data.email ?? email);
             if (rememberMe) setRememberedEmail(email);
-            router.push('/');
+            // Full load, not router.push — a warm React Query cache from an
+            // earlier session would otherwise render another organization's
+            // rows on this one's dashboard. See lib/auth/session.ts.
+            beginSession(queryClient);
             return;
           }
 
@@ -95,7 +99,10 @@ export function LoginForm() {
             }
 
             // Redirect to dashboard
-            router.push('/');
+            // Full load, not router.push — a warm React Query cache from an
+            // earlier session would otherwise render another organization's
+            // rows on this one's dashboard. See lib/auth/session.ts.
+            beginSession(queryClient);
           }
         },
       }
