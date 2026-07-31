@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { MapPin, X, Loader2 } from 'lucide-react';
+import { apiFetch } from '@/lib/api/client';
+import { useAuthStore } from '@/lib/auth/store';
 
 /** A resolved city/district target — mirrors the backend's areaTarget. */
 export interface TargetArea {
@@ -12,7 +14,10 @@ export interface TargetArea {
   bbox?: [number, number, number, number]; // west, south, east, north
 }
 
-const HERE_KEY = process.env.NEXT_PUBLIC_HERE_API_KEY;
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  'https://ropacal-backend-production.up.railway.app';
 
 const TYPE_LABELS: Record<string, string> = {
   city: 'city',
@@ -58,7 +63,7 @@ export function AreaAutocomplete({ value, onChange, placeholder = 'Target a city
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const q = query.trim();
-    if (q.length < 3 || !HERE_KEY) {
+    if (q.length < 3) {
       setOptions([]);
       return;
     }
@@ -66,38 +71,43 @@ export function AreaAutocomplete({ value, onChange, placeholder = 'Target a city
       const seq = ++requestSeqRef.current;
       setLoading(true);
       try {
-        // US-wide: Binly places bins nationwide. A common name that exists in
-        // several states (Springfield, Fremont…) returns multiple options; each
-        // option's title carries the state (e.g. "Germantown, TN, United States"),
-        // so the user disambiguates by picking the right one.
-        const url =
-          `https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(q + ', USA')}` +
-          `&in=countryCode:USA&limit=6&apiKey=${HERE_KEY}`;
-        const resp = await fetch(url);
+        // Goes through the BACKEND, not HERE directly. Two reasons:
+        //
+        //  1. Results are scoped to THIS ORGANIZATION'S country and ranked by
+        //     distance from its warehouse. This component used to hardcode
+        //     `q + ', USA'` and `in=countryCode:USA`, so a Canadian user typing
+        //     "Brampton" got "Brampton Twp, MI, United States" — Ontario was
+        //     excluded by construction. The browser has no authoritative way to
+        //     know the org's country; the server does.
+        //  2. The HERE key stays server-side. This used to send
+        //     NEXT_PUBLIC_HERE_API_KEY, which ships in the JS bundle and could be
+        //     lifted from devtools by anyone with dashboard access.
+        //
+        // Result filtering (which types count as a placement target) also moved
+        // server-side, so the rule lives in one place instead of being
+        // reimplemented here against raw HERE fields.
+        const resp = await apiFetch(
+          `${BACKEND_URL}/api/geocode/search?q=${encodeURIComponent(q)}`
+        );
+        if (!resp.ok) {
+          if (seq === requestSeqRef.current) setOptions([]);
+          return;
+        }
         const data = await resp.json();
         if (seq !== requestSeqRef.current) return; // a newer query superseded this response
         const areas: TargetArea[] = [];
         const seen = new Set<string>();
-        for (const item of data.items ?? []) {
-          // Cities/districts (locality, administrativeArea) AND specific addresses
-          // (street, houseNumber, address, intersection) — a precise address is a
-          // valid target; the recommender sweeps a radius around the point.
-          if (!['locality', 'administrativeArea', 'street', 'houseNumber', 'address', 'intersection'].includes(item.resultType)) continue;
-          // States/countries aren't placement targets; districts arrive as
-          // resultType=locality with localityType=district (HERE v7).
-          if (item.administrativeAreaType === 'state' || item.administrativeAreaType === 'country') continue;
-          if (item.localityType === 'postalCode') continue;
-          if (seen.has(item.title)) continue;
-          seen.add(item.title);
+        for (const item of data.results ?? []) {
+          // Type/state/postal-code filtering now happens on the server.
+          if (seen.has(item.label)) continue;
+          seen.add(item.label);
           const a: TargetArea = {
-            label: item.title,
-            type: item.localityType || item.administrativeAreaType || item.resultType,
-            lat: item.position?.lat,
-            lng: item.position?.lng,
+            label: item.label,
+            type: item.type,
+            lat: item.lat,
+            lng: item.lng,
           };
-          if (item.mapView) {
-            a.bbox = [item.mapView.west, item.mapView.south, item.mapView.east, item.mapView.north];
-          }
+          if (item.bbox) a.bbox = item.bbox;
           if (a.lat != null && a.lng != null) areas.push(a);
         }
         setOptions(areas);
@@ -127,16 +137,6 @@ export function AreaAutocomplete({ value, onChange, placeholder = 'Target a city
         >
           <X className="w-3 h-3" />
         </button>
-      </span>
-    );
-  }
-
-  if (!HERE_KEY) {
-    // Missing build-time key: a live-looking input that never responds is
-    // worse than an honest disabled one.
-    return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-gray-400" title="NEXT_PUBLIC_HERE_API_KEY is not configured">
-        <MapPin className="w-3.5 h-3.5" /> Area search unavailable
       </span>
     );
   }
