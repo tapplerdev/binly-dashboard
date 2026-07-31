@@ -272,6 +272,10 @@ Every interactive element should:
 
 ### Development Commands
 
+**TYPE CHECKING IS OFF.** `next.config.mjs` sets `typescript.ignoreBuildErrors: true` AND `eslint.ignoreDuringBuilds: true`, and `npx tsc --noEmit` currently reports **205 errors**. So a green `npm run build` says nothing about types — a real error in new code is indistinguishable from the existing 205. Run `npx tsc --noEmit 2>&1 | grep 'yourfile'` to check your own work.
+
+Backend + service map: see `ropacal-backend/CLAUDE.md` → "Service topology". Not duplicated here.
+
 ```bash
 # Start development server
 npm run dev
