@@ -251,9 +251,39 @@ export function PlacementReviewBasket({
 }: PlacementReviewBasketProps) {
   const areaName = areaLabel && areaLabel.trim().length > 0 ? areaLabel : 'the area';
 
-  const inArea = items.filter((i) => i.source === 'ai' && i.locality === 'in_area');
-  const nearArea = items.filter((i) => i.source === 'ai' && i.locality === 'near_area');
-  const manual = items.filter((i) => i.source === 'manual');
+  // A PARTITION, not three independent filters. Every item lands in exactly one
+  // bucket, because the last branch catches whatever the others did not.
+  //
+  // This is the bug it fixes, and it was invisible from the outside: the groups
+  // used to be three filters requiring locality === 'in_area' | 'near_area', or
+  // source === 'manual'. The backend only sets locality when a TARGET AREA is
+  // picked — `Locality string // "in_area" | "near_area" | "" (no target)`, with
+  // json:"...,omitempty", so an untargeted network-wide search omits it entirely.
+  // Every AI result therefore matched no filter, GroupSection returns null when
+  // its list is empty, and all three sections rendered nothing.
+  //
+  // The header meanwhile counts items.length, so the basket read "10 items"
+  // above an empty panel and the submit button offered to create 10 locations
+  // that were never displayed. Header and body were computed from different
+  // things and were free to disagree.
+  //
+  // Keep this an if/else chain. Going back to independent filters reintroduces
+  // the exact failure — any item matching none of them silently disappears.
+  const { inArea, nearArea, manual, ungrouped } = (() => {
+    const g = {
+      inArea: [] as QueuedLocation[],
+      nearArea: [] as QueuedLocation[],
+      manual: [] as QueuedLocation[],
+      ungrouped: [] as QueuedLocation[],
+    };
+    for (const i of items) {
+      if (i.source === 'manual') g.manual.push(i);
+      else if (i.locality === 'in_area') g.inArea.push(i);
+      else if (i.locality === 'near_area') g.nearArea.push(i);
+      else g.ungrouped.push(i); // AI pick from an untargeted search — no locality
+    }
+    return g;
+  })();
 
   const count = items.length;
   const isEmpty = count === 0;
@@ -324,6 +354,20 @@ export function PlacementReviewBasket({
               tone="violet"
               headerIcon={<ArrowUpRight className="h-4 w-4" strokeWidth={2.5} />}
               items={nearArea}
+              onRemove={onRemove}
+              onLocate={onLocate}
+            />
+
+            {/* Untargeted searches produce no locality, so these are simply the
+                recommendations. Rendered FIRST when it is the only group there
+                is, which is the common case for a network-wide search. */}
+            <GroupSection
+              title="Recommended"
+              helper="from a search across your whole network"
+              count={ungrouped.length}
+              tone="violet"
+              headerIcon={<Sparkles className="h-4 w-4" strokeWidth={2.5} />}
+              items={ungrouped}
               onRemove={onRemove}
               onLocate={onLocate}
             />
