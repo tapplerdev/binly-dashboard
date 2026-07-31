@@ -259,8 +259,20 @@ export function PlacementReviewBasket({
   const isEmpty = count === 0;
   const label = `Create ${count} location${count === 1 ? '' : 's'}`;
 
+  // Sizes to its CONTENT, and lets the dialog's left column do the scrolling.
+  //
+  // This was `h-full` with a `flex-1 overflow-y-auto` body — the shape you want
+  // when a component owns a full-height pane. It does not: it is mounted in the
+  // normal flow of a column that is already `overflow-y-auto`. So `h-full`
+  // resolved against an auto-height parent, the flex body collapsed to almost
+  // nothing, and ten queued items rendered INSIDE a near-zero-height box with no
+  // scrollbar big enough to find. The count badge said "10 items" above an
+  // apparently empty basket.
+  //
+  // Two scrollers nested like that is the actual defect; removing the inner one
+  // is the fix, not a workaround.
   return (
-    <div className="flex h-full flex-col rounded-2xl bg-white card-shadow">
+    <div className="flex flex-col rounded-2xl bg-white card-shadow">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 border-b border-gray-100 p-4">
         <div className="flex items-center gap-2">
@@ -278,9 +290,9 @@ export function PlacementReviewBasket({
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="p-4">
         {isEmpty ? (
-          <div className="flex h-full flex-col items-center justify-center py-12 text-center">
+          <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
               <MapPin className="h-6 w-6 text-gray-400" strokeWidth={2} />
             </div>
@@ -329,8 +341,10 @@ export function PlacementReviewBasket({
         )}
       </div>
 
-      {/* Submit bar */}
-      <div className="border-t border-gray-100 p-4">
+      {/* Submit bar — sticky, because the list above it is now its real height.
+          A ten-item basket is taller than the column, so a static button would
+          sit below the fold and every submit would start with a scroll. */}
+      <div className="sticky bottom-0 rounded-b-2xl border-t border-gray-100 bg-white p-4">
         <button
           type="button"
           onClick={onSubmit}
