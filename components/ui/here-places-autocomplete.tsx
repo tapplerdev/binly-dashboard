@@ -4,7 +4,15 @@ import { useRef, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import { MapPin } from 'lucide-react';
-import { hereAutosuggest, hereLookup, HereSuggestion, HerePlaceDetails } from '@/lib/services/geocoding.service';
+// Goes through the backend, which knows the caller's organization. This
+// component used to call HERE from the browser with no country filter and an
+// anchor that DEFAULTED TO KANSAS CITY when no userLocation prop was passed —
+// which all but one caller omitted. See lib/hooks/use-geocoding.ts.
+import { useGeocoding, AddressSuggestion, ResolvedAddress } from '@/lib/hooks/use-geocoding';
+
+// Names kept so the nine components consuming this file need no edit.
+type HereSuggestion = AddressSuggestion;
+type HerePlaceDetails = ResolvedAddress;
 
 interface HerePlacesAutocompleteProps {
   value: string;
@@ -31,6 +39,8 @@ export function HerePlacesAutocomplete({
   error = false,
   userLocation,
 }: HerePlacesAutocompleteProps) {
+  const { suggest, lookup } = useGeocoding();
+
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -107,7 +117,7 @@ export function HerePlacesAutocomplete({
 
     const timer = setTimeout(async () => {
       try {
-        const results = await hereAutosuggest(value, userLocation);
+        const results = await suggest(value, userLocation);
         console.log('📍 HERE MAPS API response:', results.length, 'results');
 
         if (results.length > 0) {
@@ -131,7 +141,7 @@ export function HerePlacesAutocomplete({
     }, 500); // Debounce - Wait 500ms after user stops typing
 
     return () => clearTimeout(timer);
-  }, [value, disabled, isAutoFilled, userLocation]);
+  }, [value, disabled, isAutoFilled, userLocation, suggest]);
 
   // Handle place selection
   const selectPlace = async (hereId: string, title: string) => {
@@ -139,7 +149,7 @@ export function HerePlacesAutocomplete({
     setIsFetching(true);
 
     try {
-      const placeDetails = await hereLookup(hereId);
+      const placeDetails = await lookup(hereId);
 
       if (placeDetails) {
         console.log('✅ HERE MAPS: Place selected successfully!');
