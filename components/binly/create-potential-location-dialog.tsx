@@ -16,6 +16,7 @@ import { type TargetArea } from '@/components/ui/area-autocomplete';
 import { TargetAreaOverlay } from '@/components/binly/target-area-overlay';
 import { AiRecommendPanel } from '@/components/binly/ai-recommend-panel';
 import { PlacementReviewBasket } from '@/components/binly/placement-review-basket';
+import { DataAttribution } from '@/components/binly/data-attribution';
 import type { QueuedLocation } from '@/lib/types/placement';
 import { useBins } from '@/lib/hooks/use-bins';
 import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
@@ -1080,6 +1081,11 @@ export function CreatePotentialLocationDialog({
                 submitting={loading}
                 areaLabel={aiArea ? aiArea.label.split(',')[0].trim() : undefined}
               />
+
+              {/* Licence-required credits for the boundary overlay and the
+                  GeoNames-derived city suggestions — both are surfaced in this
+                  dialog, so this is where the notice belongs. */}
+              <DataAttribution className="px-1" />
 
               {/* Cancel */}
               <Button type="button" variant="outline" onClick={handleClose} className="w-full" disabled={loading}>
