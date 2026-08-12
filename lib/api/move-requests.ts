@@ -437,5 +437,12 @@ export async function getDriverPendingMoves(driverId: string): Promise<DriverPen
     { headers: getAuthHeaders() }
   );
   if (!response.ok) return [];
-  return response.json();
+  // `?? []` is load-bearing: the backend declares this handler's slice with
+  // `var moves []PendingMove` and encodes it directly, so a driver with NO
+  // pending moves serialises as `null`, not `[]`. Returning that null made the
+  // signature a lie and crashed the shift composer, because a destructuring
+  // default (`const { data = [] } = useQuery(...)`) only fires on `undefined`.
+  // Sibling list endpoints build their slice with `make(...)` or `[]T{}` and so
+  // return `[]` — the difference is per-handler, so guard at the boundary.
+  return (await response.json()) ?? [];
 }
