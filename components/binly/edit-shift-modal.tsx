@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { X, Check, SkipForward, Circle, Navigation, MapPin, Package, ArrowRightLeft, Warehouse, Wrench, Loader2, ChevronDown, Trash2, ArrowRight, ArrowLeft, Plus, Truck } from 'lucide-react';
 import { isRedeployPlacement } from './shift-task-card';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getShiftTasks, removeTasksFromShift, addTasksToShift, createShiftWithTasks, cancelShift } from '@/lib/api/shifts';
+import { getShiftTasks, editShiftTasks, addTasksToShift, createShiftWithTasks, cancelShift } from '@/lib/api/shifts';
 import { BinSelectionMap } from './bin-selection-map';
 import { MoveRequestSelectionMap } from './move-request-selection-map';
 import { PlacementLocationSelectionMap } from './placement-location-selection-map';
@@ -403,24 +403,27 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
     setIsSubmitting(true);
     setError(null);
     try {
-      // 1. Remove tasks from source shift
+      // 1 + 2. Removes and adds on the SOURCE shift, in ONE request.
+      // These used to be two sequential calls in two transactions, so a failure
+      // between them left the shift with tasks removed and none added -- and the
+      // modal closed on it. One PATCH is all-or-nothing.
       const allRemoveIds = new Set(pendingRemoveIds);
       if (stagedMove) stagedMove.taskIds.forEach(id => allRemoveIds.add(id));
 
-      if (allRemoveIds.size > 0) {
-        await removeTasksFromShift(shift.id, Array.from(allRemoveIds), 'Modified via Edit Shift');
-      }
+      const descriptors = pendingAdds.map(t => {
+        const d: any = { task_type: t.task_type };
+        if (t.bin_id) d.bin_id = t.bin_id;
+        if (t.potential_location_id) d.potential_location_id = t.potential_location_id;
+        if (t.move_request_id) d.move_request_id = t.move_request_id;
+        return d;
+      });
 
-      // 2. Add tasks to source shift
-      if (pendingAdds.length > 0) {
-        const descriptors = pendingAdds.map(t => {
-          const d: any = { task_type: t.task_type };
-          if (t.bin_id) d.bin_id = t.bin_id;
-          if (t.potential_location_id) d.potential_location_id = t.potential_location_id;
-          if (t.move_request_id) d.move_request_id = t.move_request_id;
-          return d;
+      if (allRemoveIds.size > 0 || descriptors.length > 0) {
+        await editShiftTasks(shift.id, {
+          remove: Array.from(allRemoveIds),
+          add: descriptors,
+          reason: 'Modified via Edit Shift',
         });
-        await addTasksToShift(shift.id, descriptors);
       }
 
       // 3. Move tasks to target driver
@@ -475,7 +478,13 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
             return d;
           });
           // Remove from source (will auto-cancel if all removed)
-          await removeTasksFromShift(shift.id, incompleteTasks.map((t: any) => t.id), 'Merged into another shift');
+          // Source and target are different shifts, so this cannot join the add
+          // below into one request. Removal runs FIRST: it may auto-cancel the
+          // source, and the target add is the recoverable half if it fails.
+          await editShiftTasks(shift.id, {
+            remove: incompleteTasks.map((t: any) => t.id),
+            reason: 'Merged into another shift',
+          });
           // Add to target (backend dedup skips duplicates)
           if (stagedReassign.targetShiftId) {
             await addTasksToShift(stagedReassign.targetShiftId, taskDescriptors);

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, ArrowUp, ArrowDown, Warehouse, SkipForward, AlertTriangle, ChevronDown, ChevronUp, Navigation, Route as RouteIcon, Image as ImageIcon, ClipboardCheck, Truck } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shift';
-import { getShiftById, getShiftTasks, cancelShift, removeTasksFromShift, getShiftTasksWithHistory, previewShiftRoute } from '@/lib/api/shifts';
+import { getShiftById, getShiftTasks, cancelShift, editShiftTasks, getShiftTasksWithHistory, previewShiftRoute } from '@/lib/api/shifts';
 import { RouteTask, getTaskLabel, getTaskSubtitle, getTaskColor, getTaskBgColor } from '@/lib/types/route-task';
 import { groupWarehouseRuns, WarehouseRunCard, isRedeployPlacement } from './shift-task-card';
 import { ShiftRouteMap } from './shift-route-map';
@@ -309,7 +309,7 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift, highlightBinId
       const taskIdsArray = Array.from(selectedTaskIds);
 
       console.log('🗑️ [TASK REMOVAL] Calling API to remove tasks...');
-      const result = await removeTasksFromShift(shift.id, taskIdsArray, 'Removed by manager');
+      const result = await editShiftTasks(shift.id, { remove: taskIdsArray, reason: 'Removed by manager' });
 
       console.log('✅ [TASK REMOVAL] API Response:', result);
       console.log('✅ [TASK REMOVAL] Removed count:', result.removed_count);

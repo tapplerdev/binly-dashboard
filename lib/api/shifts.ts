@@ -222,41 +222,50 @@ export async function cancelShift(shiftId: string): Promise<void> {
  * Remove tasks from an active shift (bulk operation)
  * This unassigns tasks without deleting the underlying resources
  */
-export async function removeTasksFromShift(
+export type ShiftTaskDescriptor = {
+  task_type: string;
+  bin_id?: string;
+  potential_location_id?: string;
+  move_request_id?: string;
+};
+
+/**
+ * Add and/or remove tasks on a shift in ONE request.
+ *
+ * This replaced a pair of calls -- `POST /shifts/{id}/tasks/remove` followed by
+ * `PATCH /shifts/{id}` -- which were separate transactions. If the second
+ * failed, the modal closed on a half-applied edit: tasks removed, nothing
+ * added, and no way to tell. One PATCH is all-or-nothing.
+ *
+ * The POST endpoint is DELETED (backend DECISIONS #26). It also disagreed with
+ * this one about what removal MEANS: it returned the move to the driver's
+ * backlog, where neither shift picker can see it and the driver has no screen
+ * for it. This path releases it to the pool.
+ */
+export async function editShiftTasks(
   shiftId: string,
-  taskIds: string[],
-  reason?: string
-): Promise<{ success: boolean; removed_count: number; message: string }> {
-  console.log('🗑️ Removing tasks from shift:', { shiftId, taskIds, reason });
+  changes: { add?: ShiftTaskDescriptor[]; remove?: string[]; reason?: string },
+): Promise<any> {
+  const body: Record<string, unknown> = { reoptimize: true };
+  if (changes.add?.length) body.add_tasks = changes.add;
+  if (changes.remove?.length) body.remove_task_ids = changes.remove;
+  if (changes.reason) body.reason = changes.reason;
 
-  try {
-    const response = await apiFetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}/tasks/remove`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
-        task_ids: taskIds,
-        reason: reason || 'Removed by manager',
-      }),
-    });
+  const response = await apiFetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
 
-    console.log('📡 Remove tasks response status:', response.status);
-
-    if (response.status === 401) {
-      throw new Error('Authentication required');
-    }
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Failed to remove tasks from shift');
-    }
-
-    const data = await response.json();
-    console.log('✅ Tasks removed successfully:', data);
-    return data;
-  } catch (error) {
-    console.error('❌ Failed to remove tasks from shift:', error);
-    throw error;
+  if (response.status === 401) throw new Error('Authentication required');
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    // The backend's 400s here are actionable -- an incomplete pickup/dropoff
+    // pair, or a drop-off whose bin is already on the truck. Surface the real
+    // message; a generic one leaves the manager with no idea what to change.
+    throw new Error(errorData.error || errorData.detail || 'Failed to update shift tasks');
   }
+  return response.json();
 }
 
 /**
@@ -565,20 +574,9 @@ export async function getShiftTasksWithHistory(shiftId: string): Promise<any[]> 
  */
 export async function addTasksToShift(
   shiftId: string,
-  tasks: { task_type: string; bin_id?: string; potential_location_id?: string; move_request_id?: string }[],
+  tasks: ShiftTaskDescriptor[],
 ): Promise<any> {
-  const response = await apiFetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}`, {
-    method: 'PATCH',
-    headers: getAuthHeaders(),
-    body: JSON.stringify({ add_tasks: tasks, reoptimize: true }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || 'Failed to add tasks to shift');
-  }
-
-  return response.json();
+  return editShiftTasks(shiftId, { add: tasks });
 }
 
 /**
