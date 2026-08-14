@@ -328,6 +328,19 @@ export function ScheduleMoveModalWithMap({
           },
           reason: reasonCategory || undefined,
           notes: editMoveRequest.notes || undefined,
+          // PREFILL THE ASSIGNMENT. Without this it stayed at the reducer
+          // default {type:'unassigned'}, so the picker showed "Leave
+          // Unassigned" for a move that IS assigned -- and saving any unrelated
+          // change (an address typo, a note) matched the clear-assignment branch
+          // below and detached the move from its shift. clearAssignment calls
+          // _detach_from_shift first, which soft-deletes the move's route_tasks,
+          // so a manager fixing a typo pulled stops off a driver's live route
+          // mid-shift with nothing telling them. backend DECISIONS #48a.
+          assignment: editMoveRequest.assigned_user_id
+            ? { type: 'user' as const, userId: editMoveRequest.assigned_user_id }
+            : editMoveRequest.assigned_shift_id
+              ? { type: 'active_shift' as const, shiftId: editMoveRequest.assigned_shift_id }
+              : { type: 'unassigned' as const },
         },
       });
     }, 100);
@@ -616,7 +629,22 @@ export function ScheduleMoveModalWithMap({
         const currentAssignmentType = editMoveRequest.assignment_type || '';
         const newAssignmentType = config.assignmentType || 'unassigned';
 
-        if (newAssignmentType === 'user' && config.assignedUserId) {
+        // BELT AND BRACES on top of the prefill above. The prefill stops the
+        // picker LYING about the current state; this stops an unchanged
+        // assignment being re-written on every save. It also means the
+        // active_shift/future_shift label the prefill guesses cannot cause a
+        // spurious write -- if the shift id matches, nothing is issued at all.
+        const originalUserId = editMoveRequest.assigned_user_id || undefined;
+        const originalShiftId = editMoveRequest.assigned_shift_id || undefined;
+        const assignmentUnchanged =
+          (newAssignmentType === 'user' && config.assignedUserId === originalUserId) ||
+          ((newAssignmentType === 'active_shift' || newAssignmentType === 'future_shift') &&
+            config.assignedShiftId === originalShiftId) ||
+          (newAssignmentType === 'unassigned' && !originalUserId && !originalShiftId);
+
+        if (assignmentUnchanged) {
+          // nothing to do
+        } else if (newAssignmentType === 'user' && config.assignedUserId) {
           // Assign to driver
           console.log('🔄 [EDIT] Assigning to user:', config.assignedUserId);
           await assignMoveToUser({
