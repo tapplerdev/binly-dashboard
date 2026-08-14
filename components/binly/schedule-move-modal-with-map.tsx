@@ -310,7 +310,14 @@ export function ScheduleMoveModalWithMap({
     setTimeout(() => {
       const reasonCategory = editMoveRequest.reason as any;
       dispatch({
-        type: 'UPDATE_CONFIG',
+        // WAS `UPDATE_CONFIG`, WHICH IS NOT AN ACTION. The reducer's switch ends
+        // in `default: return state`, so this entire prefill silently no-opped
+        // and every edit opened on INITIALIZE_CONFIGS' defaults -- scheduled_date
+        // reset to tomorrow, reason and notes blanked, assignment "unassigned".
+        // That last one is DECISIONS #48a's root cause: the picker was not
+        // omitting the assignment, it was never receiving ANY of the prefill.
+        // The correct name is used twice elsewhere in this file (425, 568).
+        type: 'UPDATE_BIN_CONFIG',
         binId: editBin.id,
         updates: {
           moveType: editMoveRequest.move_type as any,

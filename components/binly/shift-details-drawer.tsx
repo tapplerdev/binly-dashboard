@@ -312,7 +312,7 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift, highlightBinId
       const result = await editShiftTasks(shift.id, { remove: taskIdsArray, reason: 'Removed by manager' });
 
       console.log('✅ [TASK REMOVAL] API Response:', result);
-      console.log('✅ [TASK REMOVAL] Removed count:', result.removed_count);
+      console.log('✅ [TASK REMOVAL] Removed count:', result.changes?.tasks_removed);
       console.log('✅ [TASK REMOVAL] Response message:', result.message);
 
       // Clear selection
@@ -325,7 +325,7 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift, highlightBinId
       console.log('🗑️ [TASK REMOVAL] Shift details reloaded');
 
       // Show success toast
-      setToastMessage(`${result.removed_count} ${taskWord} removed successfully`);
+      setToastMessage(`${result.changes?.tasks_removed} ${taskWord} removed successfully`);
       setToastType('success');
       setShowToast(true);
       console.log('✅ [TASK REMOVAL] Success toast displayed');

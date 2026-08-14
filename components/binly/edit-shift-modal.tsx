@@ -469,7 +469,33 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
           });
         } else if (stagedReassign.mode === 'merge') {
           // Merge: remove all tasks from source, add to target (dedup handled by backend)
-          const incompleteTasks = tasks.filter(t => t.is_completed === 0 && !t.skipped);
+          //
+          // A MOVE WITH ANY FINISHED LEG CANNOT BE MERGED, and this filter is
+          // what stops the whole submit 400ing on it. `POST /tasks/remove`
+          // skipped ids individually, so a lone pending dropoff just came off;
+          // PATCH validates the batch, and its `_PAIRED_LIVE_TASKS_SQL` counts a
+          // COMPLETED partner as live -- so sending one leg trips "remove both
+          // together", and sending both trips "the bin is on the truck".
+          //
+          // Both refusals are right. A collected pickup means the bin is in THIS
+          // driver's vehicle; handing the dropoff to someone else sends them to
+          // place a bin they do not have. Same physical problem as #46's
+          // redeployment case. Those legs stay on the source shift.
+          const movesWithFinishedLegs = new Set(
+            tasks
+              .filter((t: any) => t.move_request_id && (t.is_completed === 1 || t.skipped))
+              .map((t: any) => t.move_request_id),
+          );
+          const mergeable = tasks.filter(
+            t => t.is_completed === 0 && !t.skipped
+              && !(t.move_request_id && movesWithFinishedLegs.has(t.move_request_id)),
+          );
+          const strandedCount = tasks.filter(
+            t => t.is_completed === 0 && !t.skipped
+              && t.move_request_id && movesWithFinishedLegs.has(t.move_request_id),
+          ).length;
+
+          const incompleteTasks = mergeable;
           const taskDescriptors = incompleteTasks.map((t: any) => {
             const d: any = { task_type: t.task_type };
             if (t.bin_id) d.bin_id = t.bin_id;
@@ -488,6 +514,15 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
           // Add to target (backend dedup skips duplicates)
           if (stagedReassign.targetShiftId) {
             await addTasksToShift(stagedReassign.targetShiftId, taskDescriptors);
+          }
+          if (strandedCount > 0) {
+            // Not an error -- the merge did what it could. But silently leaving
+            // stops behind on a shift the manager believes they emptied is how
+            // a bin goes uncollected with nobody knowing.
+            setError(
+              `${strandedCount} stop${strandedCount === 1 ? '' : 's'} stayed on this shift — ` +
+              `the bin is already on this driver's truck and cannot be handed over.`,
+            );
           }
         }
       }
