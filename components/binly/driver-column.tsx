@@ -52,7 +52,12 @@ export function DriverColumn({ driver, shift, tasks, isToday, onCreateShift, onS
   const statusBadge = hasShift ? getStatusBadge(shift!.status) : null;
   const currentTaskIndex = tasks.findIndex((t: any) => t.is_completed === 0 && !t.skipped);
   const initials = driver.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
-  const canEdit = isToday && hasShift && (shift!.status === 'active' || shift!.status === 'ready');
+  // Editable while optimizing: the shift is EDITABLE server-side in that state
+  // and the solver re-runs on the new task set. Excluding it greyed out Edit
+  // for the length of the solve for no reason.
+  const canEdit = isToday && hasShift && (
+    shift!.status === 'active' || shift!.status === 'ready' || shift!.status === 'optimizing'
+  );
 
   const handleCancelShift = async () => {
     if (!shift) return;

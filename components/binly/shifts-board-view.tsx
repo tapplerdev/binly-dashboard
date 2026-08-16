@@ -153,7 +153,11 @@ export function ShiftsBoardView() {
     const map = new Map<string, any>();
     // Sort: active first, then ready, then others — so active takes priority
     const sorted = [...shiftsForDate].sort((a, b) => {
-      const priority: Record<string, number> = { active: 0, ready: 1, paused: 2, ended: 3 };
+      // `optimizing` RANKS WITH ACTIVE, not below `ended`. Missing from this map
+      // it fell to the `?? 9` default, so a driver with a just-started shift AND
+      // an ended one on the same day kept the ENDED row — hiding the shift the
+      // board was just fixed to fetch.
+      const priority: Record<string, number> = { active: 0, optimizing: 0, ready: 1, paused: 2, ended: 3 };
       return (priority[a.status] ?? 9) - (priority[b.status] ?? 9);
     });
     sorted.forEach(s => {
@@ -210,7 +214,15 @@ export function ShiftsBoardView() {
       route: '',
       binCount: shift.total_bins || 0,
       binsCollected: shift.completed_bins || 0,
-      status: shift.status === 'ready' ? 'scheduled' : shift.status === 'ended' ? 'completed' : shift.status as any,
+      // `optimizing` MAPS TO 'active' HERE TOO. This is a second, hand-rolled
+      // copy of `convertBackendShiftToFrontend`, and the `as any` smuggles the
+      // raw backend status past the 4-member frontend union — into
+      // getShiftStatusColor/Label, which have NO default and return undefined.
+      // A starting driver's detail drawer showed an empty, unstyled pill.
+      status: shift.status === 'ready' ? 'scheduled'
+        : shift.status === 'ended' ? 'completed'
+        : shift.status === 'optimizing' ? 'active'
+        : shift.status as any,
       optimization_metadata: shift.optimization_metadata,
       total_distance_miles: shift.total_distance_miles,
     };
@@ -463,6 +475,7 @@ export function ShiftsBoardView() {
 
                   const statusConfig: Record<string, { label: string; cls: string }> = {
                     active: { label: 'Active', cls: 'bg-green-100 text-green-700' },
+                    optimizing: { label: 'Starting…', cls: 'bg-blue-100 text-blue-700' },
                     paused: { label: 'Paused', cls: 'bg-amber-100 text-amber-700' },
                     ready: { label: 'Ready', cls: 'bg-blue-100 text-blue-700' },
                     ended: { label: 'Completed', cls: 'bg-gray-100 text-gray-600' },

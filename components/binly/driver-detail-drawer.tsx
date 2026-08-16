@@ -169,14 +169,16 @@ export function DriverDetailDrawer({ driver, onClose }: DriverDetailDrawerProps)
         <div className="flex items-center gap-2">
           <span
             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-              driver.status === 'active'
+              driver.status === 'active' || driver.status === 'optimizing'
                 ? 'bg-green-100 text-green-800'
                 : driver.status === 'ready'
                 ? 'bg-blue-100 text-blue-800'
                 : 'bg-gray-100 text-gray-600'
             }`}
           >
-            {driver.status.toUpperCase()}
+            {/* Not `.toUpperCase()` for this one — raw would read 'OPTIMIZING',
+                which is our word for it, not the manager's. */}
+            {driver.status === 'optimizing' ? 'STARTING' : driver.status.toUpperCase()}
           </span>
           {driver.shift_id && (
             <span className="text-xs text-gray-500">On Shift</span>

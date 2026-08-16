@@ -42,7 +42,11 @@ export default function TeamPage() {
     queryFn: () => getAllUsers(token),
   });
 
-  const activeDrivers = drivers?.filter((d) => d.status === 'active' || d.status === 'ready') || [];
+  // `optimizing` counts as on-shift: the driver has tapped Start and their
+  // clock is running. Omitting it undercounted the KPI below.
+  const activeDrivers = drivers?.filter(
+    (d) => d.status === 'active' || d.status === 'ready' || d.status === 'optimizing'
+  ) || [];
   const driversOnShift = drivers?.filter((d) => d.shift_id) || [];
   const totalDrivers = drivers?.length || 0;
   const admins = users?.filter((u) => u.role === 'admin') || [];
@@ -56,6 +60,8 @@ export default function TeamPage() {
         return 'text-blue-600';
       case 'paused':
         return 'text-yellow-600';
+      case 'optimizing':
+        return 'text-green-600';
       default:
         return 'text-gray-400';
     }
@@ -69,6 +75,10 @@ export default function TeamPage() {
         return 'Ready';
       case 'paused':
         return 'Paused';
+      // WITHOUT THIS the default read 'Offline' — for a driver who had just
+      // tapped Start. The most wrong answer of the set.
+      case 'optimizing':
+        return 'Starting Shift';
       default:
         return 'Offline';
     }

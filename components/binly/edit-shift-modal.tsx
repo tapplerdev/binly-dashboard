@@ -550,9 +550,16 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
                 {stagedMove ? `Move Tasks — ${shift.driver_name} → ${stagedMove.targetDriverName}` : `Edit Shift — ${shift.driver_name}`}
               </h2>
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                shift.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                shift.status === 'active' || shift.status === 'optimizing'
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-blue-100 text-blue-700'
               }`}>
-                {shift.status === 'active' ? 'Active' : 'Ready'}
+                {/* A BINARY TERNARY CANNOT SAY 'started but still solving', and its
+                    else-branch said 'Ready' — telling a manager the driver had not
+                    started, in a modal opened from the same board row. */}
+                {shift.status === 'optimizing'
+                  ? 'Starting…'
+                  : shift.status === 'active' ? 'Active' : 'Ready'}
               </span>
             </div>
             <button onClick={() => { if (stagedMove) { setStagedMove(null); setTargetDriverTasks([]); } else handleClose(); }}

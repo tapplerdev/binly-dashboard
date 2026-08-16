@@ -465,7 +465,11 @@ function convertBackendShiftToFrontend(driver: BackendDriver): Shift {
     const endTimestamp = driver.start_time + 8 * 3600; // 8 hours later
     endTime = formatTime12Hour(endTimestamp);
 
-    if (driver.status === 'active') {
+    // THE RAW BACKEND STATUS, 40 lines below the statusMap that maps
+    // `optimizing` to 'active' — so without this the same function answered
+    // "is this driver active?" two different ways, and the shift was labelled
+    // active while carrying no estimated completion.
+    if (driver.status === 'active' || driver.status === 'optimizing') {
       const estimatedEnd = new Date(endTimestamp * 1000);
       estimatedCompletion = estimatedEnd.toISOString();
     }
