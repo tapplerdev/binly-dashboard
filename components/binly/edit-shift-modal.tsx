@@ -179,7 +179,7 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
 
   // Reassign entire shift
   const [stagedReassign, setStagedReassign] = useState<StagedReassign | null>(null);
-  const [showReassignChoice, setShowReassignChoice] = useState<{ driverId: string; driverName: string; shiftId: string; tasks: any[] } | null>(null);
+  const [showReassignChoice, setShowReassignChoice] = useState<{ driverId: string; driverName: string; shiftId: string; tasks: any[]; status?: string } | null>(null);
 
   // Summary / submit
   const [showSummary, setShowSummary] = useState(false);
@@ -353,17 +353,18 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
     }
 
     const targetDriver = drivers.find(d => d.id === targetDriverId);
-    // A NEGATIVE FILTER ADMITS `optimizing`, and the merge path below PATCHes
-    // the target — which the server refuses, because `shift.EDITABLE` is
-    // {active, ready}. The manager fills in the whole form and the submit 400s.
-    // Exactly the trade the canEdit revert avoided, still live here because
-    // this one excludes by name instead of including by name.
+    // `optimizing` STAYS IN THIS LOOKUP, and excluding it was a worse bug than
+    // the one it fixed. An optimizing shift IS a live shift, so dropping it here
+    // makes `targetShift` undefined, which routes to the `direct` branch — and
+    // that PATCHes `driver_id` with NO target-side live-shift check anywhere in
+    // the backend. The target driver silently ends up holding TWO live shifts.
     //
-    // The `replace` path is fine and deliberately not touched: it CANCELS the
-    // target first, and `CANCELLABLE` does include optimizing.
+    // The real problem is narrower: only the MERGE branch is refused, because it
+    // PATCHes the target and `shift.EDITABLE` is {active, ready}. So merge is
+    // disabled below when the target is optimizing, and replace stays — it
+    // CANCELS the target first, and `CANCELLABLE` does include optimizing.
     const targetShift = shiftsForDate.find((s: any) =>
-      s.driver_id === targetDriverId &&
-      s.status !== 'ended' && s.status !== 'cancelled' && s.status !== 'optimizing');
+      s.driver_id === targetDriverId && s.status !== 'ended' && s.status !== 'cancelled');
     const targetDriverName = targetDriver?.name || 'Unknown';
 
     if (!targetShift) {
@@ -377,7 +378,7 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
     try {
       const data = await getShiftTasks(targetShift.id);
       const filtered = (data || []).filter((t: any) => !t.is_deleted && t.task_type !== 'warehouse_stop');
-      setShowReassignChoice({ driverId: targetDriverId, driverName: targetDriverName, shiftId: targetShift.id, tasks: filtered });
+      setShowReassignChoice({ driverId: targetDriverId, driverName: targetDriverName, shiftId: targetShift.id, tasks: filtered, status: targetShift.status });
     } catch {
       setShowReassignChoice({ driverId: targetDriverId, driverName: targetDriverName, shiftId: targetShift.id, tasks: [] });
     }
@@ -684,10 +685,23 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
                     <div className="text-xs text-gray-500">
                       {showReassignChoice.tasks.length} task{showReassignChoice.tasks.length !== 1 ? 's' : ''} on their current shift
                     </div>
+                    {/* MERGE IS THE ONLY BRANCH THE SERVER REFUSES. It PATCHes the
+                        target and `shift.EDITABLE` is {active, ready} — a solve is
+                        in flight against that exact task set, so adding to it would
+                        make the order that lands describe a shift that no longer
+                        exists. Disabled with the reason, rather than letting the
+                        manager fill in the form and collect a 400. Replace is
+                        unaffected: it cancels first, and CANCELLABLE includes
+                        optimizing. */}
                     <button onClick={handleReassignMerge}
-                      className="w-full text-left px-4 py-3 rounded-xl border-2 border-gray-200 bg-white hover:border-green-400 hover:bg-green-50 transition-colors">
+                      disabled={showReassignChoice.status === 'optimizing'}
+                      className="w-full text-left px-4 py-3 rounded-xl border-2 border-gray-200 bg-white hover:border-green-400 hover:bg-green-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-white">
                       <div className="text-sm font-semibold text-gray-800">Merge</div>
-                      <div className="text-xs text-gray-500 mt-0.5">Add {shift.driver_name}'s {tasks.filter(t => t.is_completed === 0 && !t.skipped).length} tasks to {showReassignChoice.driverName}'s shift. Duplicates will be skipped.</div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {showReassignChoice.status === 'optimizing'
+                          ? `${showReassignChoice.driverName} just started — their route is still being built. Use Replace, or try again in a moment.`
+                          : `Add ${shift.driver_name}'s ${tasks.filter(t => t.is_completed === 0 && !t.skipped).length} tasks to ${showReassignChoice.driverName}'s shift. Duplicates will be skipped.`}
+                      </div>
                     </button>
                     <button onClick={handleReassignReplace}
                       className="w-full text-left px-4 py-3 rounded-xl border-2 border-gray-200 bg-white hover:border-red-400 hover:bg-red-50 transition-colors">
