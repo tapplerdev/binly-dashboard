@@ -177,9 +177,11 @@ export function DriverDetailDrawer({ driver, onClose }: DriverDetailDrawerProps)
                 : 'bg-gray-100 text-gray-600'
             }`}
           >
-            {/* Not `.toUpperCase()` for this one — raw would read 'OPTIMIZING',
-                which is our word for it, not the manager's. */}
-            {driver.status === 'optimizing' ? 'STARTING' : driver.status.toUpperCase()}
+            {/* Uppercased HERE, worded by the helper. Hand-rolling the
+                optimizing case left this header saying INACTIVE while the status
+                field 66 lines down said Offline — the same self-contradiction,
+                for a different status. */}
+            {getBackendStatusLabel(driver.status).toUpperCase()}
           </span>
           {driver.shift_id && (
             <span className="text-xs text-gray-500">On Shift</span>

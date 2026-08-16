@@ -66,20 +66,25 @@ export interface ShiftActivity {
  *
  * THIS IS THE OTHER VOCABULARY, and mixing the two is what keeps producing the
  * same bug. `ShiftStatus` above is the four-value FRONTEND union that
- * `statusMap` maps into; the backend column has six values including `paused`
- * and `optimizing`, which have no frontend equivalent.
+ * `statusMap` maps into; the backend column has SEVEN values — `inactive`,
+ * `ready`, `optimizing`, `active`, `paused`, `ended`, `cancelled` (see
+ * `0004_shift_optimizing_status.py`) — and three of them have no frontend
+ * equivalent. An earlier version of this comment said six.
  *
- * Several screens render the raw backend value — a 409 conflict dialog, a shift
- * history row, two fallback table cells, a dropdown — and each had hand-rolled
- * its own label or none at all, so a status added on the server shows up in the
- * UI as our internal word. `optimizing` is the one that made that visible:
- * managers were shown "optimizing" in the exact dialog built to explain that a
- * driver has just started.
+ * **THIS IS THE ONLY PLACE THAT NAMES THEM.** It was introduced as "one label
+ * helper" while four hand-rolled label tables kept running beside it, so
+ * `optimizing` briefly shipped as `Starting`, `Starting…`, `STARTING` and
+ * `Starting Shift` at once — one MORE vocabulary rather than one. Sites that
+ * uppercase do it themselves; nobody re-words.
  *
- * Anything unrecognised falls back to the raw value rather than a placeholder —
- * an unknown status is better shown than hidden.
+ * Unknown-but-present falls back to the raw value: an 8th server status is
+ * better shown than hidden. **Nullish returns an em dash, not `''`** — every
+ * call site renders this inside a styled pill, and an empty string is a
+ * coloured badge with no text in it, which is the exact symptom this whole line
+ * of work started from.
  */
 export function getBackendStatusLabel(status: string | null | undefined): string {
+  if (!status) return '—';
   switch (status) {
     case 'optimizing': return 'Starting';
     case 'active':     return 'Active';
@@ -88,8 +93,25 @@ export function getBackendStatusLabel(status: string | null | undefined): string
     case 'ended':      return 'Completed';
     case 'cancelled':  return 'Cancelled';
     case 'inactive':   return 'Offline';
-    default:           return status ?? '';
+    default:           return status;
   }
+}
+
+/**
+ * Can a manager still edit this shift's tasks?
+ *
+ * MIRRORS `shift.EDITABLE = frozenset({ACTIVE, READY})` on the server, and it
+ * exists because guessing by exclusion keeps going wrong in the same direction:
+ * excluding `ended` and `cancelled` admits `optimizing`; excluding `optimizing`
+ * too then admits `paused`. Each miss surfaces the same way — a manager fills in
+ * a form and collects a 400. An inclusive test cannot drift like that.
+ *
+ * `optimizing` is excluded deliberately rather than incidentally: a solve is in
+ * flight against that exact task set, so adding to it would make the order that
+ * lands describe a shift that no longer exists.
+ */
+export function isShiftEditable(status: string | null | undefined): boolean {
+  return status === 'active' || status === 'ready';
 }
 
 /**

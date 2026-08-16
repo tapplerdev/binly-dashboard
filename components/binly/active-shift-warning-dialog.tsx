@@ -23,6 +23,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, Navigation, User, MapPin } from 'lucide-react';
+import { getBackendStatusLabel } from '@/lib/types/shift';
 
 export type ChangeAction =
   | 'address_change'
@@ -228,7 +229,7 @@ export function ActiveShiftWarningDialog({
                           variant="outline"
                           className={`text-xs ${getStatusBadgeColor(dep.status)}`}
                         >
-                          {dep.status}
+                          {getBackendStatusLabel(dep.status)}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">

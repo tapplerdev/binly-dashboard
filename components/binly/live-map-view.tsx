@@ -30,6 +30,7 @@ import { PotentialLocationPin } from '@/components/ui/potential-location-pin';
 import { useMapDefaultCenter } from '@/lib/hooks/use-map-center';
 import { markerLabelCss } from '@/lib/map/marker-label';
 import { RecenterOnWarehouse } from '@/components/binly/map-layers';
+import { getBackendStatusLabel } from '@/lib/types/shift';
 
 // Default map center (San Jose, CA area - center of bin operations)
 // Fallback only. The real default is the organization's warehouse — see
@@ -626,7 +627,7 @@ export function LiveMapView() {
                               : driver.status === 'paused'
                               ? 'Paused'
                               : driver.status === 'optimizing'
-                              ? 'Starting…'
+                              ? getBackendStatusLabel(driver.status)
                               : 'Inactive';
 
                           return (
@@ -923,7 +924,7 @@ export function LiveMapView() {
                         driver.status === 'active' ? 'animate-pulse' : ''
                       }`}
                       style={{ backgroundColor: statusColor }}
-                      title={`${driver.driverName} - ${driver.status}`}
+                      title={`${driver.driverName} - ${getBackendStatusLabel(driver.status)}`}
                     >
                       {initials}
                     </div>

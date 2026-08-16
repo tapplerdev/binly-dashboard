@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Calendar, List, User, X, Search, ChevronDown, ChevronUp, Filter, MapPin, Loader2, Trash2, GripVertical, Package, MapPinned, Warehouse, MoveRight, Plus, Pencil, ArrowUp, ArrowDown, ClipboardCheck, Settings, CalendarClock, Camera, Clock, Truck } from 'lucide-react';
-import { Shift, getShiftStatusColor, getShiftStatusLabel, ShiftStatus } from '@/lib/types/shift';
+import { Shift, ShiftStatus, getBackendStatusLabel, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shift';
 import { ShiftDetailsDrawer } from './shift-details-drawer';
 import { BinSelectionMap } from './bin-selection-map';
 import { MoveRequestSelectionMap } from './move-request-selection-map';
@@ -30,7 +30,6 @@ import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
 import { HerePlaceDetails } from '@/lib/services/geocoding.service';
 import { apiFetch } from '@/lib/api/client';
-import { getBackendStatusLabel } from '@/lib/types/shift';
 
 // NOTE: the legacy ShiftsView component tree (list/timeline/live views) was
 // removed with the retired assign-route endpoint — it was not mounted by any

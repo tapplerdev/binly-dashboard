@@ -12,10 +12,9 @@ import { ShiftHistoryView } from './shift-history-view';
 import { EditShiftModal } from './edit-shift-modal';
 import { PriorityBinsBanner } from './priority-bins-banner';
 import { useDrivers } from '@/lib/hooks/use-drivers';
-import { Shift } from '@/lib/types/shift';
+import { Shift, getBackendStatusLabel } from '@/lib/types/shift';
 import { reoptimizeShift } from '@/lib/api/shifts';
 import { apiFetch, getAuthHeaders } from '@/lib/api/client';
-import { getBackendStatusLabel } from '@/lib/types/shift';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -222,10 +221,16 @@ export function ShiftsBoardView() {
       // raw backend status past the 4-member frontend union — into
       // getShiftStatusColor/Label, which have NO default and return undefined.
       // A starting driver's detail drawer showed an empty, unstyled pill.
+      // EVERY LIVE STATUS MAPS, not just the one I came here for. `paused` was
+      // still falling through `as any` into getShiftStatusColor/Label — which
+      // have no default — so a paused driver's drawer had the same empty,
+      // unstyled pill that started all of this. Mirrors `statusMap`.
       status: shift.status === 'ready' ? 'scheduled'
         : shift.status === 'ended' ? 'completed'
-        : shift.status === 'optimizing' ? 'active'
-        : shift.status as any,
+        : shift.status === 'cancelled' ? 'cancelled'
+        : (shift.status === 'optimizing' || shift.status === 'paused' || shift.status === 'active')
+          ? 'active'
+        : 'scheduled',
       optimization_metadata: shift.optimization_metadata,
       total_distance_miles: shift.total_distance_miles,
     };
@@ -476,14 +481,17 @@ export function ShiftsBoardView() {
                   const completedCount = activeTasks.filter((t: any) => t.is_completed === 1).length;
                   const pct = activeTasks.length > 0 ? Math.round((completedCount / activeTasks.length) * 100) : 0;
 
-                  const statusConfig: Record<string, { label: string; cls: string }> = {
-                    active: { label: 'Active', cls: 'bg-green-100 text-green-700' },
-                    optimizing: { label: 'Starting…', cls: 'bg-blue-100 text-blue-700' },
-                    paused: { label: 'Paused', cls: 'bg-amber-100 text-amber-700' },
-                    ready: { label: 'Ready', cls: 'bg-blue-100 text-blue-700' },
-                    ended: { label: 'Completed', cls: 'bg-gray-100 text-gray-600' },
+                  // Colours only — the label is the shared helper's.
+                  const statusCls: Record<string, string> = {
+                    active: 'bg-green-100 text-green-700',
+                    optimizing: 'bg-blue-100 text-blue-700',
+                    paused: 'bg-amber-100 text-amber-700',
+                    ready: 'bg-blue-100 text-blue-700',
+                    ended: 'bg-gray-100 text-gray-600',
                   };
-                  const badge = shift ? (statusConfig[shift.status] || { label: shift.status, cls: 'bg-gray-100 text-gray-600' }) : null;
+                  const badge = shift
+                    ? { label: getBackendStatusLabel(shift.status), cls: statusCls[shift.status] ?? 'bg-gray-100 text-gray-600' }
+                    : null;
 
                   return (
                     <tr

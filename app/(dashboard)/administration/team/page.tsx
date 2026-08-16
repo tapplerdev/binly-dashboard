@@ -8,6 +8,7 @@ import { DriverDetailDrawer } from '@/components/binly/driver-detail-drawer';
 import { CreateUserModal } from '@/components/binly/create-user-modal';
 import { Card } from '@/components/ui/card';
 import { Users, UserCheck, UserX, TrendingUp, Loader2, Circle, UserPlus, Shield } from 'lucide-react';
+import { getBackendStatusLabel } from '@/lib/types/shift';
 
 export default function TeamPage() {
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
@@ -75,12 +76,10 @@ export default function TeamPage() {
         return 'Ready';
       case 'paused':
         return 'Paused';
-      // WITHOUT THIS the default read 'Offline' — for a driver who had just
-      // tapped Start. The most wrong answer of the set.
-      case 'optimizing':
-        return 'Starting Shift';
       default:
-        return 'Offline';
+        // The shared helper, so this page cannot invent its own wording. It
+        // briefly said 'Starting Shift' where everything else said 'Starting'.
+        return getBackendStatusLabel(status);
     }
   };
 

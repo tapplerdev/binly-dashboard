@@ -5,6 +5,7 @@ import { Plus, Info, X, Loader2 } from 'lucide-react';
 import { ShiftTaskCard, WarehouseRunCard, groupWarehouseRuns } from './shift-task-card';
 import { cancelShift } from '@/lib/api/shifts';
 import { useQueryClient } from '@tanstack/react-query';
+import { getBackendStatusLabel } from '@/lib/types/shift';
 
 interface DriverColumnProps {
   driver: { id: string; name: string; email?: string };
@@ -26,18 +27,23 @@ interface DriverColumnProps {
   onReoptimize?: (shiftId: string) => void;
 }
 
+// COLOURS ONLY. The label comes from `getBackendStatusLabel`, because this was
+// a full 7-case duplicate of it — which is how `optimizing` ended up shipping as
+// both "Starting" and "Starting…" in the same product.
+const _STATUS_CLS: Record<string, string> = {
+  active:     'bg-green-100 text-green-700',
+  optimizing: 'bg-blue-100 text-blue-700',
+  paused:     'bg-amber-100 text-amber-700',
+  ready:      'bg-blue-100 text-blue-700',
+  ended:      'bg-gray-100 text-gray-600',
+  cancelled:  'bg-red-100 text-red-700',
+};
+
 function getStatusBadge(status: string) {
-  switch (status) {
-    case 'active':    return { label: 'Active',    cls: 'bg-green-100 text-green-700' };
-    case 'paused':    return { label: 'Paused',    cls: 'bg-amber-100 text-amber-700' };
-    case 'ready':     return { label: 'Ready',     cls: 'bg-blue-100 text-blue-700' };
-    // Distinct from 'Ready': ready means a manager built it, optimizing means
-    // the driver has already tapped Start.
-    case 'optimizing': return { label: 'Starting…', cls: 'bg-blue-100 text-blue-700' };
-    case 'ended':     return { label: 'Completed', cls: 'bg-gray-100 text-gray-600' };
-    case 'cancelled': return { label: 'Cancelled', cls: 'bg-red-100 text-red-700' };
-    default:          return { label: status,       cls: 'bg-gray-100 text-gray-600' };
-  }
+  return {
+    label: getBackendStatusLabel(status),
+    cls: _STATUS_CLS[status] ?? 'bg-gray-100 text-gray-600',
+  };
 }
 
 export function DriverColumn({ driver, shift, tasks, isToday, onCreateShift, onSelectShift, onEditShift, onReoptimize }: DriverColumnProps) {

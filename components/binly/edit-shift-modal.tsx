@@ -13,7 +13,7 @@ import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
 import { MoveRequest, getMoveRequests } from '@/lib/api/move-requests';
 import { apiFetch } from '@/lib/api/client';
 import { useModalClose } from '@/components/binly/modal-wrapper';
-import { getBackendStatusLabel } from '@/lib/types/shift';
+import { getBackendStatusLabel, isShiftEditable } from '@/lib/types/shift';
 
 interface EditShiftModalProps {
   shift: {
@@ -255,7 +255,12 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
   // Stage move to another driver (local only)
   const stageMoveTo = async (targetDriverId: string) => {
     const targetDriver = drivers.find(d => d.id === targetDriverId);
-    const targetShift = shiftsForDate.find((s: any) => s.driver_id === targetDriverId);
+    // NO STATUS FILTER AT ALL, and `shiftsForDate` includes `ended` ones — so
+    // the common case (a driver who finished a morning shift) staged the move
+    // into that finished shift and the submit 400'd. Same family as the merge
+    // target above; same inclusive test.
+    const targetShift = shiftsForDate.find(
+      (s: any) => s.driver_id === targetDriverId && isShiftEditable(s.status));
     const selectedTasks = tasks.filter((t: any) => selectedIds.has(t.id));
 
     setStagedMove({
@@ -380,7 +385,11 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
       const filtered = (data || []).filter((t: any) => !t.is_deleted && t.task_type !== 'warehouse_stop');
       setShowReassignChoice({ driverId: targetDriverId, driverName: targetDriverName, shiftId: targetShift.id, tasks: filtered, status: targetShift.status });
     } catch {
-      setShowReassignChoice({ driverId: targetDriverId, driverName: targetDriverName, shiftId: targetShift.id, tasks: [] });
+      // STATUS CARRIED HERE TOO. Dropping it made `status` undefined, which
+      // `isShiftEditable` reads as not-editable — safe now, but it was
+      // ENABLING Merge under the old `=== 'optimizing'` test, so a failed
+      // task fetch put the 400 straight back.
+      setShowReassignChoice({ driverId: targetDriverId, driverName: targetDriverName, shiftId: targetShift.id, tasks: [], status: targetShift.status });
     }
   };
 
@@ -568,10 +577,9 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
               }`}>
                 {/* A BINARY TERNARY CANNOT SAY 'started but still solving', and its
                     else-branch said 'Ready' — telling a manager the driver had not
-                    started, in a modal opened from the same board row. */}
-                {shift.status === 'optimizing'
-                  ? 'Starting…'
-                  : shift.status === 'active' ? 'Active' : 'Ready'}
+                    started, in a modal opened from the same board row. Now the
+                    shared helper, so it cannot go stale again. */}
+                {getBackendStatusLabel(shift.status)}
               </span>
             </div>
             <button onClick={() => { if (stagedMove) { setStagedMove(null); setTargetDriverTasks([]); } else handleClose(); }}
@@ -686,20 +694,25 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
                       {showReassignChoice.tasks.length} task{showReassignChoice.tasks.length !== 1 ? 's' : ''} on their current shift
                     </div>
                     {/* MERGE IS THE ONLY BRANCH THE SERVER REFUSES. It PATCHes the
-                        target and `shift.EDITABLE` is {active, ready} — a solve is
-                        in flight against that exact task set, so adding to it would
-                        make the order that lands describe a shift that no longer
-                        exists. Disabled with the reason, rather than letting the
-                        manager fill in the form and collect a 400. Replace is
-                        unaffected: it cancels first, and CANCELLABLE includes
-                        optimizing. */}
+                        target, and `shift.EDITABLE` is {active, ready}. Replace is
+                        unaffected: it cancels first, and CANCELLABLE is wider.
+
+                        `isShiftEditable`, NOT `!== 'optimizing'`. The first version
+                        of this disabled optimizing alone and left `paused` — which
+                        is equally uneditable and which the board fetches — so a
+                        manager reassigning onto a driver on a break got an enabled
+                        button and a 400. That is the third time this exact
+                        exclude-by-name mistake has shipped; an inclusive test
+                        cannot make it a fourth. */}
                     <button onClick={handleReassignMerge}
-                      disabled={showReassignChoice.status === 'optimizing'}
+                      disabled={!isShiftEditable(showReassignChoice.status)}
                       className="w-full text-left px-4 py-3 rounded-xl border-2 border-gray-200 bg-white hover:border-green-400 hover:bg-green-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-white">
                       <div className="text-sm font-semibold text-gray-800">Merge</div>
                       <div className="text-xs text-gray-500 mt-0.5">
-                        {showReassignChoice.status === 'optimizing'
-                          ? `${showReassignChoice.driverName} just started — their route is still being built. Use Replace, or try again in a moment.`
+                        {!isShiftEditable(showReassignChoice.status)
+                          ? (showReassignChoice.status === 'optimizing'
+                              ? `${showReassignChoice.driverName} just started — their route is still being built. Use Replace, or try again in a moment.`
+                              : `${showReassignChoice.driverName}'s shift is ${getBackendStatusLabel(showReassignChoice.status).toLowerCase()} and cannot be added to. Use Replace instead.`)
                           : `Add ${shift.driver_name}'s ${tasks.filter(t => t.is_completed === 0 && !t.skipped).length} tasks to ${showReassignChoice.driverName}'s shift. Duplicates will be skipped.`}
                       </div>
                     </button>

@@ -4,6 +4,7 @@ import { BinCheck } from '@/lib/types/bin';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { User, Calendar, MapPin, TrendingUp, TrendingDown, Minus, Package } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { getBackendStatusLabel } from '@/lib/types/shift';
 
 interface CheckDetailModalProps {
   check: BinCheck | null;
@@ -140,7 +141,7 @@ export function CheckDetailModal({ check, isOpen, onClose, currentAddress }: Che
                         variant={check.shiftStatus === 'active' ? 'default' : 'secondary'}
                         className="text-xs capitalize"
                       >
-                        {check.shiftStatus}
+                        {getBackendStatusLabel(check.shiftStatus)}
                       </Badge>
                     )}
                   </div>
