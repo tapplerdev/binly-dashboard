@@ -52,12 +52,12 @@ export function DriverColumn({ driver, shift, tasks, isToday, onCreateShift, onS
   const statusBadge = hasShift ? getStatusBadge(shift!.status) : null;
   const currentTaskIndex = tasks.findIndex((t: any) => t.is_completed === 0 && !t.skipped);
   const initials = driver.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
-  // Editable while optimizing: the shift is EDITABLE server-side in that state
-  // and the solver re-runs on the new task set. Excluding it greyed out Edit
-  // for the length of the solve for no reason.
-  const canEdit = isToday && hasShift && (
-    shift!.status === 'active' || shift!.status === 'ready' || shift!.status === 'optimizing'
-  );
+  // GREYED OUT WHILE OPTIMIZING, AND THAT IS CORRECT — `shift.EDITABLE` is
+  // {active, ready} and the backend excludes optimizing on purpose: a solve is
+  // in flight against this exact task set, so adding or removing one means the
+  // order that lands describes a shift that no longer exists. Enabling the
+  // button here would trade a disabled control for a filled-in form and a 400.
+  const canEdit = isToday && hasShift && (shift!.status === 'active' || shift!.status === 'ready');
 
   const handleCancelShift = async () => {
     if (!shift) return;

@@ -153,11 +153,13 @@ export function ShiftsBoardView() {
     const map = new Map<string, any>();
     // Sort: active first, then ready, then others — so active takes priority
     const sorted = [...shiftsForDate].sort((a, b) => {
-      // `optimizing` RANKS WITH ACTIVE, not below `ended`. Missing from this map
-      // it fell to the `?? 9` default, so a driver with a just-started shift AND
-      // an ended one on the same day kept the ENDED row — hiding the shift the
-      // board was just fixed to fetch.
-      const priority: Record<string, number> = { active: 0, optimizing: 0, ready: 1, paused: 2, ended: 3 };
+      // `optimizing` RANKS ABOVE ACTIVE, matching both backend queries that answer
+      // "which shift is this driver on" (`_RUNNING_SQL`, `_CURRENT_SHIFT_SQL`).
+      // Missing from this map it fell to the `?? 9` default — BELOW `ended` — so a
+      // driver with a just-started shift and an ended one on the same day kept the
+      // ENDED row, hiding the shift the fetch loop had just been fixed to retrieve.
+      // Tying it with `active` would leave the winner order-dependent.
+      const priority: Record<string, number> = { optimizing: -1, active: 0, ready: 1, paused: 2, ended: 3 };
       return (priority[a.status] ?? 9) - (priority[b.status] ?? 9);
     });
     sorted.forEach(s => {
