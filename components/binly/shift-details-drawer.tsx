@@ -612,7 +612,7 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift, highlightBinId
                 <div className="flex-1">
                   <h4 className="text-sm font-semibold text-blue-900 mb-1">Route Optimization Pending</h4>
                   <p className="text-sm text-blue-700">
-                    This route will be automatically optimized when the driver starts their shift, taking into account real-time traffic conditions for the most efficient route.
+                    This route will be automatically optimized when the driver starts their shift, using their live location and the shortest driving distances between stops.
                   </p>
                 </div>
               </div>

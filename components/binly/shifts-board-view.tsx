@@ -37,7 +37,12 @@ async function fetchAllShifts(): Promise<any[]> {
   const results: any[] = [];
 
   // Fetch active/ready/paused shifts
-  for (const status of ['active', 'ready', 'paused']) {
+  // 'optimizing' IS NOT OPTIONAL HERE. It is a real shifts.status (DECISIONS
+  // #49 — the driver has tapped Start and the solver is building their
+  // route), and it is fetched by none of the other three. Without it the
+  // driver VANISHES from the board for the length of the solve — which reads
+  // to a manager as a driver who never started.
+  for (const status of ['active', 'ready', 'paused', 'optimizing']) {
     try {
       const resp = await apiFetch(`${API_BASE_URL}/api/manager/shifts?status=${status}&limit=50`, { headers });
       if (resp.ok) {

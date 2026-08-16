@@ -31,6 +31,9 @@ function getStatusBadge(status: string) {
     case 'active':    return { label: 'Active',    cls: 'bg-green-100 text-green-700' };
     case 'paused':    return { label: 'Paused',    cls: 'bg-amber-100 text-amber-700' };
     case 'ready':     return { label: 'Ready',     cls: 'bg-blue-100 text-blue-700' };
+    // Distinct from 'Ready': ready means a manager built it, optimizing means
+    // the driver has already tapped Start.
+    case 'optimizing': return { label: 'Starting…', cls: 'bg-blue-100 text-blue-700' };
     case 'ended':     return { label: 'Completed', cls: 'bg-gray-100 text-gray-600' };
     case 'cancelled': return { label: 'Cancelled', cls: 'bg-red-100 text-red-700' };
     default:          return { label: status,       cls: 'bg-gray-100 text-gray-600' };

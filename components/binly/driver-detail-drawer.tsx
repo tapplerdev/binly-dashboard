@@ -129,6 +129,8 @@ export function DriverDetailDrawer({ driver, onClose }: DriverDetailDrawerProps)
         return 'bg-blue-100 text-blue-800';
       case 'paused':
         return 'bg-yellow-100 text-yellow-800';
+      case 'optimizing':
+        return 'bg-blue-100 text-blue-800';
       case 'ended':
         return 'bg-gray-100 text-gray-800';
       case 'cancelled':

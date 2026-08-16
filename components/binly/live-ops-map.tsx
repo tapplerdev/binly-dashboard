@@ -59,6 +59,8 @@ function getDriverStatusColor(status: ActiveDriver['status']) {
       return '#10B981'; // Green
     case 'paused':
       return '#F59E0B'; // Yellow/Orange
+    case 'optimizing':
+      return '#3B82F6'; // Blue — starting, route being built
     case 'inactive':
     case 'ended':
       return '#6B7280'; // Gray

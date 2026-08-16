@@ -2009,7 +2009,7 @@ export function CreateShiftDrawer({
                   Lock Task Order
                 </div>
                 <p className="text-xs text-gray-600 leading-relaxed">
-                  When enabled, the driver will follow your exact task sequence. When disabled, the system will optimize the route using real-time traffic and dynamic warehouse insertion for maximum efficiency.
+                  When enabled, the driver will follow your exact task sequence. When disabled, the system will optimize the route from the driver's live location, adding warehouse trips where the truck runs out of bins.
                 </p>
               </label>
             </div>

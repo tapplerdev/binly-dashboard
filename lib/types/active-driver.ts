@@ -11,7 +11,7 @@ export interface DriverLocation {
 export interface ActiveDriver {
   driverId: string;
   driverName: string;
-  status: 'active' | 'paused' | 'inactive' | 'ended';
+  status: 'active' | 'paused' | 'optimizing' | 'inactive' | 'ended';
   shiftId: string;
   routeName?: string;
   totalBins?: number;

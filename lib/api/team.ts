@@ -8,7 +8,7 @@ export interface Driver {
   email: string;
   shift_id?: string | null;
   route_id?: string | null;
-  status: 'active' | 'paused' | 'ready' | 'inactive';
+  status: 'active' | 'paused' | 'ready' | 'optimizing' | 'inactive';
   start_time?: number | null;
   total_bins: number;
   completed_bins: number;

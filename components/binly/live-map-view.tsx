@@ -617,12 +617,16 @@ export function LiveMapView() {
                               ? '#10B981' // Green for active
                               : driver.status === 'paused'
                               ? '#F59E0B' // Orange for paused
+                              : driver.status === 'optimizing'
+                              ? '#3B82F6' // Blue — starting, route being built
                               : '#6B7280'; // Gray for inactive/ended
                           const statusLabel =
                             driver.status === 'active'
                               ? 'Active'
                               : driver.status === 'paused'
                               ? 'Paused'
+                              : driver.status === 'optimizing'
+                              ? 'Starting…'
                               : 'Inactive';
 
                           return (
@@ -895,6 +899,8 @@ export function LiveMapView() {
                   ? '#10B981' // Green for active
                   : driver.status === 'paused'
                   ? '#F59E0B' // Orange for paused
+                  : driver.status === 'optimizing'
+                  ? '#3B82F6' // Blue — starting, route being built
                   : '#6B7280'; // Gray for inactive/ended
 
               return (

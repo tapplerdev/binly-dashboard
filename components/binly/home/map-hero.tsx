@@ -49,7 +49,11 @@ export function MapHero({ data, activeFilter, onBinSelect, onAssignMove }: MapHe
 
   const drivers: ActiveDriver[] = data.activeDrivers.drivers ?? [];
   const liveDrivers = drivers.filter(
-    (d) => (d.status === 'active' || d.status === 'paused') && d.currentLocation
+    // `optimizing` is live: the driver tapped Start and their route is being
+    // built. Omitting it makes them blink off the map for the whole solve.
+    (d) =>
+      (d.status === 'active' || d.status === 'paused' || d.status === 'optimizing') &&
+      d.currentLocation
   );
 
   return (

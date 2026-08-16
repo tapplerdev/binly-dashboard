@@ -53,7 +53,10 @@ const formatDuration = (hours: number): string => {
 // Reason: Moving to template-based system where routes aren't pre-optimized.
 // Showing polylines with START/END labels implies route order, which is
 // misleading since templates are just bin collections. Routes get optimized
-// when driver starts shift using real-time traffic and driver location.
+// when driver starts shift, from the driver's live location. NOT traffic-aware:
+// the solver runs over an OSRM distance/duration matrix with no time-of-day
+// parameter, so the answer is the same at 3am and at rush hour. Traffic exists
+// only in the Mapbox path, which is not the one that runs.
 //
 // This code is preserved for potential future use if we want to show
 // route previews after optimization or for other visualization needs.

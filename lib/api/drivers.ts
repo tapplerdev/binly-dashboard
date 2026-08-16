@@ -15,7 +15,7 @@ interface BackendDriver {
   phone?: string;
   shift_id: string | null;
   route_id: string | null;
-  status: 'inactive' | 'ready' | 'active' | 'paused' | 'ended' | 'cancelled';
+  status: 'inactive' | 'ready' | 'active' | 'paused' | 'optimizing' | 'ended' | 'cancelled';
   start_time: number | null;
   total_bins: number;
   completed_bins: number;

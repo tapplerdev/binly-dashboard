@@ -46,7 +46,7 @@ interface BackendShift {
   id: string;
   driver_id: string;
   route_id: string | null;
-  status: 'ready' | 'active' | 'paused' | 'ended' | 'cancelled';
+  status: 'ready' | 'active' | 'paused' | 'optimizing' | 'ended' | 'cancelled';
   start_time: number | null; // Unix timestamp
   end_time: number | null;
   total_pause_seconds: number;
@@ -95,7 +95,7 @@ interface BackendDriver {
   email: string;
   shift_id: string | null;
   route_id: string | null;
-  status: 'inactive' | 'ready' | 'active' | 'paused' | 'ended' | 'cancelled';
+  status: 'inactive' | 'ready' | 'active' | 'paused' | 'optimizing' | 'ended' | 'cancelled';
   start_time: number | null;
   total_bins: number;
   completed_bins: number;
@@ -417,6 +417,10 @@ function convertBackendShiftToFrontend(driver: BackendDriver): Shift {
     'ready': 'scheduled',
     'active': 'active',
     'paused': 'active', // Show paused as active in list view
+    // Same treatment, same reason: the driver is in the truck. Falling
+    // through to the `|| 'scheduled'` default below would file someone who
+    // has already started under "not started yet".
+    'optimizing': 'active',
     'ended': 'completed',
     'cancelled': 'cancelled',
     'inactive': 'scheduled', // Shouldn't happen but fallback
