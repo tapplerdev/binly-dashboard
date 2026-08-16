@@ -62,6 +62,37 @@ export interface ShiftActivity {
 }
 
 /**
+ * A **backend** `shifts.status` value, rendered for a human.
+ *
+ * THIS IS THE OTHER VOCABULARY, and mixing the two is what keeps producing the
+ * same bug. `ShiftStatus` above is the four-value FRONTEND union that
+ * `statusMap` maps into; the backend column has six values including `paused`
+ * and `optimizing`, which have no frontend equivalent.
+ *
+ * Several screens render the raw backend value — a 409 conflict dialog, a shift
+ * history row, two fallback table cells, a dropdown — and each had hand-rolled
+ * its own label or none at all, so a status added on the server shows up in the
+ * UI as our internal word. `optimizing` is the one that made that visible:
+ * managers were shown "optimizing" in the exact dialog built to explain that a
+ * driver has just started.
+ *
+ * Anything unrecognised falls back to the raw value rather than a placeholder —
+ * an unknown status is better shown than hidden.
+ */
+export function getBackendStatusLabel(status: string | null | undefined): string {
+  switch (status) {
+    case 'optimizing': return 'Starting';
+    case 'active':     return 'Active';
+    case 'ready':      return 'Ready';
+    case 'paused':     return 'Paused';
+    case 'ended':      return 'Completed';
+    case 'cancelled':  return 'Cancelled';
+    case 'inactive':   return 'Offline';
+    default:           return status ?? '';
+  }
+}
+
+/**
  * Get color class for shift status badge
  */
 export function getShiftStatusColor(status: ShiftStatus): string {

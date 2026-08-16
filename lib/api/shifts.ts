@@ -469,7 +469,13 @@ function convertBackendShiftToFrontend(driver: BackendDriver): Shift {
     // `optimizing` to 'active' — so without this the same function answered
     // "is this driver active?" two different ways, and the shift was labelled
     // active while carrying no estimated completion.
-    if (driver.status === 'active' || driver.status === 'optimizing') {
+    // ALL THREE STATUSES THE MAP CALLS 'active'. I added `optimizing` here and
+    // left `paused` — which `statusMap` has mapped to 'active' since long
+    // before any of this — so the defect my own comment describes stayed live
+    // for the neighbouring status, on the line I was editing.
+    if (driver.status === 'active' ||
+        driver.status === 'optimizing' ||
+        driver.status === 'paused') {
       const estimatedEnd = new Date(endTimestamp * 1000);
       estimatedCompletion = estimatedEnd.toISOString();
     }

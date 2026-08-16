@@ -30,6 +30,7 @@ import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
 import { HerePlaceDetails } from '@/lib/services/geocoding.service';
 import { apiFetch } from '@/lib/api/client';
+import { getBackendStatusLabel } from '@/lib/types/shift';
 
 // NOTE: the legacy ShiftsView component tree (list/timeline/live views) was
 // removed with the retired assign-route endpoint — it was not mounted by any
@@ -2830,7 +2831,7 @@ export function CreateShiftDrawer({
               <div className="mb-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
                 <p className="text-sm font-semibold text-amber-900 mb-1">Driver already has a shift</p>
                 <p className="text-xs text-amber-700 mb-3">
-                  {conflictShift.active_tasks} task{conflictShift.active_tasks !== 1 ? 's' : ''} · {conflictShift.status} · Created {new Date(conflictShift.created_at * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  {conflictShift.active_tasks} task{conflictShift.active_tasks !== 1 ? 's' : ''} · {getBackendStatusLabel(conflictShift.status)} · Created {new Date(conflictShift.created_at * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </p>
                 <div className="flex gap-2">
                   <button

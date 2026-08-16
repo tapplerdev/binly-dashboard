@@ -15,6 +15,7 @@ import { useDrivers } from '@/lib/hooks/use-drivers';
 import { Shift } from '@/lib/types/shift';
 import { reoptimizeShift } from '@/lib/api/shifts';
 import { apiFetch, getAuthHeaders } from '@/lib/api/client';
+import { getBackendStatusLabel } from '@/lib/types/shift';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -562,7 +563,7 @@ export function ShiftsBoardView() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">{shift.status}</span>
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">{getBackendStatusLabel(shift.status)}</span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 min-w-[120px]">

@@ -13,6 +13,7 @@ import { usePotentialLocations } from '@/lib/hooks/use-potential-locations';
 import { MoveRequest, getMoveRequests } from '@/lib/api/move-requests';
 import { apiFetch } from '@/lib/api/client';
 import { useModalClose } from '@/components/binly/modal-wrapper';
+import { getBackendStatusLabel } from '@/lib/types/shift';
 
 interface EditShiftModalProps {
   shift: {
@@ -352,7 +353,17 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
     }
 
     const targetDriver = drivers.find(d => d.id === targetDriverId);
-    const targetShift = shiftsForDate.find((s: any) => s.driver_id === targetDriverId && s.status !== 'ended' && s.status !== 'cancelled');
+    // A NEGATIVE FILTER ADMITS `optimizing`, and the merge path below PATCHes
+    // the target — which the server refuses, because `shift.EDITABLE` is
+    // {active, ready}. The manager fills in the whole form and the submit 400s.
+    // Exactly the trade the canEdit revert avoided, still live here because
+    // this one excludes by name instead of including by name.
+    //
+    // The `replace` path is fine and deliberately not touched: it CANCELS the
+    // target first, and `CANCELLABLE` does include optimizing.
+    const targetShift = shiftsForDate.find((s: any) =>
+      s.driver_id === targetDriverId &&
+      s.status !== 'ended' && s.status !== 'cancelled' && s.status !== 'optimizing');
     const targetDriverName = targetDriver?.name || 'Unknown';
 
     if (!targetShift) {
@@ -644,7 +655,7 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
                               <button key={d.id} onClick={() => stageMoveTo(d.id)}
                                 className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 text-sm">
                                 <span className="flex-1 font-medium text-gray-800">{d.name}</span>
-                                {dShift ? <span className="text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">{dShift.status}</span>
+                                {dShift ? <span className="text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">{getBackendStatusLabel(dShift.status)}</span>
                                   : <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">+ New</span>}
                               </button>
                             );

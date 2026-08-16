@@ -20,6 +20,7 @@ import {
   Search,
 } from 'lucide-react';
 import { format, isWithinInterval, subDays, startOfDay, endOfDay } from 'date-fns';
+import { getBackendStatusLabel } from '@/lib/types/shift';
 
 interface DriverDetailDrawerProps {
   driver: Driver;
@@ -244,7 +245,7 @@ export function DriverDetailDrawer({ driver, onClose }: DriverDetailDrawerProps)
                     <Calendar className="w-5 h-5 text-gray-400" />
                     <div>
                       <p className="text-xs text-gray-500">Status</p>
-                      <p className="font-medium text-gray-900 capitalize">{driver.status}</p>
+                      <p className="font-medium text-gray-900">{getBackendStatusLabel(driver.status)}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -477,7 +478,7 @@ export function DriverDetailDrawer({ driver, onClose }: DriverDetailDrawerProps)
                         shift.status
                       )}`}
                     >
-                      {shift.status.toUpperCase()}
+                      {getBackendStatusLabel(shift.status).toUpperCase()}
                     </span>
                   </div>
 
