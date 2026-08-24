@@ -9,12 +9,35 @@ import { AIAssistantDrawer } from '@/components/binly/ai-assistant-drawer';
 import { CentrifugoProvider } from '@/lib/providers/centrifugo-provider';
 import { GlobalCentrifugoSync } from '@/components/binly/global-centrifugo-sync';
 import { useAuthStore } from '@/lib/auth/store';
+import { RequireAuth } from '@/lib/auth/auth-gate';
 import {
   PlatformActingBanner,
   PlatformOrgSwitcher,
 } from '@/components/binly/platform-org-switcher';
 
+/**
+ * The auth gate that `middleware.ts` used to provide — see `lib/auth/auth-gate.tsx`
+ * for why it is client-side now (static export has no server to redirect on).
+ *
+ * WRAPPING RATHER THAN AN EARLY RETURN INSIDE THE CHROME, deliberately: this way
+ * `DashboardChrome` does not mount at all until a token exists, so
+ * `CentrifugoProvider` is never constructed with `undefined` and then handed a
+ * real token a tick later. The old middleware guaranteed the same thing by
+ * never letting the page render.
+ */
 export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <RequireAuth>
+      <DashboardChrome>{children}</DashboardChrome>
+    </RequireAuth>
+  );
+}
+
+function DashboardChrome({
   children,
 }: {
   children: React.ReactNode;

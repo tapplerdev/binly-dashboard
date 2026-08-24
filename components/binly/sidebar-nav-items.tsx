@@ -144,7 +144,13 @@ export const sidebarNavItems: NavItem[] = [
     icon: null,
     children: [
       {
-        path: '/docs/product-vision',
+        // A PLAIN STATIC ASSET, hence the `.html`. This used to be
+        // `/docs/product-vision`, a route handler that read the file off disk
+        // with `fs.readFileSync` at request time — which a static export cannot
+        // do, there being no server. The file now lives at
+        // `public/docs/product-vision.html` and is served by CloudFront
+        // directly, the same way `public/airtag-report.html` already was.
+        path: '/docs/product-vision.html',
         key: 'vision',
         title: 'Product Vision',
         icon: <Lightbulb className="w-5 h-5" />,

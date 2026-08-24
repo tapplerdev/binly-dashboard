@@ -84,6 +84,192 @@ Before finalizing code, consider improvements, edge cases, and optimizations. It
 
 ---
 
+## Hosting — how this dashboard is actually served (changed 2026-08-24)
+
+### The short version
+
+This is a **static site**. `npm run build` produces plain HTML, CSS and JS in
+`out/`, those files are uploaded to a private S3 bucket, and CloudFront serves
+them worldwide over HTTPS. **There is no Node server anywhere in production.**
+Nothing runs on a request except the browser.
+
+That's a change: it used to be a normal Next.js app that needed a server running
+`next start`. Making it static is what allows it to live on AWS next to the rest
+of Binly, for essentially nothing.
+
+Infrastructure lives in `binly-backend/cdk/stacks/frontend_stack.py`.
+
+### What "static export" means, and the three rules it imposes
+
+`next.config.mjs` sets `output: 'export'`. Instead of building a server that
+renders pages on demand, Next renders **every page once at build time** and
+writes the resulting HTML to disk. There are 20 of them. What ships is a folder.
+
+That buys simplicity and near-zero cost, but it takes away anything that needs
+code to run per-request. Three rules follow, and **breaking any one of them
+fails the build**, not production:
+
+1. **No `middleware.ts`.** Next refuses to build an export that has one at all.
+   Ours did the auth redirect — see the next section for where that went.
+2. **No route handlers** (`app/**/route.ts`). We had one, at
+   `app/docs/product-vision/route.ts`, which read an HTML file off disk on every
+   request. That file now sits in `public/docs/product-vision.html` and is served
+   as a plain asset.
+3. **No dynamic route segments** (`app/bins/[id]/page.tsx`) unless you can list
+   every possible value at build time via `generateStaticParams`. You obviously
+   cannot list every bin id.
+
+**Rule 3 is the one to watch.** Today there are ZERO `[param]` directories under
+`app/` — every detail view is done client-side, with state or a query parameter.
+That is the only reason this whole approach works. If you ever add
+`app/bins/[id]/`, the build breaks and the fix is to use `/bins?id=123` instead.
+
+### The auth gate moved, and it is not less secure
+
+`middleware.ts` used to run on the server before every page and redirect you to
+`/login` if you had no `binly-auth-token` cookie. That is now
+`lib/auth/auth-gate.tsx`, running in the browser: `RequireAuth` wraps the
+dashboard layout, `RedirectIfAuthenticated` wraps the login page.
+
+**Why this loses no security.** The cookie it checked was written by client-side
+JavaScript (`document.cookie` in `lib/auth/store.ts`). It was never `httpOnly`
+and never signed, so anyone could type one into the console in about four
+seconds. It decided *which screen you see*, not *what data you can reach*. The
+actual security boundary is and always was the API: it verifies a JWT signature
+on every single request and re-reads your role from Postgres for admin routes. A
+faked cookie gets you an empty dashboard shell that 401s on every call — exactly
+as true before this change as after.
+
+**What genuinely changed:** the redirect happens a moment after the page starts
+loading rather than before it is sent. So an unauthenticated visitor may see one
+frame of blank layout. The gate deliberately renders a neutral spinner instead of
+the real content while it decides, so that frame never contains data.
+
+One subtlety worth knowing if you touch that file: the auth store persists to
+`localStorage` via zustand, and **that read is asynchronous**. On the very first
+render `token` is `null` even for a signed-in user. The gate waits for hydration
+before deciding — without that wait, every returning user gets thrown to `/login`
+on every hard refresh, which looks like broken sessions and is really a race.
+
+### The AWS pieces, and what each one is for
+
+| piece | what it does | why not something simpler |
+|---|---|---|
+| **S3 bucket** | holds the files from `out/` | it is **private** — no public URL |
+| **CloudFront** | the CDN; HTTPS, caching, worldwide edges | S3 alone cannot do HTTPS on a custom domain |
+| **Origin Access Control** | lets *only* CloudFront read the bucket | a public bucket can be read directly, bypassing the CDN |
+| **CloudFront Function** | rewrites `/operations/routes/` → `.../index.html` | see below — this one is not optional |
+| **ACM certificate** | the HTTPS certificate | free, but **must be issued in us-east-1** for CloudFront |
+| **Route 53** | points your domain at CloudFront | only needed once you have a domain |
+
+**The CloudFront Function is the non-obvious piece.** A private S3 bucket is
+accessed over its REST API, which has no concept of "the index file in this
+folder". A request for `/operations/routes/` asks S3 for a key that literally
+ends in a slash, and gets a 403. (The old public "S3 website" endpoint *did*
+handle this, but it is public-only and can't be locked behind CloudFront.) So a
+tiny function runs at the edge and appends `index.html`. **Without it, every page
+except the homepage 404s** — and only in production; local dev and the build look
+perfectly fine.
+
+### What it costs
+
+**Essentially nothing.** Roughly **$0/month as configured today.**
+
+- **S3** — ~10 MB of files, about **$0.0002/month**.
+- **CloudFront** — the free tier is 1 TB of traffic and 10 million requests
+  *every* month, permanently. A dashboard for ~10 operators is nowhere near it.
+  **$0.**
+- **ACM certificate** — free for CloudFront. **$0.**
+- **Route 53** — **$0.50/month**, and *only once you attach a custom domain*.
+  That is a per-hosted-zone charge. There is no public hosted zone on the
+  account today, so this is not being paid.
+
+So: **$0 now, about $0.50/month once a real domain points at it.** For context
+the rest of the AWS bill is ~$53/month, mostly the NAT gateway.
+
+### Deploying it
+
+```bash
+npm run build                                  # produces out/
+cd ../binly-backend/cdk && npx --no-install cdk deploy BinlyFrontend
+```
+
+The CDK stack uploads `out/`, invalidates the CloudFront cache (skip that and the
+CDN happily serves the previous build for hours, which looks like the deploy did
+nothing), and prints the URL.
+
+**With no domain configured it deploys anyway** and serves on a generated
+`something.cloudfront.net` address. That is the current state and it is
+deliberate — the hosting is useful before a domain exists. To attach one later:
+
+```bash
+DASHBOARD_DOMAIN=admin.yourdomain.com DASHBOARD_HOSTED_ZONE_ID=Z... \
+  npx --no-install cdk deploy BinlyFrontend
+```
+
+Note for whenever that happens: if you point the **apex** domain
+(`yourdomain.com`) at it you need an **A/ALIAS record, not a CNAME** — DNS
+forbids a CNAME at the apex because it cannot coexist with the SOA and NS records
+that must live there. A subdomain like `admin.yourdomain.com` could use either.
+The stack uses an ALIAS, which is correct for both cases.
+
+### It is live
+
+**https://d1czl6f8c4vrm5.cloudfront.net** — deployed 2026-08-24. Verified: deep
+links resolve (`/operations/routes/` → 200), the moved docs asset serves, a
+missing path returns a real 404, and the S3 bucket refuses direct requests (403),
+so the CDN cannot be bypassed.
+
+### Which API it talks to — CHECK THIS BEFORE ASSUMING
+
+`NEXT_PUBLIC_API_URL` (falling back to `NEXT_PUBLIC_BACKEND_URL`), read in
+`lib/api/client.ts`. **It is baked in at build time**, not read at runtime —
+`NEXT_PUBLIC_*` variables are substituted into the JavaScript during
+`npm run build`. Pointing the dashboard at a different backend is therefore a
+**rebuild and redeploy**, never an environment change on a running server, and
+there is no way to tell from the deployed site which one it got.
+
+> **The build deployed on 2026-08-24 points at RAILWAY**, not AWS —
+> `https://ropacal-backend-production.up.railway.app`, confirmed by grepping the
+> compiled chunks. So that CloudFront URL is currently a *hosted copy of the
+> live production dashboard*, talking to the Go backend. Useful, but it is **not**
+> exercising the Python port.
+>
+> Note `.env.local` and `.env.production` both set the Railway URL, and
+> **`.env.local` wins** — Next gives it precedence in every environment except
+> test. Editing only `.env.production` changes nothing.
+
+To build against the AWS backend instead:
+
+```bash
+NEXT_PUBLIC_API_URL=https://ihb1xl9dr3.execute-api.us-east-1.amazonaws.com npm run build
+cd ../binly-backend/cdk && npx --no-install cdk deploy BinlyFrontend
+```
+
+An inline variable beats both env files, so this needs no file edits and leaves
+nothing behind to remember to revert. Verify what landed:
+
+```bash
+grep -rhoE "https://[a-z0-9.-]+(execute-api[a-z0-9.-]*|railway\.app)" out/_next/static/chunks/*.js | sort -u
+```
+
+One caveat if you do point it at AWS: **the two backends' tokens do not
+interoperate** (Go signs HS256, the Python stack RS256), so you must log in
+fresh against whichever one the build targets. A session from the other backend
+will 401 on everything.
+
+### Things that will break this, collected in one place
+
+- Adding `middleware.ts` back, or any `route.ts` — build fails.
+- Adding an `app/**/[param]/` directory — build fails.
+- Using `next/image` with optimization on — it needs a server; `unoptimized: true`
+  is set for this reason.
+- Server Components that fetch at request time, `cookies()`, `headers()`,
+  `'use server'` actions — none are used today and none can be.
+- Deploying without invalidating the CDN cache — stale site, no error anywhere.
+
+---
+
 ## Binly Dashboard Architecture
 
 ### Project Overview

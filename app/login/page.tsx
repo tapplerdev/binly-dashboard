@@ -1,7 +1,19 @@
 import Image from 'next/image';
 import { LoginForm } from '@/components/binly/login-form';
+import { RedirectIfAuthenticated } from '@/lib/auth/auth-gate';
 
+// The other half of what `middleware.ts` did: an already-signed-in visitor
+// landing on /login goes to the dashboard instead of seeing a login form they
+// do not need. See `lib/auth/auth-gate.tsx`.
 export default function LoginPage() {
+  return (
+    <RedirectIfAuthenticated>
+      <LoginScreen />
+    </RedirectIfAuthenticated>
+  );
+}
+
+function LoginScreen() {
   return (
     <div className="min-h-screen flex">
       {/* Left Panel - Login Form */}
