@@ -4,8 +4,9 @@
 
 import { CreateManagerIncidentRequest, NoGoZone, ZoneIncident, NearbyIncident } from '@/lib/types/zone';
 import { apiFetch, getAuthHeaders } from './client';
+import { API_BASE } from '@/lib/api/base-url';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_URL = API_BASE;
 
 /**
  * Fetch all no-go zones

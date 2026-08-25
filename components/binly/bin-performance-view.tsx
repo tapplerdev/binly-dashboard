@@ -9,6 +9,7 @@ import { RelocateSuggestModal } from '@/components/binly/relocate-suggest-modal'
 import { getBins } from '@/lib/api/bins';
 import { apiFetch } from '@/lib/api/client';
 import type { Bin, BinWithPriority } from '@/lib/types/bin';
+import { API_BASE } from '@/lib/api/base-url';
 import {
   ResponsiveContainer,
   ScatterChart,
@@ -22,10 +23,7 @@ import {
   Cell,
 } from 'recharts';
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  'https://ropacal-backend-production.up.railway.app';
+const API_BASE_URL = API_BASE;
 
 interface ScorecardRow {
   id: string;

@@ -4,9 +4,10 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { Centrifuge, Subscription } from 'centrifuge';
 import { apiFetch } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/auth/store';
+import { API_BASE } from '@/lib/api/base-url';
 
 const CENTRIFUGO_URL = 'wss://binly-centrifugo-service-production.up.railway.app/connection/websocket';
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
+const BACKEND_URL = API_BASE;
 
 export type CentrifugoStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 

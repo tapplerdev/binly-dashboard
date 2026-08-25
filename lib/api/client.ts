@@ -20,6 +20,7 @@
  */
 
 import { useAuthStore } from '@/lib/auth/store';
+import { API_BASE } from '@/lib/api/base-url';
 
 /**
  * Get auth token — live Zustand state first, persisted storage as fallback
@@ -80,15 +81,24 @@ function handleUnauthorized(): void {
   window.location.assign('/login');
 }
 
-// Origins the JWT may be sent to: our backend (both env spellings in use) plus
-// relative URLs (same-origin). Guards against a future copy-paste handing apiFetch
-// a third-party URL and silently leaking the token cross-origin.
-const BACKEND_ORIGINS = [
-  process.env.NEXT_PUBLIC_API_URL,
-  process.env.NEXT_PUBLIC_BACKEND_URL,
-  'https://ropacal-backend-production.up.railway.app', // hardcoded in a few call sites
-  'http://localhost:8080',
-]
+// Origins the JWT may be sent to. Guards against a future copy-paste handing
+// apiFetch a third-party URL and silently leaking the token cross-origin.
+//
+// AN ALLOWLIST, NOT A BASE URL — which is why this reads differently from every
+// other file and does not simply become API_BASE. It answers "may I attach the
+// token to this?", so it has to be a superset: API_BASE covers the configured
+// backend, and localhost covers a dev build talking to a local server.
+//
+// THE RAILWAY ENTRY IS GONE. It was here because ~40 modules each hardcoded that
+// URL as their own fallback; they now all resolve through `API_BASE`, so nothing
+// generates a Railway URL any more and trusting one would only widen where a
+// token may be sent. If you deliberately point a build at Railway, API_BASE
+// carries it and this list follows automatically.
+//
+// Relative URLs are handled in `isBackendUrl` below rather than here — they are
+// same-origin by definition, and API_BASE is the empty string in a production
+// build, which is not a parseable URL.
+const BACKEND_ORIGINS = [API_BASE, 'http://localhost:8080']
   .filter((u): u is string => Boolean(u))
   .map((u) => new URL(u).origin);
 

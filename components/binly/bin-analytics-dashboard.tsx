@@ -8,8 +8,9 @@ import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-m
 import { Activity, TrendingUp, AlertTriangle, MapPin, ArrowUpDown, ChevronDown, Loader2, X, ArrowLeft, Maximize2, Camera, Calendar } from 'lucide-react';
 import { fetchBinAnalytics, BinPerformance } from '@/lib/api/bin-analytics';
 import { apiFetch } from '@/lib/api/client';
+import { API_BASE } from '@/lib/api/base-url';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
+const API_BASE_URL = API_BASE;
 
 // Bin detail drawer — slides in from right with check history + photos
 function BinDetailDrawer({ bin, onClose }: { bin: BinPerformance; onClose: () => void }) {

@@ -15,8 +15,9 @@ import { useDrivers } from '@/lib/hooks/use-drivers';
 import { Shift, getBackendStatusLabel } from '@/lib/types/shift';
 import { reoptimizeShift } from '@/lib/api/shifts';
 import { apiFetch, getAuthHeaders } from '@/lib/api/client';
+import { API_BASE } from '@/lib/api/base-url';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_BASE_URL = API_BASE;
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });

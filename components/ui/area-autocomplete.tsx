@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { MapPin, X, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/auth/store';
+import { API_BASE } from '@/lib/api/base-url';
 
 /** A resolved city/district target — mirrors the backend's areaTarget. */
 export interface TargetArea {
@@ -14,10 +15,7 @@ export interface TargetArea {
   bbox?: [number, number, number, number]; // west, south, east, north
 }
 
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  'https://ropacal-backend-production.up.railway.app';
+const BACKEND_URL = API_BASE;
 
 const TYPE_LABELS: Record<string, string> = {
   city: 'city',

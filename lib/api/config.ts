@@ -5,8 +5,9 @@
 
 import { WarehouseLocation } from '@/lib/types/config';
 import { apiFetch } from './client';
+import { API_BASE } from '@/lib/api/base-url';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_URL = API_BASE;
 
 /**
  * Fetch warehouse location from config

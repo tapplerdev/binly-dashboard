@@ -36,8 +36,9 @@ import {
 } from 'lucide-react';
 
 import { apiFetch, getAuthHeaders } from '@/lib/api/client';
+import { API_BASE } from '@/lib/api/base-url';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_BASE_URL = API_BASE;
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 
 function reverseGeocode(lat: number, lng: number): Promise<string> {

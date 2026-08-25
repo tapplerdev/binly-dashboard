@@ -4,8 +4,9 @@ import { useCentrifugo } from './use-centrifugo';
 import { useAuthStore } from '@/lib/auth/store';
 import { apiFetch } from '@/lib/api/client';
 import { ActiveDriver, DriverLocation } from '../types/active-driver';
+import { API_BASE } from '@/lib/api/base-url';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
+const BACKEND_URL = API_BASE;
 
 export function useActiveDrivers() {
   const { token } = useAuthStore();

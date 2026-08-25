@@ -37,14 +37,12 @@
 
 import { useMemo } from 'react';
 import { apiFetch } from '@/lib/api/client';
+import { API_BASE } from '@/lib/api/base-url';
 
 // Same resolution order the other backend callers use. apiFetch needs an
 // absolute URL: it decides whether to attach the JWT by ORIGIN, and rewrites
 // tenant routes onto /api/platform/act when an operator is acting as an org.
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  'https://ropacal-backend-production.up.railway.app';
+const BACKEND_URL = API_BASE;
 
 /** A typeahead suggestion. `id` is opaque — pass it back to `lookupAddress`. */
 export interface AddressSuggestion {

@@ -1,10 +1,8 @@
 import type { TargetArea } from '@/components/ui/area-autocomplete';
 import { apiFetch } from './client';
+import { API_BASE } from '@/lib/api/base-url';
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  'https://ropacal-backend-production.up.railway.app';
+const API_URL = API_BASE;
 
 /** A GeoJSON Polygon or MultiPolygon (minimal shape — avoids a @types/geojson dep). */
 export type AreaGeometry =

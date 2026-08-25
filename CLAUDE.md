@@ -220,7 +220,56 @@ links resolve (`/operations/routes/` → 200), the moved docs asset serves, a
 missing path returns a real 404, and the S3 bucket refuses direct requests (403),
 so the CDN cannot be bypassed.
 
-### Which API it talks to — CHECK THIS BEFORE ASSUMING
+### Which API it talks to — one file decides, and in production the answer is "this one"
+
+**`lib/api/base-url.ts` is the only place the backend URL is chosen.** Everything
+else imports `API_BASE` from it.
+
+It used to be decided in **about forty places** — every `lib/api/*.ts` module and
+a dozen components each declared their own
+`const API_URL = process.env.NEXT_PUBLIC_API_URL || <fallback>`, with three
+different fallback conventions between them. Some fell back to `localhost:8080`,
+some to the Railway production URL, some to a chain of both. Nothing enforced
+agreement, so which backend you actually reached depended on which file the
+request happened to route through — and a build with no environment variables
+silently sent live traffic to Railway.
+
+**In production the default is the empty string, which means same-origin.** The
+app calls `/api/bins`, CloudFront routes `/api/*` to API Gateway, and no
+configuration is involved at all. That is the point: switching backends is a
+CloudFront change rather than a rebuild, and there is no longer a way to
+misconfigure this by omission. Development still falls back to `localhost:8080`,
+which fails loudly and locally rather than quietly shipping traffic to prod.
+
+```bash
+npm run build     # same-origin; correct for CloudFront, needs no env vars
+```
+
+Two things to know when building for deploy:
+
+- **`.env.local` overrides everything**, including `.env.production`, in every
+  environment except test. It is gitignored, so it is your machine's config and
+  not the project's. If it names a backend, your deploy build will use it — move
+  it aside or pass the value explicitly for that one build.
+- **`.env.production` deliberately no longer sets an API URL.** Putting one back
+  re-creates the original bug.
+
+To point a build at one specific backend, pass it for that build only:
+
+```bash
+NEXT_PUBLIC_API_URL=https://ihb1xl9dr3.execute-api.us-east-1.amazonaws.com npm run build
+```
+
+Verify what actually landed — this is the only way to tell from the outside:
+
+```bash
+grep -rhoE "https://[a-z0-9.-]+(execute-api[a-z0-9.-]*|railway\.app)" out/_next/static/chunks/*.js | sort -u
+```
+
+Nothing at all means same-origin, which is the healthy answer for a CloudFront
+deploy.
+
+### Older note: why this was so easy to get wrong
 
 `NEXT_PUBLIC_API_URL` (falling back to `NEXT_PUBLIC_BACKEND_URL`), read in
 `lib/api/client.ts`. **It is baked in at build time**, not read at runtime —

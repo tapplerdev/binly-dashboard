@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Calendar, Route, AlertTriangle, Clock, MapPin, Sparkles, Loader2, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
 import { fetchBinAnalytics, BinPerformance } from '@/lib/api/bin-analytics';
 import { apiFetch, getAuthHeaders } from '@/lib/api/client';
+import { API_BASE } from '@/lib/api/base-url';
 
 interface RouteTemplate {
   id: string;
@@ -16,7 +17,7 @@ interface RouteTemplate {
   bins?: string[];
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
+const API_URL = API_BASE;
 
 async function fetchRoutes(): Promise<RouteTemplate[]> {
   const resp = await apiFetch(`${API_URL}/api/routes`, { headers: getAuthHeaders() });

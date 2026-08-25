@@ -27,6 +27,7 @@ import { NoGoZonePin } from '@/components/ui/no-go-zone-pin';
 import { BinMarkersLayer, ZoneMarkersLayer, WarehouseMarkerLayer, RecenterOnWarehouse} from '@/components/binly/map-layers';
 import { useModalClose } from '@/components/binly/modal-wrapper';
 import { MapMarkerPin } from '@/components/ui/map-marker-pin';
+import { API_BASE } from '@/lib/api/base-url';
 
 interface CreatePotentialLocationDialogProps {
   open: boolean;
@@ -802,7 +803,7 @@ export function CreatePotentialLocationDialog({
       console.log('   Payload:', JSON.stringify(payload, null, 2));
 
       // Use environment variable or default to production
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://ropacal-backend-production.up.railway.app';
+      const apiUrl = API_BASE;
 
       const response = await apiFetch(
         `${apiUrl}/api/potential-locations`,

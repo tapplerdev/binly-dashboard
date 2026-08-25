@@ -15,11 +15,9 @@ import { getBins } from '@/lib/api/bins';
 import { apiFetch } from '@/lib/api/client';
 import { WeeklyGrowthPlan } from '@/components/binly/weekly-growth-plan';
 import type { Bin } from '@/lib/types/bin';
+import { API_BASE } from '@/lib/api/base-url';
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  'https://ropacal-backend-production.up.railway.app';
+const API_BASE_URL = API_BASE;
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
 /** H3 resolution 8 ≈ 0.7 km² cells — neighborhood-scale for a Bay Area fleet. */

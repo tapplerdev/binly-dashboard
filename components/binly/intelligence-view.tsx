@@ -17,10 +17,11 @@ import {
   snoozeRecommendation, AIRecommendation,
 } from '@/lib/api/ai-recommendations';
 import { apiFetch, getAuthHeaders } from '@/lib/api/client';
+import { API_BASE } from '@/lib/api/base-url';
 
 const DEFAULT_CENTER = { lat: 37.3382, lng: -121.8863 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
+const API_URL = API_BASE;
 
 interface RouteTemplate {
   id: string;

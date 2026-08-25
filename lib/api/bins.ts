@@ -6,8 +6,9 @@
 import { Bin, BinWithPriority, PotentialLocation, BinCheck } from '@/lib/types/bin';
 import { ZoneIncident } from '@/lib/types/zone';
 import { apiFetch, getAuthHeaders } from './client';
+import { API_BASE } from '@/lib/api/base-url';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_URL = API_BASE;
 
 export type BinSortOption = 'priority' | 'bin_number' | 'fill_percentage' | 'days_since_check' | 'status' | 'location';
 export type BinFilterOption = 'all' | 'next_move_request' | 'missing' | 'pending_move' | 'in_storage' | 'high_fill' | 'medium_fill' | 'low_fill';

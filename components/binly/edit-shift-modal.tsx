@@ -14,6 +14,7 @@ import { MoveRequest, getMoveRequests } from '@/lib/api/move-requests';
 import { apiFetch } from '@/lib/api/client';
 import { useModalClose } from '@/components/binly/modal-wrapper';
 import { getBackendStatusLabel, isShiftEditable } from '@/lib/types/shift';
+import { API_BASE } from '@/lib/api/base-url';
 
 interface EditShiftModalProps {
   shift: {
@@ -473,7 +474,7 @@ export function EditShiftModal({ shift, onClose, drivers, shiftsForDate }: EditS
 
       // 4. Reassign entire shift
       if (stagedReassign) {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+        const API_URL = API_BASE;
         const token = localStorage.getItem('binly-auth-storage');
         const authToken = token ? JSON.parse(token)?.state?.token : null;
         const patchHeaders: Record<string, string> = { 'Content-Type': 'application/json' };

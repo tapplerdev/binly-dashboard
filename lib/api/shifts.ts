@@ -6,8 +6,9 @@
 import { Shift, ShiftStatus } from '@/lib/types/shift';
 import { ShiftRoutePreview } from '@/lib/types/route-preview';
 import { apiFetch, getAuthHeaders } from './client';
+import { API_BASE } from '@/lib/api/base-url';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_BASE_URL = API_BASE;
 
 /**
  * Preview a scheduled shift's optimized route WITHOUT starting it — a dry-run of

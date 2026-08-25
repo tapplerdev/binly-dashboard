@@ -4,8 +4,9 @@
  */
 
 import { apiFetch, getAuthHeaders } from './client';
+import { API_BASE } from '@/lib/api/base-url';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_URL = API_BASE;
 
 export interface NotificationSettings {
   drift_alerts_enabled: boolean;

@@ -1,8 +1,9 @@
 import { useMutation } from '@tanstack/react-query';
 import { loginSchema, type LoginInput } from './schemas';
 import type { LoginResponse } from './types';
+import { API_BASE } from '@/lib/api/base-url';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_BASE_URL = API_BASE;
 
 /**
  * React Query hook for login mutation

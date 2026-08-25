@@ -1,7 +1,8 @@
 import { Route } from '@/lib/types/route';
 import { apiFetch, getAuthHeaders } from './client';
+import { API_BASE } from '@/lib/api/base-url';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_BASE_URL = API_BASE;
 
 /**
  * Get all available routes with their bin IDs

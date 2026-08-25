@@ -30,6 +30,7 @@ import { useWarehouseLocation } from '@/lib/hooks/use-warehouse';
 import { HerePlacesAutocomplete } from '@/components/ui/here-places-autocomplete';
 import { HerePlaceDetails } from '@/lib/services/geocoding.service';
 import { apiFetch } from '@/lib/api/client';
+import { API_BASE } from '@/lib/api/base-url';
 
 // NOTE: the legacy ShiftsView component tree (list/timeline/live views) was
 // removed with the retired assign-route endpoint — it was not mounted by any
@@ -367,7 +368,7 @@ export function CreateShiftDrawer({
       console.log('📋 [EDIT MODE] Starting fetch for shift:', shift.id);
       setLoadingShiftData(true);
       try {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+        const API_URL = API_BASE;
         const url = `${API_URL}/api/manager/shifts/${shift.id}/tasks/history`;
         console.log('📋 [EDIT MODE] Fetching from URL:', url);
 
@@ -1588,7 +1589,7 @@ export function CreateShiftDrawer({
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
       // Call backend directly (not through Next.js API route)
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      const API_URL = API_BASE;
 
       let response;
       if (isEditMode && shift) {
@@ -2851,7 +2852,7 @@ export function CreateShiftDrawer({
                     type="button"
                     onClick={async () => {
                       try {
-                        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+                        const API_URL = API_BASE;
                         const token = localStorage.getItem('binly-auth-storage');
                         const authToken = token ? JSON.parse(token)?.state?.token : null;
                         await apiFetch(`${API_URL}/api/manager/shifts/${conflictShift.id}/cancel`, {

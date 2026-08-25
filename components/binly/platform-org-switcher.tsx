@@ -7,11 +7,9 @@ import { Dropdown } from '@/components/ui/dropdown';
 import { apiFetch } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/auth/store';
 import type { Organization } from '@/lib/auth/types';
+import { API_BASE } from '@/lib/api/base-url';
 
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  'https://ropacal-backend-production.up.railway.app';
+const BACKEND_URL = API_BASE;
 
 /**
  * Organization switcher for a cross-tenant Binly operator.

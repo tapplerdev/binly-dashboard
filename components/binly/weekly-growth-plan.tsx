@@ -8,11 +8,9 @@ import { CalendarCheck, Eye, ArrowUpRight, Warehouse, TrendingUp } from 'lucide-
 import { RelocateSuggestModal } from '@/components/binly/relocate-suggest-modal';
 import { acceptRecommendation } from '@/lib/api/ai-recommendations';
 import { apiFetch } from '@/lib/api/client';
+import { API_BASE } from '@/lib/api/base-url';
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  'https://ropacal-backend-production.up.railway.app';
+const API_BASE_URL = API_BASE;
 
 interface WatchRow {
   bin_id: string;

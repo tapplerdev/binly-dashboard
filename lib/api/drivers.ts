@@ -4,8 +4,9 @@
  */
 
 import { apiFetch, getAuthHeaders } from './client';
+import { API_BASE } from '@/lib/api/base-url';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ropacal-backend-production.up.railway.app';
+const API_BASE_URL = API_BASE;
 
 // Backend driver response type
 interface BackendDriver {
