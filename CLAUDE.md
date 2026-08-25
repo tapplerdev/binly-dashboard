@@ -269,55 +269,26 @@ grep -rhoE "https://[a-z0-9.-]+(execute-api[a-z0-9.-]*|railway\.app)" out/_next/
 Nothing at all means same-origin, which is the healthy answer for a CloudFront
 deploy.
 
-### Older note: why this was so easy to get wrong
+### How this went wrong the first time, kept as the reason for the rule above
 
-`NEXT_PUBLIC_API_URL` (falling back to `NEXT_PUBLIC_BACKEND_URL`), read in
-`lib/api/client.ts`. **It is baked in at build time**, not read at runtime —
-`NEXT_PUBLIC_*` variables are substituted into the JavaScript during
-`npm run build`. Pointing the dashboard at a different backend is therefore a
-**rebuild and redeploy**, never an environment change on a running server, and
-there is no way to tell from the deployed site which one it got.
+The very first CloudFront deploy went out talking to **Railway**, not AWS, and
+looked identical from the outside to a build pointing at the right place. Two
+things combined:
 
-> **The build deployed on 2026-08-24 points at RAILWAY**, not AWS —
-> `https://ropacal-backend-production.up.railway.app`, confirmed by grepping the
-> compiled chunks. So that CloudFront URL is currently a *hosted copy of the
-> live production dashboard*, talking to the Go backend. Useful, but it is **not**
-> exercising the Python port.
->
-> Note `.env.local` and `.env.production` both set the Railway URL, and
-> **`.env.local` wins** — Next gives it precedence in every environment except
-> test. Editing only `.env.production` changes nothing.
+`NEXT_PUBLIC_*` values are substituted into the JavaScript at build time, so the
+backend a bundle talks to is frozen into the artifact and cannot be read back
+from any config — the only way to find out is to grep the compiled chunks. And
+about forty files each carried their own Railway fallback, so a build with no
+environment variables did not fail, it just quietly chose production.
 
-To build against the AWS backend instead:
+`.env.local` also beats `.env.production` in every environment except test, and
+it is gitignored — so the effective backend depended on a file that exists only
+on one machine and is invisible to everyone else.
 
-```bash
-NEXT_PUBLIC_API_URL=https://ihb1xl9dr3.execute-api.us-east-1.amazonaws.com npm run build
-cd ../binly-backend/cdk && npx --no-install cdk deploy BinlyFrontend
-```
-
-An inline variable beats both env files, so this needs no file edits and leaves
-nothing behind to remember to revert. Verify what landed:
-
-```bash
-grep -rhoE "https://[a-z0-9.-]+(execute-api[a-z0-9.-]*|railway\.app)" out/_next/static/chunks/*.js | sort -u
-```
-
-One caveat if you do point it at AWS: **the two backends' tokens do not
-interoperate** (Go signs HS256, the Python stack RS256), so you must log in
-fresh against whichever one the build targets. A session from the other backend
-will 401 on everything.
-
-### Things that will break this, collected in one place
-
-- Adding `middleware.ts` back, or any `route.ts` — build fails.
-- Adding an `app/**/[param]/` directory — build fails.
-- Using `next/image` with optimization on — it needs a server; `unoptimized: true`
-  is set for this reason.
-- Server Components that fetch at request time, `cookies()`, `headers()`,
-  `'use server'` actions — none are used today and none can be.
-- Deploying without invalidating the CDN cache — stale site, no error anywhere.
-
----
+Both causes are fixed: `lib/api/base-url.ts` is the single source, its production
+default is same-origin, and `.env.production` no longer names a backend. The
+`.env.local` precedence rule still applies, which is why the deploy instructions
+above tell you to move it aside or pass the value explicitly.
 
 ## Binly Dashboard Architecture
 
