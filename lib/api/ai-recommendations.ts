@@ -56,7 +56,7 @@ export async function getPendingCount(): Promise<number> {
 
 export async function acceptRecommendation(id: string): Promise<void> {
   const resp = await apiFetch(`${API_URL}/api/manager/ai-recommendations/${id}/accept`, {
-    method: 'PUT',
+    method: 'POST',
     headers: getAuthHeaders(),
   });
   if (!resp.ok) throw new Error('Failed to accept recommendation');
@@ -64,7 +64,7 @@ export async function acceptRecommendation(id: string): Promise<void> {
 
 export async function dismissRecommendation(id: string): Promise<void> {
   const resp = await apiFetch(`${API_URL}/api/manager/ai-recommendations/${id}/dismiss`, {
-    method: 'PUT',
+    method: 'POST',
     headers: getAuthHeaders(),
   });
   if (!resp.ok) throw new Error('Failed to dismiss recommendation');
@@ -72,7 +72,7 @@ export async function dismissRecommendation(id: string): Promise<void> {
 
 export async function snoozeRecommendation(id: string, snoozeUntil?: number): Promise<void> {
   const resp = await apiFetch(`${API_URL}/api/manager/ai-recommendations/${id}/snooze`, {
-    method: 'PUT',
+    method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({ snooze_until: snoozeUntil }),
   });

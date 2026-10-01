@@ -196,7 +196,7 @@ export async function bulkAssignMoves(params: BulkAssignMovesParams): Promise<vo
  */
 export async function cancelMoveRequest(moveRequestId: string, reason?: string): Promise<void> {
   const response = await apiFetch(`${API_BASE_URL}/api/manager/bins/move-requests/${moveRequestId}/cancel`, {
-    method: 'PUT',
+    method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({ reason }),
   });
@@ -237,7 +237,7 @@ export async function updateMoveRequest(
   params: UpdateMoveRequestParams
 ): Promise<MoveRequest> {
   const response = await apiFetch(`${API_BASE_URL}/api/manager/bins/move-requests/${moveRequestId}`, {
-    method: 'PUT',
+    method: 'PATCH',
     headers: getAuthHeaders(),
     body: JSON.stringify(params),
   });
@@ -300,7 +300,7 @@ export async function assignMoveToUser(params: AssignMoveToUserParams): Promise<
 
   try {
     const response = await apiFetch(url, {
-      method: 'PUT',
+      method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ user_id }),
     });
@@ -334,7 +334,7 @@ export async function clearMoveAssignment(moveRequestId: string): Promise<void> 
   const response = await apiFetch(
     `${API_BASE_URL}/api/manager/bins/move-requests/${moveRequestId}/clear-assignment`,
     {
-      method: 'PUT',
+      method: 'POST',
       headers: getAuthHeaders(),
     }
   );

@@ -70,7 +70,7 @@ export async function updateNotificationSettings(
   settings: NotificationSettings
 ): Promise<{ status: string; settings: NotificationSettings }> {
   const response = await apiFetch(`${API_URL}/api/manager/notification-settings`, {
-    method: 'PUT',
+    method: 'PATCH',
     headers: getAuthHeaders(),
     body: JSON.stringify(settings),
   });

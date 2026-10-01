@@ -2856,7 +2856,7 @@ export function CreateShiftDrawer({
                         const token = localStorage.getItem('binly-auth-storage');
                         const authToken = token ? JSON.parse(token)?.state?.token : null;
                         await apiFetch(`${API_URL}/api/manager/shifts/${conflictShift.id}/cancel`, {
-                          method: 'PUT',
+                          method: 'POST',
                           headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {},
                         });
                         setConflictShift(null);

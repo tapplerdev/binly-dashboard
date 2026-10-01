@@ -188,8 +188,8 @@ if (shift.status === "not_started" || shift.start_time > now) {
 1. ✅ `GET /api/manager/bins/move-requests` - List all
 2. ✅ `POST /api/manager/bins/schedule-move` - Create
 3. ✅ `POST /api/manager/bins/move-requests/:id/assign-to-shift` - Assign
-4. ✅ `PUT /api/manager/bins/move-requests/:id/cancel` - Cancel
-5. ⏳ `PUT /api/manager/bins/move-requests/:id` - Update (may need to create)
+4. ✅ `POST /api/manager/bins/move-requests/:id/cancel` - Cancel
+5. ✅ `PATCH /api/manager/bins/move-requests/:id` - Update (only the fields sent change)
 6. ⏳ `GET /api/manager/bins/move-requests/:id` - Get single (may need to create)
 
 **Additional Backend Work:**

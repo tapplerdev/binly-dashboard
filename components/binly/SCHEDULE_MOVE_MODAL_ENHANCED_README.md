@@ -120,7 +120,7 @@ All dependencies are already installed:
 
 ### On Submit:
 - `POST /api/manager/bins/schedule-move` (N times) - Create move requests
-- `PUT /api/manager/bins/move-requests/:id/assign-to-user` (optional, per bin)
+- `POST /api/manager/bins/move-requests/:id/assign-to-user` (optional, per bin)
 - `POST /api/manager/bins/move-requests/:id/assign-to-shift` (optional, per bin)
 
 ## Performance
