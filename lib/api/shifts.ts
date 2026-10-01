@@ -500,6 +500,7 @@ function convertBackendShiftToFrontend(driver: BackendDriver): Shift {
     optimization_metadata: driver.optimization_metadata,
     total_distance_miles: driver.total_distance_miles,
     estimated_completion_time: driver.estimated_completion_time,
+    start_time: driver.start_time,
   };
 }
 
@@ -580,6 +581,54 @@ export async function getShiftTasksWithHistory(shiftId: string): Promise<any[]> 
     return data.data || [];
   } catch (error) {
     console.error('❌ [API] Error fetching task history:', error);
+    return [];
+  }
+}
+
+/**
+ * One event on a shift's edit timeline: created, a task added or removed, or
+ * the driver reassigned. The backend writes it in the same transaction as the
+ * edit it describes, so an edit and its record cannot disagree.
+ */
+export interface ShiftEdit {
+  id: string;
+  event_type: 'created' | 'task_added' | 'task_removed' | 'driver_reassigned';
+  task_id?: string;
+  task_type?: string;
+  bin_number?: number;
+  move_request_id?: string;
+  actor_id?: string;
+  /** Absent when the system made the change, or the user no longer exists. */
+  actor_name?: string;
+  /** A backend reason code (see describeEditReason) or a manager's own words. */
+  reason?: string;
+  from_driver_name?: string;
+  to_driver_name?: string;
+  /** created only: the shift's bin count at birth (a relocation counts once). */
+  bin_count?: number;
+  /** Unix seconds. */
+  created_at: number;
+}
+
+/**
+ * GET /api/manager/shifts/:id/edit-history — oldest first. Shifts created
+ * before the timeline existed simply have none.
+ */
+export async function getShiftEditHistory(shiftId: string): Promise<ShiftEdit[]> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/api/manager/shifts/${shiftId}/edit-history`, {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      console.warn(`⚠️  [API] Failed to fetch shift edit history: ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.data || [];
+  } catch (error) {
+    console.error('❌ [API] Error fetching shift edit history:', error);
     return [];
   }
 }

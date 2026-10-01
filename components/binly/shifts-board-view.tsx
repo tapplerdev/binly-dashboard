@@ -234,6 +234,7 @@ export function ShiftsBoardView() {
         : 'scheduled',
       optimization_metadata: shift.optimization_metadata,
       total_distance_miles: shift.total_distance_miles,
+      start_time: shift.start_time ?? null, // the drawer's timeline shows "Shift started"
     };
     setSelectedShiftForDetails(frontendShift);
   };
