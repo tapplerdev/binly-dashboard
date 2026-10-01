@@ -14,7 +14,7 @@ import { useNotificationStore } from '@/lib/stores/notification-store';
 import { useNotifications, useUnreadCount, useMarkRead, useMarkAllRead } from '@/lib/hooks/use-notifications';
 import type { UserNotification } from '@/lib/api/notifications';
 import { cn } from '@/lib/utils';
-import { sidebarNavItems } from './sidebar-nav-items';
+import { useSidebarNavItems } from './sidebar-nav-items';
 
 function getNotifIcon(type: string) {
   if (type.startsWith('bin_drift')) return { icon: MapPin, bg: 'bg-red-100', color: 'text-red-600' };
@@ -76,6 +76,7 @@ export function TopNavBar({ onOpenAIAssistant }: TopNavBarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, clearAuth } = useAuthStore();
+  const navItems = useSidebarNavItems();
   const queryClient = useQueryClient();
   // DB-backed notifications
   const { data: notifData } = useNotifications(1);
@@ -112,7 +113,7 @@ export function TopNavBar({ onOpenAIAssistant }: TopNavBarProps) {
   const userInitial = user?.name?.charAt(0).toUpperCase() || 'U';
 
   // Find which section contains the current path for default open state
-  const defaultOpenSection = sidebarNavItems.find((section) =>
+  const defaultOpenSection = navItems.find((section) =>
     section.children.some((item) => item.path === pathname)
   );
 
@@ -339,7 +340,7 @@ export function TopNavBar({ onOpenAIAssistant }: TopNavBarProps) {
 
             {/* Navigation Items with Expandable Sections */}
             <nav className="flex-1 px-4 py-4 space-y-4 overflow-y-auto">
-              {sidebarNavItems.map((section) => (
+              {navItems.map((section) => (
                 <div key={section.key}>
                   {/* Section Header */}
                   <button

@@ -3,16 +3,17 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { sidebarNavItems, NavItem } from './sidebar-nav-items';
+import { useSidebarNavItems, NavItem } from './sidebar-nav-items';
 import { ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function Sidebar() {
+  const navItems = useSidebarNavItems();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
   // Find which section contains the current path on initial mount only
-  const defaultOpenSection = sidebarNavItems.find((section) =>
+  const defaultOpenSection = navItems.find((section) =>
     section.children.some((item) => item.path === pathname)
   );
 
@@ -71,7 +72,7 @@ export function Sidebar() {
       <div className="p-6 flex-1 overflow-y-auto">
         {/* Navigation */}
         <nav className="space-y-6">
-          {sidebarNavItems.map((section) => (
+          {navItems.map((section) => (
             <div key={section.key}>
               {/* Section Header */}
               {!collapsed && (

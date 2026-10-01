@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+import { useAirtagTracking } from '@/lib/auth/use-airtag-tracking';
 import {
   Home,
   Map,
@@ -22,6 +24,8 @@ export interface NavItem {
   path?: string;
   icon?: React.ReactNode;
   external?: boolean;
+  /** Shown only to organizations with AirTag tracking (useAirtagTracking). */
+  requiresAirtagTracking?: boolean;
   children: NavItem[];
 }
 
@@ -85,6 +89,7 @@ export const sidebarNavItems: NavItem[] = [
         key: 'airtag-tracker',
         title: 'AirTag Tracker',
         icon: <Radio className="w-5 h-5" />,
+        requiresAirtagTracking: true,
         children: [],
       },
     ],
@@ -160,3 +165,22 @@ export const sidebarNavItems: NavItem[] = [
     ],
   },
 ];
+
+/**
+ * The nav for the organization being shown: the same tree, minus what that
+ * organization does not have. Both the sidebar and the mobile menu read this, so
+ * the two cannot disagree.
+ */
+export function useSidebarNavItems(): NavItem[] {
+  const airtagTracking = useAirtagTracking();
+  return useMemo(
+    () =>
+      airtagTracking
+        ? sidebarNavItems
+        : sidebarNavItems.map((section) => ({
+            ...section,
+            children: section.children.filter((item) => !item.requiresAirtagTracking),
+          })),
+    [airtagTracking]
+  );
+}
