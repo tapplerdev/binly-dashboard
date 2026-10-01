@@ -88,7 +88,7 @@ export async function updateNotificationPreferences(
   prefs: Omit<NotificationPreferences, 'user_id'>
 ): Promise<{ status: string; preferences: NotificationPreferences }> {
   const res = await apiFetch(`${API_URL}/api/notifications/preferences`, {
-    method: 'PUT',
+    method: 'PATCH',
     headers: getAuthHeaders(),
     body: JSON.stringify(prefs),
   });
