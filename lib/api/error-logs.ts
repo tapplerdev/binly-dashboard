@@ -65,7 +65,7 @@ export async function getAppErrorLogs(params?: GetErrorLogsParams): Promise<AppE
   if (params?.limit) queryParams.append('limit', String(params.limit));
 
   const response = await apiFetch(
-    `${API_BASE_URL}/manager/logs/app-errors?${queryParams.toString()}`,
+    `${API_BASE_URL}/api/manager/logs/app-errors?${queryParams.toString()}`,
     {
       headers: getAuthHeaders(),
     }
@@ -83,7 +83,7 @@ export async function getAppErrorLogs(params?: GetErrorLogsParams): Promise<AppE
  */
 export async function getAppErrorStats(): Promise<AppErrorStats> {
   const response = await apiFetch(
-    `${API_BASE_URL}/manager/logs/app-error-stats`,
+    `${API_BASE_URL}/api/manager/logs/app-error-stats`,
     {
       headers: getAuthHeaders(),
     }
@@ -104,7 +104,7 @@ export async function resolveAppErrorLog(
   notes?: string
 ): Promise<{ status: string; id: string }> {
   const response = await apiFetch(
-    `${API_BASE_URL}/manager/logs/app-errors/${errorLogId}/resolve`,
+    `${API_BASE_URL}/api/manager/logs/app-errors/${errorLogId}/resolve`,
     {
       method: 'PATCH',
       headers: getAuthHeaders(),
