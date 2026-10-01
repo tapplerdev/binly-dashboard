@@ -15,8 +15,11 @@ export default function IssuesPage() {
 
   const queryClient = useQueryClient();
 
-  // Fetch error logs
-  const { data: errorLogs = [], isLoading } = useQuery({
+  // Fetch error logs. A failed fetch never falls through to the green "No
+  // error logs found": with nothing loaded it gets an error card, and a failed
+  // refresh keeps the loaded logs under a banner. isPending rather than
+  // isLoading, so a query paused while offline shows as loading too.
+  const { data: errorLogs = [], isPending, isLoadingError, isRefetchError, refetch } = useQuery({
     queryKey: ['app-error-logs', selectedSeverity, selectedContext, showResolvedOnly],
     queryFn: () =>
       getAppErrorLogs({
@@ -162,9 +165,28 @@ export default function IssuesPage() {
 
       {/* Error Logs List */}
       <div className="space-y-3">
-        {isLoading ? (
+        {isRefetchError && (
+          <div className="flex items-center justify-between gap-3 rounded-xl border-2 border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <span>Couldn&apos;t refresh error logs. Showing the last ones loaded.</span>
+            <button onClick={() => refetch()} className="font-medium text-blue-600 hover:underline">
+              Try again
+            </button>
+          </div>
+        )}
+        {isPending ? (
           <div className="bg-white rounded-xl border-2 border-gray-200 p-8 text-center">
             <p className="text-gray-600">Loading error logs...</p>
+          </div>
+        ) : isLoadingError ? (
+          <div className="bg-white rounded-xl border-2 border-red-200 p-8 text-center">
+            <XCircle className="w-12 h-12 text-red-600 mx-auto mb-3" />
+            <p className="text-gray-900 font-medium">Couldn&apos;t load error logs</p>
+            <button
+              onClick={() => refetch()}
+              className="mt-3 text-sm font-medium text-blue-600 hover:underline"
+            >
+              Try again
+            </button>
           </div>
         ) : errorLogs.length === 0 ? (
           <div className="bg-white rounded-xl border-2 border-gray-200 p-8 text-center">
