@@ -38,6 +38,7 @@ import {
 import type { NotificationSettings } from '@/lib/api/notification-settings';
 import type { NotificationPreferences } from '@/lib/api/notifications';
 import { useAuthStore } from '@/lib/auth/store';
+import { useAirtagTracking } from '@/lib/auth/use-airtag-tracking';
 
 function formatTimeDisplay(hour: number, minute: number) {
   const min = String(minute).padStart(2, '0');
@@ -208,6 +209,10 @@ const NOTIFICATION_TYPES = [
   { value: 'digest_warehouse_bins', label: 'Warehouse Bins (Legacy)' },
 ];
 
+// AirTag-only notification types, offered as filters only to organizations with
+// AirTag tracking (useAirtagTracking).
+const AIRTAG_NOTIFICATION_TYPES = new Set(['daily_battery_report', 'bin_drift_alert']);
+
 function getTypeBadge(type: string) {
   switch (type) {
     case 'daily_move_report':
@@ -268,6 +273,7 @@ function Toggle({
 }
 
 function NotificationSettingsTab() {
+  const airtagTracking = useAirtagTracking();
   const { data: settings, isLoading } = useNotificationSettings();
   const updateMutation = useUpdateNotificationSettings();
   const digestMutation = useTriggerDigest();
@@ -333,6 +339,7 @@ function NotificationSettingsTab() {
       </Card>
 
       {/* Drift Alerts */}
+      {airtagTracking && (
       <Card className="rounded-2xl">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -391,6 +398,7 @@ function NotificationSettingsTab() {
           </CardContent>
         )}
       </Card>
+      )}
 
       {/* Daily Move Report */}
       <Card className="rounded-2xl">
@@ -521,6 +529,7 @@ function NotificationSettingsTab() {
       </Card>
 
       {/* Daily Battery Report */}
+      {airtagTracking && (
       <Card className="rounded-2xl">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -583,6 +592,7 @@ function NotificationSettingsTab() {
           </CardContent>
         )}
       </Card>
+      )}
 
       {/* Report Test Result */}
       {digestResult && (
@@ -757,6 +767,7 @@ function NotificationSettingsTab() {
 }
 
 function NotificationHistoryTab() {
+  const airtagTracking = useAirtagTracking();
   const [page, setPage] = useState(1);
   const [typeFilter, setTypeFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -795,7 +806,7 @@ function NotificationHistoryTab() {
           }}
           className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-gray-300"
         >
-          {NOTIFICATION_TYPES.map((t) => (
+          {NOTIFICATION_TYPES.filter((t) => airtagTracking || !AIRTAG_NOTIFICATION_TYPES.has(t.value)).map((t) => (
             <option key={t.value} value={t.value}>
               {t.label}
             </option>
@@ -897,6 +908,7 @@ function NotificationHistoryTab() {
 }
 
 function MyPreferencesTab() {
+  const airtagTracking = useAirtagTracking();
   const { data: prefs, isLoading } = useNotificationPreferences();
   const { data: sysSettings } = useNotificationSettings();
   const updateMutation = useUpdateNotificationPreferences();
@@ -972,19 +984,20 @@ function MyPreferencesTab() {
     : undefined;
 
   const ALL_PREF_ITEMS = [
-    { key: 'drift_alerts' as const, label: 'Drift Alerts', desc: 'Get alerted when bins move from their location', context: driftContext, icon: Radar, bg: 'bg-red-50', color: 'text-red-600', adminOnly: true },
+    { key: 'drift_alerts' as const, label: 'Drift Alerts', desc: 'Get alerted when bins move from their location', context: driftContext, icon: Radar, bg: 'bg-red-50', color: 'text-red-600', adminOnly: true, airtag: true },
     { key: 'digests' as const, label: 'Daily Move Reports', desc: 'Daily summary of overdue and upcoming moves', context: moveReportContext, icon: Clock, bg: 'bg-blue-50', color: 'text-blue-600', adminOnly: true },
     { key: 'bin_check_reports' as const, label: 'Bin Check Reports', desc: 'Daily summary of bins that need checking', context: binCheckContext, icon: ClipboardList, bg: 'bg-teal-50', color: 'text-teal-600', adminOnly: true },
     { key: 'shift_events' as const, label: 'Shift Events', desc: 'Shift creation, cancellation, and reassignment alerts', context: 'Includes route assignments and driver changes', icon: Truck, bg: 'bg-green-50', color: 'text-green-600', adminOnly: false },
     { key: 'move_requests' as const, label: 'Move Requests', desc: 'Alerts for new and updated move requests', context: 'New assignments and status changes', icon: ArrowRightLeft, bg: 'bg-amber-50', color: 'text-amber-600', adminOnly: false },
     { key: 'overdue_move_alerts' as const, label: 'Overdue Move Alerts', desc: 'Real-time alerts when moves pass their scheduled date', context: 'Individual alerts per overdue move request', icon: AlertTriangle, bg: 'bg-red-50', color: 'text-red-600', adminOnly: true },
     { key: 'due_soon_alerts' as const, label: 'Due Soon Alerts', desc: 'Alerts when move requests are approaching their due date', context: 'Individual alerts per upcoming move request', icon: Timer, bg: 'bg-yellow-50', color: 'text-yellow-600', adminOnly: true },
-    { key: 'battery_alerts' as const, label: 'Battery Alerts', desc: 'Daily AirTag low battery reports', context: sysSettings ? `Scheduled at ${formatTime(sysSettings.daily_battery_report_hour, sysSettings.daily_battery_report_minute)}` : undefined, icon: BatteryWarning, bg: 'bg-amber-50', color: 'text-amber-600', adminOnly: true },
+    { key: 'battery_alerts' as const, label: 'Battery Alerts', desc: 'Daily AirTag low battery reports', context: sysSettings ? `Scheduled at ${formatTime(sysSettings.daily_battery_report_hour, sysSettings.daily_battery_report_minute)}` : undefined, icon: BatteryWarning, bg: 'bg-amber-50', color: 'text-amber-600', adminOnly: true, airtag: true },
   ];
 
-  const PREF_ITEMS = userRole === 'admin'
+  const PREF_ITEMS = (userRole === 'admin'
     ? ALL_PREF_ITEMS
-    : ALL_PREF_ITEMS.filter((item) => !item.adminOnly);
+    : ALL_PREF_ITEMS.filter((item) => !item.adminOnly)
+  ).filter((item) => airtagTracking || !item.airtag);
 
   return (
     <div className="space-y-6">

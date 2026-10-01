@@ -99,6 +99,30 @@ export function CentrifugoProvider({ token, children }: CentrifugoProviderProps)
     };
   }, [token, organization, setOrganization, isPlatform]);
 
+  // Refresh a STORED organization once per page load. The backfill above only
+  // runs when there is none, so the stored copy was a snapshot from sign-in that
+  // never changed — and what the dashboard renders now depends on it: AirTag
+  // tracking is a per-org capability (organizations.airtag_tracking), absent
+  // from every session older than it. Non-blocking: the stored copy keeps
+  // rendering until the answer arrives, and a failed refresh changes nothing.
+  const orgRefreshed = useRef(false);
+  useEffect(() => {
+    if (isPlatform || !token || !organization || orgRefreshed.current) return;
+    orgRefreshed.current = true;
+    (async () => {
+      try {
+        const res = await apiFetch(`${BACKEND_URL}/api/auth/status`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.organization) setOrganization(data.organization);
+      } catch {
+        // Keep the stored copy.
+      }
+    })();
+  }, [token, organization, setOrganization, isPlatform]);
+
   // During the migration the backend publishes to BOTH names, so the scoped
   // channel is live and safe to use. A null organization after resolution means
   // a pre-tenancy backend, where the legacy channel is the only one that exists.

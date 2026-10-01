@@ -1,4 +1,5 @@
 import { AirTagMapView } from '@/components/binly/airtag-map-view';
+import { AirtagTrackingGate } from '@/components/binly/airtag-tracking-gate';
 
 export const metadata = {
   title: 'AirTag Tracker - Binly Dashboard',
@@ -6,5 +7,9 @@ export const metadata = {
 };
 
 export default function AirTagTrackerPage() {
-  return <AirTagMapView />;
+  return (
+    <AirtagTrackingGate>
+      <AirTagMapView />
+    </AirtagTrackingGate>
+  );
 }

@@ -45,7 +45,17 @@ export function PlatformOrgSwitcher() {
         });
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled) setPlatformOrgs(data.organizations ?? []);
+        if (cancelled) return;
+        const orgs: Organization[] = data.organizations ?? [];
+        setPlatformOrgs(orgs);
+        // The org being acted on is persisted as a snapshot from when it was
+        // picked; take its current state from the fresh list (same slug, so
+        // nothing about which tenant is acted on changes). Otherwise a flag
+        // like airtag_tracking would stay at whatever it was — or absent —
+        // until the operator switched away and back.
+        const current = useAuthStore.getState().actingOrg;
+        const fresh = current && orgs.find((o) => o.slug === current.slug);
+        if (fresh) setActingOrg(fresh);
       } catch {
         // Non-fatal: the switcher simply stays empty and the operator sees the
         // "select an organization" state rather than a broken page.
@@ -56,7 +66,7 @@ export function PlatformOrgSwitcher() {
     return () => {
       cancelled = true;
     };
-  }, [isPlatform, token, setPlatformOrgs]);
+  }, [isPlatform, token, setPlatformOrgs, setActingOrg]);
 
   if (!isPlatform) return null;
 

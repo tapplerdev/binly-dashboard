@@ -17,6 +17,12 @@ export interface Organization {
   slug: string;
   /** Present on the platform whoami listing, absent on the login response. */
   status?: string;
+  /**
+   * AirTag tracking (organizations.airtag_tracking) — on for ropacal only, since
+   * the FindMy bridge serves one company. Every AirTag surface keys on it via
+   * useAirtagTracking(). Absent on sessions from before it existed.
+   */
+  airtag_tracking?: boolean;
 }
 
 export interface LoginResponse {
