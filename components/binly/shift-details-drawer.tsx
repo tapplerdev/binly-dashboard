@@ -3,10 +3,11 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { X, MapPin, Clock, Package, Weight, TrendingUp, Check, Circle, Trash2, ArrowUp, ArrowDown, Warehouse, SkipForward, AlertTriangle, ChevronDown, ChevronUp, Navigation, Route as RouteIcon, Image as ImageIcon, ClipboardCheck, Truck } from 'lucide-react';
 import { Shift, getShiftStatusColor, getShiftStatusLabel } from '@/lib/types/shift';
-import { getShiftById, getShiftTasks, cancelShift, editShiftTasks, getShiftTasksWithHistory, previewShiftRoute } from '@/lib/api/shifts';
+import { getShiftById, getShiftTasks, cancelShift, editShiftTasks, getShiftTasksWithHistory, getShiftEditHistory, ShiftEdit, previewShiftRoute } from '@/lib/api/shifts';
 import { RouteTask, getTaskLabel, getTaskSubtitle, getTaskColor, getTaskBgColor } from '@/lib/types/route-task';
 import { groupWarehouseRuns, WarehouseRunCard, isRedeployPlacement } from './shift-task-card';
 import { ShiftRouteMap } from './shift-route-map';
+import { ShiftActivityTimeline } from './shift-activity-timeline';
 import { RoutePreviewMapModal } from './route-preview-map-modal';
 import { ShiftRoutePreview, physicalStopCount } from '@/lib/types/route-preview';
 import { useCentrifugo } from '@/lib/hooks/use-centrifugo';
@@ -123,6 +124,7 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift, highlightBinId
   const [isClosing, setIsClosing] = useState(false);
   const [tasks, setTasks] = useState<RouteTask[]>([]);
   const [allTasks, setAllTasks] = useState<RouteTask[]>([]); // Includes deleted tasks
+  const [edits, setEdits] = useState<ShiftEdit[]>([]); // The shift's edit log (who/what/why)
   const [bins, setBins] = useState<ShiftBin[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -175,8 +177,12 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift, highlightBinId
       console.log('🔍 [SHIFT DETAILS] Tasks array length:', tasksData?.length || 0);
       console.log('🔍 [SHIFT DETAILS] Tasks array is array?', Array.isArray(tasksData));
 
-      // Also fetch all tasks including deleted ones for history/audit
-      const allTasksData = await getShiftTasksWithHistory(shift.id);
+      // Also fetch all tasks including deleted ones, and the edit log, for the timeline
+      const [allTasksData, editsData] = await Promise.all([
+        getShiftTasksWithHistory(shift.id),
+        getShiftEditHistory(shift.id),
+      ]);
+      setEdits(editsData);
       console.log('📜 [SHIFT DETAILS] All tasks (with history):', allTasksData.length);
       console.log('📜 [SHIFT DETAILS] Active tasks (is_deleted=false):', allTasksData.filter(t => !t.is_deleted).length);
       console.log('📜 [SHIFT DETAILS] Deleted tasks (is_deleted=true):', allTasksData.filter(t => t.is_deleted).length);
@@ -1170,121 +1176,9 @@ export function ShiftDetailsDrawer({ shift, onClose, onEditShift, highlightBinId
                 </div>
               )
             ) : activeTab === 'timeline' ? (
-              // Timeline View
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-4">Activity Timeline</h3>
-                {loading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                  </div>
-                ) : (
-                  <div className="relative">
-                    {/* Timeline Line */}
-                    <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200" />
-
-                    {(() => {
-                      // Create timeline events from all tasks
-                      const events = [];
-
-                      // Add shift start event
-                      if (shift.start_time) {
-                        events.push({
-                          type: 'shift_start',
-                          time: shift.start_time,
-                          label: 'Shift started',
-                          color: 'blue'
-                        });
-                      }
-
-                      // Add task completion events
-                      allTasks.forEach(task => {
-                        if (task.is_completed === 1 && task.completed_at) {
-                          events.push({
-                            type: task.skipped ? 'task_skipped' : 'task_completed',
-                            time: task.completed_at,
-                            label: task.skipped ? `Skipped ${getTaskLabel(task)}` : `Completed ${getTaskLabel(task)}`,
-                            subtitle: getTaskSubtitle(task),
-                            color: task.skipped ? 'orange' : 'green'
-                          });
-                        }
-
-                        // Add task removal events
-                        if (task.is_deleted && task.deleted_at) {
-                          events.push({
-                            type: 'task_removed',
-                            time: task.deleted_at,
-                            label: `Removed ${getTaskLabel(task)}`,
-                            subtitle: task.deletion_reason || 'Removed by manager',
-                            color: 'red'
-                          });
-                        }
-                      });
-
-                      // Add shift end event
-                      if (shift.end_time) {
-                        events.push({
-                          type: 'shift_end',
-                          time: shift.end_time,
-                          label: 'Shift ended',
-                          color: 'gray'
-                        });
-                      }
-
-                      // Sort events by time (most recent first)
-                      events.sort((a, b) => b.time - a.time);
-
-                      return events.length === 0 ? (
-                        <div className="bg-gray-50 rounded-lg p-6 text-center border border-gray-200">
-                          <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                          <p className="text-sm text-gray-600">No activity yet</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4 pl-8">
-                          {events.map((event, index) => {
-                            const eventTime = new Date(event.time * 1000);
-                            const formattedTime = eventTime.toLocaleString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              hour12: true
-                            });
-
-                            const colorClasses = {
-                              blue: 'bg-blue-500',
-                              green: 'bg-green-500',
-                              orange: 'bg-orange-500',
-                              red: 'bg-red-500',
-                              gray: 'bg-gray-500'
-                            };
-
-                            return (
-                              <div key={index} className="relative">
-                                {/* Timeline Dot */}
-                                <div className={`absolute -left-8 w-4 h-4 rounded-full border-2 border-white ${colorClasses[event.color as keyof typeof colorClasses]}`} />
-
-                                {/* Event Card */}
-                                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="flex-1">
-                                      <p className="font-medium text-gray-900">{event.label}</p>
-                                      {event.subtitle && (
-                                        <p className="text-sm text-gray-500 mt-0.5">{event.subtitle}</p>
-                                      )}
-                                    </div>
-                                    <div className="flex-shrink-0">
-                                      <p className="text-xs text-gray-500">{formattedTime}</p>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
+                <ShiftActivityTimeline startedAt={shift.start_time} tasks={allTasks} edits={edits} loading={loading} />
               </div>
             ) : null}
           </div>

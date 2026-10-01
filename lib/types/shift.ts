@@ -33,6 +33,7 @@ export interface Shift {
   optimization_metadata?: OptimizationMetadata; // Added for HERE Maps optimization data
   total_distance_miles?: number; // Computed field from backend (km * 0.621371)
   estimated_completion_time?: number; // Computed field from backend (Unix timestamp)
+  start_time?: number | null; // When the driver started (Unix seconds); null until then
 }
 
 export interface ShiftBin {
